@@ -33,8 +33,22 @@ Il n'existe pas encore de conversion implicite entre `Int`, `Byte` et `Double`,
 mais un littéral entier est accepté dans une expression `Double` et un littéral
 est accepté comme `Byte` lorsqu'il tient dans l'intervalle attendu.
 
+`Bool` représente une valeur logique et n'accepte que les deux littéraux `true` et
+`false` :
+
+```text
+val actif : Bool = true
+var termine : Bool = false
+termine = actif
+```
+
+Un `Bool` occupe un octet sur la stack. Il n'existe aucune conversion implicite
+avec les types numériques. Les opérateurs booléens seront ajoutés ultérieurement ;
+les opérateurs arithmétiques sont donc refusés sur `Bool`.
+
 Un identifiant commence par une lettre ou `_`, puis contient des lettres, chiffres
-ou `_`. Les mots `val`, `var`, `def`, `Int`, `Byte` et `Double` sont réservés. Un identifiant
+ou `_`. Les mots `val`, `var`, `def`, `Int`, `Byte`, `Double`, `Bool`, `true` et
+`false` sont réservés. Un identifiant
 ne peut jamais être redéclaré. Une déclaration `val` est
 immuable, tandis qu'une déclaration `var` peut être réaffectée sans créer un
 nouveau slot sur la stack :

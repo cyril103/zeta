@@ -6,6 +6,7 @@ a = a + 1
 val resultat : Int = addition(i, doubleA - 1)
 val octet : Byte = 244
 val pi : Double = 31415e-4
+val actif : Bool = true
 
 def main () : Int = {
     0

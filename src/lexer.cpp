@@ -90,6 +90,9 @@ std::vector<Token> Lexer::scan() {
             if (text == "Int") kind = TokenKind::IntType;
             if (text == "Byte") kind = TokenKind::ByteType;
             if (text == "Double") kind = TokenKind::DoubleType;
+            if (text == "Bool") kind = TokenKind::BoolType;
+            if (text == "true") kind = TokenKind::True;
+            if (text == "false") kind = TokenKind::False;
             add(kind, std::move(text), start);
             continue;
         }

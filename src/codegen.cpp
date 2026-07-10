@@ -8,7 +8,7 @@
 namespace {
 std::size_t align16(std::size_t value) { return (value + 15U) & ~std::size_t{15U}; }
 std::size_t typeSize(ValueType type) {
-    if (type == ValueType::Byte) return 1U;
+    if (type == ValueType::Byte || type == ValueType::Bool) return 1U;
     return type == ValueType::Double ? 8U : 4U;
 }
 std::size_t valueSize(ValueType type) { return type == ValueType::Double ? 8U : 4U; }
@@ -64,7 +64,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 if (item.type == ValueType::Double) {
                     out << "    movsd xmm0, qword [rbp-" << slotOffset(program, item.slot) << "]\n"
                         << "    movsd qword [rbp-" << valueOffset(program, item.output) << "], xmm0\n";
-                } else if (item.type == ValueType::Byte) {
+                } else if (item.type == ValueType::Byte || item.type == ValueType::Bool) {
                     out << "    movzx eax, byte [rbp-" << slotOffset(program, item.slot) << "]\n";
                     out << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
                 } else {
@@ -112,9 +112,9 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         << "    movsd qword [rbp-" << slotOffset(program, item.slot) << "], xmm0\n";
                 } else {
                     out << "    mov eax, dword [rbp-" << valueOffset(program, item.value) << "]\n"
-                        << "    mov " << (item.type == ValueType::Byte ? "byte" : "dword")
+                        << "    mov " << (item.type == ValueType::Byte || item.type == ValueType::Bool ? "byte" : "dword")
                         << " [rbp-" << slotOffset(program, item.slot) << "], "
-                        << (item.type == ValueType::Byte ? "al\n" : "eax\n");
+                        << (item.type == ValueType::Byte || item.type == ValueType::Bool ? "al\n" : "eax\n");
                 }
             }
         }, instruction);

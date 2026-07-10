@@ -1,0 +1,4 @@
+def identite (valeur : Bool) : Bool = valeur
+val entier : Int = 1
+val invalide : Bool = identite(entier)
+def main () : Int = 0

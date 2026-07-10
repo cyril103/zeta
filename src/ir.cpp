@@ -91,6 +91,10 @@ ValueType IrGenerator::validateExpression(
     const ValueType actual = std::visit([&](const auto& node) -> ValueType {
         using T = std::decay_t<decltype(node)>;
         if constexpr (std::is_same_v<T, IntegerExpr>) {
+            if (expected == ValueType::Bool) {
+                throw CompileError(expressionNode.location,
+                                   "un Bool doit être écrit avec 'true' ou 'false'");
+            }
             if (expected == ValueType::Byte && node.value > 255) {
                 throw CompileError(expressionNode.location,
                                    "le littéral " + std::to_string(node.value) +
@@ -99,6 +103,8 @@ ValueType IrGenerator::validateExpression(
             return expected;
         } else if constexpr (std::is_same_v<T, DoubleExpr>) {
             return ValueType::Double;
+        } else if constexpr (std::is_same_v<T, BoolExpr>) {
+            return ValueType::Bool;
         } else if constexpr (std::is_same_v<T, NameExpr>) {
             const auto local = locals.find(node.name);
             if (!parameters.contains(node.name) && local == locals.end() &&
@@ -143,9 +149,17 @@ ValueType IrGenerator::validateExpression(
             }
             return declaration->type;
         } else if constexpr (std::is_same_v<T, UnaryExpr>) {
+            if (expected == ValueType::Bool) {
+                throw CompileError(expressionNode.location,
+                                   "les opérateurs arithmétiques ne s'appliquent pas à Bool");
+            }
             validateExpression(*node.operand, expected, parameters, locals);
             return expected;
         } else if constexpr (std::is_same_v<T, BinaryExpr>) {
+            if (expected == ValueType::Bool) {
+                throw CompileError(expressionNode.location,
+                                   "les opérateurs arithmétiques ne s'appliquent pas à Bool");
+            }
             validateExpression(*node.left, expected, parameters, locals);
             validateExpression(*node.right, expected, parameters, locals);
             return expected;
@@ -231,6 +245,10 @@ ValueId IrGenerator::expression(
         } else if constexpr (std::is_same_v<T, DoubleExpr>) {
             const ValueId output = nextValue(ValueType::Double);
             ir_.instructions.push_back(IrDoubleConst{output, node.value});
+            return output;
+        } else if constexpr (std::is_same_v<T, BoolExpr>) {
+            const ValueId output = nextValue(ValueType::Bool);
+            ir_.instructions.push_back(IrConst{output, node.value ? 1 : 0, ValueType::Bool});
             return output;
         } else if constexpr (std::is_same_v<T, NameExpr>) {
             if (const auto parameter = parameters.find(node.name);
@@ -327,7 +345,8 @@ std::string IrGenerator::print(const IrProgram& program) {
     const auto suffix = [](ValueType type) {
         if (type == ValueType::Int) return "i32";
         if (type == ValueType::Byte) return "u8";
-        return "f64";
+        if (type == ValueType::Double) return "f64";
+        return "i1";
     };
     out << "module {\n";
     for (std::size_t i = 0; i < program.slots.size(); ++i) {
@@ -338,8 +357,8 @@ std::string IrGenerator::print(const IrProgram& program) {
         std::visit([&](const auto& item) {
             using T = std::decay_t<decltype(item)>;
             if constexpr (std::is_same_v<T, IrConst>)
-                out << "  $" << item.output << " = const."
-                    << (item.type == ValueType::Int ? "i32 " : "u8 ") << item.value << '\n';
+                out << "  $" << item.output << " = const." << suffix(item.type)
+                    << ' ' << item.value << '\n';
             else if constexpr (std::is_same_v<T, IrDoubleConst>)
                 out << "  $" << item.output << " = const.f64 " << item.value << '\n';
             else if constexpr (std::is_same_v<T, IrLoad>)

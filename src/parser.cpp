@@ -24,6 +24,7 @@ ValueType Parser::consumeType(const std::string& message) {
     if (match(TokenKind::IntType)) return ValueType::Int;
     if (match(TokenKind::ByteType)) return ValueType::Byte;
     if (match(TokenKind::DoubleType)) return ValueType::Double;
+    if (match(TokenKind::BoolType)) return ValueType::Bool;
     throw CompileError(peek().location, message + ", reçu " + tokenName(peek().kind));
 }
 
@@ -76,7 +77,7 @@ Declaration Parser::declaration(BindingKind kind) {
                                                      "nom de paramètre attendu");
                 consume(TokenKind::Colon, "':' attendu après le paramètre");
                 const ValueType parameterType = consumeType(
-                    "type 'Int', 'Byte' ou 'Double' attendu pour le paramètre");
+                    "type 'Int', 'Byte', 'Double' ou 'Bool' attendu pour le paramètre");
                 parameters.push_back(Parameter{parameterName.location,
                                                parameterName.text,
                                                parameterType});
@@ -85,7 +86,7 @@ Declaration Parser::declaration(BindingKind kind) {
         consume(TokenKind::RightParen, "')' attendue après les paramètres");
     }
     consume(TokenKind::Colon, "':' attendu après l'identifiant");
-    const ValueType type = consumeType("type 'Int', 'Byte' ou 'Double' attendu");
+    const ValueType type = consumeType("type 'Int', 'Byte', 'Double' ou 'Bool' attendu");
     consume(TokenKind::Equal, "'=' attendu après le type");
     return Declaration{start.location, name.text, type, kind, callable,
                        std::move(parameters), expression()};
@@ -156,6 +157,11 @@ ExprPtr Parser::primary() {
             throw CompileError(token.location, "nombre Double invalide ou hors limites");
         }
         return std::make_unique<Expression>(Expression{token.location, DoubleExpr{value}});
+    }
+    if (match(TokenKind::True) || match(TokenKind::False)) {
+        const Token token = previous();
+        return std::make_unique<Expression>(Expression{
+            token.location, BoolExpr{token.kind == TokenKind::True}});
     }
     if (match(TokenKind::Identifier)) {
         const Token token = previous();

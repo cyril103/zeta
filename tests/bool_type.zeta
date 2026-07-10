@@ -1,0 +1,11 @@
+def identite (valeur : Bool) : Bool = valeur
+
+val actif : Bool = true
+var termine : Bool = false
+termine = identite(actif)
+def toujoursVrai : Bool = true
+
+def main () : Int = {
+    val local : Bool = toujoursVrai
+    0
+}
