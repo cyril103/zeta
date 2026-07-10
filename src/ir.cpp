@@ -40,7 +40,7 @@ IrProgram IrGenerator::generate(const Program& program) {
                     ir_.slots.push_back(IrSlot{node.name, node.type});
                     ir_.instructions.push_back(IrStore{slot, value, node.type});
                 }
-            } else {
+            } else if constexpr (std::is_same_v<T, Assignment>) {
                 const auto found = symbols_.find(node.name);
                 if (found == symbols_.end()) {
                     throw CompileError(node.location,
@@ -56,6 +56,15 @@ IrProgram IrGenerator::generate(const Program& program) {
                 const ValueId value = expression(*node.value);
                 ir_.instructions.push_back(IrStore{found->second.slot, value,
                                                    found->second.declaration->type});
+            } else if constexpr (std::is_same_v<T, WhileStatement>) {
+                const std::unordered_map<std::string, ValueType> parameterTypes;
+                const std::unordered_map<std::string, const Declaration*> locals;
+                validateLoop(node, parameterTypes, locals);
+                const std::unordered_map<std::string, ValueId> parameterValues;
+                emitLoop(node, parameterValues);
+            } else {
+                throw CompileError(node.location,
+                                   "une expression seule n'est pas autorisée au niveau global");
             }
         }, statement.value);
     }
@@ -278,7 +287,7 @@ ValueType IrGenerator::validateExpression(
                         validateExpression(*item.initializer, item.type,
                                            visibleParameters, blockLocals);
                         blockLocals.emplace(item.name, &item);
-                    } else {
+                    } else if constexpr (std::is_same_v<S, Assignment>) {
                         if (parameters.contains(item.name)) {
                             throw CompileError(item.location,
                                                "le paramètre '" + item.name + "' est immuable");
@@ -297,6 +306,11 @@ ValueType IrGenerator::validateExpression(
                         }
                         validateExpression(*item.value, declaration->type,
                                            parameters, blockLocals);
+                    } else if constexpr (std::is_same_v<S, WhileStatement>) {
+                        validateLoop(item, parameters, blockLocals);
+                    } else if constexpr (std::is_same_v<S, Assignment>) {
+                        const ValueType type = inferType(*item.expression, parameters, blockLocals);
+                        validateExpression(*item.expression, type, parameters, blockLocals);
                     }
                 }, statement->value);
             }
@@ -316,6 +330,105 @@ ValueType IrGenerator::validateExpression(
     }
     expressionNode.inferredType = actual;
     return actual;
+}
+
+void IrGenerator::validateLoop(
+    const WhileStatement& loop,
+    const std::unordered_map<std::string, ValueType>& parameters,
+    const std::unordered_map<std::string, const Declaration*>& locals) const {
+    validateExpression(*loop.condition, ValueType::Bool, parameters, locals);
+    auto bodyLocals = locals;
+    for (const StatementPtr& statement : loop.body) {
+        std::visit([&](const auto& item) {
+            using T = std::decay_t<decltype(item)>;
+            if constexpr (std::is_same_v<T, Declaration>) {
+                if (parameters.contains(item.name) || bodyLocals.contains(item.name) ||
+                    symbols_.contains(item.name)) {
+                    throw CompileError(item.location,
+                                       "l'identifiant '" + item.name + "' est déjà défini");
+                }
+                std::unordered_map<std::string, ValueType> nestedParameters;
+                for (const Parameter& parameter : item.parameters) {
+                    if (!nestedParameters.emplace(parameter.name, parameter.type).second) {
+                        throw CompileError(parameter.location,
+                                           "paramètre '" + parameter.name +
+                                           "' déclaré plusieurs fois");
+                    }
+                }
+                auto visibleParameters = parameters;
+                for (const auto& [name, type] : nestedParameters)
+                    visibleParameters.insert_or_assign(name, type);
+                validateExpression(*item.initializer, item.type,
+                                   visibleParameters, bodyLocals);
+                bodyLocals.emplace(item.name, &item);
+            } else if constexpr (std::is_same_v<T, Assignment>) {
+                if (parameters.contains(item.name)) {
+                    throw CompileError(item.location,
+                                       "le paramètre '" + item.name + "' est immuable");
+                }
+                const auto local = bodyLocals.find(item.name);
+                const auto global = symbols_.find(item.name);
+                if (local == bodyLocals.end() && global == symbols_.end()) {
+                    throw CompileError(item.location,
+                                       "identifiant inconnu '" + item.name + "'");
+                }
+                const Declaration* declaration = local != bodyLocals.end()
+                    ? local->second : global->second.declaration;
+                if (declaration->kind != BindingKind::Var) {
+                    throw CompileError(item.location,
+                                       "l'identifiant '" + item.name + "' est immuable");
+                }
+                validateExpression(*item.value, declaration->type, parameters, bodyLocals);
+            } else if constexpr (std::is_same_v<T, WhileStatement>) {
+                validateLoop(item, parameters, bodyLocals);
+            } else {
+                const ValueType type = inferType(*item.expression, parameters, bodyLocals);
+                validateExpression(*item.expression, type, parameters, bodyLocals);
+            }
+        }, statement->value);
+    }
+}
+
+void IrGenerator::emitLoop(
+    const WhileStatement& loop,
+    const std::unordered_map<std::string, ValueId>& parameters) {
+    const std::size_t conditionLabel = nextLabel_++;
+    const std::size_t endLabel = nextLabel_++;
+    ir_.instructions.push_back(IrLabel{conditionLabel});
+    const ValueId condition = expression(*loop.condition, parameters);
+    ir_.instructions.push_back(IrBranch{condition, false, endLabel});
+
+    std::vector<std::string> localNames;
+    for (const StatementPtr& statement : loop.body) {
+        std::visit([&](const auto& item) {
+            using T = std::decay_t<decltype(item)>;
+            if constexpr (std::is_same_v<T, Declaration>) {
+                localNames.push_back(item.name);
+                if (item.kind == BindingKind::Def) {
+                    symbols_.emplace(item.name, Symbol{0, item.kind, &item});
+                } else {
+                    const ValueId value = expression(*item.initializer, parameters);
+                    const SlotId slot = ir_.slots.size();
+                    symbols_.emplace(item.name, Symbol{slot, item.kind, &item});
+                    ir_.slots.push_back(IrSlot{item.name, item.type});
+                    ir_.instructions.push_back(IrStore{slot, value, item.type});
+                }
+            } else if constexpr (std::is_same_v<T, Assignment>) {
+                const auto found = symbols_.find(item.name);
+                const ValueId value = expression(*item.value, parameters);
+                ir_.instructions.push_back(IrStore{found->second.slot, value,
+                                                   found->second.declaration->type});
+            } else if constexpr (std::is_same_v<T, WhileStatement>) {
+                emitLoop(item, parameters);
+            } else {
+                expression(*item.expression, parameters);
+            }
+        }, statement->value);
+    }
+    ir_.instructions.push_back(IrJump{conditionLabel});
+    ir_.instructions.push_back(IrLabel{endLabel});
+    for (auto name = localNames.rbegin(); name != localNames.rend(); ++name)
+        symbols_.erase(*name);
 }
 
 ValueId IrGenerator::expression(const Expression& expressionNode) {
@@ -420,7 +533,7 @@ ValueId IrGenerator::expression(
                             ir_.slots.push_back(IrSlot{item.name, item.type});
                             ir_.instructions.push_back(IrStore{slot, value, item.type});
                         }
-                    } else {
+                    } else if constexpr (std::is_same_v<S, Assignment>) {
                         if (parameters.contains(item.name)) {
                             throw CompileError(item.location,
                                                "le paramètre '" + item.name + "' est immuable");
@@ -433,6 +546,10 @@ ValueId IrGenerator::expression(
                         const ValueId value = expression(*item.value, parameters);
                         ir_.instructions.push_back(IrStore{found->second.slot, value,
                                                           found->second.declaration->type});
+                    } else if constexpr (std::is_same_v<S, WhileStatement>) {
+                        emitLoop(item, parameters);
+                    } else {
+                        expression(*item.expression, parameters);
                     }
                 }, statement->value);
             }

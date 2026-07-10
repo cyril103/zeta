@@ -65,6 +65,12 @@ private:
         const Expression& expression,
         const std::unordered_map<std::string, ValueType>& parameters,
         const std::unordered_map<std::string, const Declaration*>& locals) const;
+    void validateLoop(
+        const WhileStatement& loop,
+        const std::unordered_map<std::string, ValueType>& parameters,
+        const std::unordered_map<std::string, const Declaration*>& locals) const;
+    void emitLoop(const WhileStatement& loop,
+                  const std::unordered_map<std::string, ValueId>& parameters);
     ValueId expression(const Expression& expression);
     ValueId expression(const Expression& expression,
                        const std::unordered_map<std::string, ValueId>& parameters);

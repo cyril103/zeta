@@ -22,6 +22,8 @@ private:
     Statement statement();
     Declaration declaration(BindingKind kind);
     Assignment assignment();
+    WhileStatement whileStatement();
+    std::vector<StatementPtr> loopBody();
     ExprPtr expression();
     ExprPtr logicalOr();
     ExprPtr logicalAnd();

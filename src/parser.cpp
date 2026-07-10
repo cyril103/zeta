@@ -58,9 +58,49 @@ Statement Parser::statement() {
     if (match(TokenKind::Val)) return declaration(BindingKind::Val);
     if (match(TokenKind::Var)) return declaration(BindingKind::Var);
     if (match(TokenKind::Def)) return declaration(BindingKind::Def);
+    if (match(TokenKind::While)) return whileStatement();
     if (check(TokenKind::Identifier)) return assignment();
     throw CompileError(peek().location,
                        "instruction attendue ('val', 'var', 'def' ou affectation)");
+}
+
+WhileStatement Parser::whileStatement() {
+    const Token start = previous();
+    consume(TokenKind::LeftParen, "'(' attendue après 'while'");
+    expressionContinuation();
+    ExprPtr condition = expression();
+    expressionContinuation();
+    consume(TokenKind::RightParen, "')' attendue après le prédicat");
+    consume(TokenKind::Do, "'do' attendu après le prédicat de la boucle");
+    consume(TokenKind::LeftBrace, "'{' attendue après 'do'");
+    return WhileStatement{start.location, std::move(condition), loopBody()};
+}
+
+std::vector<StatementPtr> Parser::loopBody() {
+    std::vector<StatementPtr> body;
+    ++blockDepth_;
+    skipSeparators();
+    while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
+        const bool startsStatement = check(TokenKind::Val) || check(TokenKind::Var) ||
+            check(TokenKind::Def) || check(TokenKind::While) ||
+            (check(TokenKind::Identifier) && current_ + 1 < tokens_.size() &&
+             tokens_[current_ + 1].kind == TokenKind::Equal);
+        if (startsStatement) {
+            body.push_back(std::make_unique<Statement>(statement()));
+        } else {
+            const SourceLocation location = peek().location;
+            body.push_back(std::make_unique<Statement>(
+                ExpressionStatement{location, expression()}));
+        }
+        if (!check(TokenKind::RightBrace) && !match(TokenKind::Separator)) {
+            throw CompileError(peek().location,
+                               "fin de ligne ou ';' attendue dans le corps de la boucle");
+        }
+        skipSeparators();
+    }
+    consume(TokenKind::RightBrace, "'}' attendue à la fin de la boucle");
+    --blockDepth_;
+    return body;
 }
 
 Declaration Parser::declaration(BindingKind kind) {
@@ -273,7 +313,7 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
 
     while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
         const bool startsDeclaration = check(TokenKind::Val) || check(TokenKind::Var) ||
-                                       check(TokenKind::Def);
+                                       check(TokenKind::Def) || check(TokenKind::While);
         const bool startsAssignment = check(TokenKind::Identifier) &&
                                       current_ + 1 < tokens_.size() &&
                                       tokens_[current_ + 1].kind == TokenKind::Equal;

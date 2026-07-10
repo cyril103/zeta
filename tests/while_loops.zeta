@@ -1,0 +1,26 @@
+def main () : Int = {
+    var i : Int = 0
+    var somme : Int = 0
+
+    def incremente () : Int = {
+        i = i + 1
+        i
+    }
+
+    while (i < 10) do {
+        incremente()
+        somme = somme + i
+    }
+
+    var externe : Int = 0
+    while (externe < 3) do {
+        var interne : Int = 0
+        while (interne < 2) do {
+            interne = interne + 1
+            somme = somme + 1
+        }
+        externe = externe + 1
+    }
+
+    if (i == 10 && somme == 61 && externe == 3) 0 else 8
+}

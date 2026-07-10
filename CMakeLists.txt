@@ -111,6 +111,14 @@ if(BUILD_TESTING)
     add_test(NAME run_conditional_expressions COMMAND ${CMAKE_CURRENT_BINARY_DIR}/conditional-expressions)
     set_tests_properties(run_conditional_expressions PROPERTIES DEPENDS compile_conditional_expressions)
 
+    add_test(
+        NAME compile_while_loops
+        COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/while_loops.zeta
+                -o ${CMAKE_CURRENT_BINARY_DIR}/while-loops
+    )
+    add_test(NAME run_while_loops COMMAND ${CMAKE_CURRENT_BINARY_DIR}/while-loops)
+    set_tests_properties(run_while_loops PROPERTIES DEPENDS compile_while_loops)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -144,7 +152,11 @@ if(BUILD_TESTING)
             if_non_bool_predicate
             if_branch_type_mismatch
             if_missing_else
-            else_without_if)
+            else_without_if
+            while_non_bool_predicate
+            while_missing_do
+            while_scope
+            while_as_expression)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

@@ -19,6 +19,8 @@ enum class TokenKind {
     False,
     If,
     Else,
+    While,
+    Do,
     Colon,
     Comma,
     Equal,
@@ -65,6 +67,8 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::False: return "'false'";
     case TokenKind::If: return "'if'";
     case TokenKind::Else: return "'else'";
+    case TokenKind::While: return "'while'";
+    case TokenKind::Do: return "'do'";
     case TokenKind::Colon: return "':'";
     case TokenKind::Comma: return "','";
     case TokenKind::Equal: return "'='";

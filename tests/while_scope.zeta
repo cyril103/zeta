@@ -1,0 +1,8 @@
+def main () : Int = {
+    var i : Int = 0
+    while (i < 1) do {
+        val local : Int = 42
+        i = i + 1
+    }
+    local
+}

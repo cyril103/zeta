@@ -120,6 +120,8 @@ std::vector<Token> Lexer::scan() {
             if (text == "false") kind = TokenKind::False;
             if (text == "if") kind = TokenKind::If;
             if (text == "else") kind = TokenKind::Else;
+            if (text == "while") kind = TokenKind::While;
+            if (text == "do") kind = TokenKind::Do;
             add(kind, std::move(text), start);
             continue;
         }

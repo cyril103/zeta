@@ -75,8 +75,25 @@ Le prédicat doit être un `Bool`, `else` est obligatoire et toutes les branches
 doivent produire le type attendu par le contexte. Une seule branche est exécutée.
 Chaque branche peut être une expression simple, un autre `if` ou une expression-bloc.
 
+## Boucles
+
+`while` et `do` définissent une instruction de boucle :
+
+```text
+var i : Int = 0
+while (i < 10) do {
+    i = i + 1
+}
+```
+
+Le prédicat doit être un `Bool` et il est réévalué avant chaque itération. Le corps
+peut contenir déclarations, affectations, appels utilisés comme instructions et
+boucles imbriquées. Il possède sa propre portée : ses déclarations locales ne sont
+plus visibles après `}`. Contrairement à `if`, `while` n'est pas une expression et
+ne retourne aucune valeur.
+
 Un identifiant commence par une lettre ou `_`, puis contient des lettres, chiffres
-ou `_`. Les mots `val`, `var`, `def`, `if`, `else`, `Int`, `Byte`, `Double`,
+ou `_`. Les mots `val`, `var`, `def`, `if`, `else`, `while`, `do`, `Int`, `Byte`, `Double`,
 `Bool`, `true` et `false` sont réservés. Un identifiant
 ne peut jamais être redéclaré. Une déclaration `val` est
 immuable, tandis qu'une déclaration `var` peut être réaffectée sans créer un

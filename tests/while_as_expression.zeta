@@ -1,0 +1,5 @@
+def main () : Int = {
+    val resultat : Int = while (false) do {
+    }
+    resultat
+}
