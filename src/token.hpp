@@ -20,6 +20,8 @@ enum class TokenKind {
     Slash,
     LeftParen,
     RightParen,
+    LeftBrace,
+    RightBrace,
     Separator,
     End,
 };
@@ -47,6 +49,8 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::Slash: return "'/'";
     case TokenKind::LeftParen: return "'('";
     case TokenKind::RightParen: return "')'";
+    case TokenKind::LeftBrace: return "'{'";
+    case TokenKind::RightBrace: return "'}'";
     case TokenKind::Separator: return "une fin de ligne ou ';'";
     case TokenKind::End: return "la fin du fichier";
     }

@@ -23,6 +23,15 @@ void Parser::skipSeparators() {
     while (match(TokenKind::Separator)) {}
 }
 
+void Parser::expressionContinuation() {
+    if (!check(TokenKind::Separator)) return;
+    if (blockDepth_ == 0) {
+        throw CompileError(peek().location,
+                           "une expression sur plusieurs lignes doit être entre accolades");
+    }
+    skipSeparators();
+}
+
 Program Parser::parse() {
     Program program;
     skipSeparators();
@@ -86,6 +95,7 @@ ExprPtr Parser::addition() {
     ExprPtr expr = multiplication();
     while (match(TokenKind::Plus) || match(TokenKind::Minus)) {
         const Token op = previous();
+        expressionContinuation();
         ExprPtr right = multiplication();
         expr = std::make_unique<Expression>(Expression{
             op.location, BinaryExpr{op.text[0], std::move(expr), std::move(right)}});
@@ -97,6 +107,7 @@ ExprPtr Parser::multiplication() {
     ExprPtr expr = unary();
     while (match(TokenKind::Star) || match(TokenKind::Slash)) {
         const Token op = previous();
+        expressionContinuation();
         ExprPtr right = unary();
         expr = std::make_unique<Expression>(Expression{
             op.location, BinaryExpr{op.text[0], std::move(expr), std::move(right)}});
@@ -107,6 +118,7 @@ ExprPtr Parser::multiplication() {
 ExprPtr Parser::unary() {
     if (match(TokenKind::Minus) || match(TokenKind::Plus)) {
         const Token op = previous();
+        expressionContinuation();
         return std::make_unique<Expression>(Expression{
             op.location, UnaryExpr{op.text[0], unary()}});
     }
@@ -114,6 +126,9 @@ ExprPtr Parser::unary() {
 }
 
 ExprPtr Parser::primary() {
+    if (match(TokenKind::LeftBrace)) {
+        return blockExpression(previous().location);
+    }
     if (match(TokenKind::Integer)) {
         const Token token = previous();
         std::int64_t value{};
@@ -127,11 +142,18 @@ ExprPtr Parser::primary() {
         const Token token = previous();
         if (match(TokenKind::LeftParen)) {
             std::vector<ExprPtr> arguments;
+            expressionContinuation();
             if (!check(TokenKind::RightParen)) {
                 do {
                     arguments.push_back(expression());
-                } while (match(TokenKind::Comma));
+                    if (match(TokenKind::Comma)) {
+                        expressionContinuation();
+                    } else {
+                        break;
+                    }
+                } while (true);
             }
+            expressionContinuation();
             consume(TokenKind::RightParen, "')' attendue après les arguments");
             return std::make_unique<Expression>(Expression{
                 token.location, CallExpr{token.text, std::move(arguments)}});
@@ -139,9 +161,44 @@ ExprPtr Parser::primary() {
         return std::make_unique<Expression>(Expression{token.location, NameExpr{token.text}});
     }
     if (match(TokenKind::LeftParen)) {
+        expressionContinuation();
         ExprPtr expr = expression();
+        expressionContinuation();
         consume(TokenKind::RightParen, "')' attendue après l'expression");
         return expr;
     }
     throw CompileError(peek().location, "expression attendue");
+}
+
+ExprPtr Parser::blockExpression(SourceLocation location) {
+    ++blockDepth_;
+    std::vector<StatementPtr> statements;
+    skipSeparators();
+
+    while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
+        const bool startsDeclaration = check(TokenKind::Val) || check(TokenKind::Var) ||
+                                       check(TokenKind::Def);
+        const bool startsAssignment = check(TokenKind::Identifier) &&
+                                      current_ + 1 < tokens_.size() &&
+                                      tokens_[current_ + 1].kind == TokenKind::Equal;
+        if (!startsDeclaration && !startsAssignment) break;
+
+        statements.push_back(std::make_unique<Statement>(statement()));
+        if (!match(TokenKind::Separator)) {
+            throw CompileError(peek().location,
+                               "fin de ligne ou ';' attendue après l'instruction du bloc");
+        }
+        skipSeparators();
+    }
+
+    if (check(TokenKind::RightBrace)) {
+        throw CompileError(peek().location,
+                           "un bloc doit se terminer par une expression");
+    }
+    ExprPtr result = expression();
+    skipSeparators();
+    consume(TokenKind::RightBrace, "'}' attendue à la fin du bloc");
+    --blockDepth_;
+    return std::make_unique<Expression>(Expression{
+        location, BlockExpr{std::move(statements), std::move(result)}});
 }

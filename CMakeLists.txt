@@ -52,6 +52,14 @@ if(BUILD_TESTING)
     add_test(NAME run_functions COMMAND ${CMAKE_CURRENT_BINARY_DIR}/functions)
     set_tests_properties(run_functions PROPERTIES DEPENDS compile_functions)
 
+    add_test(
+        NAME compile_block_expressions
+        COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/block_expressions.zeta
+                -o ${CMAKE_CURRENT_BINARY_DIR}/block-expressions
+    )
+    add_test(NAME run_block_expressions COMMAND ${CMAKE_CURRENT_BINARY_DIR}/block-expressions)
+    set_tests_properties(run_block_expressions PROPERTIES DEPENDS compile_block_expressions)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -62,7 +70,10 @@ if(BUILD_TESTING)
             function_duplicate_parameter
             function_wrong_arity
             call_non_function
-            function_without_call)
+            function_without_call
+            block_missing_result
+            block_scope
+            multiline_without_braces)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

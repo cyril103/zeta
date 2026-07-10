@@ -51,7 +51,7 @@ IrProgram IrGenerator::generate(const Program& program) {
                 const ValueId value = expression(*node.value);
                 ir_.instructions.push_back(IrStore{found->second.slot, value});
             }
-        }, statement);
+        }, statement.value);
     }
     return std::move(ir_);
 }
@@ -59,28 +59,41 @@ IrProgram IrGenerator::generate(const Program& program) {
 void IrGenerator::validateExpression(
     const Expression& expressionNode,
     const std::unordered_set<std::string>& parameters) const {
+    const std::unordered_map<std::string, const Declaration*> locals;
+    validateExpression(expressionNode, parameters, locals);
+}
+
+void IrGenerator::validateExpression(
+    const Expression& expressionNode,
+    const std::unordered_set<std::string>& parameters,
+    const std::unordered_map<std::string, const Declaration*>& locals) const {
     std::visit([&](const auto& node) {
         using T = std::decay_t<decltype(node)>;
         if constexpr (std::is_same_v<T, NameExpr>) {
-            if (!parameters.contains(node.name) && !symbols_.contains(node.name)) {
+            const auto local = locals.find(node.name);
+            if (!parameters.contains(node.name) && local == locals.end() &&
+                !symbols_.contains(node.name)) {
                 throw CompileError(expressionNode.location,
                                    "identifiant inconnu '" + node.name + "'");
             }
             if (!parameters.contains(node.name)) {
-                const Symbol& symbol = symbols_.at(node.name);
-                if (symbol.kind == BindingKind::Def && symbol.declaration->callable) {
+                const Declaration* declaration = local != locals.end()
+                    ? local->second : symbols_.at(node.name).declaration;
+                if (declaration->kind == BindingKind::Def && declaration->callable) {
                     throw CompileError(expressionNode.location,
                                        "la fonction '" + node.name + "' doit être appelée");
                 }
             }
         } else if constexpr (std::is_same_v<T, CallExpr>) {
+            const auto local = locals.find(node.name);
             const auto found = symbols_.find(node.name);
-            if (found == symbols_.end()) {
+            if (local == locals.end() && found == symbols_.end()) {
                 throw CompileError(expressionNode.location,
                                    "fonction inconnue '" + node.name + "'");
             }
-            const Declaration* declaration = found->second.declaration;
-            if (found->second.kind != BindingKind::Def || !declaration->callable) {
+            const Declaration* declaration = local != locals.end()
+                ? local->second : found->second.declaration;
+            if (declaration->kind != BindingKind::Def || !declaration->callable) {
                 throw CompileError(expressionNode.location,
                                    "'" + node.name + "' n'est pas une fonction");
             }
@@ -91,13 +104,58 @@ void IrGenerator::validateExpression(
                                    " argument(s), reçu " + std::to_string(node.arguments.size()));
             }
             for (const ExprPtr& argument : node.arguments) {
-                validateExpression(*argument, parameters);
+                validateExpression(*argument, parameters, locals);
             }
         } else if constexpr (std::is_same_v<T, UnaryExpr>) {
-            validateExpression(*node.operand, parameters);
+            validateExpression(*node.operand, parameters, locals);
         } else if constexpr (std::is_same_v<T, BinaryExpr>) {
-            validateExpression(*node.left, parameters);
-            validateExpression(*node.right, parameters);
+            validateExpression(*node.left, parameters, locals);
+            validateExpression(*node.right, parameters, locals);
+        } else if constexpr (std::is_same_v<T, BlockExpr>) {
+            auto blockLocals = locals;
+            for (const StatementPtr& statement : node.statements) {
+                std::visit([&](const auto& item) {
+                    using S = std::decay_t<decltype(item)>;
+                    if constexpr (std::is_same_v<S, Declaration>) {
+                        if (parameters.contains(item.name) || blockLocals.contains(item.name) ||
+                            symbols_.contains(item.name)) {
+                            throw CompileError(item.location,
+                                               "l'identifiant '" + item.name + "' est déjà défini");
+                        }
+                        std::unordered_set<std::string> nestedParameters;
+                        for (const Parameter& parameter : item.parameters) {
+                            if (!nestedParameters.emplace(parameter.name).second) {
+                                throw CompileError(parameter.location,
+                                                   "paramètre '" + parameter.name +
+                                                   "' déclaré plusieurs fois");
+                            }
+                        }
+                        auto visibleParameters = parameters;
+                        visibleParameters.insert(nestedParameters.begin(), nestedParameters.end());
+                        validateExpression(*item.initializer, visibleParameters, blockLocals);
+                        blockLocals.emplace(item.name, &item);
+                    } else {
+                        if (parameters.contains(item.name)) {
+                            throw CompileError(item.location,
+                                               "le paramètre '" + item.name + "' est immuable");
+                        }
+                        const auto localTarget = blockLocals.find(item.name);
+                        const auto globalTarget = symbols_.find(item.name);
+                        if (localTarget == blockLocals.end() && globalTarget == symbols_.end()) {
+                            throw CompileError(item.location,
+                                               "identifiant inconnu '" + item.name + "'");
+                        }
+                        const Declaration* declaration = localTarget != blockLocals.end()
+                            ? localTarget->second : globalTarget->second.declaration;
+                        if (declaration->kind != BindingKind::Var) {
+                            throw CompileError(item.location,
+                                               "l'identifiant '" + item.name + "' est immuable");
+                        }
+                        validateExpression(*item.value, parameters, blockLocals);
+                    }
+                }, statement->value);
+            }
+            validateExpression(*node.result, parameters, blockLocals);
         }
     }, expressionNode.value);
 }
@@ -144,10 +202,10 @@ ValueId IrGenerator::expression(
                                    "fonction invalide '" + node.name + "'");
             }
             const Declaration& function = *found->second.declaration;
-            std::unordered_map<std::string, ValueId> arguments;
+            std::unordered_map<std::string, ValueId> arguments = parameters;
             for (std::size_t i = 0; i < node.arguments.size(); ++i) {
-                arguments.emplace(function.parameters[i].name,
-                                  expression(*node.arguments[i], parameters));
+                arguments.insert_or_assign(function.parameters[i].name,
+                                           expression(*node.arguments[i], parameters));
             }
             return expression(*function.initializer, arguments);
         } else if constexpr (std::is_same_v<T, UnaryExpr>) {
@@ -155,12 +213,48 @@ ValueId IrGenerator::expression(
             const ValueId output = nextValue();
             ir_.instructions.push_back(IrUnary{output, node.op, operand});
             return output;
-        } else {
+        } else if constexpr (std::is_same_v<T, BinaryExpr>) {
             const ValueId left = expression(*node.left, parameters);
             const ValueId right = expression(*node.right, parameters);
             const ValueId output = nextValue();
             ir_.instructions.push_back(IrBinary{output, node.op, left, right});
             return output;
+        } else {
+            std::vector<std::string> localNames;
+            for (const StatementPtr& statement : node.statements) {
+                std::visit([&](const auto& item) {
+                    using S = std::decay_t<decltype(item)>;
+                    if constexpr (std::is_same_v<S, Declaration>) {
+                        localNames.push_back(item.name);
+                        if (item.kind == BindingKind::Def) {
+                            symbols_.emplace(item.name, Symbol{0, item.kind, &item});
+                        } else {
+                            const ValueId value = expression(*item.initializer, parameters);
+                            const SlotId slot = ir_.slots.size();
+                            symbols_.emplace(item.name, Symbol{slot, item.kind, &item});
+                            ir_.slots.push_back(IrSlot{item.name, item.type});
+                            ir_.instructions.push_back(IrStore{slot, value});
+                        }
+                    } else {
+                        if (parameters.contains(item.name)) {
+                            throw CompileError(item.location,
+                                               "le paramètre '" + item.name + "' est immuable");
+                        }
+                        const auto found = symbols_.find(item.name);
+                        if (found == symbols_.end() || found->second.kind != BindingKind::Var) {
+                            throw CompileError(item.location,
+                                               "affectation invalide de '" + item.name + "'");
+                        }
+                        const ValueId value = expression(*item.value, parameters);
+                        ir_.instructions.push_back(IrStore{found->second.slot, value});
+                    }
+                }, statement->value);
+            }
+            const ValueId result = expression(*node.result, parameters);
+            for (auto name = localNames.rbegin(); name != localNames.rend(); ++name) {
+                symbols_.erase(*name);
+            }
+            return result;
         }
     }, expressionNode.value);
 }

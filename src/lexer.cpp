@@ -47,6 +47,8 @@ std::vector<Token> Lexer::scan() {
         case '/': add(TokenKind::Slash, "/", start); continue;
         case '(': add(TokenKind::LeftParen, "(", start); continue;
         case ')': add(TokenKind::RightParen, ")", start); continue;
+        case '{': add(TokenKind::LeftBrace, "{", start); continue;
+        case '}': add(TokenKind::RightBrace, "}", start); continue;
         case ';': add(TokenKind::Separator, ";", start); continue;
         default: break;
         }

@@ -40,6 +40,10 @@ private:
 
     void validateExpression(const Expression& expression,
                             const std::unordered_set<std::string>& parameters = {}) const;
+    void validateExpression(
+        const Expression& expression,
+        const std::unordered_set<std::string>& parameters,
+        const std::unordered_map<std::string, const Declaration*>& locals) const;
     ValueId expression(const Expression& expression);
     ValueId expression(const Expression& expression,
                        const std::unordered_map<std::string, ValueId>& parameters);

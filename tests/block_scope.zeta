@@ -1,0 +1,5 @@
+val resultat : Int = {
+    val local : Int = 42
+    local
+}
+val fuite : Int = local

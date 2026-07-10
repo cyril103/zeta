@@ -49,6 +49,23 @@ argument est évalué une fois, puis lié au paramètre correspondant. Les fonct
 peuvent appeler des fonctions déclarées auparavant et peuvent ne prendre aucun
 paramètre avec `def zero () : Int = 0`.
 
+## Expressions sur plusieurs lignes
+
+Une expression sur plusieurs lignes doit être placée entre accolades. Le bloc
+peut contenir des déclarations et des affectations, puis doit se terminer par une
+expression. Cette dernière fournit la valeur du bloc :
+
+```text
+def add (a : Int, b : Int) : Int = {
+    val res : Int = a + b
+    res
+}
+```
+
+Les identifiants déclarés dans un bloc sont locaux à ce bloc. Les `val` et `def`
+locales restent immuables, tandis que les `var` locales peuvent être réaffectées.
+Les instructions sont séparées par un retour à la ligne ou `;`.
+
 Les expressions acceptent les littéraux, les valeurs précédentes, les parenthèses,
 les signes unaires `+`/`-` et les opérateurs `+`, `-`, `*`, `/` avec leur priorité
 habituelle. Les déclarations sont séparées par un retour à la ligne ou `;`.

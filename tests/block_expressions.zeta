@@ -1,0 +1,20 @@
+def add (a : Int, b : Int) : Int = {
+    val res : Int = a +
+        b
+    res
+}
+
+def calcule (depart : Int) : Int = {
+    var resultat : Int = depart
+    resultat = resultat * 2
+    def incremente (valeur : Int) : Int = valeur + 1
+    incremente(resultat)
+}
+
+val somme : Int = {
+    add(
+        2,
+        3
+    )
+}
+val calcul : Int = calcule(5)
