@@ -1,4 +1,5 @@
 val i : Int = 2 + 2
 var a : Int = 5
+def doubleA : Int = a * 2
 a = a + 1
-val resultat : Int = i * (a - 1)
+val resultat : Int = i * (doubleA - 1)

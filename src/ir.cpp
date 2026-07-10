@@ -16,21 +16,29 @@ IrProgram IrGenerator::generate(const Program& program) {
                     throw CompileError(node.location,
                                        "l'identifiant '" + node.name + "' est déjà défini");
                 }
-                // The initializer cannot refer to the value currently being declared.
-                const ValueId value = expression(*node.initializer);
-                const SlotId slot = ir_.slots.size();
-                symbols_.emplace(node.name, Symbol{slot, node.isMutable});
-                ir_.slots.push_back(IrSlot{node.name, node.type});
-                ir_.instructions.push_back(IrStore{slot, value});
+                // A declaration cannot refer to itself or to a later declaration.
+                validateExpression(*node.initializer);
+                if (node.kind == BindingKind::Def) {
+                    symbols_.emplace(node.name,
+                                     Symbol{0, node.kind, node.initializer.get()});
+                } else {
+                    const ValueId value = expression(*node.initializer);
+                    const SlotId slot = ir_.slots.size();
+                    symbols_.emplace(node.name, Symbol{slot, node.kind, nullptr});
+                    ir_.slots.push_back(IrSlot{node.name, node.type});
+                    ir_.instructions.push_back(IrStore{slot, value});
+                }
             } else {
                 const auto found = symbols_.find(node.name);
                 if (found == symbols_.end()) {
                     throw CompileError(node.location,
                                        "identifiant inconnu '" + node.name + "'");
                 }
-                if (!found->second.isMutable) {
-                    throw CompileError(node.location,
-                                       "la val '" + node.name + "' est immuable");
+                if (found->second.kind != BindingKind::Var) {
+                    const std::string message = found->second.kind == BindingKind::Def
+                        ? "la définition '" + node.name + "' est immuable"
+                        : "la val '" + node.name + "' est immuable";
+                    throw CompileError(node.location, message);
                 }
                 const ValueId value = expression(*node.value);
                 ir_.instructions.push_back(IrStore{found->second.slot, value});
@@ -38,6 +46,23 @@ IrProgram IrGenerator::generate(const Program& program) {
         }, statement);
     }
     return std::move(ir_);
+}
+
+void IrGenerator::validateExpression(const Expression& expressionNode) const {
+    std::visit([&](const auto& node) {
+        using T = std::decay_t<decltype(node)>;
+        if constexpr (std::is_same_v<T, NameExpr>) {
+            if (!symbols_.contains(node.name)) {
+                throw CompileError(expressionNode.location,
+                                   "identifiant inconnu '" + node.name + "'");
+            }
+        } else if constexpr (std::is_same_v<T, UnaryExpr>) {
+            validateExpression(*node.operand);
+        } else if constexpr (std::is_same_v<T, BinaryExpr>) {
+            validateExpression(*node.left);
+            validateExpression(*node.right);
+        }
+    }, expressionNode.value);
 }
 
 ValueId IrGenerator::expression(const Expression& expressionNode) {
@@ -52,6 +77,9 @@ ValueId IrGenerator::expression(const Expression& expressionNode) {
             if (found == symbols_.end()) {
                 throw CompileError(expressionNode.location,
                                    "val inconnue '" + node.name + "'");
+            }
+            if (found->second.kind == BindingKind::Def) {
+                return expression(*found->second.definition);
             }
             const ValueId output = nextValue();
             ir_.instructions.push_back(IrLoad{output, found->second.slot});

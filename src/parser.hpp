@@ -18,7 +18,7 @@ private:
     const Token& consume(TokenKind kind, const std::string& message);
     void skipSeparators();
     Statement statement();
-    Declaration declaration(bool isMutable);
+    Declaration declaration(BindingKind kind);
     Assignment assignment();
     ExprPtr expression();
     ExprPtr addition();

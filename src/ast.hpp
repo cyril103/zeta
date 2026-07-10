@@ -21,11 +21,13 @@ struct Expression {
     std::variant<IntegerExpr, NameExpr, UnaryExpr, BinaryExpr> value;
 };
 
+enum class BindingKind { Val, Var, Def };
+
 struct Declaration {
     SourceLocation location;
     std::string name;
     std::string type;
-    bool isMutable;
+    BindingKind kind;
     ExprPtr initializer;
 };
 

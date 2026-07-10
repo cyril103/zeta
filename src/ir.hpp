@@ -33,9 +33,11 @@ public:
 private:
     struct Symbol {
         SlotId slot;
-        bool isMutable;
+        BindingKind kind;
+        const Expression* definition;
     };
 
+    void validateExpression(const Expression& expression) const;
     ValueId expression(const Expression& expression);
     ValueId nextValue();
     IrProgram ir_;

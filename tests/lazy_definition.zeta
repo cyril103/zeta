@@ -1,0 +1,7 @@
+var base : Int = 2
+def double : Int = base * 2
+base = 5
+val resultat : Int = double + double
+
+// Cette expression ne doit jamais produire de code puisqu'elle n'est pas utilisée.
+def jamaisEvalue : Int = 1 / 0

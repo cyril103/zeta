@@ -36,7 +36,21 @@ if(BUILD_TESTING)
     add_test(NAME run_mutable_assignment COMMAND ${CMAKE_CURRENT_BINARY_DIR}/mutable-assignment)
     set_tests_properties(run_mutable_assignment PROPERTIES DEPENDS compile_mutable_assignment)
 
-    foreach(invalid_case IN ITEMS redefinition assignment invalid_identifier unknown_assignment)
+    add_test(
+        NAME compile_lazy_definition
+        COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/lazy_definition.zeta
+                -o ${CMAKE_CURRENT_BINARY_DIR}/lazy-definition
+    )
+    add_test(NAME run_lazy_definition COMMAND ${CMAKE_CURRENT_BINARY_DIR}/lazy-definition)
+    set_tests_properties(run_lazy_definition PROPERTIES DEPENDS compile_lazy_definition)
+
+    foreach(invalid_case IN ITEMS
+            redefinition
+            assignment
+            invalid_identifier
+            unknown_assignment
+            definition_assignment
+            definition_unknown_reference)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta
