@@ -1,0 +1,23 @@
+val entierNegatif : Int = -5
+val entierPositif : Int = 10
+val intInferieur : Bool = entierNegatif < entierPositif
+val intSuperieurOuEgal : Bool = entierPositif >= 10
+val intDifferent : Bool = entierNegatif != entierPositif
+
+val petitOctet : Byte = 1
+val grandOctet : Byte = 255
+val byteInferieur : Bool = petitOctet < grandOctet
+
+val pi : Double = 3.1415
+val doubleEgal : Bool = pi == 31415e-4
+val doubleSuperieur : Bool = pi > 3.0
+
+val boolEgal : Bool = true == true
+val boolDifferent : Bool = true != false
+val logique : Bool = !false && true || false
+
+// Le membre droit ne doit pas être exécuté.
+val courtCircuitEt : Bool = false && (1 / 0 == 0)
+val courtCircuitOu : Bool = true || (1 / 0 == 0)
+
+def main () : Int = 0

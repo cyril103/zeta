@@ -74,29 +74,66 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
             } else if constexpr (std::is_same_v<T, IrUnary>) {
                 if (item.type == ValueType::Double) {
                     out << "    mov rax, qword [rbp-" << valueOffset(program, item.operand) << "]\n";
-                    if (item.op == '-') out << "    btc rax, 63\n";
+                    if (item.op == "-") out << "    btc rax, 63\n";
                     out << "    mov qword [rbp-" << valueOffset(program, item.output) << "], rax\n";
                 } else {
                     out << "    mov eax, dword [rbp-" << valueOffset(program, item.operand) << "]\n";
-                    if (item.op == '-') out << "    neg eax\n";
+                    if (item.op == "-") out << "    neg eax\n";
+                    if (item.op == "!") out << "    xor eax, 1\n";
                     if (item.type == ValueType::Byte) out << "    and eax, 255\n";
                     out << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
                 }
             } else if constexpr (std::is_same_v<T, IrBinary>) {
+                const bool comparison = item.op == "==" || item.op == "!=" ||
+                    item.op == "<" || item.op == "<=" || item.op == ">" || item.op == ">=";
+                if (item.op == "&&" || item.op == "||") {
+                    out << "    mov eax, dword [rbp-" << valueOffset(program, item.left) << "]\n"
+                        << "    " << (item.op == "&&" ? "and" : "or")
+                        << " eax, dword [rbp-" << valueOffset(program, item.right) << "]\n"
+                        << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
+                    return;
+                }
+                if (comparison && item.operandType == ValueType::Double) {
+                    out << "    movsd xmm0, qword [rbp-" << valueOffset(program, item.left) << "]\n"
+                        << "    ucomisd xmm0, qword [rbp-" << valueOffset(program, item.right) << "]\n";
+                    if (item.op == "==") out << "    sete al\n    setnp dl\n    and al, dl\n";
+                    if (item.op == "!=") out << "    setne al\n    setp dl\n    or al, dl\n";
+                    if (item.op == "<") out << "    setb al\n    setnp dl\n    and al, dl\n";
+                    if (item.op == ">") out << "    seta al\n";
+                    if (item.op == "<=") out << "    setbe al\n    setnp dl\n    and al, dl\n";
+                    if (item.op == ">=") out << "    setae al\n";
+                    out << "    movzx eax, al\n"
+                        << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
+                    return;
+                }
+                if (comparison) {
+                    out << "    mov eax, dword [rbp-" << valueOffset(program, item.left) << "]\n"
+                        << "    cmp eax, dword [rbp-" << valueOffset(program, item.right) << "]\n";
+                    const bool unsignedComparison = item.operandType == ValueType::Byte;
+                    const char* condition = item.op == "==" ? "e" : item.op == "!=" ? "ne" :
+                        item.op == "<" ? (unsignedComparison ? "b" : "l") :
+                        item.op == ">" ? (unsignedComparison ? "a" : "g") :
+                        item.op == "<=" ? (unsignedComparison ? "be" : "le") :
+                        (unsignedComparison ? "ae" : "ge");
+                    out << "    set" << condition << " al\n"
+                        << "    movzx eax, al\n"
+                        << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
+                    return;
+                }
                 if (item.type == ValueType::Double) {
                     out << "    movsd xmm0, qword [rbp-" << valueOffset(program, item.left) << "]\n";
-                    const char* operation = item.op == '+' ? "addsd" : item.op == '-' ? "subsd" :
-                                            item.op == '*' ? "mulsd" : "divsd";
+                    const char* operation = item.op == "+" ? "addsd" : item.op == "-" ? "subsd" :
+                                            item.op == "*" ? "mulsd" : "divsd";
                     out << "    " << operation << " xmm0, qword [rbp-"
                         << valueOffset(program, item.right) << "]\n"
                         << "    movsd qword [rbp-" << valueOffset(program, item.output) << "], xmm0\n";
                     return;
                 }
                 out << "    mov eax, dword [rbp-" << valueOffset(program, item.left) << "]\n";
-                if (item.op == '+') out << "    add eax, dword [rbp-" << valueOffset(program, item.right) << "]\n";
-                if (item.op == '-') out << "    sub eax, dword [rbp-" << valueOffset(program, item.right) << "]\n";
-                if (item.op == '*') out << "    imul eax, dword [rbp-" << valueOffset(program, item.right) << "]\n";
-                if (item.op == '/') {
+                if (item.op == "+") out << "    add eax, dword [rbp-" << valueOffset(program, item.right) << "]\n";
+                if (item.op == "-") out << "    sub eax, dword [rbp-" << valueOffset(program, item.right) << "]\n";
+                if (item.op == "*") out << "    imul eax, dword [rbp-" << valueOffset(program, item.right) << "]\n";
+                if (item.op == "/") {
                     if (item.type == ValueType::Byte)
                         out << "    xor edx, edx\n";
                     else
@@ -106,7 +143,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 }
                 if (item.type == ValueType::Byte) out << "    and eax, 255\n";
                 out << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
-            } else {
+            } else if constexpr (std::is_same_v<T, IrStore>) {
                 if (item.type == ValueType::Double) {
                     out << "    movsd xmm0, qword [rbp-" << valueOffset(program, item.value) << "]\n"
                         << "    movsd qword [rbp-" << slotOffset(program, item.slot) << "], xmm0\n";
@@ -116,6 +153,20 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         << " [rbp-" << slotOffset(program, item.slot) << "], "
                         << (item.type == ValueType::Byte || item.type == ValueType::Bool ? "al\n" : "eax\n");
                 }
+            } else if constexpr (std::is_same_v<T, IrCopy>) {
+                if (item.type == ValueType::Double) {
+                    out << "    mov rax, qword [rbp-" << valueOffset(program, item.input) << "]\n"
+                        << "    mov qword [rbp-" << valueOffset(program, item.output) << "], rax\n";
+                } else {
+                    out << "    mov eax, dword [rbp-" << valueOffset(program, item.input) << "]\n"
+                        << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
+                }
+            } else if constexpr (std::is_same_v<T, IrBranch>) {
+                out << "    cmp dword [rbp-" << valueOffset(program, item.condition) << "], 0\n"
+                    << "    " << (item.jumpWhenTrue ? "jne" : "je")
+                    << " ir_label_" << item.label << '\n';
+            } else {
+                out << "ir_label_" << item.label << ":\n";
             }
         }, instruction);
     }

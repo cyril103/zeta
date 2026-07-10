@@ -83,6 +83,53 @@ ValueType IrGenerator::validateExpression(
     return validateExpression(expressionNode, expected, parameters, locals);
 }
 
+ValueType IrGenerator::inferType(
+    const Expression& expressionNode,
+    const std::unordered_map<std::string, ValueType>& parameters,
+    const std::unordered_map<std::string, const Declaration*>& locals) const {
+    return std::visit([&](const auto& node) -> ValueType {
+        using T = std::decay_t<decltype(node)>;
+        if constexpr (std::is_same_v<T, IntegerExpr>) return ValueType::Int;
+        else if constexpr (std::is_same_v<T, DoubleExpr>) return ValueType::Double;
+        else if constexpr (std::is_same_v<T, BoolExpr>) return ValueType::Bool;
+        else if constexpr (std::is_same_v<T, NameExpr>) {
+            if (const auto parameter = parameters.find(node.name); parameter != parameters.end())
+                return parameter->second;
+            if (const auto local = locals.find(node.name); local != locals.end())
+                return local->second->type;
+            if (const auto symbol = symbols_.find(node.name); symbol != symbols_.end())
+                return symbol->second.declaration->type;
+            return ValueType::Int;
+        } else if constexpr (std::is_same_v<T, CallExpr>) {
+            if (const auto local = locals.find(node.name); local != locals.end())
+                return local->second->type;
+            if (const auto symbol = symbols_.find(node.name); symbol != symbols_.end())
+                return symbol->second.declaration->type;
+            return ValueType::Int;
+        } else if constexpr (std::is_same_v<T, UnaryExpr>) {
+            return node.op == "!" ? ValueType::Bool
+                                  : inferType(*node.operand, parameters, locals);
+        } else if constexpr (std::is_same_v<T, BinaryExpr>) {
+            if (node.op == "&&" || node.op == "||" || node.op == "==" || node.op == "!=" ||
+                node.op == "<" || node.op == "<=" || node.op == ">" || node.op == ">=")
+                return ValueType::Bool;
+            const ValueType left = inferType(*node.left, parameters, locals);
+            const ValueType right = inferType(*node.right, parameters, locals);
+            if (left == right) return left;
+            if (left == ValueType::Double || right == ValueType::Double) return ValueType::Double;
+            if (left == ValueType::Byte || right == ValueType::Byte) return ValueType::Byte;
+            return left;
+        } else {
+            auto blockLocals = locals;
+            for (const StatementPtr& statement : node.statements) {
+                if (const auto* declaration = std::get_if<Declaration>(&statement->value))
+                    blockLocals.insert_or_assign(declaration->name, declaration);
+            }
+            return inferType(*node.result, parameters, blockLocals);
+        }
+    }, expressionNode.value);
+}
+
 ValueType IrGenerator::validateExpression(
     const Expression& expressionNode,
     ValueType expected,
@@ -149,6 +196,10 @@ ValueType IrGenerator::validateExpression(
             }
             return declaration->type;
         } else if constexpr (std::is_same_v<T, UnaryExpr>) {
+            if (node.op == "!") {
+                validateExpression(*node.operand, ValueType::Bool, parameters, locals);
+                return ValueType::Bool;
+            }
             if (expected == ValueType::Bool) {
                 throw CompileError(expressionNode.location,
                                    "les opérateurs arithmétiques ne s'appliquent pas à Bool");
@@ -156,6 +207,35 @@ ValueType IrGenerator::validateExpression(
             validateExpression(*node.operand, expected, parameters, locals);
             return expected;
         } else if constexpr (std::is_same_v<T, BinaryExpr>) {
+            const bool logical = node.op == "&&" || node.op == "||";
+            const bool equality = node.op == "==" || node.op == "!=";
+            const bool ordering = node.op == "<" || node.op == "<=" ||
+                                  node.op == ">" || node.op == ">=";
+            if (logical) {
+                validateExpression(*node.left, ValueType::Bool, parameters, locals);
+                validateExpression(*node.right, ValueType::Bool, parameters, locals);
+                return ValueType::Bool;
+            }
+            if (equality || ordering) {
+                const ValueType leftType = inferType(*node.left, parameters, locals);
+                const ValueType rightType = inferType(*node.right, parameters, locals);
+                ValueType operandType = leftType;
+                if (leftType != rightType) {
+                    if (leftType == ValueType::Double || rightType == ValueType::Double)
+                        operandType = ValueType::Double;
+                    else if (leftType == ValueType::Byte || rightType == ValueType::Byte)
+                        operandType = ValueType::Byte;
+                    else if (leftType == ValueType::Bool || rightType == ValueType::Bool)
+                        operandType = ValueType::Bool;
+                }
+                if (ordering && operandType == ValueType::Bool) {
+                    throw CompileError(expressionNode.location,
+                                       "seuls '==' et '!=' sont autorisés sur Bool");
+                }
+                validateExpression(*node.left, operandType, parameters, locals);
+                validateExpression(*node.right, operandType, parameters, locals);
+                return ValueType::Bool;
+            }
             if (expected == ValueType::Bool) {
                 throw CompileError(expressionNode.location,
                                    "les opérateurs arithmétiques ne s'appliquent pas à Bool");
@@ -292,11 +372,23 @@ ValueId IrGenerator::expression(
                                                expressionNode.inferredType});
             return output;
         } else if constexpr (std::is_same_v<T, BinaryExpr>) {
+            if (node.op == "&&" || node.op == "||") {
+                const ValueId left = expression(*node.left, parameters);
+                const ValueId output = nextValue(ValueType::Bool);
+                const std::size_t endLabel = nextLabel_++;
+                ir_.instructions.push_back(IrCopy{output, left, ValueType::Bool});
+                ir_.instructions.push_back(IrBranch{left, node.op == "||", endLabel});
+                const ValueId right = expression(*node.right, parameters);
+                ir_.instructions.push_back(IrCopy{output, right, ValueType::Bool});
+                ir_.instructions.push_back(IrLabel{endLabel});
+                return output;
+            }
             const ValueId left = expression(*node.left, parameters);
             const ValueId right = expression(*node.right, parameters);
             const ValueId output = nextValue(expressionNode.inferredType);
             ir_.instructions.push_back(IrBinary{output, node.op, left, right,
-                                                expressionNode.inferredType});
+                                                expressionNode.inferredType,
+                                                node.left->inferredType});
             return output;
         } else {
             std::vector<std::string> localNames;
@@ -365,17 +457,31 @@ std::string IrGenerator::print(const IrProgram& program) {
                 out << "  $" << item.output << " = load."
                     << suffix(item.type) << " %" << program.slots[item.slot].name << '\n';
             else if constexpr (std::is_same_v<T, IrUnary>)
-                out << "  $" << item.output << " = " << (item.op == '-' ? "neg" : "copy")
+                out << "  $" << item.output << " = "
+                    << (item.op == "-" ? "neg" : item.op == "!" ? "not" : "copy")
                     << '.' << suffix(item.type) << " $" << item.operand << '\n';
             else if constexpr (std::is_same_v<T, IrBinary>) {
-                const char* name = item.op == '+' ? "add" : item.op == '-' ? "sub" :
-                                   item.op == '*' ? "mul" : "div";
+                const std::string name = item.op == "+" ? "add" : item.op == "-" ? "sub" :
+                    item.op == "*" ? "mul" : item.op == "/" ? "div" :
+                    item.op == "==" ? "eq" : item.op == "!=" ? "ne" :
+                    item.op == "<" ? "lt" : item.op == "<=" ? "le" :
+                    item.op == ">" ? "gt" : item.op == ">=" ? "ge" :
+                    item.op == "&&" ? "and" : "or";
                 out << "  $" << item.output << " = " << name
-                    << '.' << suffix(item.type) << " $"
+                    << '.' << suffix(item.operandType) << " $"
                     << item.left << ", $" << item.right << '\n';
             } else
-                out << "  store." << suffix(item.type) << " $" << item.value
-                    << ", %" << program.slots[item.slot].name << '\n';
+                if constexpr (std::is_same_v<T, IrStore>)
+                    out << "  store." << suffix(item.type) << " $" << item.value
+                        << ", %" << program.slots[item.slot].name << '\n';
+                else if constexpr (std::is_same_v<T, IrCopy>)
+                    out << "  $" << item.output << " = copy." << suffix(item.type)
+                        << " $" << item.input << '\n';
+                else if constexpr (std::is_same_v<T, IrBranch>)
+                    out << "  branch." << (item.jumpWhenTrue ? "true" : "false")
+                        << " $" << item.condition << ", label" << item.label << '\n';
+                else
+                    out << "label" << item.label << ":\n";
         }, instruction);
     }
     out << "  exit.i32 $" << program.exitValue << '\n';

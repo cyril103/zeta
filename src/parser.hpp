@@ -23,6 +23,10 @@ private:
     Declaration declaration(BindingKind kind);
     Assignment assignment();
     ExprPtr expression();
+    ExprPtr logicalOr();
+    ExprPtr logicalAnd();
+    ExprPtr equality();
+    ExprPtr comparison();
     ExprPtr addition();
     ExprPtr multiplication();
     ExprPtr unary();

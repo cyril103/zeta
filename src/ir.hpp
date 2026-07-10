@@ -14,10 +14,21 @@ using SlotId = std::size_t;
 struct IrConst { ValueId output; std::int32_t value; ValueType type; };
 struct IrDoubleConst { ValueId output; double value; };
 struct IrLoad { ValueId output; SlotId slot; ValueType type; };
-struct IrUnary { ValueId output; char op; ValueId operand; ValueType type; };
-struct IrBinary { ValueId output; char op; ValueId left; ValueId right; ValueType type; };
+struct IrUnary { ValueId output; std::string op; ValueId operand; ValueType type; };
+struct IrBinary {
+    ValueId output;
+    std::string op;
+    ValueId left;
+    ValueId right;
+    ValueType type;
+    ValueType operandType;
+};
 struct IrStore { SlotId slot; ValueId value; ValueType type; };
-using IrInstruction = std::variant<IrConst, IrDoubleConst, IrLoad, IrUnary, IrBinary, IrStore>;
+struct IrCopy { ValueId output; ValueId input; ValueType type; };
+struct IrBranch { ValueId condition; bool jumpWhenTrue; std::size_t label; };
+struct IrLabel { std::size_t label; };
+using IrInstruction = std::variant<IrConst, IrDoubleConst, IrLoad, IrUnary, IrBinary,
+                                   IrStore, IrCopy, IrBranch, IrLabel>;
 
 struct IrSlot { std::string name; ValueType type; };
 struct IrProgram {
@@ -49,10 +60,15 @@ private:
         ValueType expected,
         const std::unordered_map<std::string, ValueType>& parameters,
         const std::unordered_map<std::string, const Declaration*>& locals) const;
+    ValueType inferType(
+        const Expression& expression,
+        const std::unordered_map<std::string, ValueType>& parameters,
+        const std::unordered_map<std::string, const Declaration*>& locals) const;
     ValueId expression(const Expression& expression);
     ValueId expression(const Expression& expression,
                        const std::unordered_map<std::string, ValueId>& parameters);
     ValueId nextValue(ValueType type);
     IrProgram ir_;
     std::unordered_map<std::string, Symbol> symbols_;
+    std::size_t nextLabel_{0};
 };

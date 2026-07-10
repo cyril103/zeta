@@ -20,6 +20,15 @@ enum class TokenKind {
     Colon,
     Comma,
     Equal,
+    EqualEqual,
+    Bang,
+    BangEqual,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
+    AndAnd,
+    OrOr,
     Plus,
     Minus,
     Star,
@@ -55,6 +64,15 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::Colon: return "':'";
     case TokenKind::Comma: return "','";
     case TokenKind::Equal: return "'='";
+    case TokenKind::EqualEqual: return "'=='";
+    case TokenKind::Bang: return "'!'";
+    case TokenKind::BangEqual: return "'!='";
+    case TokenKind::Less: return "'<'";
+    case TokenKind::LessEqual: return "'<='";
+    case TokenKind::Greater: return "'>'";
+    case TokenKind::GreaterEqual: return "'>='";
+    case TokenKind::AndAnd: return "'&&'";
+    case TokenKind::OrOr: return "'||'";
     case TokenKind::Plus: return "'+'";
     case TokenKind::Minus: return "'-'";
     case TokenKind::Star: return "'*'";

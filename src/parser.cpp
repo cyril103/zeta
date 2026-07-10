@@ -98,7 +98,56 @@ Assignment Parser::assignment() {
     return Assignment{name.location, name.text, expression()};
 }
 
-ExprPtr Parser::expression() { return addition(); }
+ExprPtr Parser::expression() { return logicalOr(); }
+
+ExprPtr Parser::logicalOr() {
+    ExprPtr expr = logicalAnd();
+    while (match(TokenKind::OrOr)) {
+        const Token op = previous();
+        expressionContinuation();
+        ExprPtr right = logicalAnd();
+        expr = std::make_unique<Expression>(Expression{
+            op.location, BinaryExpr{op.text, std::move(expr), std::move(right)}});
+    }
+    return expr;
+}
+
+ExprPtr Parser::logicalAnd() {
+    ExprPtr expr = equality();
+    while (match(TokenKind::AndAnd)) {
+        const Token op = previous();
+        expressionContinuation();
+        ExprPtr right = equality();
+        expr = std::make_unique<Expression>(Expression{
+            op.location, BinaryExpr{op.text, std::move(expr), std::move(right)}});
+    }
+    return expr;
+}
+
+ExprPtr Parser::equality() {
+    ExprPtr expr = comparison();
+    while (match(TokenKind::EqualEqual) || match(TokenKind::BangEqual)) {
+        const Token op = previous();
+        expressionContinuation();
+        ExprPtr right = comparison();
+        expr = std::make_unique<Expression>(Expression{
+            op.location, BinaryExpr{op.text, std::move(expr), std::move(right)}});
+    }
+    return expr;
+}
+
+ExprPtr Parser::comparison() {
+    ExprPtr expr = addition();
+    while (match(TokenKind::Less) || match(TokenKind::LessEqual) ||
+           match(TokenKind::Greater) || match(TokenKind::GreaterEqual)) {
+        const Token op = previous();
+        expressionContinuation();
+        ExprPtr right = addition();
+        expr = std::make_unique<Expression>(Expression{
+            op.location, BinaryExpr{op.text, std::move(expr), std::move(right)}});
+    }
+    return expr;
+}
 
 ExprPtr Parser::addition() {
     ExprPtr expr = multiplication();
@@ -107,7 +156,7 @@ ExprPtr Parser::addition() {
         expressionContinuation();
         ExprPtr right = multiplication();
         expr = std::make_unique<Expression>(Expression{
-            op.location, BinaryExpr{op.text[0], std::move(expr), std::move(right)}});
+            op.location, BinaryExpr{op.text, std::move(expr), std::move(right)}});
     }
     return expr;
 }
@@ -119,17 +168,17 @@ ExprPtr Parser::multiplication() {
         expressionContinuation();
         ExprPtr right = unary();
         expr = std::make_unique<Expression>(Expression{
-            op.location, BinaryExpr{op.text[0], std::move(expr), std::move(right)}});
+            op.location, BinaryExpr{op.text, std::move(expr), std::move(right)}});
     }
     return expr;
 }
 
 ExprPtr Parser::unary() {
-    if (match(TokenKind::Minus) || match(TokenKind::Plus)) {
+    if (match(TokenKind::Minus) || match(TokenKind::Plus) || match(TokenKind::Bang)) {
         const Token op = previous();
         expressionContinuation();
         return std::make_unique<Expression>(Expression{
-            op.location, UnaryExpr{op.text[0], unary()}});
+            op.location, UnaryExpr{op.text, unary()}});
     }
     return primary();
 }

@@ -37,10 +37,32 @@ std::vector<Token> Lexer::scan() {
             continue;
         }
 
+        if (c == '=' && peek() == '=') {
+            advance(); add(TokenKind::EqualEqual, "==", start); continue;
+        }
+        if (c == '!' && peek() == '=') {
+            advance(); add(TokenKind::BangEqual, "!=", start); continue;
+        }
+        if (c == '<' && peek() == '=') {
+            advance(); add(TokenKind::LessEqual, "<=", start); continue;
+        }
+        if (c == '>' && peek() == '=') {
+            advance(); add(TokenKind::GreaterEqual, ">=", start); continue;
+        }
+        if (c == '&' && peek() == '&') {
+            advance(); add(TokenKind::AndAnd, "&&", start); continue;
+        }
+        if (c == '|' && peek() == '|') {
+            advance(); add(TokenKind::OrOr, "||", start); continue;
+        }
+
         switch (c) {
         case ':': add(TokenKind::Colon, ":", start); continue;
         case ',': add(TokenKind::Comma, ",", start); continue;
         case '=': add(TokenKind::Equal, "=", start); continue;
+        case '!': add(TokenKind::Bang, "!", start); continue;
+        case '<': add(TokenKind::Less, "<", start); continue;
+        case '>': add(TokenKind::Greater, ">", start); continue;
         case '+': add(TokenKind::Plus, "+", start); continue;
         case '-': add(TokenKind::Minus, "-", start); continue;
         case '*': add(TokenKind::Star, "*", start); continue;
@@ -51,6 +73,9 @@ std::vector<Token> Lexer::scan() {
         case '}': add(TokenKind::RightBrace, "}", start); continue;
         case ';': add(TokenKind::Separator, ";", start); continue;
         default: break;
+        }
+        if (c == '&' || c == '|') {
+            throw CompileError(start, std::string("opérateur incomplet '") + c + "'");
         }
 
         const auto uc = static_cast<unsigned char>(c);

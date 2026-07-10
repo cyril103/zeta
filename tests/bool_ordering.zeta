@@ -1,0 +1,2 @@
+val invalide : Bool = false < true
+def main () : Int = 0

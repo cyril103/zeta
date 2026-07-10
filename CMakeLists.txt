@@ -95,6 +95,14 @@ if(BUILD_TESTING)
     add_test(NAME run_bool_type COMMAND ${CMAKE_CURRENT_BINARY_DIR}/bool-type)
     set_tests_properties(run_bool_type PROPERTIES DEPENDS compile_bool_type)
 
+    add_test(
+        NAME compile_boolean_operators
+        COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/boolean_operators.zeta
+                -o ${CMAKE_CURRENT_BINARY_DIR}/boolean-operators
+    )
+    add_test(NAME run_boolean_operators COMMAND ${CMAKE_CURRENT_BINARY_DIR}/boolean-operators)
+    set_tests_properties(run_boolean_operators PROPERTIES DEPENDS compile_boolean_operators)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -120,7 +128,11 @@ if(BUILD_TESTING)
             bool_numeric_literal
             bool_arithmetic
             bool_int_mismatch
-            bool_argument_mismatch)
+            bool_argument_mismatch
+            comparison_type_mismatch
+            bool_ordering
+            logical_numeric_operand
+            incomplete_logical_operator)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

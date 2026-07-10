@@ -27,8 +27,8 @@ struct DoubleExpr { double value; };
 struct BoolExpr { bool value; };
 struct NameExpr { std::string name; };
 struct CallExpr { std::string name; std::vector<ExprPtr> arguments; };
-struct UnaryExpr { char op; ExprPtr operand; };
-struct BinaryExpr { char op; ExprPtr left; ExprPtr right; };
+struct UnaryExpr { std::string op; ExprPtr operand; };
+struct BinaryExpr { std::string op; ExprPtr left; ExprPtr right; };
 struct BlockExpr { std::vector<StatementPtr> statements; ExprPtr result; };
 
 struct Expression {

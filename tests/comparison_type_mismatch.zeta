@@ -1,0 +1,4 @@
+val entier : Int = 1
+val octet : Byte = 1
+val invalide : Bool = entier == octet
+def main () : Int = 0

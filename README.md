@@ -43,8 +43,17 @@ termine = actif
 ```
 
 Un `Bool` occupe un octet sur la stack. Il n'existe aucune conversion implicite
-avec les types numériques. Les opérateurs booléens seront ajoutés ultérieurement ;
-les opérateurs arithmétiques sont donc refusés sur `Bool`.
+avec les types numériques. Les opérateurs disponibles sont :
+
+- `==` et `!=` pour l'égalité et la différence sur tous les types ;
+- `<`, `>`, `<=` et `>=` pour l'ordre sur `Int`, `Byte` et `Double` ;
+- `&&` et `||` pour le et/ou logique avec court-circuit ;
+- `!` pour la négation logique.
+
+Les deux opérandes d'une comparaison doivent avoir le même type, à l'exception
+des littéraux compatibles avec le contexte. Les opérateurs arithmétiques restent
+interdits sur `Bool`. Les priorités, de la plus faible à la plus forte, sont `||`,
+`&&`, égalité, comparaison, addition, multiplication et opérateurs unaires.
 
 Un identifiant commence par une lettre ou `_`, puis contient des lettres, chiffres
 ou `_`. Les mots `val`, `var`, `def`, `Int`, `Byte`, `Double`, `Bool`, `true` et
