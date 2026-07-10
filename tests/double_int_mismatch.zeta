@@ -1,0 +1,3 @@
+val entier : Int = 42
+val flottant : Double = entier
+def main () : Int = 0

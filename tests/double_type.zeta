@@ -1,0 +1,13 @@
+def moyenne (a : Double, b : Double) : Double = (a + b) / 2
+
+val piScientifique : Double = 31415e-4
+val piDecimal : Double = 3.1415
+val petit : Double = 2.5e-3
+var facteur : Double = 1e+2
+facteur = facteur * 2.5e-1
+val resultat : Double = moyenne(piScientifique, piDecimal)
+
+def main () : Int = {
+    val negatif : Double = -2.5e-3
+    0
+}

@@ -79,6 +79,14 @@ if(BUILD_TESTING)
     add_test(NAME run_byte_type COMMAND ${CMAKE_CURRENT_BINARY_DIR}/byte-type)
     set_tests_properties(run_byte_type PROPERTIES DEPENDS compile_byte_type)
 
+    add_test(
+        NAME compile_double_type
+        COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/double_type.zeta
+                -o ${CMAKE_CURRENT_BINARY_DIR}/double-type
+    )
+    add_test(NAME run_double_type COMMAND ${CMAKE_CURRENT_BINARY_DIR}/double-type)
+    set_tests_properties(run_double_type PROPERTIES DEPENDS compile_double_type)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -97,7 +105,10 @@ if(BUILD_TESTING)
             main_parameters
             byte_out_of_range
             byte_int_mismatch
-            byte_argument_mismatch)
+            byte_argument_mismatch
+            double_int_mismatch
+            double_to_int_mismatch
+            double_invalid_exponent)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

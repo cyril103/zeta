@@ -57,10 +57,26 @@ std::vector<Token> Lexer::scan() {
         if (std::isdigit(uc)) {
             const std::size_t begin = current_ - 1;
             while (std::isdigit(static_cast<unsigned char>(peek()))) advance();
+            bool floating = false;
+            if (peek() == '.') {
+                floating = true;
+                advance();
+                while (std::isdigit(static_cast<unsigned char>(peek()))) advance();
+            }
+            if (peek() == 'e' || peek() == 'E') {
+                floating = true;
+                advance();
+                if (peek() == '+' || peek() == '-') advance();
+                if (!std::isdigit(static_cast<unsigned char>(peek()))) {
+                    throw CompileError(start, "exposant scientifique incomplet");
+                }
+                while (std::isdigit(static_cast<unsigned char>(peek()))) advance();
+            }
             if (std::isalpha(static_cast<unsigned char>(peek())) || peek() == '_') {
                 throw CompileError(start, "un identifiant ne peut pas commencer par un chiffre");
             }
-            add(TokenKind::Integer, std::string(source_.substr(begin, current_ - begin)), start);
+            add(floating ? TokenKind::Floating : TokenKind::Integer,
+                std::string(source_.substr(begin, current_ - begin)), start);
             continue;
         }
         if (std::isalpha(uc) || c == '_') {
@@ -73,6 +89,7 @@ std::vector<Token> Lexer::scan() {
             if (text == "def") kind = TokenKind::Def;
             if (text == "Int") kind = TokenKind::IntType;
             if (text == "Byte") kind = TokenKind::ByteType;
+            if (text == "Double") kind = TokenKind::DoubleType;
             add(kind, std::move(text), start);
             continue;
         }

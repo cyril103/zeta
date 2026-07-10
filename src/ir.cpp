@@ -2,10 +2,15 @@
 
 #include "diagnostic.hpp"
 
+#include <iomanip>
+#include <limits>
 #include <sstream>
 #include <type_traits>
 
-ValueId IrGenerator::nextValue() { return ir_.valueCount++; }
+ValueId IrGenerator::nextValue(ValueType type) {
+    ir_.valueTypes.push_back(type);
+    return ir_.valueCount++;
+}
 
 IrProgram IrGenerator::generate(const Program& program) {
     for (const Statement& statement : program.statements) {
@@ -92,6 +97,8 @@ ValueType IrGenerator::validateExpression(
                                    " dépasse l'intervalle Byte (0..255)");
             }
             return expected;
+        } else if constexpr (std::is_same_v<T, DoubleExpr>) {
+            return ValueType::Double;
         } else if constexpr (std::is_same_v<T, NameExpr>) {
             const auto local = locals.find(node.name);
             if (!parameters.contains(node.name) && local == locals.end() &&
@@ -214,9 +221,16 @@ ValueId IrGenerator::expression(
     return std::visit([&](const auto& node) -> ValueId {
         using T = std::decay_t<decltype(node)>;
         if constexpr (std::is_same_v<T, IntegerExpr>) {
-            const ValueId output = nextValue();
-            ir_.instructions.push_back(IrConst{output, node.value,
-                                               expressionNode.inferredType});
+            const ValueId output = nextValue(expressionNode.inferredType);
+            if (expressionNode.inferredType == ValueType::Double)
+                ir_.instructions.push_back(IrDoubleConst{output, static_cast<double>(node.value)});
+            else
+                ir_.instructions.push_back(IrConst{output, node.value,
+                                                   expressionNode.inferredType});
+            return output;
+        } else if constexpr (std::is_same_v<T, DoubleExpr>) {
+            const ValueId output = nextValue(ValueType::Double);
+            ir_.instructions.push_back(IrDoubleConst{output, node.value});
             return output;
         } else if constexpr (std::is_same_v<T, NameExpr>) {
             if (const auto parameter = parameters.find(node.name);
@@ -235,7 +249,7 @@ ValueId IrGenerator::expression(
                 }
                 return expression(*found->second.declaration->initializer, parameters);
             }
-            const ValueId output = nextValue();
+            const ValueId output = nextValue(expressionNode.inferredType);
             ir_.instructions.push_back(IrLoad{output, found->second.slot,
                                               expressionNode.inferredType});
             return output;
@@ -255,14 +269,14 @@ ValueId IrGenerator::expression(
             return expression(*function.initializer, arguments);
         } else if constexpr (std::is_same_v<T, UnaryExpr>) {
             const ValueId operand = expression(*node.operand, parameters);
-            const ValueId output = nextValue();
+            const ValueId output = nextValue(expressionNode.inferredType);
             ir_.instructions.push_back(IrUnary{output, node.op, operand,
                                                expressionNode.inferredType});
             return output;
         } else if constexpr (std::is_same_v<T, BinaryExpr>) {
             const ValueId left = expression(*node.left, parameters);
             const ValueId right = expression(*node.right, parameters);
-            const ValueId output = nextValue();
+            const ValueId output = nextValue(expressionNode.inferredType);
             ir_.instructions.push_back(IrBinary{output, node.op, left, right,
                                                 expressionNode.inferredType});
             return output;
@@ -309,6 +323,12 @@ ValueId IrGenerator::expression(
 
 std::string IrGenerator::print(const IrProgram& program) {
     std::ostringstream out;
+    out << std::setprecision(std::numeric_limits<double>::max_digits10);
+    const auto suffix = [](ValueType type) {
+        if (type == ValueType::Int) return "i32";
+        if (type == ValueType::Byte) return "u8";
+        return "f64";
+    };
     out << "module {\n";
     for (std::size_t i = 0; i < program.slots.size(); ++i) {
         out << "  %" << program.slots[i].name << " = stack " << typeName(program.slots[i].type)
@@ -320,23 +340,23 @@ std::string IrGenerator::print(const IrProgram& program) {
             if constexpr (std::is_same_v<T, IrConst>)
                 out << "  $" << item.output << " = const."
                     << (item.type == ValueType::Int ? "i32 " : "u8 ") << item.value << '\n';
+            else if constexpr (std::is_same_v<T, IrDoubleConst>)
+                out << "  $" << item.output << " = const.f64 " << item.value << '\n';
             else if constexpr (std::is_same_v<T, IrLoad>)
                 out << "  $" << item.output << " = load."
-                    << (item.type == ValueType::Int ? "i32 %" : "u8 %")
-                    << program.slots[item.slot].name << '\n';
+                    << suffix(item.type) << " %" << program.slots[item.slot].name << '\n';
             else if constexpr (std::is_same_v<T, IrUnary>)
                 out << "  $" << item.output << " = " << (item.op == '-' ? "neg" : "copy")
-                    << (item.type == ValueType::Int ? ".i32 $" : ".u8 $")
-                    << item.operand << '\n';
+                    << '.' << suffix(item.type) << " $" << item.operand << '\n';
             else if constexpr (std::is_same_v<T, IrBinary>) {
                 const char* name = item.op == '+' ? "add" : item.op == '-' ? "sub" :
                                    item.op == '*' ? "mul" : "div";
                 out << "  $" << item.output << " = " << name
-                    << (item.type == ValueType::Int ? ".i32 $" : ".u8 $")
+                    << '.' << suffix(item.type) << " $"
                     << item.left << ", $" << item.right << '\n';
             } else
-                out << "  store." << (item.type == ValueType::Int ? "i32 $" : "u8 $")
-                    << item.value << ", %" << program.slots[item.slot].name << '\n';
+                out << "  store." << suffix(item.type) << " $" << item.value
+                    << ", %" << program.slots[item.slot].name << '\n';
         }, instruction);
     }
     out << "  exit.i32 $" << program.exitValue << '\n';

@@ -18,11 +18,23 @@ val x : Byte = 244
 ```
 
 Les opérations entre `Byte` restent des opérations 8 bits et débordent modulo 256.
-Il n'existe pas encore de conversion implicite entre `Int` et `Byte`, mais un
-littéral est accepté lorsqu'il tient dans le type attendu.
+`Double` est un nombre à virgule flottante signé au format IEEE-754 double précision
+sur 64 bits. Il accepte les écritures décimales et scientifiques avec exposant
+positif ou négatif :
+
+```text
+val pi : Double = 31415e-4
+val aussiPi : Double = 3.1415
+val grand : Double = 1e+12
+val petit : Double = 2.5e-3
+```
+
+Il n'existe pas encore de conversion implicite entre `Int`, `Byte` et `Double`,
+mais un littéral entier est accepté dans une expression `Double` et un littéral
+est accepté comme `Byte` lorsqu'il tient dans l'intervalle attendu.
 
 Un identifiant commence par une lettre ou `_`, puis contient des lettres, chiffres
-ou `_`. Les mots `val`, `var`, `def`, `Int` et `Byte` sont réservés. Un identifiant
+ou `_`. Les mots `val`, `var`, `def`, `Int`, `Byte` et `Double` sont réservés. Un identifiant
 ne peut jamais être redéclaré. Une déclaration `val` est
 immuable, tandis qu'une déclaration `var` peut être réaffectée sans créer un
 nouveau slot sur la stack :

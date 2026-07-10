@@ -3,6 +3,7 @@
 #include "diagnostic.hpp"
 
 #include <charconv>
+#include <cmath>
 #include <limits>
 
 const Token& Parser::peek() const { return tokens_[current_]; }
@@ -22,6 +23,7 @@ const Token& Parser::consume(TokenKind kind, const std::string& message) {
 ValueType Parser::consumeType(const std::string& message) {
     if (match(TokenKind::IntType)) return ValueType::Int;
     if (match(TokenKind::ByteType)) return ValueType::Byte;
+    if (match(TokenKind::DoubleType)) return ValueType::Double;
     throw CompileError(peek().location, message + ", reçu " + tokenName(peek().kind));
 }
 
@@ -74,7 +76,7 @@ Declaration Parser::declaration(BindingKind kind) {
                                                      "nom de paramètre attendu");
                 consume(TokenKind::Colon, "':' attendu après le paramètre");
                 const ValueType parameterType = consumeType(
-                    "type 'Int' ou 'Byte' attendu pour le paramètre");
+                    "type 'Int', 'Byte' ou 'Double' attendu pour le paramètre");
                 parameters.push_back(Parameter{parameterName.location,
                                                parameterName.text,
                                                parameterType});
@@ -83,7 +85,7 @@ Declaration Parser::declaration(BindingKind kind) {
         consume(TokenKind::RightParen, "')' attendue après les paramètres");
     }
     consume(TokenKind::Colon, "':' attendu après l'identifiant");
-    const ValueType type = consumeType("type 'Int' ou 'Byte' attendu");
+    const ValueType type = consumeType("type 'Int', 'Byte' ou 'Double' attendu");
     consume(TokenKind::Equal, "'=' attendu après le type");
     return Declaration{start.location, name.text, type, kind, callable,
                        std::move(parameters), expression()};
@@ -143,6 +145,17 @@ ExprPtr Parser::primary() {
             throw CompileError(token.location, "entier hors de l'intervalle Int32");
         }
         return std::make_unique<Expression>(Expression{token.location, IntegerExpr{static_cast<std::int32_t>(value)}});
+    }
+    if (match(TokenKind::Floating)) {
+        const Token token = previous();
+        double value{};
+        const auto result = std::from_chars(token.text.data(),
+                                            token.text.data() + token.text.size(), value);
+        if (result.ec != std::errc{} || result.ptr != token.text.data() + token.text.size() ||
+            !std::isfinite(value)) {
+            throw CompileError(token.location, "nombre Double invalide ou hors limites");
+        }
+        return std::make_unique<Expression>(Expression{token.location, DoubleExpr{value}});
     }
     if (match(TokenKind::Identifier)) {
         const Token token = previous();

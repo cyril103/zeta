@@ -1,0 +1,2 @@
+val invalide : Double = 1e-
+def main () : Int = 0
