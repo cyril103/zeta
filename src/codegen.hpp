@@ -1,0 +1,10 @@
+#pragma once
+
+#include "ir.hpp"
+
+#include <string>
+
+class FasmCodeGenerator {
+public:
+    static std::string generate(const IrProgram& program);
+};

@@ -1,0 +1,49 @@
+# Build directories
+/build/
+/out/
+/bin/
+/lib/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+
+# C/C++ compilation artifacts
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dll
+*.dylib
+*.exe
+*.out
+*.pdb
+*.d
+
+# Generated compiler output
+/generated/
+*.ir
+*.tmp.asm
+
+# Test and coverage artifacts
+*.gcda
+*.gcno
+*.gcov
+coverage/
+
+# Editor and operating-system files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
