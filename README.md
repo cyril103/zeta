@@ -55,9 +55,29 @@ des littéraux compatibles avec le contexte. Les opérateurs arithmétiques rest
 interdits sur `Bool`. Les priorités, de la plus faible à la plus forte, sont `||`,
 `&&`, égalité, comparaison, addition, multiplication et opérateurs unaires.
 
+## Expressions conditionnelles
+
+`if`, `else if` et `else` forment une expression et produisent donc une valeur :
+
+```text
+def abs (x : Int) : Int = if (x < 0) -x else x
+
+def signe (x : Int) : Int = if (x < 0) {
+    -1
+} else if (x > 0) {
+    1
+} else {
+    0
+}
+```
+
+Le prédicat doit être un `Bool`, `else` est obligatoire et toutes les branches
+doivent produire le type attendu par le contexte. Une seule branche est exécutée.
+Chaque branche peut être une expression simple, un autre `if` ou une expression-bloc.
+
 Un identifiant commence par une lettre ou `_`, puis contient des lettres, chiffres
-ou `_`. Les mots `val`, `var`, `def`, `Int`, `Byte`, `Double`, `Bool`, `true` et
-`false` sont réservés. Un identifiant
+ou `_`. Les mots `val`, `var`, `def`, `if`, `else`, `Int`, `Byte`, `Double`,
+`Bool`, `true` et `false` sont réservés. Un identifiant
 ne peut jamais être redéclaré. Une déclaration `val` est
 immuable, tandis qu'une déclaration `var` peut être réaffectée sans créer un
 nouveau slot sur la stack :

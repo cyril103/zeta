@@ -118,6 +118,8 @@ std::vector<Token> Lexer::scan() {
             if (text == "Bool") kind = TokenKind::BoolType;
             if (text == "true") kind = TokenKind::True;
             if (text == "false") kind = TokenKind::False;
+            if (text == "if") kind = TokenKind::If;
+            if (text == "else") kind = TokenKind::Else;
             add(kind, std::move(text), start);
             continue;
         }

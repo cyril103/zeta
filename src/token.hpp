@@ -17,6 +17,8 @@ enum class TokenKind {
     Floating,
     True,
     False,
+    If,
+    Else,
     Colon,
     Comma,
     Equal,
@@ -61,6 +63,8 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::Floating: return "un nombre à virgule flottante";
     case TokenKind::True: return "'true'";
     case TokenKind::False: return "'false'";
+    case TokenKind::If: return "'if'";
+    case TokenKind::Else: return "'else'";
     case TokenKind::Colon: return "':'";
     case TokenKind::Comma: return "','";
     case TokenKind::Equal: return "'='";

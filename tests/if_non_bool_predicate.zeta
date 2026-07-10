@@ -1,0 +1,2 @@
+val invalide : Int = if (1) 2 else 3
+def main () : Int = 0

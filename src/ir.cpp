@@ -119,13 +119,22 @@ ValueType IrGenerator::inferType(
             if (left == ValueType::Double || right == ValueType::Double) return ValueType::Double;
             if (left == ValueType::Byte || right == ValueType::Byte) return ValueType::Byte;
             return left;
-        } else {
+        } else if constexpr (std::is_same_v<T, BlockExpr>) {
             auto blockLocals = locals;
             for (const StatementPtr& statement : node.statements) {
                 if (const auto* declaration = std::get_if<Declaration>(&statement->value))
                     blockLocals.insert_or_assign(declaration->name, declaration);
             }
             return inferType(*node.result, parameters, blockLocals);
+        } else {
+            const ValueType thenType = inferType(*node.thenBranch, parameters, locals);
+            const ValueType elseType = inferType(*node.elseBranch, parameters, locals);
+            if (thenType == elseType) return thenType;
+            if (thenType == ValueType::Double || elseType == ValueType::Double)
+                return ValueType::Double;
+            if (thenType == ValueType::Byte || elseType == ValueType::Byte)
+                return ValueType::Byte;
+            return thenType;
         }
     }, expressionNode.value);
 }
@@ -293,6 +302,11 @@ ValueType IrGenerator::validateExpression(
             }
             validateExpression(*node.result, expected, parameters, blockLocals);
             return expected;
+        } else {
+            validateExpression(*node.condition, ValueType::Bool, parameters, locals);
+            validateExpression(*node.thenBranch, expected, parameters, locals);
+            validateExpression(*node.elseBranch, expected, parameters, locals);
+            return expected;
         }
     }, expressionNode.value);
     if (actual != expected) {
@@ -390,7 +404,7 @@ ValueId IrGenerator::expression(
                                                 expressionNode.inferredType,
                                                 node.left->inferredType});
             return output;
-        } else {
+        } else if constexpr (std::is_same_v<T, BlockExpr>) {
             std::vector<std::string> localNames;
             for (const StatementPtr& statement : node.statements) {
                 std::visit([&](const auto& item) {
@@ -427,6 +441,20 @@ ValueId IrGenerator::expression(
                 symbols_.erase(*name);
             }
             return result;
+        } else {
+            const ValueId condition = expression(*node.condition, parameters);
+            const ValueId output = nextValue(expressionNode.inferredType);
+            const std::size_t elseLabel = nextLabel_++;
+            const std::size_t endLabel = nextLabel_++;
+            ir_.instructions.push_back(IrBranch{condition, false, elseLabel});
+            const ValueId thenValue = expression(*node.thenBranch, parameters);
+            ir_.instructions.push_back(IrCopy{output, thenValue, expressionNode.inferredType});
+            ir_.instructions.push_back(IrJump{endLabel});
+            ir_.instructions.push_back(IrLabel{elseLabel});
+            const ValueId elseValue = expression(*node.elseBranch, parameters);
+            ir_.instructions.push_back(IrCopy{output, elseValue, expressionNode.inferredType});
+            ir_.instructions.push_back(IrLabel{endLabel});
+            return output;
         }
     }, expressionNode.value);
 }
@@ -480,6 +508,8 @@ std::string IrGenerator::print(const IrProgram& program) {
                 else if constexpr (std::is_same_v<T, IrBranch>)
                     out << "  branch." << (item.jumpWhenTrue ? "true" : "false")
                         << " $" << item.condition << ", label" << item.label << '\n';
+                else if constexpr (std::is_same_v<T, IrJump>)
+                    out << "  jump label" << item.label << '\n';
                 else
                     out << "label" << item.label << ":\n";
         }, instruction);

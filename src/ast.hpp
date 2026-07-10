@@ -30,10 +30,12 @@ struct CallExpr { std::string name; std::vector<ExprPtr> arguments; };
 struct UnaryExpr { std::string op; ExprPtr operand; };
 struct BinaryExpr { std::string op; ExprPtr left; ExprPtr right; };
 struct BlockExpr { std::vector<StatementPtr> statements; ExprPtr result; };
+struct IfExpr { ExprPtr condition; ExprPtr thenBranch; ExprPtr elseBranch; };
 
 struct Expression {
     SourceLocation location;
-    std::variant<IntegerExpr, DoubleExpr, BoolExpr, NameExpr, CallExpr, UnaryExpr, BinaryExpr, BlockExpr> value;
+    std::variant<IntegerExpr, DoubleExpr, BoolExpr, NameExpr, CallExpr, UnaryExpr,
+                 BinaryExpr, BlockExpr, IfExpr> value;
     mutable ValueType inferredType{ValueType::Int};
 };
 

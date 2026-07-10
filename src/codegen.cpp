@@ -165,6 +165,8 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 out << "    cmp dword [rbp-" << valueOffset(program, item.condition) << "], 0\n"
                     << "    " << (item.jumpWhenTrue ? "jne" : "je")
                     << " ir_label_" << item.label << '\n';
+            } else if constexpr (std::is_same_v<T, IrJump>) {
+                out << "    jmp ir_label_" << item.label << '\n';
             } else {
                 out << "ir_label_" << item.label << ":\n";
             }

@@ -184,6 +184,9 @@ ExprPtr Parser::unary() {
 }
 
 ExprPtr Parser::primary() {
+    if (match(TokenKind::If)) {
+        return ifExpression(previous().location);
+    }
     if (match(TokenKind::LeftBrace)) {
         return blockExpression(previous().location);
     }
@@ -242,6 +245,25 @@ ExprPtr Parser::primary() {
         return expr;
     }
     throw CompileError(peek().location, "expression attendue");
+}
+
+ExprPtr Parser::ifExpression(SourceLocation location) {
+    consume(TokenKind::LeftParen, "'(' attendue après 'if'");
+    expressionContinuation();
+    ExprPtr condition = expression();
+    expressionContinuation();
+    consume(TokenKind::RightParen, "')' attendue après le prédicat");
+    ExprPtr thenBranch = expression();
+    skipSeparators();
+    consume(TokenKind::Else, "'else' obligatoire après la première branche");
+    ExprPtr elseBranch;
+    if (match(TokenKind::If))
+        elseBranch = ifExpression(previous().location);
+    else
+        elseBranch = expression();
+    return std::make_unique<Expression>(Expression{
+        location, IfExpr{std::move(condition), std::move(thenBranch),
+                         std::move(elseBranch)}});
 }
 
 ExprPtr Parser::blockExpression(SourceLocation location) {
