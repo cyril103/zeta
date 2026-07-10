@@ -1,0 +1,2 @@
+val nombre : Int = 4
+val resultat : Int = nombre(2)

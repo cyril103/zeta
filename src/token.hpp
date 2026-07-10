@@ -12,6 +12,7 @@ enum class TokenKind {
     Identifier,
     Integer,
     Colon,
+    Comma,
     Equal,
     Plus,
     Minus,
@@ -38,6 +39,7 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::Identifier: return "un identifiant";
     case TokenKind::Integer: return "un entier";
     case TokenKind::Colon: return "':'";
+    case TokenKind::Comma: return "','";
     case TokenKind::Equal: return "'='";
     case TokenKind::Plus: return "'+'";
     case TokenKind::Minus: return "'-'";

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 #include <vector>
 
@@ -34,11 +35,14 @@ private:
     struct Symbol {
         SlotId slot;
         BindingKind kind;
-        const Expression* definition;
+        const Declaration* declaration;
     };
 
-    void validateExpression(const Expression& expression) const;
+    void validateExpression(const Expression& expression,
+                            const std::unordered_set<std::string>& parameters = {}) const;
     ValueId expression(const Expression& expression);
+    ValueId expression(const Expression& expression,
+                       const std::unordered_map<std::string, ValueId>& parameters);
     ValueId nextValue();
     IrProgram ir_;
     std::unordered_map<std::string, Symbol> symbols_;

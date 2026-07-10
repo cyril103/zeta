@@ -49,10 +49,29 @@ Declaration Parser::declaration(BindingKind kind) {
     const Token start = previous();
     const Token& name = consume(TokenKind::Identifier,
                                 "identifiant attendu après '" + start.text + "'");
+    bool callable = false;
+    std::vector<Parameter> parameters;
+    if (kind == BindingKind::Def && match(TokenKind::LeftParen)) {
+        callable = true;
+        if (!check(TokenKind::RightParen)) {
+            do {
+                const Token& parameterName = consume(TokenKind::Identifier,
+                                                     "nom de paramètre attendu");
+                consume(TokenKind::Colon, "':' attendu après le paramètre");
+                const Token& parameterType = consume(TokenKind::IntType,
+                                                     "type 'Int' attendu pour le paramètre");
+                parameters.push_back(Parameter{parameterName.location,
+                                               parameterName.text,
+                                               parameterType.text});
+            } while (match(TokenKind::Comma));
+        }
+        consume(TokenKind::RightParen, "')' attendue après les paramètres");
+    }
     consume(TokenKind::Colon, "':' attendu après l'identifiant");
     const Token& type = consume(TokenKind::IntType, "type 'Int' attendu");
     consume(TokenKind::Equal, "'=' attendu après le type");
-    return Declaration{start.location, name.text, type.text, kind, expression()};
+    return Declaration{start.location, name.text, type.text, kind, callable,
+                       std::move(parameters), expression()};
 }
 
 Assignment Parser::assignment() {
@@ -106,6 +125,17 @@ ExprPtr Parser::primary() {
     }
     if (match(TokenKind::Identifier)) {
         const Token token = previous();
+        if (match(TokenKind::LeftParen)) {
+            std::vector<ExprPtr> arguments;
+            if (!check(TokenKind::RightParen)) {
+                do {
+                    arguments.push_back(expression());
+                } while (match(TokenKind::Comma));
+            }
+            consume(TokenKind::RightParen, "')' attendue après les arguments");
+            return std::make_unique<Expression>(Expression{
+                token.location, CallExpr{token.text, std::move(arguments)}});
+        }
         return std::make_unique<Expression>(Expression{token.location, NameExpr{token.text}});
     }
     if (match(TokenKind::LeftParen)) {

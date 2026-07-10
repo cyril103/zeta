@@ -1,0 +1,11 @@
+def add (a : Int, b : Int) : Int = a + b
+def double (value : Int) : Int = add(value, value)
+def zero () : Int = 0
+
+var base : Int = 3
+val premier : Int = add(base, 4)
+base = 10
+val second : Int = double(base) + zero()
+
+// Le corps ne doit pas être généré car la fonction n'est jamais appelée.
+def jamaisAppelee (diviseur : Int) : Int = 1 / diviseur

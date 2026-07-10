@@ -1,0 +1,2 @@
+def add (a : Int, b : Int) : Int = a + b
+val resultat : Int = add(1)

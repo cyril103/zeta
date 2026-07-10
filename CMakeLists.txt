@@ -44,13 +44,25 @@ if(BUILD_TESTING)
     add_test(NAME run_lazy_definition COMMAND ${CMAKE_CURRENT_BINARY_DIR}/lazy-definition)
     set_tests_properties(run_lazy_definition PROPERTIES DEPENDS compile_lazy_definition)
 
+    add_test(
+        NAME compile_functions
+        COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/functions.zeta
+                -o ${CMAKE_CURRENT_BINARY_DIR}/functions
+    )
+    add_test(NAME run_functions COMMAND ${CMAKE_CURRENT_BINARY_DIR}/functions)
+    set_tests_properties(run_functions PROPERTIES DEPENDS compile_functions)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
             invalid_identifier
             unknown_assignment
             definition_assignment
-            definition_unknown_reference)
+            definition_unknown_reference
+            function_duplicate_parameter
+            function_wrong_arity
+            call_non_function
+            function_without_call)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

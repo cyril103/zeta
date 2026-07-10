@@ -39,6 +39,7 @@ std::vector<Token> Lexer::scan() {
 
         switch (c) {
         case ':': add(TokenKind::Colon, ":", start); continue;
+        case ',': add(TokenKind::Comma, ",", start); continue;
         case '=': add(TokenKind::Equal, "=", start); continue;
         case '+': add(TokenKind::Plus, "+", start); continue;
         case '-': add(TokenKind::Minus, "-", start); continue;

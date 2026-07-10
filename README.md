@@ -7,6 +7,7 @@ des définitions paresseuses. Ses syntaxes de déclaration actuelles sont :
 val identifiant : Int = expression
 var identifiant : Int = expression
 def identifiant : Int = expression
+def fonction(parametre : Int, autre : Int) : Int = expression
 ```
 
 `Int` est un entier signé sur 32 bits. Un identifiant commence par une lettre ou
@@ -34,6 +35,19 @@ val resultat : Int = double // vaut 10
 
 Comme pour les autres déclarations, les identifiants utilisés dans une `def`
 doivent avoir été déclarés auparavant.
+
+Une `def` peut également déclarer une fonction avec des paramètres typés. Elle
+s'utilise alors avec des parenthèses :
+
+```text
+def add (a : Int, b : Int) : Int = a + b
+val resultat : Int = add(2, 3)
+```
+
+Le corps d'une fonction n'est développé dans l'IR qu'à chaque appel. Chaque
+argument est évalué une fois, puis lié au paramètre correspondant. Les fonctions
+peuvent appeler des fonctions déclarées auparavant et peuvent ne prendre aucun
+paramètre avec `def zero () : Int = 0`.
 
 Les expressions acceptent les littéraux, les valeurs précédentes, les parenthèses,
 les signes unaires `+`/`-` et les opérateurs `+`, `-`, `*`, `/` avec leur priorité

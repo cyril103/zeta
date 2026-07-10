@@ -1,5 +1,6 @@
 val i : Int = 2 + 2
 var a : Int = 5
 def doubleA : Int = a * 2
+def addition (gauche : Int, droite : Int) : Int = gauche + droite
 a = a + 1
-val resultat : Int = i * (doubleA - 1)
+val resultat : Int = addition(i, doubleA - 1)
