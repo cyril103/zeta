@@ -1,15 +1,23 @@
 # Zeta
 
-Zeta est un langage compilé à valeurs immuables. Sa syntaxe actuelle est :
+Zeta est un langage compilé avec des valeurs immuables et des variables mutables.
+Ses syntaxes de déclaration actuelles sont :
 
 ```text
 val identifiant : Int = expression
+var identifiant : Int = expression
 ```
 
 `Int` est un entier signé sur 32 bits. Un identifiant commence par une lettre ou
 `_`, puis contient des lettres, chiffres ou `_`. Les mots `val` et `Int` sont
-réservés. Une valeur déjà déclarée peut être lue dans une expression, mais ne peut
-être ni redéclarée ni affectée avec `=`.
+réservés. Un identifiant ne peut jamais être redéclaré. Une déclaration `val` est
+immuable, tandis qu'une déclaration `var` peut être réaffectée sans créer un
+nouveau slot sur la stack :
+
+```text
+var compteur : Int = 1
+compteur = compteur + 1
+```
 
 Les expressions acceptent les littéraux, les valeurs précédentes, les parenthèses,
 les signes unaires `+`/`-` et les opérateurs `+`, `-`, `*`, `/` avec leur priorité

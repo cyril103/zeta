@@ -28,7 +28,15 @@ if(BUILD_TESTING)
     add_test(NAME run_example COMMAND ${CMAKE_CURRENT_BINARY_DIR}/basic)
     set_tests_properties(run_example PROPERTIES DEPENDS compile_example)
 
-    foreach(invalid_case IN ITEMS redefinition assignment invalid_identifier)
+    add_test(
+        NAME compile_mutable_assignment
+        COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/mutable_assignment.zeta
+                -o ${CMAKE_CURRENT_BINARY_DIR}/mutable-assignment
+    )
+    add_test(NAME run_mutable_assignment COMMAND ${CMAKE_CURRENT_BINARY_DIR}/mutable-assignment)
+    set_tests_properties(run_mutable_assignment PROPERTIES DEPENDS compile_mutable_assignment)
+
+    foreach(invalid_case IN ITEMS redefinition assignment invalid_identifier unknown_assignment)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

@@ -8,17 +8,34 @@
 ValueId IrGenerator::nextValue() { return ir_.valueCount++; }
 
 IrProgram IrGenerator::generate(const Program& program) {
-    for (const Declaration& declaration : program.declarations) {
-        if (symbols_.contains(declaration.name)) {
-            throw CompileError(declaration.location,
-                               "la val '" + declaration.name + "' est déjà définie");
-        }
-        // The initializer cannot refer to the value currently being declared.
-        const ValueId value = expression(*declaration.initializer);
-        const SlotId slot = ir_.slots.size();
-        symbols_.emplace(declaration.name, slot);
-        ir_.slots.push_back(IrSlot{declaration.name, declaration.type});
-        ir_.instructions.push_back(IrStore{slot, value});
+    for (const Statement& statement : program.statements) {
+        std::visit([&](const auto& node) {
+            using T = std::decay_t<decltype(node)>;
+            if constexpr (std::is_same_v<T, Declaration>) {
+                if (symbols_.contains(node.name)) {
+                    throw CompileError(node.location,
+                                       "l'identifiant '" + node.name + "' est déjà défini");
+                }
+                // The initializer cannot refer to the value currently being declared.
+                const ValueId value = expression(*node.initializer);
+                const SlotId slot = ir_.slots.size();
+                symbols_.emplace(node.name, Symbol{slot, node.isMutable});
+                ir_.slots.push_back(IrSlot{node.name, node.type});
+                ir_.instructions.push_back(IrStore{slot, value});
+            } else {
+                const auto found = symbols_.find(node.name);
+                if (found == symbols_.end()) {
+                    throw CompileError(node.location,
+                                       "identifiant inconnu '" + node.name + "'");
+                }
+                if (!found->second.isMutable) {
+                    throw CompileError(node.location,
+                                       "la val '" + node.name + "' est immuable");
+                }
+                const ValueId value = expression(*node.value);
+                ir_.instructions.push_back(IrStore{found->second.slot, value});
+            }
+        }, statement);
     }
     return std::move(ir_);
 }
@@ -37,7 +54,7 @@ ValueId IrGenerator::expression(const Expression& expressionNode) {
                                    "val inconnue '" + node.name + "'");
             }
             const ValueId output = nextValue();
-            ir_.instructions.push_back(IrLoad{output, found->second});
+            ir_.instructions.push_back(IrLoad{output, found->second.slot});
             return output;
         } else if constexpr (std::is_same_v<T, UnaryExpr>) {
             const ValueId operand = expression(*node.operand);

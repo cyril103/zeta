@@ -1,0 +1,3 @@
+var compteur : Int = 1
+compteur = compteur + 1
+compteur = compteur * 5

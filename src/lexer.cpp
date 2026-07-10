@@ -66,6 +66,7 @@ std::vector<Token> Lexer::scan() {
             std::string text(source_.substr(begin, current_ - begin));
             TokenKind kind = TokenKind::Identifier;
             if (text == "val") kind = TokenKind::Val;
+            if (text == "var") kind = TokenKind::Var;
             if (text == "Int") kind = TokenKind::IntType;
             add(kind, std::move(text), start);
             continue;

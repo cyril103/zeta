@@ -6,6 +6,7 @@
 
 enum class TokenKind {
     Val,
+    Var,
     IntType,
     Identifier,
     Integer,
@@ -30,6 +31,7 @@ struct Token {
 inline std::string tokenName(TokenKind kind) {
     switch (kind) {
     case TokenKind::Val: return "'val'";
+    case TokenKind::Var: return "'var'";
     case TokenKind::IntType: return "'Int'";
     case TokenKind::Identifier: return "un identifiant";
     case TokenKind::Integer: return "un entier";

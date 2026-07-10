@@ -31,8 +31,13 @@ public:
     static std::string print(const IrProgram& program);
 
 private:
+    struct Symbol {
+        SlotId slot;
+        bool isMutable;
+    };
+
     ValueId expression(const Expression& expression);
     ValueId nextValue();
     IrProgram ir_;
-    std::unordered_map<std::string, SlotId> symbols_;
+    std::unordered_map<std::string, Symbol> symbols_;
 };

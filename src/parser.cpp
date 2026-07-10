@@ -27,7 +27,7 @@ Program Parser::parse() {
     Program program;
     skipSeparators();
     while (!check(TokenKind::End)) {
-        program.declarations.push_back(declaration());
+        program.statements.push_back(statement());
         if (!check(TokenKind::End) && !match(TokenKind::Separator)) {
             throw CompileError(peek().location, "fin de déclaration attendue");
         }
@@ -36,13 +36,28 @@ Program Parser::parse() {
     return program;
 }
 
-Declaration Parser::declaration() {
-    const Token& start = consume(TokenKind::Val, "une déclaration doit commencer par 'val'");
-    const Token& name = consume(TokenKind::Identifier, "identifiant attendu après 'val'");
+Statement Parser::statement() {
+    if (match(TokenKind::Val)) return declaration(false);
+    if (match(TokenKind::Var)) return declaration(true);
+    if (check(TokenKind::Identifier)) return assignment();
+    throw CompileError(peek().location,
+                       "instruction attendue ('val', 'var' ou affectation)");
+}
+
+Declaration Parser::declaration(bool isMutable) {
+    const Token start = previous();
+    const Token& name = consume(TokenKind::Identifier,
+                                "identifiant attendu après '" + start.text + "'");
     consume(TokenKind::Colon, "':' attendu après l'identifiant");
     const Token& type = consume(TokenKind::IntType, "type 'Int' attendu");
     consume(TokenKind::Equal, "'=' attendu après le type");
-    return Declaration{start.location, name.text, type.text, expression()};
+    return Declaration{start.location, name.text, type.text, isMutable, expression()};
+}
+
+Assignment Parser::assignment() {
+    const Token& name = consume(TokenKind::Identifier, "identifiant attendu");
+    consume(TokenKind::Equal, "'=' attendu après l'identifiant");
+    return Assignment{name.location, name.text, expression()};
 }
 
 ExprPtr Parser::expression() { return addition(); }

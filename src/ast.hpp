@@ -25,9 +25,18 @@ struct Declaration {
     SourceLocation location;
     std::string name;
     std::string type;
+    bool isMutable;
     ExprPtr initializer;
 };
 
+struct Assignment {
+    SourceLocation location;
+    std::string name;
+    ExprPtr value;
+};
+
+using Statement = std::variant<Declaration, Assignment>;
+
 struct Program {
-    std::vector<Declaration> declarations;
+    std::vector<Statement> statements;
 };

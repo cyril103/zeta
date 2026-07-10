@@ -17,7 +17,9 @@ private:
     bool match(TokenKind kind);
     const Token& consume(TokenKind kind, const std::string& message);
     void skipSeparators();
-    Declaration declaration();
+    Statement statement();
+    Declaration declaration(bool isMutable);
+    Assignment assignment();
     ExprPtr expression();
     ExprPtr addition();
     ExprPtr multiplication();
