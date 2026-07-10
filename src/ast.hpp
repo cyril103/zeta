@@ -8,6 +8,12 @@
 #include <variant>
 #include <vector>
 
+enum class ValueType { Int, Byte };
+
+inline std::string typeName(ValueType type) {
+    return type == ValueType::Int ? "Int" : "Byte";
+}
+
 struct Expression;
 struct Statement;
 using ExprPtr = std::unique_ptr<Expression>;
@@ -23,6 +29,7 @@ struct BlockExpr { std::vector<StatementPtr> statements; ExprPtr result; };
 struct Expression {
     SourceLocation location;
     std::variant<IntegerExpr, NameExpr, CallExpr, UnaryExpr, BinaryExpr, BlockExpr> value;
+    mutable ValueType inferredType{ValueType::Int};
 };
 
 enum class BindingKind { Val, Var, Def };
@@ -30,13 +37,13 @@ enum class BindingKind { Val, Var, Def };
 struct Parameter {
     SourceLocation location;
     std::string name;
-    std::string type;
+    ValueType type;
 };
 
 struct Declaration {
     SourceLocation location;
     std::string name;
-    std::string type;
+    ValueType type;
     BindingKind kind;
     bool callable;
     std::vector<Parameter> parameters;

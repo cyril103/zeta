@@ -19,6 +19,12 @@ const Token& Parser::consume(TokenKind kind, const std::string& message) {
     throw CompileError(peek().location, message + ", reçu " + tokenName(peek().kind));
 }
 
+ValueType Parser::consumeType(const std::string& message) {
+    if (match(TokenKind::IntType)) return ValueType::Int;
+    if (match(TokenKind::ByteType)) return ValueType::Byte;
+    throw CompileError(peek().location, message + ", reçu " + tokenName(peek().kind));
+}
+
 void Parser::skipSeparators() {
     while (match(TokenKind::Separator)) {}
 }
@@ -67,19 +73,19 @@ Declaration Parser::declaration(BindingKind kind) {
                 const Token& parameterName = consume(TokenKind::Identifier,
                                                      "nom de paramètre attendu");
                 consume(TokenKind::Colon, "':' attendu après le paramètre");
-                const Token& parameterType = consume(TokenKind::IntType,
-                                                     "type 'Int' attendu pour le paramètre");
+                const ValueType parameterType = consumeType(
+                    "type 'Int' ou 'Byte' attendu pour le paramètre");
                 parameters.push_back(Parameter{parameterName.location,
                                                parameterName.text,
-                                               parameterType.text});
+                                               parameterType});
             } while (match(TokenKind::Comma));
         }
         consume(TokenKind::RightParen, "')' attendue après les paramètres");
     }
     consume(TokenKind::Colon, "':' attendu après l'identifiant");
-    const Token& type = consume(TokenKind::IntType, "type 'Int' attendu");
+    const ValueType type = consumeType("type 'Int' ou 'Byte' attendu");
     consume(TokenKind::Equal, "'=' attendu après le type");
-    return Declaration{start.location, name.text, type.text, kind, callable,
+    return Declaration{start.location, name.text, type, kind, callable,
                        std::move(parameters), expression()};
 }
 

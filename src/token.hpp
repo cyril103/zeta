@@ -9,6 +9,7 @@ enum class TokenKind {
     Var,
     Def,
     IntType,
+    ByteType,
     Identifier,
     Integer,
     Colon,
@@ -38,6 +39,7 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::Var: return "'var'";
     case TokenKind::Def: return "'def'";
     case TokenKind::IntType: return "'Int'";
+    case TokenKind::ByteType: return "'Byte'";
     case TokenKind::Identifier: return "un identifiant";
     case TokenKind::Integer: return "un entier";
     case TokenKind::Colon: return "':'";

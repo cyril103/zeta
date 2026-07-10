@@ -10,9 +10,20 @@ def identifiant : Int = expression
 def fonction(parametre : Int, autre : Int) : Int = expression
 ```
 
-`Int` est un entier signé sur 32 bits. Un identifiant commence par une lettre ou
-`_`, puis contient des lettres, chiffres ou `_`. Les mots `val` et `Int` sont
-réservés. Un identifiant ne peut jamais être redéclaré. Une déclaration `val` est
+`Int` est un entier signé sur 32 bits. `Byte` est un entier non signé sur 8 bits,
+compris entre `0` et `255` :
+
+```text
+val x : Byte = 244
+```
+
+Les opérations entre `Byte` restent des opérations 8 bits et débordent modulo 256.
+Il n'existe pas encore de conversion implicite entre `Int` et `Byte`, mais un
+littéral est accepté lorsqu'il tient dans le type attendu.
+
+Un identifiant commence par une lettre ou `_`, puis contient des lettres, chiffres
+ou `_`. Les mots `val`, `var`, `def`, `Int` et `Byte` sont réservés. Un identifiant
+ne peut jamais être redéclaré. Une déclaration `val` est
 immuable, tandis qu'une déclaration `var` peut être réaffectée sans créer un
 nouveau slot sur la stack :
 

@@ -1,0 +1,12 @@
+def incremente (valeur : Byte) : Byte = valeur + 1
+
+val x : Byte = 244
+var compteur : Byte = incremente(x)
+compteur = compteur + 10
+val debordement : Byte = 255 + 1
+val negatifModulo : Byte = -1
+
+def main () : Int = {
+    val local : Byte = compteur * 2
+    0
+}

@@ -1,0 +1,4 @@
+def identite (valeur : Byte) : Byte = valeur
+val entier : Int = 42
+val resultat : Byte = identite(entier)
+def main () : Int = 0

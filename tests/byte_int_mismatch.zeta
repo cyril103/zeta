@@ -1,0 +1,3 @@
+val entier : Int = 42
+val octet : Byte = entier
+def main () : Int = 0

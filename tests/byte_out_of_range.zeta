@@ -1,0 +1,2 @@
+val invalide : Byte = 256
+def main () : Int = 0

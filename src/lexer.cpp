@@ -72,6 +72,7 @@ std::vector<Token> Lexer::scan() {
             if (text == "var") kind = TokenKind::Var;
             if (text == "def") kind = TokenKind::Def;
             if (text == "Int") kind = TokenKind::IntType;
+            if (text == "Byte") kind = TokenKind::ByteType;
             add(kind, std::move(text), start);
             continue;
         }

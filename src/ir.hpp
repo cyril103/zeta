@@ -5,21 +5,20 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <variant>
 #include <vector>
 
 using ValueId = std::size_t;
 using SlotId = std::size_t;
 
-struct IrConst { ValueId output; std::int32_t value; };
-struct IrLoad { ValueId output; SlotId slot; };
-struct IrUnary { ValueId output; char op; ValueId operand; };
-struct IrBinary { ValueId output; char op; ValueId left; ValueId right; };
-struct IrStore { SlotId slot; ValueId value; };
+struct IrConst { ValueId output; std::int32_t value; ValueType type; };
+struct IrLoad { ValueId output; SlotId slot; ValueType type; };
+struct IrUnary { ValueId output; char op; ValueId operand; ValueType type; };
+struct IrBinary { ValueId output; char op; ValueId left; ValueId right; ValueType type; };
+struct IrStore { SlotId slot; ValueId value; ValueType type; };
 using IrInstruction = std::variant<IrConst, IrLoad, IrUnary, IrBinary, IrStore>;
 
-struct IrSlot { std::string name; std::string type; };
+struct IrSlot { std::string name; ValueType type; };
 struct IrProgram {
     std::vector<IrSlot> slots;
     std::vector<IrInstruction> instructions;
@@ -39,11 +38,14 @@ private:
         const Declaration* declaration;
     };
 
-    void validateExpression(const Expression& expression,
-                            const std::unordered_set<std::string>& parameters = {}) const;
-    void validateExpression(
+    ValueType validateExpression(
         const Expression& expression,
-        const std::unordered_set<std::string>& parameters,
+        ValueType expected,
+        const std::unordered_map<std::string, ValueType>& parameters = {}) const;
+    ValueType validateExpression(
+        const Expression& expression,
+        ValueType expected,
+        const std::unordered_map<std::string, ValueType>& parameters,
         const std::unordered_map<std::string, const Declaration*>& locals) const;
     ValueId expression(const Expression& expression);
     ValueId expression(const Expression& expression,

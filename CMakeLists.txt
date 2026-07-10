@@ -71,6 +71,14 @@ if(BUILD_TESTING)
         WILL_FAIL TRUE
     )
 
+    add_test(
+        NAME compile_byte_type
+        COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/byte_type.zeta
+                -o ${CMAKE_CURRENT_BINARY_DIR}/byte-type
+    )
+    add_test(NAME run_byte_type COMMAND ${CMAKE_CURRENT_BINARY_DIR}/byte-type)
+    set_tests_properties(run_byte_type PROPERTIES DEPENDS compile_byte_type)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -86,7 +94,10 @@ if(BUILD_TESTING)
             block_scope
             multiline_without_braces
             missing_main
-            main_parameters)
+            main_parameters
+            byte_out_of_range
+            byte_int_mismatch
+            byte_argument_mismatch)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta
