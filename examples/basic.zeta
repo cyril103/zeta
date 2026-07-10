@@ -4,3 +4,7 @@ def doubleA : Int = a * 2
 def addition (gauche : Int, droite : Int) : Int = gauche + droite
 a = a + 1
 val resultat : Int = addition(i, doubleA - 1)
+
+def main () : Int = {
+    0
+}

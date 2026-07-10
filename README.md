@@ -82,3 +82,18 @@ cmake --build build
 La compilation produit `build/basic.ir`, `build/basic.asm` et l'exécutable
 `build/basic`. La cible actuelle est Linux x86-64 et nécessite `fasm` dans le
 `PATH`.
+
+## Point d'entrée
+
+Tout programme Zeta doit déclarer exactement ce point d'entrée :
+
+```text
+def main () : Int = {
+    0
+}
+```
+
+`main` ne prend aucun paramètre et retourne un `Int`. Sa valeur devient le code de
+sortie du processus : `0` indique une terminaison normale, tandis qu'une autre
+valeur signale une terminaison non normale. Un programme sans `main`, ou avec une
+signature différente, est refusé par le compilateur.

@@ -24,6 +24,7 @@ struct IrProgram {
     std::vector<IrSlot> slots;
     std::vector<IrInstruction> instructions;
     std::size_t valueCount{0};
+    ValueId exitValue{0};
 };
 
 class IrGenerator {

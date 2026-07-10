@@ -51,8 +51,8 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
         }, instruction);
     }
 
-    out << "    mov eax, 60\n"
-           "    xor edi, edi\n"
+    out << "    mov edi, dword [rbp-" << valueOffset(program, program.exitValue) << "]\n"
+           "    mov eax, 60\n"
            "    syscall\n";
     return out.str();
 }

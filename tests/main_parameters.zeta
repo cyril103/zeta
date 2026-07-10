@@ -1,0 +1,1 @@
+def main (argument : Int) : Int = argument

@@ -5,3 +5,5 @@ val resultat : Int = double + double
 
 // Cette expression ne doit jamais produire de code puisqu'elle n'est pas utilisée.
 def jamaisEvalue : Int = 1 / 0
+
+def main () : Int = 0

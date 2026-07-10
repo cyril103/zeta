@@ -53,6 +53,19 @@ IrProgram IrGenerator::generate(const Program& program) {
             }
         }, statement.value);
     }
+
+    const auto mainSymbol = symbols_.find("main");
+    if (mainSymbol == symbols_.end()) {
+        throw CompileError(SourceLocation{1, 1},
+                           "point d'entrée manquant : 'def main () : Int' est obligatoire");
+    }
+    const Declaration& mainDeclaration = *mainSymbol->second.declaration;
+    if (mainDeclaration.kind != BindingKind::Def || !mainDeclaration.callable ||
+        !mainDeclaration.parameters.empty() || mainDeclaration.type != "Int") {
+        throw CompileError(mainDeclaration.location,
+                           "le point d'entrée doit avoir la signature 'def main () : Int'");
+    }
+    ir_.exitValue = expression(*mainDeclaration.initializer);
     return std::move(ir_);
 }
 
@@ -285,6 +298,7 @@ std::string IrGenerator::print(const IrProgram& program) {
                 out << "  store.i32 $" << item.value << ", %" << program.slots[item.slot].name << '\n';
         }, instruction);
     }
+    out << "  exit.i32 $" << program.exitValue << '\n';
     out << "}\n";
     return out.str();
 }

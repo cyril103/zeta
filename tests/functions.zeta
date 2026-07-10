@@ -9,3 +9,5 @@ val second : Int = double(base) + zero()
 
 // Le corps ne doit pas être généré car la fonction n'est jamais appelée.
 def jamaisAppelee (diviseur : Int) : Int = 1 / diviseur
+
+def main () : Int = 0

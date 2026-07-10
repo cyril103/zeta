@@ -60,6 +60,17 @@ if(BUILD_TESTING)
     add_test(NAME run_block_expressions COMMAND ${CMAKE_CURRENT_BINARY_DIR}/block-expressions)
     set_tests_properties(run_block_expressions PROPERTIES DEPENDS compile_block_expressions)
 
+    add_test(
+        NAME compile_main_exit_code
+        COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/main_exit_code.zeta
+                -o ${CMAKE_CURRENT_BINARY_DIR}/main-exit-code
+    )
+    add_test(NAME run_main_exit_code COMMAND ${CMAKE_CURRENT_BINARY_DIR}/main-exit-code)
+    set_tests_properties(run_main_exit_code PROPERTIES
+        DEPENDS compile_main_exit_code
+        WILL_FAIL TRUE
+    )
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -73,7 +84,9 @@ if(BUILD_TESTING)
             function_without_call
             block_missing_result
             block_scope
-            multiline_without_braces)
+            multiline_without_braces
+            missing_main
+            main_parameters)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta
