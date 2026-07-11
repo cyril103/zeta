@@ -1,6 +1,6 @@
 import io
 
 def main () : Int = {
-    val written : Int = io.print("Zeta")
+    val written : Int = io.println("Zeta")
     0
 }
