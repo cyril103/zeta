@@ -1,0 +1,5 @@
+def invalid (first : &mut Int, second : &mut Int) : Int = 0
+def main () : Int = {
+    var value : Int = 1
+    invalid(&mut value, &mut value)
+}

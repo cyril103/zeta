@@ -394,7 +394,9 @@ if(BUILD_TESTING)
             reference_shared_write
             reference_borrow_conflict
             reference_double_mut
-            reference_borrowed_assignment)
+            reference_borrowed_assignment
+            reference_call_alias
+            reference_mutable_direct_read)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

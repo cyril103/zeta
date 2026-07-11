@@ -322,6 +322,40 @@ L'égalité, l'ordre et l'arithmétique sur des tableaux entiers ne sont pas enc
 définis. Les paramètres et retours de type tableau sont également différés jusqu'à
 l'introduction d'une convention d'appel pour les blocs par valeur (`sret`).
 
+## Références empruntées
+
+Une référence sûre désigne une valeur existante sans la posséder ni l'allouer :
+
+```text
+var valeur : Int = 41
+val lecture : &Int = &valeur
+val écriture : &mut Int = &mut valeur
+```
+
+`&T` autorise la lecture avec `*référence`. `&mut T` autorise également
+`*référence = valeur`. Une référence est toujours non nulle, occupe 8 octets sur
+x86-64 et ne réalise aucune allocation dynamique.
+
+Les emprunts suivent actuellement des portées lexicales conservatrices :
+
+- plusieurs emprunts partagés `&T` peuvent coexister ;
+- un emprunt `&mut T` doit être unique et exclut toute lecture ou mutation directe ;
+- une valeur empruntée ne peut pas être réaffectée avant la fin du bloc ;
+- seuls les identifiants de données peuvent être empruntés ;
+- `&mut` exige une variable déclarée avec `var` ;
+- deux arguments incompatibles ne peuvent pas emprunter la même valeur dans un appel.
+
+Les références peuvent être passées aux fonctions et évitent notamment la copie
+des tableaux fixes :
+
+```text
+def somme (values : &[Int; 3]) : Int = values[0] + values[1] + values[2]
+```
+
+Le stockage global, les variables référence mutables et les retours de références
+sont encore interdits. Les slices, `Box[T]`, les pointeurs bruts, l'arithmétique
+d'adresse et l'allocation sur le tas ne font pas partie de cette étape.
+
 ## Expressions sur plusieurs lignes
 
 Une expression sur plusieurs lignes doit être placée entre accolades. Le bloc

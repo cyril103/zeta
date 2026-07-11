@@ -192,7 +192,7 @@ contrôles statiques/dynamiques des limites.
 Ordre recommandé :
 
 1. tableaux de taille fixe — terminé ;
-2. références ou pointeurs contrôlés ;
+2. références empruntées `&T` et `&mut T` — disponibles localement et en paramètres ;
 3. structures ;
 4. énumérations ;
 5. tableaux dynamiques.

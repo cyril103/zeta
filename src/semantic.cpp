@@ -356,7 +356,8 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (node.mutableBorrow && (symbol->kind != BindingKind::Var || symbol->parameter))
                 throw CompileError(expression.location,
                                    "'&mut' exige une variable 'var'");
-            checkExpression(*node.operand, symbol->type);
+            node.operand->inferredType = symbol->type;
+            node.operand->typed = true;
             return ValueType(std::make_shared<ValueType>(symbol->type), node.mutableBorrow);
         }
         else if constexpr (std::is_same_v<T, DereferenceExpr>) {
@@ -374,6 +375,10 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (symbol->kind == BindingKind::Def && symbol->callable)
                 throw CompileError(expression.location,
                                    "la fonction '" + node.name + "' doit être appelée");
+            if (const auto borrowed = borrows_.find(node.name);
+                borrowed != borrows_.end() && borrowed->second.mutableBorrow)
+                throw CompileError(expression.location,
+                    "accès direct interdit pendant l'emprunt mutable de '" + node.name + "'");
             return symbol->type;
         } else if constexpr (std::is_same_v<T, CallExpr>) {
             const SemanticSymbol* symbol = symbols_.lookup(node.name);
@@ -387,6 +392,29 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 throw CompileError(expression.location, "la fonction '" + node.name + "' attend " +
                     std::to_string(parameterCount) + " argument(s), reçu " +
                     std::to_string(node.arguments.size()));
+            std::unordered_map<std::string, BorrowState> callBorrows;
+            for (const ExprPtr& argument : node.arguments) {
+                const auto* address = std::get_if<AddressExpr>(&argument->value);
+                if (address == nullptr) continue;
+                const auto* name = std::get_if<NameExpr>(&address->operand->value);
+                if (name == nullptr) continue;
+                BorrowState& temporary = callBorrows[name->name];
+                const auto existing = borrows_.find(name->name);
+                if (address->mutableBorrow) {
+                    if (temporary.mutableBorrow || temporary.shared != 0 ||
+                        (existing != borrows_.end() &&
+                         (existing->second.mutableBorrow || existing->second.shared != 0)))
+                        throw CompileError(argument->location,
+                            "emprunts incompatibles de '" + name->name + "' dans l'appel");
+                    temporary.mutableBorrow = true;
+                } else {
+                    if (temporary.mutableBorrow ||
+                        (existing != borrows_.end() && existing->second.mutableBorrow))
+                        throw CompileError(argument->location,
+                            "emprunt partagé incompatible de '" + name->name + "'");
+                    ++temporary.shared;
+                }
+            }
             for (std::size_t i = 0; i < node.arguments.size(); ++i) {
                 const ValueType parameterType = symbol->declaration != nullptr
                     ? symbol->declaration->parameters[i].type : symbol->parameterTypes[i];
