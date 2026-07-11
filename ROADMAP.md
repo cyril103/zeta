@@ -185,9 +185,13 @@ Prochaines étapes :
 
 ## Phase 7 — Structures de données
 
+Les tableaux de taille fixe sont disponibles : types récursifs `[T; N]`,
+littéraux, copie par valeur, lecture et mutation indexées, tableaux imbriqués et
+contrôles statiques/dynamiques des limites.
+
 Ordre recommandé :
 
-1. tableaux de taille fixe ;
+1. tableaux de taille fixe — terminé ;
 2. références ou pointeurs contrôlés ;
 3. structures ;
 4. énumérations ;

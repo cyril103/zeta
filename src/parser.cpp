@@ -142,6 +142,20 @@ bool Parser::checkSeparator() const {
 bool Parser::matchSeparator() {
     return match(TokenKind::Separator) || match(TokenKind::Semicolon);
 }
+bool Parser::startsAssignment() const {
+    if (!check(TokenKind::Identifier) || current_ + 1 >= tokens_.size()) return false;
+    if (tokens_[current_ + 1].kind == TokenKind::Equal) return true;
+    std::size_t cursor = current_ + 1;
+    while (cursor < tokens_.size() && tokens_[cursor].kind == TokenKind::LeftBracket) {
+        std::size_t depth = 0;
+        do {
+            if (tokens_[cursor].kind == TokenKind::LeftBracket) ++depth;
+            else if (tokens_[cursor].kind == TokenKind::RightBracket) --depth;
+            ++cursor;
+        } while (cursor < tokens_.size() && depth != 0);
+    }
+    return cursor < tokens_.size() && tokens_[cursor].kind == TokenKind::Equal;
+}
 
 const Token& Parser::consume(TokenKind kind, const std::string& message) {
     if (check(kind)) return tokens_[current_++];
@@ -261,9 +275,7 @@ std::vector<StatementPtr> Parser::loopBody() {
             check(TokenKind::Val) || check(TokenKind::Var) ||
             check(TokenKind::Def) || check(TokenKind::While) || check(TokenKind::Return) ||
             check(TokenKind::Break) || check(TokenKind::Continue) ||
-            (check(TokenKind::Identifier) && current_ + 1 < tokens_.size() &&
-             (tokens_[current_ + 1].kind == TokenKind::Equal ||
-              tokens_[current_ + 1].kind == TokenKind::LeftBracket));
+            startsAssignment();
         if (startsStatement) {
             body.push_back(std::make_unique<Statement>(statement()));
         } else {
@@ -579,11 +591,7 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
                                        check(TokenKind::Def) || check(TokenKind::While) ||
                                        check(TokenKind::Return) || check(TokenKind::Break) ||
                                        check(TokenKind::Continue);
-        const bool startsAssignment = check(TokenKind::Identifier) &&
-                                      current_ + 1 < tokens_.size() &&
-                                      (tokens_[current_ + 1].kind == TokenKind::Equal ||
-                                       tokens_[current_ + 1].kind == TokenKind::LeftBracket);
-        if (!startsDeclaration && !startsAssignment) break;
+        if (!startsDeclaration && !startsAssignment()) break;
 
         statements.push_back(std::make_unique<Statement>(statement()));
         if (!check(TokenKind::RightBrace) && !matchSeparator()) {

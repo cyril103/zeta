@@ -84,6 +84,13 @@ void SemanticAnalyzer::checkStatement(Statement& statement, bool global) {
 }
 
 void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecursion) {
+    if (declaration.callable && declaration.type.kind == ValueType::Kind::Array)
+        throw CompileError(declaration.location,
+                           "le retour d'un tableau par valeur n'est pas encore pris en charge");
+    for (const Parameter& parameter : declaration.parameters)
+        if (parameter.type.kind == ValueType::Kind::Array)
+            throw CompileError(parameter.location,
+                               "les paramètres tableaux ne sont pas encore pris en charge");
     const SemanticSymbol declarationSymbol{declaration.type, declaration.kind,
                                             declaration.callable, &declaration, false, {}};
     if (declaration.callable && allowRecursion &&
@@ -311,6 +318,9 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (TypeRules::isComparison(node.op)) {
                 const ValueType operands = TypeRules::commonOperandType(
                     inferType(*node.left), inferType(*node.right));
+                if (operands.kind == ValueType::Kind::Array)
+                    throw CompileError(expression.location,
+                                       "les comparaisons de tableaux ne sont pas encore disponibles");
                 if (TypeRules::isOrdering(node.op) &&
                     (operands == ValueType::Bool || operands == ValueType::String))
                     throw CompileError(expression.location,

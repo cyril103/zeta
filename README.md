@@ -281,6 +281,47 @@ ne possède pas de corps Zeta. Elle est réservée aux déclarations globales ; 
 compilateur exporte sa signature, génère une référence ELF externe, assemble
 l'objet correspondant depuis `runtime/`, le met en cache et le transmet à `ld`.
 
+## Tableaux de taille fixe
+
+Un tableau fixe porte son type d'élément et sa longueur dans son type :
+
+```text
+val nombres : [Int; 3] = [10, 20, 30]
+var caractères : [Char; 2] = ['A', 'é']
+val matrice : [[Int; 2]; 2] = [[1, 2], [3, 4]]
+```
+
+La longueur doit être strictement positive et le littéral doit fournir exactement
+le nombre d'éléments annoncé. Chaque élément est vérifié récursivement. Les
+tableaux peuvent contenir tous les types actuels, notamment `Char`, `String` et
+d'autres tableaux.
+
+Un tableau possède ses données directement. Sa taille est
+`taille(element) × longueur` et une affectation ou initialisation depuis un autre
+tableau copie tout le bloc :
+
+```text
+var copie : [Int; 3] = nombres
+copie[0] = 99 // nombres[0] reste égal à 10
+```
+
+La mutation d'un élément exige une variable déclarée avec `var`. Une `val` et ses
+éléments restent immuables. Les lectures et écritures imbriquées sont disponibles :
+
+```text
+var matrice : [[Int; 2]; 2] = [[1, 2], [3, 4]]
+matrice[1][0] = 30
+val résultat : Int = matrice[1][0]
+```
+
+Un index constant hors limites est rejeté à la compilation. Un index calculé est
+contrôlé à l'exécution ; une valeur négative ou supérieure ou égale à la longueur
+termine le programme avec le code `101` avant tout accès mémoire.
+
+L'égalité, l'ordre et l'arithmétique sur des tableaux entiers ne sont pas encore
+définis. Les paramètres et retours de type tableau sont également différés jusqu'à
+l'introduction d'une convention d'appel pour les blocs par valeur (`sret`).
+
 ## Expressions sur plusieurs lignes
 
 Une expression sur plusieurs lignes doit être placée entre accolades. Le bloc

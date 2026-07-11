@@ -1,0 +1,2 @@
+def invalide (values : [Int; 2]) : Int = values[0]
+def main () : Int = invalide([1, 2])
