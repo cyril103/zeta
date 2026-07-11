@@ -34,6 +34,7 @@ enum class TokenKind {
     Colon,
     Comma,
     Dot,
+    Semicolon,
     Equal,
     EqualEqual,
     Bang,
@@ -52,6 +53,8 @@ enum class TokenKind {
     RightParen,
     LeftBrace,
     RightBrace,
+    LeftBracket,
+    RightBracket,
     Separator,
     End,
 };
@@ -93,6 +96,7 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::Colon: return "':'";
     case TokenKind::Comma: return "','";
     case TokenKind::Dot: return "'.'";
+    case TokenKind::Semicolon: return "';'";
     case TokenKind::Equal: return "'='";
     case TokenKind::EqualEqual: return "'=='";
     case TokenKind::Bang: return "'!'";
@@ -111,6 +115,8 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::RightParen: return "')'";
     case TokenKind::LeftBrace: return "'{'";
     case TokenKind::RightBrace: return "'}'";
+    case TokenKind::LeftBracket: return "'['";
+    case TokenKind::RightBracket: return "']'";
     case TokenKind::Separator: return "une fin de ligne ou ';'";
     case TokenKind::End: return "la fin du fichier";
     }

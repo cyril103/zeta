@@ -108,7 +108,9 @@ std::vector<Token> Lexer::scan() {
         case ')': add(TokenKind::RightParen, ")", start); continue;
         case '{': add(TokenKind::LeftBrace, "{", start); continue;
         case '}': add(TokenKind::RightBrace, "}", start); continue;
-        case ';': add(TokenKind::Separator, ";", start); continue;
+        case ';': add(TokenKind::Semicolon, ";", start); continue;
+        case '[': add(TokenKind::LeftBracket, "[", start); continue;
+        case ']': add(TokenKind::RightBracket, "]", start); continue;
         default: break;
         }
         if (c == '&' || c == '|') {

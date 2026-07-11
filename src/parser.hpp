@@ -15,6 +15,8 @@ private:
     const Token& previous() const;
     bool check(TokenKind kind) const;
     bool match(TokenKind kind);
+    bool checkSeparator() const;
+    bool matchSeparator();
     const Token& consume(TokenKind kind, const std::string& message);
     ValueType consumeType(const std::string& message);
     void skipSeparators();

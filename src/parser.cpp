@@ -136,6 +136,12 @@ bool Parser::match(TokenKind kind) {
     ++current_;
     return true;
 }
+bool Parser::checkSeparator() const {
+    return check(TokenKind::Separator) || check(TokenKind::Semicolon);
+}
+bool Parser::matchSeparator() {
+    return match(TokenKind::Separator) || match(TokenKind::Semicolon);
+}
 
 const Token& Parser::consume(TokenKind kind, const std::string& message) {
     if (check(kind)) return tokens_[current_++];
@@ -153,11 +159,11 @@ ValueType Parser::consumeType(const std::string& message) {
 }
 
 void Parser::skipSeparators() {
-    while (match(TokenKind::Separator)) {}
+    while (matchSeparator()) {}
 }
 
 void Parser::expressionContinuation() {
-    if (!check(TokenKind::Separator)) return;
+    if (!checkSeparator()) return;
     if (blockDepth_ == 0) {
         throw CompileError(peek().location,
                            "une expression sur plusieurs lignes doit être entre accolades");
@@ -173,13 +179,13 @@ Program Parser::parse() {
         const Token& module = consume(TokenKind::Identifier,
                                       "nom de module attendu après 'import'");
         program.imports.push_back(Program::Import{start.location, module.text});
-        if (!check(TokenKind::End) && !match(TokenKind::Separator))
+        if (!check(TokenKind::End) && !matchSeparator())
             throw CompileError(peek().location, "fin d'instruction attendue après l'import");
         skipSeparators();
     }
     while (!check(TokenKind::End)) {
         program.statements.push_back(statement());
-        if (!check(TokenKind::End) && !match(TokenKind::Separator)) {
+        if (!check(TokenKind::End) && !matchSeparator()) {
             throw CompileError(peek().location, "fin d'instruction attendue");
         }
         skipSeparators();
@@ -251,7 +257,7 @@ std::vector<StatementPtr> Parser::loopBody() {
             body.push_back(std::make_unique<Statement>(
                 ExpressionStatement{location, expression()}));
         }
-        if (!check(TokenKind::RightBrace) && !match(TokenKind::Separator)) {
+        if (!check(TokenKind::RightBrace) && !matchSeparator()) {
             throw CompileError(peek().location,
                                "fin de ligne ou ';' attendue dans le corps de la boucle");
         }
@@ -530,7 +536,7 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
         if (!startsDeclaration && !startsAssignment) break;
 
         statements.push_back(std::make_unique<Statement>(statement()));
-        if (!check(TokenKind::RightBrace) && !match(TokenKind::Separator)) {
+        if (!check(TokenKind::RightBrace) && !matchSeparator()) {
             throw CompileError(peek().location,
                                "fin de ligne ou ';' attendue après l'instruction du bloc");
         }
