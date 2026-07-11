@@ -315,6 +315,12 @@ if(BUILD_TESTING)
     add_test(NAME run_reference_parameters COMMAND ${CMAKE_CURRENT_BINARY_DIR}/reference-parameters)
     set_tests_properties(run_reference_parameters PROPERTIES DEPENDS compile_reference_parameters)
 
+    add_test(NAME compile_reference_array COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/reference_array.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/reference-array)
+    add_test(NAME run_reference_array COMMAND ${CMAKE_CURRENT_BINARY_DIR}/reference-array)
+    set_tests_properties(run_reference_array PROPERTIES DEPENDS compile_reference_array)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment

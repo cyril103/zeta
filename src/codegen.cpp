@@ -112,9 +112,12 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     << "    js ir_array_bounds_error\n"
                     << "    cmp rax, " << item.arrayType.length << "\n"
                     << "    jae ir_array_bounds_error\n"
-                    << "    imul rax, " << elementBytes << "\n"
-                    << "    lea rsi, [rbp-" << valueOffset(program, item.array) << "]\n"
-                    << "    add rsi, rax\n";
+                    << "    imul rax, " << elementBytes << "\n";
+                if (item.arrayIsReference)
+                    out << "    mov rsi, qword [rbp-" << valueOffset(program, item.array) << "]\n";
+                else
+                    out << "    lea rsi, [rbp-" << valueOffset(program, item.array) << "]\n";
+                out << "    add rsi, rax\n";
                 emitBlockCopy(out, "[rsi]",
                     "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]",
                     elementBytes);

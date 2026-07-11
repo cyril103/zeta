@@ -1,0 +1,6 @@
+def sum (values : &[Int; 3]) : Int = values[0] + values[1] + values[2]
+
+def main () : Int = {
+    val values : [Int; 3] = [10, 20, 12]
+    if (sum(&values) == 42) 0 else 1
+}

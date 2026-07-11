@@ -391,8 +391,12 @@ ValueId IrGenerator::expression(
             const ValueId array = expression(*node.array, parameters);
             const ValueId index = expression(*node.index, parameters);
             const ValueId output = nextValue(expressionNode.inferredType);
-            ir_.instructions.push_back(IrIndexLoad{output, array, index,
-                                                   node.array->inferredType});
+            const bool arrayIsReference =
+                node.array->inferredType.kind == ValueType::Kind::Reference;
+            const ValueType arrayType = arrayIsReference
+                ? *node.array->inferredType.element : node.array->inferredType;
+            ir_.instructions.push_back(IrIndexLoad{output, array, index, arrayType,
+                                                   arrayIsReference});
             return output;
         } else if constexpr (std::is_same_v<T, AddressExpr>) {
             const auto& name = std::get<NameExpr>(node.operand->value);

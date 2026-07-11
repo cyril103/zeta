@@ -258,7 +258,8 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
                              node.elements.size());
         }
         else if constexpr (std::is_same_v<T, IndexExpr>) {
-            const ValueType arrayType = inferType(*node.array);
+            ValueType arrayType = inferType(*node.array);
+            if (arrayType.kind == ValueType::Kind::Reference) arrayType = *arrayType.element;
             return arrayType.kind == ValueType::Kind::Array ? *arrayType.element : ValueType::Int;
         }
         else if constexpr (std::is_same_v<T, AddressExpr>)
@@ -328,11 +329,13 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             return expected;
         }
         else if constexpr (std::is_same_v<T, IndexExpr>) {
-            const ValueType arrayType = inferType(*node.array);
+            const ValueType operandType = inferType(*node.array);
+            ValueType arrayType = operandType;
+            if (arrayType.kind == ValueType::Kind::Reference) arrayType = *arrayType.element;
             if (arrayType.kind != ValueType::Kind::Array)
                 throw CompileError(node.array->location,
                                    "l'indexation exige une valeur de type tableau");
-            checkExpression(*node.array, arrayType);
+            checkExpression(*node.array, operandType);
             checkExpression(*node.index, ValueType::Int);
             if (const auto index = constantInteger(*node.index);
                 index && (*index < 0 || static_cast<std::uint64_t>(*index) >= arrayType.length)) {
