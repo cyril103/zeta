@@ -45,6 +45,29 @@ std::string formatDouble(double value) {
         << value;
     return out.str();
 }
+std::string displacedAddress(const std::string& address, std::size_t displacement) {
+    if (displacement == 0) return address;
+    return address.substr(0, address.size() - 1) + "+" + std::to_string(displacement) + "]";
+}
+void emitBlockCopy(std::ostringstream& out, const std::string& source,
+                   const std::string& target, std::size_t bytes) {
+    std::size_t offset = 0;
+    while (bytes - offset >= 8U) {
+        out << "    mov rax, qword " << displacedAddress(source, offset) << "\n"
+            << "    mov qword " << displacedAddress(target, offset) << ", rax\n";
+        offset += 8U;
+    }
+    if (bytes - offset >= 4U) {
+        out << "    mov eax, dword " << displacedAddress(source, offset) << "\n"
+            << "    mov dword " << displacedAddress(target, offset) << ", eax\n";
+        offset += 4U;
+    }
+    while (offset < bytes) {
+        out << "    mov al, byte " << displacedAddress(source, offset) << "\n"
+            << "    mov byte " << displacedAddress(target, offset) << ", al\n";
+        ++offset;
+    }
+}
 }
 
 std::string FasmCodeGenerator::generate(const IrProgram& program) {
@@ -71,12 +94,26 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 out << "    lea rax, [string_const_" << item.output << "]\n"
                     << "    mov qword [rbp-" << offset << "], rax\n"
                     << "    mov qword [rbp-" << offset - 8U << "], " << item.utf8.size() << '\n';
+            } else if constexpr (std::is_same_v<T, IrArrayConstruct>) {
+                const std::size_t output = valueOffset(program, item.output);
+                const std::size_t elementBytes = valueTypeSize(*item.type.element);
+                for (std::size_t i = 0; i < item.elements.size(); ++i) {
+                    const std::string source = "[rbp-" +
+                        std::to_string(valueOffset(program, item.elements[i])) + "]";
+                    const std::string target = "[rbp-" + std::to_string(output) +
+                        (i == 0 ? "]" : "+" + std::to_string(i * elementBytes) + "]");
+                    emitBlockCopy(out, source, target, elementBytes);
+                }
             } else if constexpr (std::is_same_v<T, IrLoad>) {
                 const IrSlot& slot = program.slots[item.slot];
                 const std::string address = slot.global
                     ? "[global_slot_" + std::to_string(item.slot) + "]"
                     : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
-                if (item.type == ValueType::String) {
+                if (item.type.kind == ValueType::Kind::Array) {
+                    emitBlockCopy(out, address,
+                        "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]",
+                        valueTypeSize(item.type));
+                } else if (item.type == ValueType::String) {
                     const std::size_t offset = valueOffset(program, item.output);
                     out << "    mov rax, qword " << address << "\n"
                         << "    mov qword [rbp-" << offset << "], rax\n"
@@ -235,7 +272,11 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 const std::string address = slot.global
                     ? "[global_slot_" + std::to_string(item.slot) + "]"
                     : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
-                if (item.type == ValueType::String) {
+                if (item.type.kind == ValueType::Kind::Array) {
+                    emitBlockCopy(out,
+                        "[rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
+                        address, valueTypeSize(item.type));
+                } else if (item.type == ValueType::String) {
                     const std::size_t source = valueOffset(program, item.value);
                     out << "    mov rax, qword [rbp-" << source << "]\n"
                         << "    mov qword " << address << ", rax\n"
@@ -251,7 +292,12 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         << (item.type == ValueType::Byte || item.type == ValueType::Bool ? "al\n" : "eax\n");
                 }
             } else if constexpr (std::is_same_v<T, IrCopy>) {
-                if (item.type == ValueType::String) {
+                if (item.type.kind == ValueType::Kind::Array) {
+                    emitBlockCopy(out,
+                        "[rbp-" + std::to_string(valueOffset(program, item.input)) + "]",
+                        "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]",
+                        valueTypeSize(item.type));
+                } else if (item.type == ValueType::String) {
                     const std::size_t input = valueOffset(program, item.input);
                     const std::size_t output = valueOffset(program, item.output);
                     out << "    mov rax, qword [rbp-" << input << "]\n"
@@ -383,8 +429,10 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
         }
         for (std::size_t i = 0; i < program.slots.size(); ++i) {
             if (!program.slots[i].global) continue;
-            out << "global_slot_" << i << ": "
-                << (program.slots[i].type == ValueType::String ? "rq 2" :
+            out << "global_slot_" << i << ": ";
+            if (program.slots[i].type.kind == ValueType::Kind::Array)
+                out << "rb " << valueTypeSize(program.slots[i].type) << '\n';
+            else out << (program.slots[i].type == ValueType::String ? "rq 2" :
                     program.slots[i].type == ValueType::Double ? "rq 1" :
                     (program.slots[i].type == ValueType::Int ||
                      program.slots[i].type == ValueType::Char) ? "rd 1" : "rb 1") << '\n';

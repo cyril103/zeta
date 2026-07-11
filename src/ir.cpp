@@ -330,8 +330,13 @@ ValueId IrGenerator::expression(
             ir_.instructions.push_back(IrStringConst{output, node.utf8});
             return output;
         } else if constexpr (std::is_same_v<T, ArrayExpr>) {
-            throw CompileError(expressionNode.location,
-                               "la génération des tableaux n'est pas encore disponible");
+            std::vector<ValueId> elements;
+            for (const ExprPtr& element : node.elements)
+                elements.push_back(expression(*element, parameters));
+            const ValueId output = nextValue(expressionNode.inferredType);
+            ir_.instructions.push_back(IrArrayConstruct{output, std::move(elements),
+                                                        expressionNode.inferredType});
+            return output;
         } else if constexpr (std::is_same_v<T, NameExpr>) {
             if (const auto parameter = parameters.find(node.name);
                 parameter != parameters.end()) {
@@ -505,6 +510,14 @@ std::string IrGenerator::print(const IrProgram& program) {
             else if constexpr (std::is_same_v<T, IrStringConst>)
                 out << "  $" << item.output << " = const.string " << item.utf8.size()
                     << " bytes\n";
+            else if constexpr (std::is_same_v<T, IrArrayConstruct>) {
+                out << "  $" << item.output << " = array " << typeName(item.type) << " [";
+                for (std::size_t i = 0; i < item.elements.size(); ++i) {
+                    if (i != 0) out << ", ";
+                    out << '$' << item.elements[i];
+                }
+                out << "]\n";
+            }
             else if constexpr (std::is_same_v<T, IrLoad>)
                 out << "  $" << item.output << " = load."
                     << suffix(item.type) << " %" << program.slots[item.slot].name << '\n';

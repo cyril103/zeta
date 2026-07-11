@@ -1,0 +1,7 @@
+val source : [Int; 3] = [10, 20, 30]
+
+def main () : Int = {
+    var copy : [Int; 3] = source
+    val secondCopy : [Int; 3] = copy
+    0
+}

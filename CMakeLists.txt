@@ -253,6 +253,12 @@ if(BUILD_TESTING)
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_io_int.cmake)
     set_tests_properties(run_io_int PROPERTIES DEPENDS compile_io_int)
 
+    add_test(NAME compile_array_copy COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_copy.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/array-copy)
+    add_test(NAME run_array_copy COMMAND ${CMAKE_CURRENT_BINARY_DIR}/array-copy)
+    set_tests_properties(run_array_copy PROPERTIES DEPENDS compile_array_copy)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
