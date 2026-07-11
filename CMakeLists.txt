@@ -303,6 +303,12 @@ if(BUILD_TESTING)
     add_test(NAME run_reference_write COMMAND ${CMAKE_CURRENT_BINARY_DIR}/reference-write)
     set_tests_properties(run_reference_write PROPERTIES DEPENDS compile_reference_write)
 
+    add_test(NAME compile_reference_borrows COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/reference_borrows.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/reference-borrows)
+    add_test(NAME run_reference_borrows COMMAND ${CMAKE_CURRENT_BINARY_DIR}/reference-borrows)
+    set_tests_properties(run_reference_borrows PROPERTIES DEPENDS compile_reference_borrows)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -373,7 +379,10 @@ if(BUILD_TESTING)
             reference_temporary
             reference_global
             reference_return
-            reference_shared_write)
+            reference_shared_write
+            reference_borrow_conflict
+            reference_double_mut
+            reference_borrowed_assignment)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

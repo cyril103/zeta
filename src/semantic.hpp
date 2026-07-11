@@ -4,6 +4,7 @@
 #include "module.hpp"
 #include "symbol_table.hpp"
 #include <optional>
+#include <unordered_map>
 
 class TypedProgram {
 public:
@@ -31,8 +32,14 @@ private:
     void checkDereferenceAssignment(DereferenceAssignment& assignment);
     void checkLoop(WhileStatement& loop);
     void checkStatements(std::vector<StatementPtr>& statements);
+    void pushBorrowScope();
+    void popBorrowScope();
+
+    struct BorrowState { std::size_t shared{0}; bool mutableBorrow{false}; };
 
     SymbolTable symbols_;
     std::optional<ValueType> returnType_;
     std::size_t loopDepth_{0};
+    std::unordered_map<std::string, BorrowState> borrows_;
+    std::vector<std::vector<std::pair<std::string, bool>>> borrowScopes_;
 };

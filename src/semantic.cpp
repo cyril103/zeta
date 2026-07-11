@@ -26,6 +26,8 @@ TypedProgram SemanticAnalyzer::analyze(
     const std::unordered_map<std::string, ModuleInterface>* interfaces,
     bool requireMain) {
     symbols_ = SymbolTable{};
+    borrows_.clear();
+    borrowScopes_ = {{}};
     if (interfaces != nullptr) {
         for (const Program::Import& import : program.imports) {
             const auto module = interfaces->find(import.module);
@@ -96,6 +98,27 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
         if (declaration.kind != BindingKind::Val)
             throw CompileError(declaration.location,
                                "une référence locale doit être déclarée avec 'val'");
+        if (const auto* address = std::get_if<AddressExpr>(&declaration.initializer->value)) {
+            const auto* borrowedName = std::get_if<NameExpr>(&address->operand->value);
+            if (borrowedName == nullptr) {
+                throw CompileError(declaration.location,
+                                   "une référence doit emprunter un identifiant");
+            }
+            const auto& name = borrowedName->name;
+            BorrowState& state = borrows_[name];
+            if (address->mutableBorrow) {
+                if (state.mutableBorrow || state.shared != 0)
+                    throw CompileError(declaration.location,
+                                       "emprunt mutable exclusif impossible pour '" + name + "'");
+                state.mutableBorrow = true;
+            } else {
+                if (state.mutableBorrow)
+                    throw CompileError(declaration.location,
+                                       "'" + name + "' possède déjà un emprunt mutable");
+                ++state.shared;
+            }
+            borrowScopes_.back().push_back({name, address->mutableBorrow});
+        }
     }
     if (declaration.callable && declaration.type.kind == ValueType::Kind::Array)
         throw CompileError(declaration.location,
@@ -147,6 +170,11 @@ void SemanticAnalyzer::checkAssignment(Assignment& assignment) {
         const std::string subject = target->kind == BindingKind::Def ? "la définition '" : "la val '";
         throw CompileError(assignment.location, subject + assignment.name + "' est immuable");
     }
+    if (const auto borrowed = borrows_.find(assignment.name);
+        borrowed != borrows_.end() &&
+        (borrowed->second.mutableBorrow || borrowed->second.shared != 0))
+        throw CompileError(assignment.location,
+                           "la variable '" + assignment.name + "' est empruntée");
     checkExpression(*assignment.value, target->type);
 }
 
@@ -157,6 +185,11 @@ void SemanticAnalyzer::checkIndexAssignment(IndexAssignment& assignment) {
     if (target->parameter || target->kind != BindingKind::Var)
         throw CompileError(assignment.location,
                            "le tableau '" + assignment.name + "' est immuable");
+    if (const auto borrowed = borrows_.find(assignment.name);
+        borrowed != borrows_.end() &&
+        (borrowed->second.mutableBorrow || borrowed->second.shared != 0))
+        throw CompileError(assignment.location,
+                           "le tableau '" + assignment.name + "' est emprunté");
     if (target->type.kind != ValueType::Kind::Array)
         throw CompileError(assignment.location,
                            "la cible d'une affectation indexée doit être un tableau");
@@ -190,10 +223,24 @@ void SemanticAnalyzer::checkStatements(std::vector<StatementPtr>& statements) {
 void SemanticAnalyzer::checkLoop(WhileStatement& loop) {
     checkExpression(*loop.condition, ValueType::Bool);
     symbols_.pushScope();
+    pushBorrowScope();
     ++loopDepth_;
     checkStatements(loop.body);
     --loopDepth_;
+    popBorrowScope();
     symbols_.popScope();
+}
+
+void SemanticAnalyzer::pushBorrowScope() { borrowScopes_.emplace_back(); }
+
+void SemanticAnalyzer::popBorrowScope() {
+    for (const auto& [name, mutableBorrow] : borrowScopes_.back()) {
+        BorrowState& state = borrows_.at(name);
+        if (mutableBorrow) state.mutableBorrow = false;
+        else --state.shared;
+        if (!state.mutableBorrow && state.shared == 0) borrows_.erase(name);
+    }
+    borrowScopes_.pop_back();
 }
 
 ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
@@ -394,8 +441,10 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             return expected;
         } else if constexpr (std::is_same_v<T, BlockExpr>) {
             symbols_.pushScope();
+            pushBorrowScope();
             checkStatements(node.statements);
             if (node.result) checkExpression(*node.result, expected);
+            popBorrowScope();
             symbols_.popScope();
             return expected;
         } else {

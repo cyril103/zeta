@@ -1,0 +1,6 @@
+def main () : Int = {
+    var value : Int = 1
+    val first : &Int = &value
+    val second : &Int = &value
+    if (*first == 1 && *second == 1) 0 else 1
+}
