@@ -39,10 +39,6 @@ calculs flottants avec SSE2 et le stockage adapté à la taille de chaque type.
 
 ## Limites actuelles
 
-- Les fonctions sont développées dans l'IR à chaque appel.
-- Il n'existe pas encore de véritables appels de fonctions en assembleur.
-- La récursion n'est pas possible.
-- L'analyse sémantique et la génération IR sont encore fortement liées.
 - Il n'existe ni entrée utilisateur, ni affichage, ni runtime Zeta.
 - Les chaînes de caractères ne sont pas disponibles.
 - Il n'existe aucune conversion explicite entre les types.
@@ -112,6 +108,11 @@ Travail nécessaire :
 - ajouter des tests qui vérifient la sortie standard.
 
 ## Phase 4 — Véritables fonctions
+
+État : terminée pour les fonctions de niveau global. Chacune devient une fonction
+IR distincte avec `call`, paramètres, `return`, label assembleur et stack frame.
+La récursion est prise en charge. Les fonctions locales capturant leur portée
+restent développées sur place jusqu'à l'introduction de véritables fermetures.
 
 Remplacer le développement systématique des fonctions par :
 

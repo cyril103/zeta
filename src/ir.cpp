@@ -17,18 +17,21 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
     ir_ = IrProgram{};
     symbols_.clear();
     nextLabel_ = 0;
+    inFunction_ = false;
+    std::vector<const Declaration*> functions;
     for (const Statement& statement : program.statements) {
         std::visit([&](const auto& node) {
             using T = std::decay_t<decltype(node)>;
             if constexpr (std::is_same_v<T, Declaration>) {
                 if (node.kind == BindingKind::Def) {
                     symbols_.emplace(node.name,
-                                     Symbol{0, node.kind, &node});
+                                     Symbol{0, node.kind, &node, true});
+                    if (node.callable) functions.push_back(&node);
                 } else {
                     const ValueId value = expression(*node.initializer);
                     const SlotId slot = ir_.slots.size();
-                    symbols_.emplace(node.name, Symbol{slot, node.kind, &node});
-                    ir_.slots.push_back(IrSlot{node.name, node.type});
+                    symbols_.emplace(node.name, Symbol{slot, node.kind, &node, true});
+                    ir_.slots.push_back(IrSlot{node.name, node.type, true});
                     ir_.instructions.push_back(IrStore{slot, value, node.type});
                 }
             } else if constexpr (std::is_same_v<T, Assignment>) {
@@ -46,9 +49,24 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
         }, statement.value);
     }
 
-    const auto mainSymbol = symbols_.find("main");
-    const Declaration& mainDeclaration = *mainSymbol->second.declaration;
-    ir_.exitValue = expression(*mainDeclaration.initializer);
+    const ValueId mainResult = nextValue(ValueType::Int);
+    ir_.instructions.push_back(IrCall{mainResult, "main", {}, {}, ValueType::Int});
+    ir_.instructions.push_back(IrExit{mainResult});
+    ir_.exitValue = mainResult;
+
+    inFunction_ = true;
+    for (const Declaration* function : functions) {
+        ir_.instructions.push_back(IrFunctionStart{function->name});
+        std::unordered_map<std::string, ValueId> parameters;
+        for (std::size_t i = 0; i < function->parameters.size(); ++i) {
+            const Parameter& parameter = function->parameters[i];
+            const ValueId value = nextValue(parameter.type);
+            parameters.emplace(parameter.name, value);
+            ir_.instructions.push_back(IrParameter{value, i, parameter.type});
+        }
+        const ValueId result = expression(*function->initializer, parameters);
+        ir_.instructions.push_back(IrReturn{result, function->type});
+    }
     return std::move(ir_);
 }
 
@@ -69,12 +87,12 @@ void IrGenerator::emitLoop(
             if constexpr (std::is_same_v<T, Declaration>) {
                 localNames.push_back(item.name);
                 if (item.kind == BindingKind::Def) {
-                    symbols_.emplace(item.name, Symbol{0, item.kind, &item});
+                    symbols_.emplace(item.name, Symbol{0, item.kind, &item, false});
                 } else {
                     const ValueId value = expression(*item.initializer, parameters);
                     const SlotId slot = ir_.slots.size();
-                    symbols_.emplace(item.name, Symbol{slot, item.kind, &item});
-                    ir_.slots.push_back(IrSlot{item.name, item.type});
+                    symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false});
+                    ir_.slots.push_back(IrSlot{item.name, item.type, false});
                     ir_.instructions.push_back(IrStore{slot, value, item.type});
                 }
             } else if constexpr (std::is_same_v<T, Assignment>) {
@@ -150,12 +168,24 @@ ValueId IrGenerator::expression(
                                    "fonction invalide '" + node.name + "'");
             }
             const Declaration& function = *found->second.declaration;
-            std::unordered_map<std::string, ValueId> arguments = parameters;
-            for (std::size_t i = 0; i < node.arguments.size(); ++i) {
-                arguments.insert_or_assign(function.parameters[i].name,
-                                           expression(*node.arguments[i], parameters));
+            if (!found->second.global) {
+                std::unordered_map<std::string, ValueId> localArguments = parameters;
+                for (std::size_t i = 0; i < node.arguments.size(); ++i) {
+                    localArguments.insert_or_assign(function.parameters[i].name,
+                        expression(*node.arguments[i], parameters));
+                }
+                return expression(*function.initializer, localArguments);
             }
-            return expression(*function.initializer, arguments);
+            std::vector<ValueId> arguments;
+            std::vector<ValueType> argumentTypes;
+            for (std::size_t i = 0; i < node.arguments.size(); ++i) {
+                arguments.push_back(expression(*node.arguments[i], parameters));
+                argumentTypes.push_back(function.parameters[i].type);
+            }
+            const ValueId output = nextValue(function.type);
+            ir_.instructions.push_back(IrCall{output, node.name, std::move(arguments),
+                                              std::move(argumentTypes), function.type});
+            return output;
         } else if constexpr (std::is_same_v<T, ConversionExpr>) {
             const ValueId input = expression(*node.operand, parameters);
             const ValueId output = nextValue(node.target);
@@ -195,12 +225,12 @@ ValueId IrGenerator::expression(
                     if constexpr (std::is_same_v<S, Declaration>) {
                         localNames.push_back(item.name);
                         if (item.kind == BindingKind::Def) {
-                            symbols_.emplace(item.name, Symbol{0, item.kind, &item});
+                            symbols_.emplace(item.name, Symbol{0, item.kind, &item, false});
                         } else {
                             const ValueId value = expression(*item.initializer, parameters);
                             const SlotId slot = ir_.slots.size();
-                            symbols_.emplace(item.name, Symbol{slot, item.kind, &item});
-                            ir_.slots.push_back(IrSlot{item.name, item.type});
+                            symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false});
+                            ir_.slots.push_back(IrSlot{item.name, item.type, false});
                             ir_.instructions.push_back(IrStore{slot, value, item.type});
                         }
                     } else if constexpr (std::is_same_v<S, Assignment>) {
@@ -257,7 +287,8 @@ std::string IrGenerator::print(const IrProgram& program) {
     };
     out << "module {\n";
     for (std::size_t i = 0; i < program.slots.size(); ++i) {
-        out << "  %" << program.slots[i].name << " = stack " << typeName(program.slots[i].type)
+        out << "  %" << program.slots[i].name << " = "
+            << (program.slots[i].global ? "global " : "stack ") << typeName(program.slots[i].type)
             << " ; slot " << i << '\n';
     }
     for (const IrInstruction& instruction : program.instructions) {
@@ -296,6 +327,22 @@ std::string IrGenerator::print(const IrProgram& program) {
                 else if constexpr (std::is_same_v<T, IrCopy>)
                     out << "  $" << item.output << " = copy." << suffix(item.type)
                         << " $" << item.input << '\n';
+                else if constexpr (std::is_same_v<T, IrCall>) {
+                    out << "  $" << item.output << " = call " << item.function << '(';
+                    for (std::size_t i = 0; i < item.arguments.size(); ++i) {
+                        if (i != 0) out << ", ";
+                        out << '$' << item.arguments[i];
+                    }
+                    out << ") : " << suffix(item.returnType) << '\n';
+                } else if constexpr (std::is_same_v<T, IrFunctionStart>)
+                    out << "\n  function " << item.name << ":\n";
+                else if constexpr (std::is_same_v<T, IrParameter>)
+                    out << "  $" << item.output << " = parameter."
+                        << suffix(item.type) << ' ' << item.index << '\n';
+                else if constexpr (std::is_same_v<T, IrReturn>)
+                    out << "  return." << suffix(item.type) << " $" << item.value << '\n';
+                else if constexpr (std::is_same_v<T, IrExit>)
+                    out << "  exit.i32 $" << item.value << '\n';
                 else if constexpr (std::is_same_v<T, IrBranch>)
                     out << "  branch." << (item.jumpWhenTrue ? "true" : "false")
                         << " $" << item.condition << ", label" << item.label << '\n';
@@ -305,7 +352,6 @@ std::string IrGenerator::print(const IrProgram& program) {
                     out << "label" << item.label << ":\n";
         }, instruction);
     }
-    out << "  exit.i32 $" << program.exitValue << '\n';
     out << "}\n";
     return out.str();
 }

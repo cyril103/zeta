@@ -32,7 +32,7 @@ TypedProgram SemanticAnalyzer::analyze(Program& program) {
 void SemanticAnalyzer::checkStatement(Statement& statement, bool global) {
     std::visit([&](auto& node) {
         using T = std::decay_t<decltype(node)>;
-        if constexpr (std::is_same_v<T, Declaration>) checkDeclaration(node);
+        if constexpr (std::is_same_v<T, Declaration>) checkDeclaration(node, global);
         else if constexpr (std::is_same_v<T, Assignment>) checkAssignment(node);
         else if constexpr (std::is_same_v<T, WhileStatement>) checkLoop(node);
         else {
@@ -45,7 +45,14 @@ void SemanticAnalyzer::checkStatement(Statement& statement, bool global) {
     }, statement.value);
 }
 
-void SemanticAnalyzer::checkDeclaration(Declaration& declaration) {
+void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecursion) {
+    const SemanticSymbol declarationSymbol{declaration.type, declaration.kind,
+                                            declaration.callable, &declaration, false};
+    if (declaration.callable && allowRecursion &&
+        !symbols_.define(declaration.name, declarationSymbol)) {
+        throw CompileError(declaration.location,
+                           "l'identifiant '" + declaration.name + "' est déjà défini");
+    }
     symbols_.pushScope();
     for (const Parameter& parameter : declaration.parameters) {
         if (!symbols_.defineParameter(parameter.name,
@@ -57,9 +64,8 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration) {
     checkExpression(*declaration.initializer, declaration.type);
     symbols_.popScope();
 
-    if (!symbols_.define(declaration.name,
-            SemanticSymbol{declaration.type, declaration.kind, declaration.callable,
-                           &declaration, false})) {
+    if ((!declaration.callable || !allowRecursion) &&
+        !symbols_.define(declaration.name, declarationSymbol)) {
         throw CompileError(declaration.location,
                            "l'identifiant '" + declaration.name + "' est déjà défini");
     }

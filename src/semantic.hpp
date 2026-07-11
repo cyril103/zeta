@@ -21,7 +21,7 @@ private:
     ValueType checkExpression(Expression& expression, ValueType expected);
     ValueType inferType(const Expression& expression) const;
     void checkStatement(Statement& statement, bool global);
-    void checkDeclaration(Declaration& declaration);
+    void checkDeclaration(Declaration& declaration, bool allowRecursion);
     void checkAssignment(Assignment& assignment);
     void checkLoop(WhileStatement& loop);
     void checkStatements(std::vector<StatementPtr>& statements);

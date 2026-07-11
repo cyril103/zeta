@@ -27,13 +27,25 @@ struct IrBinary {
 };
 struct IrStore { SlotId slot; ValueId value; ValueType type; };
 struct IrCopy { ValueId output; ValueId input; ValueType type; };
+struct IrCall {
+    ValueId output;
+    std::string function;
+    std::vector<ValueId> arguments;
+    std::vector<ValueType> argumentTypes;
+    ValueType returnType;
+};
+struct IrFunctionStart { std::string name; };
+struct IrParameter { ValueId output; std::size_t index; ValueType type; };
+struct IrReturn { ValueId value; ValueType type; };
+struct IrExit { ValueId value; };
 struct IrBranch { ValueId condition; bool jumpWhenTrue; std::size_t label; };
 struct IrJump { std::size_t label; };
 struct IrLabel { std::size_t label; };
 using IrInstruction = std::variant<IrConst, IrDoubleConst, IrLoad, IrConvert, IrUnary, IrBinary,
-                                   IrStore, IrCopy, IrBranch, IrJump, IrLabel>;
+                                   IrStore, IrCopy, IrCall, IrFunctionStart, IrParameter,
+                                   IrReturn, IrExit, IrBranch, IrJump, IrLabel>;
 
-struct IrSlot { std::string name; ValueType type; };
+struct IrSlot { std::string name; ValueType type; bool global; };
 struct IrProgram {
     std::vector<IrSlot> slots;
     std::vector<IrInstruction> instructions;
@@ -52,6 +64,7 @@ private:
         SlotId slot;
         BindingKind kind;
         const Declaration* declaration;
+        bool global;
     };
 
     void emitLoop(const WhileStatement& loop,
@@ -62,5 +75,6 @@ private:
     ValueId nextValue(ValueType type);
     IrProgram ir_;
     std::unordered_map<std::string, Symbol> symbols_;
+    bool inFunction_{false};
     std::size_t nextLabel_{0};
 };

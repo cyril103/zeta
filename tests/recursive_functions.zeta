@@ -1,0 +1,6 @@
+def factorielle (n : Int) : Int = {
+    val courant : Int = n
+    if (courant <= 1) 1 else courant * factorielle(courant - 1)
+}
+
+def main () : Int = if (factorielle(5) == 120) 0 else 1

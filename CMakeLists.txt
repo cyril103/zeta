@@ -128,6 +128,14 @@ if(BUILD_TESTING)
     add_test(NAME run_explicit_conversions COMMAND ${CMAKE_CURRENT_BINARY_DIR}/explicit-conversions)
     set_tests_properties(run_explicit_conversions PROPERTIES DEPENDS compile_explicit_conversions)
 
+    add_test(
+        NAME compile_recursive_functions
+        COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/recursive_functions.zeta
+                -o ${CMAKE_CURRENT_BINARY_DIR}/recursive-functions
+    )
+    add_test(NAME run_recursive_functions COMMAND ${CMAKE_CURRENT_BINARY_DIR}/recursive-functions)
+    set_tests_properties(run_recursive_functions PROPERTIES DEPENDS compile_recursive_functions)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment

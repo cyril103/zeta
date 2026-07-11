@@ -140,10 +140,16 @@ def add (a : Int, b : Int) : Int = a + b
 val resultat : Int = add(2, 3)
 ```
 
-Le corps d'une fonction n'est développé dans l'IR qu'à chaque appel. Chaque
-argument est évalué une fois, puis lié au paramètre correspondant. Les fonctions
-peuvent appeler des fonctions déclarées auparavant et peuvent ne prendre aucun
-paramètre avec `def zero () : Int = 0`.
+Chaque fonction possède une unité IR et un label assembleur propres. Un appel
+évalue chaque argument une fois, les transmet sur la pile et crée une nouvelle
+stack frame ; sa valeur est renvoyée dans un registre. Les fonctions peuvent
+s'appeler récursivement, appeler des fonctions déclarées auparavant et ne prendre
+aucun paramètre avec `def zero () : Int = 0`.
+
+Cette convention concerne les fonctions déclarées au niveau global. Une fonction
+locale peut capturer les variables de son bloc ; elle reste pour l'instant
+développée au point d'appel, en attendant une représentation dédiée des
+fermetures.
 
 ## Expressions sur plusieurs lignes
 
