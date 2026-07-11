@@ -7,6 +7,8 @@
 #include <cctype>
 #include <fstream>
 #include <functional>
+#include <iomanip>
+#include <sstream>
 #include <stdexcept>
 
 namespace {
@@ -23,6 +25,20 @@ bool validModuleName(const std::string& name) {
         if (!std::isalnum(static_cast<unsigned char>(character)) && character != '_') return false;
     return true;
 }
+
+std::uint64_t hashText(std::string_view text, std::uint64_t hash = 1469598103934665603ULL) {
+    for (const unsigned char byte : text) {
+        hash ^= byte;
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
+std::string hexHash(std::uint64_t hash) {
+    std::ostringstream output;
+    output << std::hex << std::setfill('0') << std::setw(16) << hash;
+    return output.str();
+}
 }
 
 ModuleGraph ModuleLoader::load(const std::filesystem::path& rootPath) {
@@ -35,6 +51,7 @@ ModuleGraph ModuleLoader::load(const std::filesystem::path& rootPath) {
     loadModule(graph_.root, absolute);
     buildInterfaces();
     buildDependencyGraph();
+    buildFingerprints();
     return std::move(graph_);
 }
 
@@ -79,9 +96,31 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
     Parser parser(lexer.scan());
     Program program = parser.parse();
     std::vector<Program::Import> imports = program.imports;
-    graph_.modules.emplace(name, Module{name, path, std::move(program)});
+    graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source)});
     for (const Program::Import& import : imports)
         loadModule(import.module, sourceDirectory_ / (import.module + ".zeta"));
+}
+
+void ModuleLoader::buildFingerprints() {
+    for (const std::string& name : graph_.compilationOrder) {
+        const Module& module = graph_.modules.at(name);
+        std::uint64_t hash = module.sourceHash;
+        std::vector<std::string> exports;
+        for (const auto& [symbolName, symbol] : graph_.interfaces.at(name).exports) {
+            std::string signature = symbolName + ":" + typeName(symbol.type) + ":" +
+                std::to_string(static_cast<int>(symbol.kind)) + ":" +
+                (symbol.callable ? "call" : "value");
+            for (ValueType parameter : symbol.parameterTypes)
+                signature += ":" + typeName(parameter);
+            exports.push_back(std::move(signature));
+        }
+        std::sort(exports.begin(), exports.end());
+        for (const std::string& signature : exports) hash = hashText(signature, hash);
+        for (const std::string& dependency : graph_.dependencies.at(name))
+            hash = hashText(graph_.fingerprints.at(dependency), hash);
+        hash = hashText("zeta-module-cache-v1", hash);
+        graph_.fingerprints.emplace(name, hexHash(hash));
+    }
 }
 
 void ModuleLoader::buildInterfaces() {

@@ -220,6 +220,36 @@ Les boucles acceptent `break` pour quitter immédiatement la boucle courante et
 `continue` pour reprendre à l'évaluation de son prédicat. Dans des boucles
 imbriquées, ces instructions ciblent toujours la boucle la plus proche.
 
+## Modules et compilation séparée
+
+Chaque fichier `.zeta` constitue un module portant le nom du fichier. Les modules
+importés sont recherchés dans le même dossier que le fichier racine :
+
+```text
+// maths.zeta
+pub def abs (x : Int) : Int = if (x < 0) -x else x
+
+// main.zeta
+import maths
+
+def main () : Int = maths.abs(-5)
+```
+
+`pub` est autorisé uniquement sur une déclaration globale. Un symbole sans `pub`
+reste privé, et un import ne réexporte pas les symboles qu'il importe. Le
+compilateur charge récursivement les fichiers, construit leurs interfaces, rejette
+les cycles avec leur chemin et analyse les modules dans l'ordre topologique. Seul
+le fichier donné sur la ligne de commande doit fournir `def main () : Int`.
+
+Les noms de liaison sont préfixés par leur module afin que deux modules puissent
+déclarer le même identifiant. La compilation produit une IR fusionnée, des objets
+ELF64 relogeables assemblés par FASM, puis utilise `ld` pour créer l'exécutable
+statique. Les artefacts de module se trouvent dans `<sortie>.modules/`.
+
+Le dossier `<sortie>.cache/` conserve les objets et leurs empreintes. Une empreinte
+dépend du source, de l'interface publique, des interfaces importées et de la
+version du format de cache. Un objet inchangé est réutilisé automatiquement.
+
 ## Expressions sur plusieurs lignes
 
 Une expression sur plusieurs lignes doit être placée entre accolades. Le bloc

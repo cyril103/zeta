@@ -23,6 +23,12 @@ void writeFile(const fs::path& path, const std::string& content) {
     output << content;
 }
 
+std::string readOptionalFile(const fs::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) return {};
+    return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+}
+
 void runFasm(const fs::path& assembly, const fs::path& executable) {
     const pid_t child = fork();
     if (child < 0) throw std::runtime_error("impossible de lancer FASM");
@@ -114,8 +120,20 @@ int main(int argc, char** argv) {
         objectAssemblyPath += ".object.asm";
         fs::path objectPath = outputPath;
         objectPath += ".o";
-        writeFile(objectAssemblyPath, FasmCodeGenerator::generateObject(ir));
-        runFasm(objectAssemblyPath, objectPath);
+        fs::path cacheDirectory = outputPath;
+        cacheDirectory += ".cache";
+        fs::create_directories(cacheDirectory);
+        std::string programFingerprint = "zeta-program-cache-v1";
+        for (const std::string& moduleName : modules.compilationOrder)
+            programFingerprint += ":" + moduleName + ":" + modules.fingerprints.at(moduleName);
+        const fs::path cachedProgramObject = cacheDirectory / "program.o";
+        const fs::path programStamp = cacheDirectory / "program.stamp";
+        if (!fs::exists(cachedProgramObject) || readOptionalFile(programStamp) != programFingerprint) {
+            writeFile(objectAssemblyPath, FasmCodeGenerator::generateObject(ir));
+            runFasm(objectAssemblyPath, cachedProgramObject);
+            writeFile(programStamp, programFingerprint);
+        }
+        fs::copy_file(cachedProgramObject, objectPath, fs::copy_options::overwrite_existing);
 
         fs::path moduleDirectory = outputPath;
         moduleDirectory += ".modules";
@@ -125,9 +143,16 @@ int main(int argc, char** argv) {
             const std::string symbol = "zeta_module_" + moduleName;
             const fs::path moduleAssembly = moduleDirectory / (moduleName + ".asm");
             const fs::path moduleObject = moduleDirectory / (moduleName + ".o");
-            writeFile(moduleAssembly,
-                "format ELF64\nsection '.rodata'\npublic " + symbol + "\n" + symbol + ": db 0\n");
-            runFasm(moduleAssembly, moduleObject);
+            const fs::path cachedModuleObject = cacheDirectory / (moduleName + ".o");
+            const fs::path moduleStamp = cacheDirectory / (moduleName + ".stamp");
+            const std::string& fingerprint = modules.fingerprints.at(moduleName);
+            if (!fs::exists(cachedModuleObject) || readOptionalFile(moduleStamp) != fingerprint) {
+                writeFile(moduleAssembly,
+                    "format ELF64\nsection '.rodata'\npublic " + symbol + "\n" + symbol + ": db 0\n");
+                runFasm(moduleAssembly, cachedModuleObject);
+                writeFile(moduleStamp, fingerprint);
+            }
+            fs::copy_file(cachedModuleObject, moduleObject, fs::copy_options::overwrite_existing);
             objects.push_back(moduleObject);
         }
         runLinker(objects, outputPath);

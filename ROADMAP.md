@@ -199,7 +199,7 @@ Exemple envisagé :
 val nombres : [Int; 3] = [1, 2, 3]
 ```
 
-## Phase 8 — Modules et compilation séparée
+## Phase 8 — Modules et compilation séparée (disponible)
 
 Syntaxe envisagée :
 
@@ -209,13 +209,19 @@ import maths
 def main () : Int = maths.abs(-5)
 ```
 
-À prévoir :
+Disponible :
 
-- résolution de plusieurs fichiers source ;
-- symboles publics et privés ;
-- graphe de dépendances ;
-- unités IR ou objets séparés ;
-- liaison finale avec FASM.
+- résolution récursive de plusieurs fichiers source ;
+- symboles publics et privés et noms qualifiés ;
+- interfaces de modules et graphe de dépendances sans cycles ;
+- ordre topologique et IR fusionnée avec noms manglés ;
+- objets ELF64 relogeables assemblés par FASM ;
+- liaison finale avec `ld` ;
+- cache invalidé par le source, l'interface et les dépendances.
+
+Une évolution future pourra déplacer davantage de code de l'unité IR fusionnée
+vers les objets propres à chaque module, puis sérialiser les interfaces pour ne
+plus reparcourir les sources inchangés.
 
 ## Phase 9 — Optimisations IR
 
