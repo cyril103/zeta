@@ -8,6 +8,8 @@ enum class TokenKind {
     Val,
     Var,
     Def,
+    Import,
+    Pub,
     IntType,
     ByteType,
     DoubleType,
@@ -30,6 +32,7 @@ enum class TokenKind {
     Continue,
     Colon,
     Comma,
+    Dot,
     Equal,
     EqualEqual,
     Bang,
@@ -63,6 +66,8 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::Val: return "'val'";
     case TokenKind::Var: return "'var'";
     case TokenKind::Def: return "'def'";
+    case TokenKind::Import: return "'import'";
+    case TokenKind::Pub: return "'pub'";
     case TokenKind::IntType: return "'Int'";
     case TokenKind::ByteType: return "'Byte'";
     case TokenKind::DoubleType: return "'Double'";
@@ -85,6 +90,7 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::Continue: return "'continue'";
     case TokenKind::Colon: return "':'";
     case TokenKind::Comma: return "','";
+    case TokenKind::Dot: return "'.'";
     case TokenKind::Equal: return "'='";
     case TokenKind::EqualEqual: return "'=='";
     case TokenKind::Bang: return "'!'";

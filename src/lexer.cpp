@@ -95,6 +95,7 @@ std::vector<Token> Lexer::scan() {
         switch (c) {
         case ':': add(TokenKind::Colon, ":", start); continue;
         case ',': add(TokenKind::Comma, ",", start); continue;
+        case '.': add(TokenKind::Dot, ".", start); continue;
         case '=': add(TokenKind::Equal, "=", start); continue;
         case '!': add(TokenKind::Bang, "!", start); continue;
         case '<': add(TokenKind::Less, "<", start); continue;
@@ -148,6 +149,8 @@ std::vector<Token> Lexer::scan() {
             if (text == "val") kind = TokenKind::Val;
             if (text == "var") kind = TokenKind::Var;
             if (text == "def") kind = TokenKind::Def;
+            if (text == "import") kind = TokenKind::Import;
+            if (text == "pub") kind = TokenKind::Pub;
             if (text == "Int") kind = TokenKind::IntType;
             if (text == "Byte") kind = TokenKind::ByteType;
             if (text == "Double") kind = TokenKind::DoubleType;

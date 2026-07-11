@@ -1,0 +1,2 @@
+pub val code : Int = 7
+pub def main () : Int = if (code == 7) 0 else 1

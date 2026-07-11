@@ -21,6 +21,7 @@ private:
     void expressionContinuation();
     Statement statement();
     Declaration declaration(BindingKind kind);
+    std::string qualifiedName();
     Assignment assignment();
     WhileStatement whileStatement();
     std::vector<StatementPtr> loopBody();
@@ -39,4 +40,5 @@ private:
     std::vector<Token> tokens_;
     std::size_t current_{0};
     std::size_t blockDepth_{0};
+    bool publicDeclaration_{false};
 };

@@ -58,6 +58,7 @@ struct Declaration {
     std::string name;
     ValueType type;
     BindingKind kind;
+    bool publicSymbol;
     bool callable;
     std::vector<Parameter> parameters;
     ExprPtr initializer;
@@ -97,5 +98,10 @@ struct Statement {
 };
 
 struct Program {
+    struct Import {
+        SourceLocation location;
+        std::string module;
+    };
+    std::vector<Import> imports;
     std::vector<Statement> statements;
 };

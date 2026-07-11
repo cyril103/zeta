@@ -166,6 +166,12 @@ if(BUILD_TESTING)
     add_test(NAME run_string_type COMMAND ${CMAKE_CURRENT_BINARY_DIR}/string-type)
     set_tests_properties(run_string_type PROPERTIES DEPENDS compile_string_type)
 
+    add_test(NAME compile_public_declaration COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_declaration.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/public-declaration)
+    add_test(NAME run_public_declaration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/public-declaration)
+    set_tests_properties(run_public_declaration PROPERTIES DEPENDS compile_public_declaration)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment

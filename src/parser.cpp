@@ -168,6 +168,15 @@ void Parser::expressionContinuation() {
 Program Parser::parse() {
     Program program;
     skipSeparators();
+    while (match(TokenKind::Import)) {
+        const Token start = previous();
+        const Token& module = consume(TokenKind::Identifier,
+                                      "nom de module attendu après 'import'");
+        program.imports.push_back(Program::Import{start.location, module.text});
+        if (!check(TokenKind::End) && !match(TokenKind::Separator))
+            throw CompileError(peek().location, "fin d'instruction attendue après l'import");
+        skipSeparators();
+    }
     while (!check(TokenKind::End)) {
         program.statements.push_back(statement());
         if (!check(TokenKind::End) && !match(TokenKind::Separator)) {
@@ -179,6 +188,15 @@ Program Parser::parse() {
 }
 
 Statement Parser::statement() {
+    if (match(TokenKind::Pub)) {
+        if (blockDepth_ != 0)
+            throw CompileError(previous().location,
+                               "'pub' est autorisé uniquement au niveau global");
+        publicDeclaration_ = true;
+        if (!check(TokenKind::Val) && !check(TokenKind::Var) && !check(TokenKind::Def))
+            throw CompileError(peek().location,
+                               "'val', 'var' ou 'def' attendu après 'pub'");
+    }
     if (match(TokenKind::Val)) return declaration(BindingKind::Val);
     if (match(TokenKind::Var)) return declaration(BindingKind::Var);
     if (match(TokenKind::Def)) return declaration(BindingKind::Def);
@@ -211,7 +229,7 @@ std::vector<StatementPtr> Parser::loopBody() {
     ++blockDepth_;
     skipSeparators();
     while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
-        const bool startsStatement = check(TokenKind::Val) || check(TokenKind::Var) ||
+        const bool startsStatement = check(TokenKind::Pub) || check(TokenKind::Val) || check(TokenKind::Var) ||
             check(TokenKind::Def) || check(TokenKind::While) || check(TokenKind::Return) ||
             check(TokenKind::Break) || check(TokenKind::Continue) ||
             (check(TokenKind::Identifier) && current_ + 1 < tokens_.size() &&
@@ -259,8 +277,21 @@ Declaration Parser::declaration(BindingKind kind) {
     consume(TokenKind::Colon, "':' attendu après l'identifiant");
     const ValueType type = consumeType("type attendu");
     consume(TokenKind::Equal, "'=' attendu après le type");
-    return Declaration{start.location, name.text, type, kind, callable,
+    const bool publicSymbol = publicDeclaration_;
+    publicDeclaration_ = false;
+    return Declaration{start.location, name.text, type, kind, publicSymbol, callable,
                        std::move(parameters), expression()};
+}
+
+std::string Parser::qualifiedName() {
+    std::string name = previous().text;
+    while (match(TokenKind::Dot)) {
+        const Token& part = consume(TokenKind::Identifier,
+                                    "identifiant attendu après '.'");
+        name += '.';
+        name += part.text;
+    }
+    return name;
 }
 
 Assignment Parser::assignment() {
@@ -415,6 +446,7 @@ ExprPtr Parser::primary() {
     }
     if (match(TokenKind::Identifier)) {
         const Token token = previous();
+        const std::string name = qualifiedName();
         if (match(TokenKind::LeftParen)) {
             std::vector<ExprPtr> arguments;
             expressionContinuation();
@@ -431,9 +463,9 @@ ExprPtr Parser::primary() {
             expressionContinuation();
             consume(TokenKind::RightParen, "')' attendue après les arguments");
             return std::make_unique<Expression>(Expression{
-                token.location, CallExpr{token.text, std::move(arguments)}});
+                token.location, CallExpr{name, std::move(arguments)}});
         }
-        return std::make_unique<Expression>(Expression{token.location, NameExpr{token.text}});
+        return std::make_unique<Expression>(Expression{token.location, NameExpr{name}});
     }
     if (match(TokenKind::LeftParen)) {
         expressionContinuation();
