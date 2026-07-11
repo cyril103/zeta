@@ -221,7 +221,9 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/io_interface.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/io-interface)
     add_test(NAME run_io_interface COMMAND ${CMAKE_CURRENT_BINARY_DIR}/io-interface)
-    set_tests_properties(run_io_interface PROPERTIES DEPENDS compile_io_interface)
+    set_tests_properties(run_io_interface PROPERTIES
+        DEPENDS compile_io_interface
+        PASS_REGULAR_EXPRESSION "Zeta")
 
     add_test(NAME assemble_runtime_io COMMAND fasm
         ${CMAKE_CURRENT_SOURCE_DIR}/runtime/io.asm

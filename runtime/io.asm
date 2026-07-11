@@ -6,9 +6,28 @@ public zeta_fn_io__print
 public zeta_fn_io__println
 
 ; ABI Zeta : une String est passée sur la pile sous la forme {adresse, longueur}.
-; Ces stubs sont remplacés progressivement par les primitives Linux write(2).
 zeta_fn_io__print:
-    xor eax, eax
+    mov rsi, qword [rsp+8]
+    mov rdx, qword [rsp+16]
+    xor r8d, r8d
+.write:
+    test rdx, rdx
+    jz .done
+    mov eax, 1
+    mov edi, 1
+    syscall
+    test rax, rax
+    jg .written
+    cmp rax, -4
+    je .write
+    ret
+.written:
+    add r8, rax
+    add rsi, rax
+    sub rdx, rax
+    jmp .write
+.done:
+    mov rax, r8
     ret
 
 zeta_fn_io__println:

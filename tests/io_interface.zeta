@@ -1,3 +1,6 @@
 import io
 
-def main () : Int = io.print("")
+def main () : Int = {
+    val written : Int = io.print("Zeta")
+    0
+}
