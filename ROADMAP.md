@@ -189,6 +189,20 @@ Les tableaux de taille fixe sont disponibles : types récursifs `[T; N]`,
 littéraux, copie par valeur, lecture et mutation indexées, tableaux imbriqués et
 contrôles statiques/dynamiques des limites.
 
+Les références empruntées sont également disponibles : `&T`, `&mut T`, prise
+d'adresse, lecture et écriture par déréférencement, paramètres sur 64 bits et
+indexation sans copie d'un tableau reçu par référence. L'analyse impose plusieurs
+emprunts partagés ou un unique emprunt mutable, refuse les alias mutables dans un
+appel et conserve pour l'instant les emprunts jusqu'à la fin de leur bloc lexical.
+
+Limites actuelles des références :
+
+- aucun retour ni stockage global de référence ;
+- aucune variable référence réaffectable ;
+- pas encore de mutation indexée directe via `&mut [T; N]` ;
+- pas de slices, pointeurs bruts, `Box`, tas ou allocation dynamique ;
+- pas d'inférence de durées de vie non lexicales.
+
 Ordre recommandé :
 
 1. tableaux de taille fixe — terminé ;
@@ -255,8 +269,22 @@ plus reparcourir les sources inchangés.
 
 ## Prochaine session recommandée
 
-Commencer par la phase 1 : séparer clairement le pipeline en
-`AST -> analyse sémantique -> AST typé -> IR`. Une fois cette base stabilisée,
-enchaîner avec les véritables fonctions et une runtime minimale fournissant
-`print`. Ces travaux débloqueront la récursion, `return`, les chaînes et des tests
-de programmes beaucoup plus observables.
+Consolider d'abord les références et préparer les vues dynamiques :
+
+1. autoriser la mutation `values[index] = valeur` lorsque
+   `values : &mut [T; N]` ;
+2. ajouter des tests de références vers `String`, `Char`, tableaux imbriqués et
+   appels récursifs ;
+3. réduire les emprunts lexicaux lorsque leur dernière utilisation est connue ;
+4. concevoir `Slice[T]` et `SliceMut[T]` comme `{adresse, longueur}` sans
+   allocation ;
+5. permettre de créer une slice depuis un tableau fixe emprunté ;
+6. passer et indexer les slices dans l'ABI avec les mêmes contrôles de limites ;
+7. utiliser ensuite les slices pour les buffers d'E/S et les futures chaînes
+   construites dynamiquement.
+
+Après stabilisation des slices, choisir explicitement le premier modèle de
+propriété dynamique (`Box[T]`, déplacement sans copie et destruction
+déterministe) avant d'introduire un allocateur fondé sur `mmap`. En parallèle, la
+compilation séparée pourra évoluer de l'IR fusionnée vers du code réellement
+réparti dans les objets propres à chaque module.
