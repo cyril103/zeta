@@ -16,7 +16,8 @@ add_executable(zeta
 )
 target_include_directories(zeta PRIVATE src)
 target_compile_definitions(zeta PRIVATE
-    ZETA_STDLIB_DIR="${CMAKE_CURRENT_SOURCE_DIR}/stdlib")
+    ZETA_STDLIB_DIR="${CMAKE_CURRENT_SOURCE_DIR}/stdlib"
+    ZETA_RUNTIME_DIR="${CMAKE_CURRENT_SOURCE_DIR}/runtime")
 target_compile_options(zeta PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
 include(CTest)

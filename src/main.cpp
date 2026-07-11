@@ -154,6 +154,32 @@ int main(int argc, char** argv) {
             }
             fs::copy_file(cachedModuleObject, moduleObject, fs::copy_options::overwrite_existing);
             objects.push_back(moduleObject);
+
+            bool hasNativeExports = false;
+            for (const auto& [exportName, exported] : modules.interfaces.at(moduleName).exports) {
+                static_cast<void>(exportName);
+                hasNativeExports = hasNativeExports || exported.nativeSymbol;
+            }
+            if (hasNativeExports) {
+#ifdef ZETA_RUNTIME_DIR
+                const fs::path runtimeAssembly = fs::path(ZETA_RUNTIME_DIR) / (moduleName + ".asm");
+#else
+                const fs::path runtimeAssembly;
+#endif
+                const std::string runtimeSource = readOptionalFile(runtimeAssembly);
+                if (runtimeSource.empty())
+                    throw std::runtime_error("runtime natif introuvable pour le module " + moduleName);
+                const fs::path cachedRuntimeObject = cacheDirectory / ("runtime-" + moduleName + ".o");
+                const fs::path runtimeStamp = cacheDirectory / ("runtime-" + moduleName + ".stamp");
+                const std::string runtimeFingerprint = fingerprint + ":" + runtimeSource;
+                if (!fs::exists(cachedRuntimeObject) ||
+                    readOptionalFile(runtimeStamp) != runtimeFingerprint) {
+                    runFasm(runtimeAssembly, cachedRuntimeObject);
+                    writeFile(runtimeStamp, runtimeFingerprint);
+                }
+                fs::copy_file(cachedRuntimeObject, moduleDirectory / (moduleName + ".runtime.o"),
+                              fs::copy_options::overwrite_existing);
+            }
         }
         runLinker(objects, outputPath);
         fs::permissions(outputPath,
