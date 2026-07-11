@@ -183,7 +183,8 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
         else if constexpr (std::is_same_v<T, CharacterExpr>) return ValueType::Char;
         else if constexpr (std::is_same_v<T, StringExpr>) return ValueType::String;
         else if constexpr (std::is_same_v<T, ArrayExpr>) {
-            if (node.elements.empty()) return ValueType(std::make_shared<ValueType>(ValueType::Int), 0);
+            if (node.elements.empty())
+                return ValueType(std::make_shared<ValueType>(ValueType::Int), std::size_t{0});
             return ValueType(std::make_shared<ValueType>(inferType(*node.elements.front())),
                              node.elements.size());
         }

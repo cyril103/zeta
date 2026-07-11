@@ -104,6 +104,7 @@ std::vector<Token> Lexer::scan() {
         case '-': add(TokenKind::Minus, "-", start); continue;
         case '*': add(TokenKind::Star, "*", start); continue;
         case '/': add(TokenKind::Slash, "/", start); continue;
+        case '&': add(TokenKind::Ampersand, "&", start); continue;
         case '(': add(TokenKind::LeftParen, "(", start); continue;
         case ')': add(TokenKind::RightParen, ")", start); continue;
         case '{': add(TokenKind::LeftBrace, "{", start); continue;
@@ -113,7 +114,7 @@ std::vector<Token> Lexer::scan() {
         case ']': add(TokenKind::RightBracket, "]", start); continue;
         default: break;
         }
-        if (c == '&' || c == '|') {
+        if (c == '|') {
             throw CompileError(start, std::string("opérateur incomplet '") + c + "'");
         }
 
@@ -154,6 +155,7 @@ std::vector<Token> Lexer::scan() {
             if (text == "import") kind = TokenKind::Import;
             if (text == "pub") kind = TokenKind::Pub;
             if (text == "native") kind = TokenKind::Native;
+            if (text == "mut") kind = TokenKind::Mut;
             if (text == "Int") kind = TokenKind::IntType;
             if (text == "Byte") kind = TokenKind::ByteType;
             if (text == "Double") kind = TokenKind::DoubleType;

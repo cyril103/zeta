@@ -11,6 +11,7 @@ enum class TokenKind {
     Import,
     Pub,
     Native,
+    Mut,
     IntType,
     ByteType,
     DoubleType,
@@ -44,6 +45,7 @@ enum class TokenKind {
     Greater,
     GreaterEqual,
     AndAnd,
+    Ampersand,
     OrOr,
     Plus,
     Minus,
@@ -73,6 +75,7 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::Import: return "'import'";
     case TokenKind::Pub: return "'pub'";
     case TokenKind::Native: return "'native'";
+    case TokenKind::Mut: return "'mut'";
     case TokenKind::IntType: return "'Int'";
     case TokenKind::ByteType: return "'Byte'";
     case TokenKind::DoubleType: return "'Double'";
@@ -106,6 +109,7 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::Greater: return "'>'";
     case TokenKind::GreaterEqual: return "'>='";
     case TokenKind::AndAnd: return "'&&'";
+    case TokenKind::Ampersand: return "'&'";
     case TokenKind::OrOr: return "'||'";
     case TokenKind::Plus: return "'+'";
     case TokenKind::Minus: return "'-'";

@@ -9,15 +9,19 @@
 #include <vector>
 
 struct ValueType {
-    enum class Kind { Int, Byte, Double, Bool, Char, String, Array };
+    enum class Kind { Int, Byte, Double, Bool, Char, String, Array, Reference };
 
     Kind kind;
     std::shared_ptr<const ValueType> element;
     std::size_t length{0};
+    bool mutableReference{false};
 
     explicit ValueType(Kind primitive) : kind(primitive) {}
     ValueType(std::shared_ptr<const ValueType> elementType, std::size_t arrayLength)
         : kind(Kind::Array), element(std::move(elementType)), length(arrayLength) {}
+    ValueType(std::shared_ptr<const ValueType> referencedType, bool mutableBorrow)
+        : kind(Kind::Reference), element(std::move(referencedType)),
+          mutableReference(mutableBorrow) {}
 
     static const ValueType Int;
     static const ValueType Byte;
@@ -28,9 +32,11 @@ struct ValueType {
 
     friend bool operator==(const ValueType& left, const ValueType& right) {
         if (left.kind != right.kind) return false;
-        if (left.kind != Kind::Array) return true;
-        return left.length == right.length && left.element != nullptr && right.element != nullptr &&
-               *left.element == *right.element;
+        if (left.kind != Kind::Array && left.kind != Kind::Reference) return true;
+        if (left.element == nullptr || right.element == nullptr || *left.element != *right.element)
+            return false;
+        return left.kind == Kind::Array ? left.length == right.length
+                                        : left.mutableReference == right.mutableReference;
     }
 };
 
@@ -48,7 +54,10 @@ inline std::string typeName(ValueType type) {
     if (type == ValueType::Bool) return "Bool";
     if (type == ValueType::Char) return "Char";
     if (type == ValueType::String) return "String";
-    return "[" + typeName(*type.element) + "; " + std::to_string(type.length) + "]";
+    if (type.kind == ValueType::Kind::Array)
+        return "[" + typeName(*type.element) + "; " + std::to_string(type.length) + "]";
+    return type.mutableReference ? "&mut " + typeName(*type.element)
+                                 : "&" + typeName(*type.element);
 }
 
 inline std::size_t valueTypeSize(const ValueType& type) {
@@ -56,6 +65,7 @@ inline std::size_t valueTypeSize(const ValueType& type) {
     if (type == ValueType::Int || type == ValueType::Char) return 4U;
     if (type == ValueType::Double) return 8U;
     if (type == ValueType::String) return 16U;
+    if (type.kind == ValueType::Kind::Reference) return 8U;
     return valueTypeSize(*type.element) * type.length;
 }
 
@@ -63,6 +73,7 @@ inline std::size_t valueTypeAlignment(const ValueType& type) {
     if (type == ValueType::Byte || type == ValueType::Bool) return 1U;
     if (type == ValueType::Int || type == ValueType::Char) return 4U;
     if (type == ValueType::Double || type == ValueType::String) return 8U;
+    if (type.kind == ValueType::Kind::Reference) return 8U;
     return valueTypeAlignment(*type.element);
 }
 

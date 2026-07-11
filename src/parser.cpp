@@ -163,6 +163,11 @@ const Token& Parser::consume(TokenKind kind, const std::string& message) {
 }
 
 ValueType Parser::consumeType(const std::string& message) {
+    if (match(TokenKind::Ampersand)) {
+        const bool mutableBorrow = match(TokenKind::Mut);
+        const ValueType referenced = consumeType("type référencé attendu après '&'");
+        return ValueType(std::make_shared<ValueType>(referenced), mutableBorrow);
+    }
     if (match(TokenKind::LeftBracket)) {
         const ValueType element = consumeType("type d'élément attendu après '['");
         consume(TokenKind::Semicolon, "';' attendu après le type d'élément");
