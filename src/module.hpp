@@ -43,9 +43,11 @@ public:
 
 private:
     void loadModule(const std::string& name, const std::filesystem::path& path);
+    std::filesystem::path resolveImport(const std::string& name) const;
     void buildInterfaces();
     void buildDependencyGraph();
     void buildFingerprints();
     std::filesystem::path sourceDirectory_;
+    std::filesystem::path standardLibraryDirectory_;
     ModuleGraph graph_;
 };

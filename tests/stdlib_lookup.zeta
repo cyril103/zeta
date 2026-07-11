@@ -1,0 +1,3 @@
+import probe
+
+def main () : Int = if (probe.available()) 0 else 1

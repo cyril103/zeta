@@ -45,6 +45,9 @@ ModuleGraph ModuleLoader::load(const std::filesystem::path& rootPath) {
     graph_ = ModuleGraph{};
     const std::filesystem::path absolute = std::filesystem::absolute(rootPath);
     sourceDirectory_ = absolute.parent_path();
+#ifdef ZETA_STDLIB_DIR
+    standardLibraryDirectory_ = ZETA_STDLIB_DIR;
+#endif
     graph_.root = absolute.stem().string();
     if (!validModuleName(graph_.root))
         throw std::runtime_error("nom de module invalide : " + graph_.root);
@@ -98,7 +101,15 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
     std::vector<Program::Import> imports = program.imports;
     graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source)});
     for (const Program::Import& import : imports)
-        loadModule(import.module, sourceDirectory_ / (import.module + ".zeta"));
+        loadModule(import.module, resolveImport(import.module));
+}
+
+std::filesystem::path ModuleLoader::resolveImport(const std::string& name) const {
+    const std::filesystem::path local = sourceDirectory_ / (name + ".zeta");
+    if (std::filesystem::exists(local)) return local;
+    const std::filesystem::path standard = standardLibraryDirectory_ / (name + ".zeta");
+    if (!standardLibraryDirectory_.empty() && std::filesystem::exists(standard)) return standard;
+    throw std::runtime_error("module introuvable : " + name);
 }
 
 void ModuleLoader::buildFingerprints() {

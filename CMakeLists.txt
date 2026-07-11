@@ -15,6 +15,8 @@ add_executable(zeta
     src/codegen.cpp
 )
 target_include_directories(zeta PRIVATE src)
+target_compile_definitions(zeta PRIVATE
+    ZETA_STDLIB_DIR="${CMAKE_CURRENT_SOURCE_DIR}/stdlib")
 target_compile_options(zeta PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
 include(CTest)
@@ -207,6 +209,12 @@ if(BUILD_TESTING)
         -o ${CMAKE_CURRENT_BINARY_DIR}/native-declaration)
     add_test(NAME run_native_declaration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/native-declaration)
     set_tests_properties(run_native_declaration PROPERTIES DEPENDS compile_native_declaration)
+
+    add_test(NAME compile_stdlib_lookup COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/stdlib_lookup.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/stdlib-lookup)
+    add_test(NAME run_stdlib_lookup COMMAND ${CMAKE_CURRENT_BINARY_DIR}/stdlib-lookup)
+    set_tests_properties(run_stdlib_lookup PROPERTIES DEPENDS compile_stdlib_lookup)
 
     foreach(invalid_case IN ITEMS
             redefinition
