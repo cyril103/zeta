@@ -325,7 +325,9 @@ if(BUILD_TESTING)
             array_literal_syntax
             array_zero_length
             array_length_mismatch
-            array_element_mismatch)
+            array_element_mismatch
+            array_index_too_large
+            array_index_negative)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

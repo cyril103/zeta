@@ -10,6 +10,15 @@ namespace {
     throw CompileError(location, "type " + typeName(expected) + " attendu, reçu " +
                                      typeName(actual));
 }
+std::optional<std::int64_t> constantInteger(const Expression& expression) {
+    if (const auto* integer = std::get_if<IntegerExpr>(&expression.value)) return integer->value;
+    if (const auto* unary = std::get_if<UnaryExpr>(&expression.value)) {
+        const auto operand = constantInteger(*unary->operand);
+        if (operand && unary->op == "-") return -*operand;
+        if (operand && unary->op == "+") return *operand;
+    }
+    return std::nullopt;
+}
 }
 
 TypedProgram SemanticAnalyzer::analyze(
@@ -216,6 +225,11 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                                    "l'indexation exige une valeur de type tableau");
             checkExpression(*node.array, arrayType);
             checkExpression(*node.index, ValueType::Int);
+            if (const auto index = constantInteger(*node.index);
+                index && (*index < 0 || static_cast<std::uint64_t>(*index) >= arrayType.length)) {
+                throw CompileError(node.index->location, "index " + std::to_string(*index) +
+                    " hors limites pour " + typeName(arrayType));
+            }
             return *arrayType.element;
         }
         else if constexpr (std::is_same_v<T, NameExpr>) {
