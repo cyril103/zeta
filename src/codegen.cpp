@@ -378,6 +378,9 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         const std::size_t offset = valueOffset(program, item.arguments[i]);
                         out << "    push qword [rbp-" << offset - 8U << "]\n"
                             << "    push qword [rbp-" << offset << "]\n";
+                    } else if (item.argumentTypes[i].kind == ValueType::Kind::Reference) {
+                        out << "    push qword [rbp-"
+                            << valueOffset(program, item.arguments[i]) << "]\n";
                     } else if (item.argumentTypes[i] == ValueType::Double) {
                         out << "    sub rsp, 8\n"
                             << "    movsd xmm0, qword [rbp-" << valueOffset(program, item.arguments[i]) << "]\n"
@@ -409,6 +412,10 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                             << "    mov rdx, qword [rbp-" << source - 8U << "]\n"
                             << "    mov qword [rbp+" << stackOffset << "], rax\n"
                             << "    mov qword [rbp+" << stackOffset + 8U << "], rdx\n";
+                    } else if (item.argumentTypes[i].kind == ValueType::Kind::Reference) {
+                        out << "    mov rax, qword [rbp-"
+                            << valueOffset(program, item.arguments[i]) << "]\n"
+                            << "    mov qword [rbp+" << stackOffset << "], rax\n";
                     } else if (item.argumentTypes[i] == ValueType::Double) {
                         out << "    movsd xmm0, qword [rbp-" << valueOffset(program, item.arguments[i]) << "]\n"
                             << "    movsd qword [rbp+" << stackOffset << "], xmm0\n";
@@ -432,6 +439,9 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         << "    mov qword [rbp-" << offset << "], rax\n"
                         << "    mov rax, qword [rbp+" << item.stackOffset + 8U << "]\n"
                         << "    mov qword [rbp-" << offset - 8U << "], rax\n";
+                } else if (item.type.kind == ValueType::Kind::Reference) {
+                    out << "    mov rax, qword [rbp+" << item.stackOffset << "]\n"
+                        << "    mov qword [rbp-" << valueOffset(program, item.output) << "], rax\n";
                 } else if (item.type == ValueType::Double) {
                     out << "    movsd xmm0, qword [rbp+" << item.stackOffset << "]\n"
                         << "    movsd qword [rbp-" << valueOffset(program, item.output) << "], xmm0\n";

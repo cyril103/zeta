@@ -1,0 +1,13 @@
+def increment (value : &mut Int) : Int = {
+    *value = *value + 1
+    *value
+}
+
+def read (value : &Int) : Int = *value
+
+def main () : Int = {
+    var number : Int = 40
+    val incremented : Int = increment(&mut number)
+    val observed : Int = read(&number)
+    if (incremented == 41 && observed == 41 && number == 41) 0 else 1
+}
