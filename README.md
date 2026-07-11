@@ -169,6 +169,10 @@ def positif (x : Int) : Int = {
 `return` reste optionnel : sans lui, la dernière expression du corps fournit la
 valeur comme auparavant. La valeur retournée doit respecter le type déclaré.
 
+Les boucles acceptent `break` pour quitter immédiatement la boucle courante et
+`continue` pour reprendre à l'évaluation de son prédicat. Dans des boucles
+imbriquées, ces instructions ciblent toujours la boucle la plus proche.
+
 ## Expressions sur plusieurs lignes
 
 Une expression sur plusieurs lignes doit être placée entre accolades. Le bloc

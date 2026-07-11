@@ -7,6 +7,7 @@
 #include <string>
 #include <unordered_map>
 #include <variant>
+#include <utility>
 #include <vector>
 
 using ValueId = std::size_t;
@@ -84,5 +85,6 @@ private:
     IrProgram ir_;
     std::unordered_map<std::string, Symbol> symbols_;
     bool inFunction_{false};
+    std::vector<std::pair<std::size_t, std::size_t>> loopLabels_;
     std::size_t nextLabel_{0};
 };

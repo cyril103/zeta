@@ -1,0 +1,11 @@
+def main () : Int = {
+    var i : Int = 0
+    var somme : Int = 0
+    while (i < 10) do {
+        i = i + 1
+        if (i == 3) { continue } else 0
+        if (i == 8) { break } else 0
+        somme = somme + i
+    }
+    if (i == 8 && somme == 25) 0 else 1
+}

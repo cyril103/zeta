@@ -29,4 +29,5 @@ private:
 
     SymbolTable symbols_;
     std::optional<ValueType> returnType_;
+    std::size_t loopDepth_{0};
 };

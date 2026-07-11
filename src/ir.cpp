@@ -17,6 +17,7 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
     ir_ = IrProgram{};
     symbols_.clear();
     nextLabel_ = 0;
+    loopLabels_.clear();
     inFunction_ = false;
     std::vector<const Declaration*> functions;
     for (const Statement& statement : program.statements) {
@@ -98,9 +99,13 @@ void IrGenerator::emitTailExpression(
                     emitLoop(item, parameters);
                 } else if constexpr (std::is_same_v<T, ExpressionStatement>) {
                     expression(*item.expression, parameters);
-                } else {
+                } else if constexpr (std::is_same_v<T, ReturnStatement>) {
                     const ValueId value = expression(*item.value, parameters);
                     ir_.instructions.push_back(IrReturn{value, item.value->inferredType});
+                } else if constexpr (std::is_same_v<T, BreakStatement>) {
+                    ir_.instructions.push_back(IrJump{loopLabels_.back().second});
+                } else {
+                    ir_.instructions.push_back(IrJump{loopLabels_.back().first});
                 }
             }, statement->value);
         }
@@ -143,6 +148,7 @@ void IrGenerator::emitLoop(
     ir_.instructions.push_back(IrLabel{conditionLabel});
     const ValueId condition = expression(*loop.condition, parameters);
     ir_.instructions.push_back(IrBranch{condition, false, endLabel});
+    loopLabels_.emplace_back(conditionLabel, endLabel);
 
     std::vector<std::string> localNames;
     for (const StatementPtr& statement : loop.body) {
@@ -168,14 +174,19 @@ void IrGenerator::emitLoop(
                 emitLoop(item, parameters);
             } else if constexpr (std::is_same_v<T, ExpressionStatement>) {
                 expression(*item.expression, parameters);
-            } else {
+            } else if constexpr (std::is_same_v<T, ReturnStatement>) {
                 const ValueId value = expression(*item.value, parameters);
                 ir_.instructions.push_back(IrReturn{value, item.value->inferredType});
+            } else if constexpr (std::is_same_v<T, BreakStatement>) {
+                ir_.instructions.push_back(IrJump{endLabel});
+            } else {
+                ir_.instructions.push_back(IrJump{conditionLabel});
             }
         }, statement->value);
     }
     ir_.instructions.push_back(IrJump{conditionLabel});
     ir_.instructions.push_back(IrLabel{endLabel});
+    loopLabels_.pop_back();
     for (auto name = localNames.rbegin(); name != localNames.rend(); ++name)
         symbols_.erase(*name);
 }
@@ -317,9 +328,13 @@ ValueId IrGenerator::expression(
                         emitLoop(item, parameters);
                     } else if constexpr (std::is_same_v<S, ExpressionStatement>) {
                         expression(*item.expression, parameters);
-                    } else {
+                    } else if constexpr (std::is_same_v<S, ReturnStatement>) {
                         const ValueId value = expression(*item.value, parameters);
                         ir_.instructions.push_back(IrReturn{value, item.value->inferredType});
+                    } else if constexpr (std::is_same_v<S, BreakStatement>) {
+                        ir_.instructions.push_back(IrJump{loopLabels_.back().second});
+                    } else {
+                        ir_.instructions.push_back(IrJump{loopLabels_.back().first});
                     }
                 }, statement->value);
             }

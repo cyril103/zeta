@@ -134,8 +134,8 @@ Cette phase devra permettre :
 
 ## Phase 5 — Contrôle de flux supplémentaire
 
-État : `return` est disponible et optionnel ; `break` et `continue` restent à
-implémenter pour terminer cette phase.
+État : terminée. `return` est disponible et optionnel ; `break` et `continue`
+contrôlent la boucle englobante la plus proche.
 
 Ajouter `return` après la mise en place des véritables fonctions :
 

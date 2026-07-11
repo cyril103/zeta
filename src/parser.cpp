@@ -63,6 +63,8 @@ Statement Parser::statement() {
         const Token token = previous();
         return ReturnStatement{token.location, expression()};
     }
+    if (match(TokenKind::Break)) return BreakStatement{previous().location};
+    if (match(TokenKind::Continue)) return ContinueStatement{previous().location};
     if (check(TokenKind::Identifier)) return assignment();
     throw CompileError(peek().location,
                        "instruction attendue ('val', 'var', 'def' ou affectation)");
@@ -87,6 +89,7 @@ std::vector<StatementPtr> Parser::loopBody() {
     while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
         const bool startsStatement = check(TokenKind::Val) || check(TokenKind::Var) ||
             check(TokenKind::Def) || check(TokenKind::While) || check(TokenKind::Return) ||
+            check(TokenKind::Break) || check(TokenKind::Continue) ||
             (check(TokenKind::Identifier) && current_ + 1 < tokens_.size() &&
              tokens_[current_ + 1].kind == TokenKind::Equal);
         if (startsStatement) {
@@ -332,14 +335,15 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
     while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
         const bool startsDeclaration = check(TokenKind::Val) || check(TokenKind::Var) ||
                                        check(TokenKind::Def) || check(TokenKind::While) ||
-                                       check(TokenKind::Return);
+                                       check(TokenKind::Return) || check(TokenKind::Break) ||
+                                       check(TokenKind::Continue);
         const bool startsAssignment = check(TokenKind::Identifier) &&
                                       current_ + 1 < tokens_.size() &&
                                       tokens_[current_ + 1].kind == TokenKind::Equal;
         if (!startsDeclaration && !startsAssignment) break;
 
         statements.push_back(std::make_unique<Statement>(statement()));
-        if (!match(TokenKind::Separator)) {
+        if (!check(TokenKind::RightBrace) && !match(TokenKind::Separator)) {
             throw CompileError(peek().location,
                                "fin de ligne ou ';' attendue après l'instruction du bloc");
         }
@@ -348,7 +352,9 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
 
     if (check(TokenKind::RightBrace)) {
         if (!statements.empty() &&
-            std::holds_alternative<ReturnStatement>(statements.back()->value)) {
+            (std::holds_alternative<ReturnStatement>(statements.back()->value) ||
+             std::holds_alternative<BreakStatement>(statements.back()->value) ||
+             std::holds_alternative<ContinueStatement>(statements.back()->value))) {
             consume(TokenKind::RightBrace, "'}' attendue à la fin du bloc");
             --blockDepth_;
             return std::make_unique<Expression>(Expression{

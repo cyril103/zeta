@@ -22,6 +22,8 @@ enum class TokenKind {
     While,
     Do,
     Return,
+    Break,
+    Continue,
     Colon,
     Comma,
     Equal,
@@ -71,6 +73,8 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::While: return "'while'";
     case TokenKind::Do: return "'do'";
     case TokenKind::Return: return "'return'";
+    case TokenKind::Break: return "'break'";
+    case TokenKind::Continue: return "'continue'";
     case TokenKind::Colon: return "':'";
     case TokenKind::Comma: return "','";
     case TokenKind::Equal: return "'='";

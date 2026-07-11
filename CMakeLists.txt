@@ -150,6 +150,12 @@ if(BUILD_TESTING)
     add_test(NAME run_return_statements COMMAND ${CMAKE_CURRENT_BINARY_DIR}/return-statements)
     set_tests_properties(run_return_statements PROPERTIES DEPENDS compile_return_statements)
 
+    add_test(NAME compile_break_continue COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/break_continue.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/break-continue)
+    add_test(NAME run_break_continue COMMAND ${CMAKE_CURRENT_BINARY_DIR}/break-continue)
+    set_tests_properties(run_break_continue PROPERTIES DEPENDS compile_break_continue)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -191,7 +197,9 @@ if(BUILD_TESTING)
             bool_conversion_source
             bool_conversion_target
             return_outside_function
-            return_type_mismatch)
+            return_type_mismatch
+            break_outside_loop
+            continue_outside_loop)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

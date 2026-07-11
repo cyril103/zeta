@@ -123,6 +123,8 @@ std::vector<Token> Lexer::scan() {
             if (text == "while") kind = TokenKind::While;
             if (text == "do") kind = TokenKind::Do;
             if (text == "return") kind = TokenKind::Return;
+            if (text == "break") kind = TokenKind::Break;
+            if (text == "continue") kind = TokenKind::Continue;
             add(kind, std::move(text), start);
             continue;
         }

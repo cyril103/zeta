@@ -41,10 +41,16 @@ void SemanticAnalyzer::checkStatement(Statement& statement, bool global) {
                                    "une expression seule n'est pas autorisée au niveau global");
             }
             checkExpression(*node.expression, inferType(*node.expression));
-        } else {
+        } else if constexpr (std::is_same_v<T, ReturnStatement>) {
             if (!returnType_)
                 throw CompileError(node.location, "'return' est autorisé uniquement dans une fonction");
             checkExpression(*node.value, *returnType_);
+        } else {
+            if (loopDepth_ == 0)
+                throw CompileError(node.location,
+                    std::is_same_v<T, BreakStatement>
+                        ? "'break' est autorisé uniquement dans une boucle"
+                        : "'continue' est autorisé uniquement dans une boucle");
         }
     }, statement.value);
 }
@@ -102,7 +108,9 @@ void SemanticAnalyzer::checkStatements(std::vector<StatementPtr>& statements) {
 void SemanticAnalyzer::checkLoop(WhileStatement& loop) {
     checkExpression(*loop.condition, ValueType::Bool);
     symbols_.pushScope();
+    ++loopDepth_;
     checkStatements(loop.body);
+    --loopDepth_;
     symbols_.popScope();
 }
 
