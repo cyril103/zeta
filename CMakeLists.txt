@@ -291,6 +291,12 @@ if(BUILD_TESTING)
     add_test(NAME run_array_types COMMAND ${CMAKE_CURRENT_BINARY_DIR}/array-types)
     set_tests_properties(run_array_types PROPERTIES DEPENDS compile_array_types)
 
+    add_test(NAME compile_reference_read COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/reference_read.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/reference-read)
+    add_test(NAME run_reference_read COMMAND ${CMAKE_CURRENT_BINARY_DIR}/reference-read)
+    set_tests_properties(run_reference_read PROPERTIES DEPENDS compile_reference_read)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment

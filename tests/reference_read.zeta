@@ -1,0 +1,8 @@
+var globalValue : Int = 7
+
+def main () : Int = {
+    var localValue : Int = 42
+    val localReference : &Int = &localValue
+    val globalReference : &Int = &globalValue
+    if (*localReference == 42 && *globalReference == 7) 0 else 1
+}

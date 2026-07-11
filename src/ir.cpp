@@ -374,10 +374,20 @@ ValueId IrGenerator::expression(
             ir_.instructions.push_back(IrIndexLoad{output, array, index,
                                                    node.array->inferredType});
             return output;
-        } else if constexpr (std::is_same_v<T, AddressExpr> ||
-                             std::is_same_v<T, DereferenceExpr>) {
-            throw CompileError(expressionNode.location,
-                               "la génération des références n'est pas encore disponible");
+        } else if constexpr (std::is_same_v<T, AddressExpr>) {
+            const auto& name = std::get<NameExpr>(node.operand->value);
+            const auto found = symbols_.find(name.name);
+            if (found == symbols_.end())
+                throw CompileError(expressionNode.location, "cible d'emprunt inconnue");
+            const ValueId output = nextValue(expressionNode.inferredType);
+            ir_.instructions.push_back(IrAddressOf{output, found->second.slot});
+            return output;
+        } else if constexpr (std::is_same_v<T, DereferenceExpr>) {
+            const ValueId reference = expression(*node.operand, parameters);
+            const ValueId output = nextValue(expressionNode.inferredType);
+            ir_.instructions.push_back(IrDereference{output, reference,
+                                                     expressionNode.inferredType});
+            return output;
         } else if constexpr (std::is_same_v<T, NameExpr>) {
             if (const auto parameter = parameters.find(node.name);
                 parameter != parameters.end()) {
@@ -576,6 +586,11 @@ std::string IrGenerator::print(const IrProgram& program) {
                 for (ValueId index : item.indexes) out << "[$" << index << ']';
                 out << ", $" << item.value << '\n';
             }
+            else if constexpr (std::is_same_v<T, IrAddressOf>)
+                out << "  $" << item.output << " = address %"
+                    << program.slots[item.slot].name << '\n';
+            else if constexpr (std::is_same_v<T, IrDereference>)
+                out << "  $" << item.output << " = dereference $" << item.reference << '\n';
             else if constexpr (std::is_same_v<T, IrLoad>)
                 out << "  $" << item.output << " = load."
                     << suffix(item.type) << " %" << program.slots[item.slot].name << '\n';
