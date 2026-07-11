@@ -31,6 +31,7 @@ ModuleGraph ModuleLoader::load(const std::filesystem::path& rootPath) {
     if (!validModuleName(graph_.root))
         throw std::runtime_error("nom de module invalide : " + graph_.root);
     loadModule(graph_.root, absolute);
+    buildInterfaces();
     return std::move(graph_);
 }
 
@@ -46,4 +47,24 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
     graph_.modules.emplace(name, Module{name, path, std::move(program)});
     for (const Program::Import& import : imports)
         loadModule(import.module, sourceDirectory_ / (import.module + ".zeta"));
+}
+
+void ModuleLoader::buildInterfaces() {
+    for (const auto& [name, module] : graph_.modules) {
+        ModuleInterface interface{name, {}};
+        for (const Statement& statement : module.program.statements) {
+            const auto* declaration = std::get_if<Declaration>(&statement.value);
+            if (declaration == nullptr || !declaration->publicSymbol) continue;
+            std::vector<ValueType> parameterTypes;
+            for (const Parameter& parameter : declaration->parameters)
+                parameterTypes.push_back(parameter.type);
+            if (!interface.exports.emplace(declaration->name,
+                    ExportedSymbol{declaration->kind, declaration->type,
+                                   declaration->callable, std::move(parameterTypes)}).second) {
+                throw CompileError(declaration->location,
+                    "symbole public '" + declaration->name + "' exporté plusieurs fois par " + name);
+            }
+        }
+        graph_.interfaces.emplace(name, std::move(interface));
+    }
 }

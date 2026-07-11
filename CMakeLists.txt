@@ -179,6 +179,11 @@ if(BUILD_TESTING)
     add_test(NAME run_module_loading COMMAND ${CMAKE_CURRENT_BINARY_DIR}/module-loading)
     set_tests_properties(run_module_loading PROPERTIES DEPENDS compile_module_loading)
 
+    add_test(NAME reject_module_duplicate_export COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/modules_duplicate_export/main.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/invalid-module-duplicate-export)
+    set_tests_properties(reject_module_duplicate_export PROPERTIES WILL_FAIL TRUE)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment

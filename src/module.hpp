@@ -5,6 +5,19 @@
 #include <filesystem>
 #include <string>
 #include <unordered_map>
+#include <vector>
+
+struct ExportedSymbol {
+    BindingKind kind;
+    ValueType type;
+    bool callable;
+    std::vector<ValueType> parameterTypes;
+};
+
+struct ModuleInterface {
+    std::string name;
+    std::unordered_map<std::string, ExportedSymbol> exports;
+};
 
 struct Module {
     std::string name;
@@ -15,6 +28,7 @@ struct Module {
 struct ModuleGraph {
     std::string root;
     std::unordered_map<std::string, Module> modules;
+    std::unordered_map<std::string, ModuleInterface> interfaces;
 };
 
 class ModuleLoader {
@@ -23,6 +37,7 @@ public:
 
 private:
     void loadModule(const std::string& name, const std::filesystem::path& path);
+    void buildInterfaces();
     std::filesystem::path sourceDirectory_;
     ModuleGraph graph_;
 };

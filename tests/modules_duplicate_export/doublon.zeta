@@ -1,0 +1,2 @@
+pub val valeur : Int = 1
+pub val valeur : Int = 2
