@@ -229,6 +229,14 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/runtime/io.asm
         ${CMAKE_CURRENT_BINARY_DIR}/runtime-io.o)
 
+    add_test(NAME compile_io_output COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/io_output.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/io-output)
+    add_test(NAME run_io_output COMMAND ${CMAKE_COMMAND}
+        -DPROGRAM=${CMAKE_CURRENT_BINARY_DIR}/io-output
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_io_output.cmake)
+    set_tests_properties(run_io_output PROPERTIES DEPENDS compile_io_output)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
