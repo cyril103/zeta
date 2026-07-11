@@ -149,6 +149,19 @@ const Token& Parser::consume(TokenKind kind, const std::string& message) {
 }
 
 ValueType Parser::consumeType(const std::string& message) {
+    if (match(TokenKind::LeftBracket)) {
+        const ValueType element = consumeType("type d'élément attendu après '['");
+        consume(TokenKind::Semicolon, "';' attendu après le type d'élément");
+        const Token& lengthToken = consume(TokenKind::Integer,
+                                           "taille entière attendue après ';'");
+        std::size_t length = 0;
+        const auto result = std::from_chars(lengthToken.text.data(),
+            lengthToken.text.data() + lengthToken.text.size(), length);
+        if (result.ec != std::errc{} || result.ptr != lengthToken.text.data() + lengthToken.text.size())
+            throw CompileError(lengthToken.location, "taille de tableau invalide");
+        consume(TokenKind::RightBracket, "']' attendue après la taille du tableau");
+        return ValueType(std::make_shared<ValueType>(element), length);
+    }
     if (match(TokenKind::IntType)) return ValueType::Int;
     if (match(TokenKind::ByteType)) return ValueType::Byte;
     if (match(TokenKind::DoubleType)) return ValueType::Double;
