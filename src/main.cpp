@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
         fs::path cacheDirectory = outputPath;
         cacheDirectory += ".cache";
         fs::create_directories(cacheDirectory);
-        std::string programFingerprint = "zeta-program-cache-v1";
+        std::string programFingerprint = "zeta-program-cache-v2-native-externals";
         for (const std::string& moduleName : modules.compilationOrder)
             programFingerprint += ":" + moduleName + ":" + modules.fingerprints.at(moduleName);
         const fs::path cachedProgramObject = cacheDirectory / "program.o";
@@ -179,6 +179,7 @@ int main(int argc, char** argv) {
                 }
                 fs::copy_file(cachedRuntimeObject, moduleDirectory / (moduleName + ".runtime.o"),
                               fs::copy_options::overwrite_existing);
+                objects.push_back(moduleDirectory / (moduleName + ".runtime.o"));
             }
         }
         runLinker(objects, outputPath);

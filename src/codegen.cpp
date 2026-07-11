@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <limits>
 #include <sstream>
+#include <set>
 #include <type_traits>
 
 namespace {
@@ -399,6 +400,20 @@ std::string FasmCodeGenerator::generateObject(const IrProgram& program) {
         "format ELF64 executable 3\nentry start\n\nsegment readable executable\n";
     assembly.replace(0, executableHeader.size(),
                      "format ELF64\nsection '.text' executable\npublic start\n");
+    std::set<std::string> definitions;
+    std::set<std::string> calls;
+    for (const IrInstruction& instruction : program.instructions) {
+        if (const auto* function = std::get_if<IrFunctionStart>(&instruction))
+            definitions.insert(function->name);
+        else if (const auto* call = std::get_if<IrCall>(&instruction))
+            calls.insert(call->function);
+        else if (const auto* call = std::get_if<IrTailCall>(&instruction))
+            calls.insert(call->function);
+    }
+    std::string externals;
+    for (const std::string& call : calls)
+        if (!definitions.contains(call)) externals += "extrn zeta_fn_" + call + "\n";
+    assembly.insert(assembly.find("start:"), externals);
     const auto replaceSegment = [&](const std::string& from, const std::string& to) {
         if (const std::size_t position = assembly.find(from); position != std::string::npos)
             assembly.replace(position, from.size(), to);
