@@ -54,6 +54,10 @@ calculs flottants avec SSE2 et le stockage adapté à la taille de chaque type.
 
 Priorité recommandée avant d'ajouter beaucoup de syntaxe.
 
+État : terminée. Le pipeline passe désormais par un analyseur sémantique et un
+AST typé avant la génération IR ; la résolution utilise une pile de portées et
+les règles de types sont centralisées.
+
 - Séparer l'analyse sémantique de la génération IR.
 - Introduire une véritable table de symboles avec une pile de portées.
 - Produire un AST typé après l'analyse sémantique.

@@ -9,6 +9,7 @@ add_executable(zeta
     src/main.cpp
     src/lexer.cpp
     src/parser.cpp
+    src/semantic.cpp
     src/ir.cpp
     src/codegen.cpp
 )

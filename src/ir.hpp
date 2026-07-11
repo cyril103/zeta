@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ast.hpp"
+#include "semantic.hpp"
 
 #include <cstdint>
 #include <string>
@@ -42,7 +43,7 @@ struct IrProgram {
 
 class IrGenerator {
 public:
-    IrProgram generate(const Program& program);
+    IrProgram generate(const TypedProgram& program);
     static std::string print(const IrProgram& program);
 
 private:
@@ -52,23 +53,6 @@ private:
         const Declaration* declaration;
     };
 
-    ValueType validateExpression(
-        const Expression& expression,
-        ValueType expected,
-        const std::unordered_map<std::string, ValueType>& parameters = {}) const;
-    ValueType validateExpression(
-        const Expression& expression,
-        ValueType expected,
-        const std::unordered_map<std::string, ValueType>& parameters,
-        const std::unordered_map<std::string, const Declaration*>& locals) const;
-    ValueType inferType(
-        const Expression& expression,
-        const std::unordered_map<std::string, ValueType>& parameters,
-        const std::unordered_map<std::string, const Declaration*>& locals) const;
-    void validateLoop(
-        const WhileStatement& loop,
-        const std::unordered_map<std::string, ValueType>& parameters,
-        const std::unordered_map<std::string, const Declaration*>& locals) const;
     void emitLoop(const WhileStatement& loop,
                   const std::unordered_map<std::string, ValueId>& parameters);
     ValueId expression(const Expression& expression);

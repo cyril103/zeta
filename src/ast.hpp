@@ -36,7 +36,8 @@ struct Expression {
     SourceLocation location;
     std::variant<IntegerExpr, DoubleExpr, BoolExpr, NameExpr, CallExpr, UnaryExpr,
                  BinaryExpr, BlockExpr, IfExpr> value;
-    mutable ValueType inferredType{ValueType::Int};
+    ValueType inferredType{ValueType::Int};
+    bool typed{false};
 };
 
 enum class BindingKind { Val, Var, Def };

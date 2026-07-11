@@ -3,6 +3,7 @@
 #include "ir.hpp"
 #include "lexer.hpp"
 #include "parser.hpp"
+#include "semantic.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -84,8 +85,11 @@ int main(int argc, char** argv) {
         const std::string source = readFile(sourcePath);
         Lexer lexer(source);
         Parser parser(lexer.scan());
+        Program program = parser.parse();
+        SemanticAnalyzer semanticAnalyzer;
+        const TypedProgram typedProgram = semanticAnalyzer.analyze(program);
         IrGenerator irGenerator;
-        const IrProgram ir = irGenerator.generate(parser.parse());
+        const IrProgram ir = irGenerator.generate(typedProgram);
 
         fs::path irPath = outputPath;
         irPath += ".ir";

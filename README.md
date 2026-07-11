@@ -166,6 +166,20 @@ La compilation produit `build/basic.ir`, `build/basic.asm` et l'exécutable
 `build/basic`. La cible actuelle est Linux x86-64 et nécessite `fasm` dans le
 `PATH`.
 
+## Architecture du compilateur
+
+Le pipeline interne sépare explicitement les responsabilités :
+
+```text
+tokens -> AST brut -> analyse sémantique -> AST typé -> IR -> x86-64
+```
+
+L'analyse sémantique résout les identifiants avec une pile de portées, contrôle
+les déclarations, les affectations et les appels, puis annote chaque expression
+avec son type. Les règles communes de compatibilité sont centralisées dans
+`type_rules.hpp`. Le générateur IR n'accepte qu'un `TypedProgram` délivré après
+la réussite de cette analyse ; il ne réalise donc aucun contrôle de typage.
+
 ## Point d'entrée
 
 Tout programme Zeta doit déclarer exactement ce point d'entrée :
