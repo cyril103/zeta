@@ -356,7 +356,11 @@ if(BUILD_TESTING)
             array_index_negative
             array_immutable_mutation
             array_function_signature
-            array_comparison)
+            array_comparison
+            reference_mutable_val
+            reference_temporary
+            reference_global
+            reference_return)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

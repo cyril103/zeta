@@ -84,6 +84,17 @@ void SemanticAnalyzer::checkStatement(Statement& statement, bool global) {
 }
 
 void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecursion) {
+    if (declaration.type.kind == ValueType::Kind::Reference) {
+        if (declaration.callable)
+            throw CompileError(declaration.location,
+                               "le retour de références n'est pas encore autorisé");
+        if (allowRecursion)
+            throw CompileError(declaration.location,
+                               "une référence ne peut pas être stockée globalement");
+        if (declaration.kind != BindingKind::Val)
+            throw CompileError(declaration.location,
+                               "une référence locale doit être déclarée avec 'val'");
+    }
     if (declaration.callable && declaration.type.kind == ValueType::Kind::Array)
         throw CompileError(declaration.location,
                            "le retour d'un tableau par valeur n'est pas encore pris en charge");
@@ -273,9 +284,19 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             return *arrayType.element;
         }
         else if constexpr (std::is_same_v<T, AddressExpr>) {
-            const ValueType operandType = inferType(*node.operand);
-            checkExpression(*node.operand, operandType);
-            return ValueType(std::make_shared<ValueType>(operandType), node.mutableBorrow);
+            const auto* name = std::get_if<NameExpr>(&node.operand->value);
+            if (name == nullptr)
+                throw CompileError(expression.location,
+                                   "seul un identifiant de donnée peut être emprunté");
+            const SemanticSymbol* symbol = symbols_.lookup(name->name);
+            if (symbol == nullptr || (symbol->kind == BindingKind::Def && symbol->callable))
+                throw CompileError(expression.location,
+                                   "identifiant non empruntable '" + name->name + "'");
+            if (node.mutableBorrow && (symbol->kind != BindingKind::Var || symbol->parameter))
+                throw CompileError(expression.location,
+                                   "'&mut' exige une variable 'var'");
+            checkExpression(*node.operand, symbol->type);
+            return ValueType(std::make_shared<ValueType>(symbol->type), node.mutableBorrow);
         }
         else if constexpr (std::is_same_v<T, DereferenceExpr>) {
             const ValueType reference = inferType(*node.operand);
@@ -342,6 +363,9 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 if (operands.kind == ValueType::Kind::Array)
                     throw CompileError(expression.location,
                                        "les comparaisons de tableaux ne sont pas encore disponibles");
+                if (operands.kind == ValueType::Kind::Reference)
+                    throw CompileError(expression.location,
+                                       "les comparaisons de références ne sont pas disponibles");
                 if (TypeRules::isOrdering(node.op) &&
                     (operands == ValueType::Bool || operands == ValueType::String))
                     throw CompileError(expression.location,

@@ -1,0 +1,4 @@
+def main () : Int = {
+    val reference : &Int = &(1 + 2)
+    0
+}
