@@ -1,0 +1,3 @@
+import native_api
+
+def main () : Int = 0

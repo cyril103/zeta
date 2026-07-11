@@ -1,0 +1,1 @@
+pub native def write (value : String) : Int

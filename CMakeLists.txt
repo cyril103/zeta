@@ -202,6 +202,12 @@ if(BUILD_TESTING)
     add_test(NAME run_modules_integration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/modules-integration)
     set_tests_properties(run_modules_integration PROPERTIES DEPENDS compile_modules_integration)
 
+    add_test(NAME compile_native_declaration COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/modules_native_declaration/main.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/native-declaration)
+    add_test(NAME run_native_declaration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/native-declaration)
+    set_tests_properties(run_native_declaration PROPERTIES DEPENDS compile_native_declaration)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -256,7 +262,8 @@ if(BUILD_TESTING)
             string_arithmetic
             string_ordering
             string_type_mismatch
-            module_missing)
+            module_missing
+            native_main)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

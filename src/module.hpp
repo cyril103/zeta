@@ -12,6 +12,7 @@ struct ExportedSymbol {
     BindingKind kind;
     ValueType type;
     bool callable;
+    bool nativeSymbol;
     std::vector<ValueType> parameterTypes;
 };
 

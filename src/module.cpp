@@ -110,6 +110,7 @@ void ModuleLoader::buildFingerprints() {
             std::string signature = symbolName + ":" + typeName(symbol.type) + ":" +
                 std::to_string(static_cast<int>(symbol.kind)) + ":" +
                 (symbol.callable ? "call" : "value");
+            signature += symbol.nativeSymbol ? ":native" : ":zeta";
             for (ValueType parameter : symbol.parameterTypes)
                 signature += ":" + typeName(parameter);
             exports.push_back(std::move(signature));
@@ -134,7 +135,8 @@ void ModuleLoader::buildInterfaces() {
                 parameterTypes.push_back(parameter.type);
             if (!interface.exports.emplace(declaration->name,
                     ExportedSymbol{declaration->kind, declaration->type,
-                                   declaration->callable, std::move(parameterTypes)}).second) {
+                                   declaration->callable, declaration->nativeSymbol,
+                                   std::move(parameterTypes)}).second) {
                 throw CompileError(declaration->location,
                     "symbole public '" + declaration->name + "' exporté plusieurs fois par " + name);
             }

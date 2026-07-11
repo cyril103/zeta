@@ -39,7 +39,8 @@ TypedProgram SemanticAnalyzer::analyze(
     }
     const Declaration& declaration = *main->declaration;
     if (declaration.kind != BindingKind::Def || !declaration.callable ||
-        !declaration.parameters.empty() || declaration.type != ValueType::Int) {
+        declaration.nativeSymbol || !declaration.parameters.empty() ||
+        declaration.type != ValueType::Int) {
         throw CompileError(declaration.location,
                            "le point d'entrée doit avoir la signature 'def main () : Int'");
     }
@@ -80,6 +81,7 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
         throw CompileError(declaration.location,
                            "l'identifiant '" + declaration.name + "' est déjà défini");
     }
+    if (declaration.nativeSymbol) return;
     symbols_.pushScope();
     for (const Parameter& parameter : declaration.parameters) {
         if (!symbols_.defineParameter(parameter.name,
