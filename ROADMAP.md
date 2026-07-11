@@ -134,6 +134,9 @@ Cette phase devra permettre :
 
 ## Phase 5 — Contrôle de flux supplémentaire
 
+État : `return` est disponible et optionnel ; `break` et `continue` restent à
+implémenter pour terminer cette phase.
+
 Ajouter `return` après la mise en place des véritables fonctions :
 
 ```zeta

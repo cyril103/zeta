@@ -144,6 +144,12 @@ if(BUILD_TESTING)
     add_test(NAME run_tail_recursive_functions COMMAND ${CMAKE_CURRENT_BINARY_DIR}/tail-recursive-functions)
     set_tests_properties(run_tail_recursive_functions PROPERTIES DEPENDS compile_tail_recursive_functions)
 
+    add_test(NAME compile_return_statements COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/return_statements.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/return-statements)
+    add_test(NAME run_return_statements COMMAND ${CMAKE_CURRENT_BINARY_DIR}/return-statements)
+    set_tests_properties(run_return_statements PROPERTIES DEPENDS compile_return_statements)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -183,7 +189,9 @@ if(BUILD_TESTING)
             while_scope
             while_as_expression
             bool_conversion_source
-            bool_conversion_target)
+            bool_conversion_target
+            return_outside_function
+            return_type_mismatch)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

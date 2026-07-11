@@ -59,6 +59,10 @@ Statement Parser::statement() {
     if (match(TokenKind::Var)) return declaration(BindingKind::Var);
     if (match(TokenKind::Def)) return declaration(BindingKind::Def);
     if (match(TokenKind::While)) return whileStatement();
+    if (match(TokenKind::Return)) {
+        const Token token = previous();
+        return ReturnStatement{token.location, expression()};
+    }
     if (check(TokenKind::Identifier)) return assignment();
     throw CompileError(peek().location,
                        "instruction attendue ('val', 'var', 'def' ou affectation)");
@@ -82,7 +86,7 @@ std::vector<StatementPtr> Parser::loopBody() {
     skipSeparators();
     while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
         const bool startsStatement = check(TokenKind::Val) || check(TokenKind::Var) ||
-            check(TokenKind::Def) || check(TokenKind::While) ||
+            check(TokenKind::Def) || check(TokenKind::While) || check(TokenKind::Return) ||
             (check(TokenKind::Identifier) && current_ + 1 < tokens_.size() &&
              tokens_[current_ + 1].kind == TokenKind::Equal);
         if (startsStatement) {
@@ -327,7 +331,8 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
 
     while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
         const bool startsDeclaration = check(TokenKind::Val) || check(TokenKind::Var) ||
-                                       check(TokenKind::Def) || check(TokenKind::While);
+                                       check(TokenKind::Def) || check(TokenKind::While) ||
+                                       check(TokenKind::Return);
         const bool startsAssignment = check(TokenKind::Identifier) &&
                                       current_ + 1 < tokens_.size() &&
                                       tokens_[current_ + 1].kind == TokenKind::Equal;
@@ -342,6 +347,13 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
     }
 
     if (check(TokenKind::RightBrace)) {
+        if (!statements.empty() &&
+            std::holds_alternative<ReturnStatement>(statements.back()->value)) {
+            consume(TokenKind::RightBrace, "'}' attendue à la fin du bloc");
+            --blockDepth_;
+            return std::make_unique<Expression>(Expression{
+                location, BlockExpr{std::move(statements), nullptr}});
+        }
         throw CompileError(peek().location,
                            "un bloc doit se terminer par une expression");
     }

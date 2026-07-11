@@ -75,14 +75,16 @@ struct ExpressionStatement {
     SourceLocation location;
     ExprPtr expression;
 };
+struct ReturnStatement { SourceLocation location; ExprPtr value; };
 
 struct Statement {
-    std::variant<Declaration, Assignment, WhileStatement, ExpressionStatement> value;
+    std::variant<Declaration, Assignment, WhileStatement, ExpressionStatement, ReturnStatement> value;
 
     Statement(Declaration declaration) : value(std::move(declaration)) {}
     Statement(Assignment assignment) : value(std::move(assignment)) {}
     Statement(WhileStatement loop) : value(std::move(loop)) {}
     Statement(ExpressionStatement expression) : value(std::move(expression)) {}
+    Statement(ReturnStatement statement) : value(std::move(statement)) {}
 };
 
 struct Program {

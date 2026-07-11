@@ -122,6 +122,7 @@ std::vector<Token> Lexer::scan() {
             if (text == "else") kind = TokenKind::Else;
             if (text == "while") kind = TokenKind::While;
             if (text == "do") kind = TokenKind::Do;
+            if (text == "return") kind = TokenKind::Return;
             add(kind, std::move(text), start);
             continue;
         }

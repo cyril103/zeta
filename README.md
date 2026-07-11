@@ -157,6 +157,18 @@ réécrit alors les paramètres de la frame courante et saute au début du corps
 pile d'appels ne grandit pas. Les appels non terminaux, par exemple
 `n * factorielle(n - 1)`, conservent une récursion classique.
 
+Le retour d'une fonction peut être écrit explicitement avec `return`, notamment
+pour quitter une branche avant la fin :
+
+```text
+def positif (x : Int) : Int = {
+    if (x < 0) { return 0 } else x
+}
+```
+
+`return` reste optionnel : sans lui, la dernière expression du corps fournit la
+valeur comme auparavant. La valeur retournée doit respecter le type déclaré.
+
 ## Expressions sur plusieurs lignes
 
 Une expression sur plusieurs lignes doit être placée entre accolades. Le bloc

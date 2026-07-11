@@ -1,0 +1,4 @@
+def invalide () : Bool = {
+    return 1
+}
+def main () : Int = 0

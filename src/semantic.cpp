@@ -35,12 +35,16 @@ void SemanticAnalyzer::checkStatement(Statement& statement, bool global) {
         if constexpr (std::is_same_v<T, Declaration>) checkDeclaration(node, global);
         else if constexpr (std::is_same_v<T, Assignment>) checkAssignment(node);
         else if constexpr (std::is_same_v<T, WhileStatement>) checkLoop(node);
-        else {
+        else if constexpr (std::is_same_v<T, ExpressionStatement>) {
             if (global) {
                 throw CompileError(node.location,
                                    "une expression seule n'est pas autorisée au niveau global");
             }
             checkExpression(*node.expression, inferType(*node.expression));
+        } else {
+            if (!returnType_)
+                throw CompileError(node.location, "'return' est autorisé uniquement dans une fonction");
+            checkExpression(*node.value, *returnType_);
         }
     }, statement.value);
 }
@@ -61,7 +65,10 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
                                "paramètre '" + parameter.name + "' déclaré plusieurs fois");
         }
     }
+    const auto previousReturnType = returnType_;
+    if (declaration.callable) returnType_ = declaration.type;
     checkExpression(*declaration.initializer, declaration.type);
+    returnType_ = previousReturnType;
     symbols_.popScope();
 
     if ((!declaration.callable || !allowRecursion) &&
@@ -117,7 +124,7 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
                 return ValueType::Bool;
             return TypeRules::commonOperandType(inferType(*node.left), inferType(*node.right));
         } else if constexpr (std::is_same_v<T, BlockExpr>) {
-            return inferType(*node.result);
+            return node.result ? inferType(*node.result) : ValueType::Int;
         } else {
             return TypeRules::commonOperandType(inferType(*node.thenBranch),
                                                 inferType(*node.elseBranch));
@@ -204,7 +211,7 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
         } else if constexpr (std::is_same_v<T, BlockExpr>) {
             symbols_.pushScope();
             checkStatements(node.statements);
-            checkExpression(*node.result, expected);
+            if (node.result) checkExpression(*node.result, expected);
             symbols_.popScope();
             return expected;
         } else {

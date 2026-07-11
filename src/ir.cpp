@@ -96,12 +96,15 @@ void IrGenerator::emitTailExpression(
                                                        found->second.declaration->type});
                 } else if constexpr (std::is_same_v<T, WhileStatement>) {
                     emitLoop(item, parameters);
-                } else {
+                } else if constexpr (std::is_same_v<T, ExpressionStatement>) {
                     expression(*item.expression, parameters);
+                } else {
+                    const ValueId value = expression(*item.value, parameters);
+                    ir_.instructions.push_back(IrReturn{value, item.value->inferredType});
                 }
             }, statement->value);
         }
-        emitTailExpression(*block->result, parameters, function);
+        if (block->result) emitTailExpression(*block->result, parameters, function);
         for (auto name = localNames.rbegin(); name != localNames.rend(); ++name)
             symbols_.erase(*name);
         return;
@@ -163,8 +166,11 @@ void IrGenerator::emitLoop(
                                                    found->second.declaration->type});
             } else if constexpr (std::is_same_v<T, WhileStatement>) {
                 emitLoop(item, parameters);
-            } else {
+            } else if constexpr (std::is_same_v<T, ExpressionStatement>) {
                 expression(*item.expression, parameters);
+            } else {
+                const ValueId value = expression(*item.value, parameters);
+                ir_.instructions.push_back(IrReturn{value, item.value->inferredType});
             }
         }, statement->value);
     }
@@ -309,12 +315,16 @@ ValueId IrGenerator::expression(
                                                           found->second.declaration->type});
                     } else if constexpr (std::is_same_v<S, WhileStatement>) {
                         emitLoop(item, parameters);
-                    } else {
+                    } else if constexpr (std::is_same_v<S, ExpressionStatement>) {
                         expression(*item.expression, parameters);
+                    } else {
+                        const ValueId value = expression(*item.value, parameters);
+                        ir_.instructions.push_back(IrReturn{value, item.value->inferredType});
                     }
                 }, statement->value);
             }
-            const ValueId result = expression(*node.result, parameters);
+            const ValueId result = node.result ? expression(*node.result, parameters)
+                                               : nextValue(expressionNode.inferredType);
             for (auto name = localNames.rbegin(); name != localNames.rend(); ++name) {
                 symbols_.erase(*name);
             }

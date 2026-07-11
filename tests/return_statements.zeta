@@ -1,0 +1,13 @@
+def explicite (x : Int) : Int = {
+    return x + 1
+}
+
+def implicite (x : Int) : Int = x + 2
+
+def positif (x : Int) : Int = {
+    if (x < 0) {
+        return 0
+    } else x
+}
+
+def main () : Int = if (explicite(4) == 5 && implicite(4) == 6 && positif(-2) == 0 && positif(3) == 3) 0 else 1

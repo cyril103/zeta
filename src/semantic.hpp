@@ -2,6 +2,7 @@
 
 #include "ast.hpp"
 #include "symbol_table.hpp"
+#include <optional>
 
 class TypedProgram {
 public:
@@ -27,4 +28,5 @@ private:
     void checkStatements(std::vector<StatementPtr>& statements);
 
     SymbolTable symbols_;
+    std::optional<ValueType> returnType_;
 };
