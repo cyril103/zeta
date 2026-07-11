@@ -1,0 +1,14 @@
+val ascii : Char = 'A'
+val accent : Char = 'é'
+val emoji : Char = '🚀'
+val echappe : Char = '\u{1F680}'
+val nouvelleLigne : Char = '\n'
+
+def main () : Int = {
+    val code : Int = Int(emoji)
+    val reconstruit : Char = Char(code)
+    val invalide : Char = Char(-1)
+    val substitut : Char = Char(55296)
+    if (ascii < accent && emoji == echappe && reconstruit == emoji &&
+        nouvelleLigne == '\u{A}' && invalide == '\u{FFFD}' && substitut == '\u{FFFD}') 0 else 1
+}

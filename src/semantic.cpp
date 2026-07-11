@@ -120,6 +120,7 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
         if constexpr (std::is_same_v<T, IntegerExpr>) return ValueType::Int;
         else if constexpr (std::is_same_v<T, DoubleExpr>) return ValueType::Double;
         else if constexpr (std::is_same_v<T, BoolExpr>) return ValueType::Bool;
+        else if constexpr (std::is_same_v<T, CharacterExpr>) return ValueType::Char;
         else if constexpr (std::is_same_v<T, NameExpr> || std::is_same_v<T, CallExpr>) {
             const SemanticSymbol* symbol = symbols_.lookup(node.name);
             return symbol == nullptr ? ValueType::Int : symbol->type;
@@ -150,9 +151,11 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (expected == ValueType::Byte && node.value > 255)
                 throw CompileError(expression.location, "le littéral " +
                     std::to_string(node.value) + " dépasse l'intervalle Byte (0..255)");
+            if (expected == ValueType::Char) return ValueType::Int;
             return expected;
         } else if constexpr (std::is_same_v<T, DoubleExpr>) return ValueType::Double;
         else if constexpr (std::is_same_v<T, BoolExpr>) return ValueType::Bool;
+        else if constexpr (std::is_same_v<T, CharacterExpr>) return ValueType::Char;
         else if constexpr (std::is_same_v<T, NameExpr>) {
             const SemanticSymbol* symbol = symbols_.lookup(node.name);
             if (symbol == nullptr)

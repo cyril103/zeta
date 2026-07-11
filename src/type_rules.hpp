@@ -12,9 +12,13 @@ inline bool isOrdering(std::string_view op) {
     return op == "<" || op == "<=" || op == ">" || op == ">=";
 }
 inline bool isComparison(std::string_view op) { return isEquality(op) || isOrdering(op); }
-inline bool isNumeric(ValueType type) { return type != ValueType::Bool; }
+inline bool isNumeric(ValueType type) {
+    return type == ValueType::Int || type == ValueType::Byte || type == ValueType::Double;
+}
 inline bool canExplicitlyConvert(ValueType source, ValueType target) {
-    return isNumeric(source) && isNumeric(target);
+    return (isNumeric(source) && isNumeric(target)) ||
+           (source == ValueType::Char && target == ValueType::Int) ||
+           (source == ValueType::Int && target == ValueType::Char) || source == target;
 }
 
 inline ValueType commonOperandType(ValueType left, ValueType right) {

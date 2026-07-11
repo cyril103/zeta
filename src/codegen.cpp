@@ -97,6 +97,17 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 } else {
                     out << "    mov eax, dword [rbp-" << valueOffset(program, item.input) << "]\n";
                     if (item.target == ValueType::Byte) out << "    and eax, 255\n";
+                    if (item.target == ValueType::Char) {
+                        out << "    cmp eax, 10FFFFh\n"
+                            << "    ja ir_invalid_char_" << item.output << "\n"
+                            << "    cmp eax, 0D800h\n"
+                            << "    jb ir_valid_char_" << item.output << "\n"
+                            << "    cmp eax, 0DFFFh\n"
+                            << "    ja ir_valid_char_" << item.output << "\n"
+                            << "ir_invalid_char_" << item.output << ":\n"
+                            << "    mov eax, 0FFFDh\n"
+                            << "ir_valid_char_" << item.output << ":\n";
+                    }
                     out << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
                 }
             } else if constexpr (std::is_same_v<T, IrUnary>) {
@@ -137,7 +148,8 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 if (comparison) {
                     out << "    mov eax, dword [rbp-" << valueOffset(program, item.left) << "]\n"
                         << "    cmp eax, dword [rbp-" << valueOffset(program, item.right) << "]\n";
-                    const bool unsignedComparison = item.operandType == ValueType::Byte;
+                    const bool unsignedComparison = item.operandType == ValueType::Byte ||
+                                                    item.operandType == ValueType::Char;
                     const char* condition = item.op == "==" ? "e" : item.op == "!=" ? "ne" :
                         item.op == "<" ? (unsignedComparison ? "b" : "l") :
                         item.op == ">" ? (unsignedComparison ? "a" : "g") :
@@ -273,7 +285,8 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
             if (!program.slots[i].global) continue;
             out << "global_slot_" << i << ": "
                 << (program.slots[i].type == ValueType::Double ? "rq 1" :
-                    program.slots[i].type == ValueType::Int ? "rd 1" : "rb 1") << '\n';
+                    (program.slots[i].type == ValueType::Int ||
+                     program.slots[i].type == ValueType::Char) ? "rd 1" : "rb 1") << '\n';
         }
     }
     return out.str();

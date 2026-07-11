@@ -159,6 +159,9 @@ Une boucle `for` pourra être étudiée après stabilisation de ces instructions
 
 ## Phase 6 — Type String
 
+Le type `Char`, représentant un point de code Unicode sur 32 bits, est disponible
+en préparation de cette phase. Les futures chaînes utiliseront UTF-8.
+
 Syntaxe envisagée :
 
 ```zeta

@@ -68,6 +68,20 @@ des littéraux compatibles avec le contexte. Les opérateurs arithmétiques rest
 interdits sur `Bool`. Les priorités, de la plus faible à la plus forte, sont `||`,
 `&&`, égalité, comparaison, addition, multiplication et opérateurs unaires.
 
+`Char` représente un point de code Unicode valide sur 32 bits. Il accepte un
+caractère UTF-8 ou un échappement Unicode :
+
+```text
+val lettre : Char = 'é'
+val emoji : Char = '🚀'
+val aussiEmoji : Char = '\u{1F680}'
+```
+
+Les substituts `U+D800..U+DFFF` ne sont pas des valeurs `Char`. L'égalité et les
+comparaisons d'ordre sont disponibles, mais pas l'arithmétique. `Int(char)` donne
+le point de code et `Char(entier)` effectue la conversion inverse. Une valeur
+entière invalide est normalisée vers le caractère de remplacement `U+FFFD`.
+
 ## Expressions conditionnelles
 
 `if`, `else if` et `else` forment une expression et produisent donc une valeur :

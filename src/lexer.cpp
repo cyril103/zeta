@@ -36,6 +36,24 @@ std::vector<Token> Lexer::scan() {
             while (!atEnd() && peek() != '\n') advance();
             continue;
         }
+        if (c == '\'') {
+            const std::size_t begin = current_ - 1;
+            bool escaped = false;
+            while (!atEnd() && peek() != '\n') {
+                const char value = advance();
+                if (value == '\'' && !escaped) {
+                    add(TokenKind::Character,
+                        std::string(source_.substr(begin, current_ - begin)), start);
+                    break;
+                }
+                escaped = value == '\\' && !escaped;
+                if (value != '\\') escaped = false;
+            }
+            if (tokens_.empty() || tokens_.back().location.line != start.line ||
+                tokens_.back().kind != TokenKind::Character)
+                throw CompileError(start, "littéral Char non terminé");
+            continue;
+        }
 
         if (c == '=' && peek() == '=') {
             advance(); add(TokenKind::EqualEqual, "==", start); continue;
@@ -116,6 +134,7 @@ std::vector<Token> Lexer::scan() {
             if (text == "Byte") kind = TokenKind::ByteType;
             if (text == "Double") kind = TokenKind::DoubleType;
             if (text == "Bool") kind = TokenKind::BoolType;
+            if (text == "Char") kind = TokenKind::CharType;
             if (text == "true") kind = TokenKind::True;
             if (text == "false") kind = TokenKind::False;
             if (text == "if") kind = TokenKind::If;

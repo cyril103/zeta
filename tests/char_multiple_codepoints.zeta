@@ -1,0 +1,4 @@
+def main () : Int = {
+    val invalide : Char = 'ab'
+    0
+}

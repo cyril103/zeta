@@ -6,6 +6,53 @@
 #include <cmath>
 #include <limits>
 
+namespace {
+std::uint32_t decodeCharacter(const Token& token) {
+    const std::string_view text(token.text);
+    const std::string_view body = text.substr(1, text.size() - 2);
+    std::uint32_t value = 0;
+    std::size_t consumed = 0;
+    if (!body.empty() && body[0] == '\\') {
+        if (body == "\\n") return '\n';
+        if (body == "\\r") return '\r';
+        if (body == "\\t") return '\t';
+        if (body == "\\0") return 0;
+        if (body == "\\\\") return '\\';
+        if (body == "\\\'") return '\'';
+        if (body.size() >= 5 && body.substr(0, 3) == "\\u{" && body.back() == '}') {
+            const std::string_view digits = body.substr(3, body.size() - 4);
+            const auto result = std::from_chars(digits.data(), digits.data() + digits.size(),
+                                                value, 16);
+            if (!digits.empty() && result.ec == std::errc{} &&
+                result.ptr == digits.data() + digits.size()) consumed = body.size();
+        }
+    } else if (!body.empty()) {
+        const auto first = static_cast<unsigned char>(body[0]);
+        if (first < 0x80) { value = first; consumed = 1; }
+        else {
+            const std::size_t length = (first & 0xE0) == 0xC0 ? 2 :
+                (first & 0xF0) == 0xE0 ? 3 : (first & 0xF8) == 0xF0 ? 4 : 0;
+            if (length != 0 && body.size() >= length) {
+                value = first & ((1U << (7U - static_cast<unsigned>(length))) - 1U);
+                consumed = length;
+                for (std::size_t i = 1; i < length; ++i) {
+                    const auto next = static_cast<unsigned char>(body[i]);
+                    if ((next & 0xC0) != 0x80) { consumed = 0; break; }
+                    value = (value << 6U) | (next & 0x3FU);
+                }
+                const std::uint32_t minimum = length == 2 ? 0x80U :
+                    length == 3 ? 0x800U : 0x10000U;
+                if (consumed != 0 && value < minimum) consumed = 0;
+            }
+        }
+    }
+    if (body.empty() || consumed != body.size() || value > 0x10FFFFU ||
+        (value >= 0xD800U && value <= 0xDFFFU))
+        throw CompileError(token.location, "le littéral doit contenir un seul point de code Unicode valide");
+    return value;
+}
+}
+
 const Token& Parser::peek() const { return tokens_[current_]; }
 const Token& Parser::previous() const { return tokens_[current_ - 1]; }
 bool Parser::check(TokenKind kind) const { return peek().kind == kind; }
@@ -25,6 +72,7 @@ ValueType Parser::consumeType(const std::string& message) {
     if (match(TokenKind::ByteType)) return ValueType::Byte;
     if (match(TokenKind::DoubleType)) return ValueType::Double;
     if (match(TokenKind::BoolType)) return ValueType::Bool;
+    if (match(TokenKind::CharType)) return ValueType::Char;
     throw CompileError(peek().location, message + ", reçu " + tokenName(peek().kind));
 }
 
@@ -238,11 +286,13 @@ ExprPtr Parser::primary() {
         return blockExpression(previous().location);
     }
     if (match(TokenKind::IntType) || match(TokenKind::ByteType) ||
-        match(TokenKind::DoubleType) || match(TokenKind::BoolType)) {
+        match(TokenKind::DoubleType) || match(TokenKind::BoolType) ||
+        match(TokenKind::CharType)) {
         const Token token = previous();
         const ValueType target = token.kind == TokenKind::IntType ? ValueType::Int :
             token.kind == TokenKind::ByteType ? ValueType::Byte :
-            token.kind == TokenKind::DoubleType ? ValueType::Double : ValueType::Bool;
+            token.kind == TokenKind::DoubleType ? ValueType::Double :
+            token.kind == TokenKind::BoolType ? ValueType::Bool : ValueType::Char;
         consume(TokenKind::LeftParen, "'(' attendue après le type de conversion");
         expressionContinuation();
         ExprPtr operand = expression();
@@ -259,6 +309,11 @@ ExprPtr Parser::primary() {
             throw CompileError(token.location, "entier hors de l'intervalle Int32");
         }
         return std::make_unique<Expression>(Expression{token.location, IntegerExpr{static_cast<std::int32_t>(value)}});
+    }
+    if (match(TokenKind::Character)) {
+        const Token token = previous();
+        return std::make_unique<Expression>(Expression{
+            token.location, CharacterExpr{decodeCharacter(token)}});
     }
     if (match(TokenKind::Floating)) {
         const Token token = previous();

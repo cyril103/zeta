@@ -156,6 +156,11 @@ if(BUILD_TESTING)
     add_test(NAME run_break_continue COMMAND ${CMAKE_CURRENT_BINARY_DIR}/break-continue)
     set_tests_properties(run_break_continue PROPERTIES DEPENDS compile_break_continue)
 
+    add_test(NAME compile_char_type COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/char_type.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/char-type)
+    add_test(NAME run_char_type COMMAND ${CMAKE_CURRENT_BINARY_DIR}/char-type)
+    set_tests_properties(run_char_type PROPERTIES DEPENDS compile_char_type)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -199,7 +204,13 @@ if(BUILD_TESTING)
             return_outside_function
             return_type_mismatch
             break_outside_loop
-            continue_outside_loop)
+            continue_outside_loop
+            char_multiple_codepoints
+            char_arithmetic
+            char_int_mismatch
+            char_empty
+            char_invalid_escape
+            char_surrogate_literal)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

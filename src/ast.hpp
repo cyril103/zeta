@@ -8,13 +8,14 @@
 #include <variant>
 #include <vector>
 
-enum class ValueType { Int, Byte, Double, Bool };
+enum class ValueType { Int, Byte, Double, Bool, Char };
 
 inline std::string typeName(ValueType type) {
     if (type == ValueType::Int) return "Int";
     if (type == ValueType::Byte) return "Byte";
     if (type == ValueType::Double) return "Double";
-    return "Bool";
+    if (type == ValueType::Bool) return "Bool";
+    return "Char";
 }
 
 struct Expression;
@@ -25,6 +26,7 @@ using StatementPtr = std::unique_ptr<Statement>;
 struct IntegerExpr { std::int32_t value; };
 struct DoubleExpr { double value; };
 struct BoolExpr { bool value; };
+struct CharacterExpr { std::uint32_t value; };
 struct NameExpr { std::string name; };
 struct CallExpr { std::string name; std::vector<ExprPtr> arguments; };
 struct ConversionExpr { ValueType target; ExprPtr operand; };
@@ -35,7 +37,7 @@ struct IfExpr { ExprPtr condition; ExprPtr thenBranch; ExprPtr elseBranch; };
 
 struct Expression {
     SourceLocation location;
-    std::variant<IntegerExpr, DoubleExpr, BoolExpr, NameExpr, CallExpr, ConversionExpr,
+    std::variant<IntegerExpr, DoubleExpr, BoolExpr, CharacterExpr, NameExpr, CallExpr, ConversionExpr,
                  UnaryExpr, BinaryExpr, BlockExpr, IfExpr> value;
     ValueType inferredType{ValueType::Int};
     bool typed{false};

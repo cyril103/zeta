@@ -217,6 +217,11 @@ ValueId IrGenerator::expression(
             const ValueId output = nextValue(ValueType::Bool);
             ir_.instructions.push_back(IrConst{output, node.value ? 1 : 0, ValueType::Bool});
             return output;
+        } else if constexpr (std::is_same_v<T, CharacterExpr>) {
+            const ValueId output = nextValue(ValueType::Char);
+            ir_.instructions.push_back(IrConst{output, static_cast<std::int32_t>(node.value),
+                                               ValueType::Char});
+            return output;
         } else if constexpr (std::is_same_v<T, NameExpr>) {
             if (const auto parameter = parameters.find(node.name);
                 parameter != parameters.end()) {
@@ -369,7 +374,8 @@ std::string IrGenerator::print(const IrProgram& program) {
         if (type == ValueType::Int) return "i32";
         if (type == ValueType::Byte) return "u8";
         if (type == ValueType::Double) return "f64";
-        return "i1";
+        if (type == ValueType::Bool) return "i1";
+        return "u32";
     };
     out << "module {\n";
     for (std::size_t i = 0; i < program.slots.size(); ++i) {
