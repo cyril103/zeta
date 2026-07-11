@@ -1,0 +1,3 @@
+import service
+
+def main () : Int = if (service.execute(5, "ok") == 12) 0 else 1

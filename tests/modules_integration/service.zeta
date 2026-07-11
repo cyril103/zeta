@@ -1,0 +1,4 @@
+import maths
+import textes
+
+pub def execute (valeur : Int, message : String) : Int = if (textes.identite(message) == "ok") maths.calcul(valeur) else 0

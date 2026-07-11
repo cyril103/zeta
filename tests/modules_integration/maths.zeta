@@ -1,0 +1,2 @@
+pub def calcul (valeur : Int) : Int = valeur + 7
+def privee () : Int = 99

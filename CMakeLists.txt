@@ -196,6 +196,12 @@ if(BUILD_TESTING)
         -o ${CMAKE_CURRENT_BINARY_DIR}/invalid-module-cycle)
     set_tests_properties(reject_module_cycle PROPERTIES WILL_FAIL TRUE)
 
+    add_test(NAME compile_modules_integration COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/modules_integration/main.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/modules-integration)
+    add_test(NAME run_modules_integration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/modules-integration)
+    set_tests_properties(run_modules_integration PROPERTIES DEPENDS compile_modules_integration)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment

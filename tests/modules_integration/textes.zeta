@@ -1,0 +1,2 @@
+pub def identite (valeur : String) : String = valeur
+def calcul () : Int = 1
