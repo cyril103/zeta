@@ -141,6 +141,8 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
         else if constexpr (std::is_same_v<T, BoolExpr>) return ValueType::Bool;
         else if constexpr (std::is_same_v<T, CharacterExpr>) return ValueType::Char;
         else if constexpr (std::is_same_v<T, StringExpr>) return ValueType::String;
+        else if constexpr (std::is_same_v<T, ArrayExpr>)
+            return node.elements.empty() ? ValueType::Int : inferType(*node.elements.front());
         else if constexpr (std::is_same_v<T, NameExpr> || std::is_same_v<T, CallExpr>) {
             const SemanticSymbol* symbol = symbols_.lookup(node.name);
             return symbol == nullptr ? ValueType::Int : symbol->type;
@@ -178,6 +180,7 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
         else if constexpr (std::is_same_v<T, BoolExpr>) return ValueType::Bool;
         else if constexpr (std::is_same_v<T, CharacterExpr>) return ValueType::Char;
         else if constexpr (std::is_same_v<T, StringExpr>) return ValueType::String;
+        else if constexpr (std::is_same_v<T, ArrayExpr>) return expected;
         else if constexpr (std::is_same_v<T, NameExpr>) {
             const SemanticSymbol* symbol = symbols_.lookup(node.name);
             if (symbol == nullptr)

@@ -329,6 +329,9 @@ ValueId IrGenerator::expression(
             const ValueId output = nextValue(ValueType::String);
             ir_.instructions.push_back(IrStringConst{output, node.utf8});
             return output;
+        } else if constexpr (std::is_same_v<T, ArrayExpr>) {
+            throw CompileError(expressionNode.location,
+                               "la génération des tableaux n'est pas encore disponible");
         } else if constexpr (std::is_same_v<T, NameExpr>) {
             if (const auto parameter = parameters.find(node.name);
                 parameter != parameters.end()) {

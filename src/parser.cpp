@@ -429,6 +429,18 @@ ExprPtr Parser::primary() {
     if (match(TokenKind::LeftBrace)) {
         return blockExpression(previous().location);
     }
+    if (match(TokenKind::LeftBracket)) {
+        const Token token = previous();
+        std::vector<ExprPtr> elements;
+        if (!check(TokenKind::RightBracket)) {
+            do {
+                elements.push_back(expression());
+            } while (match(TokenKind::Comma));
+        }
+        consume(TokenKind::RightBracket, "']' attendue après le littéral de tableau");
+        return std::make_unique<Expression>(Expression{
+            token.location, ArrayExpr{std::move(elements)}});
+    }
     if (match(TokenKind::IntType) || match(TokenKind::ByteType) ||
         match(TokenKind::DoubleType) || match(TokenKind::BoolType) ||
         match(TokenKind::CharType) || match(TokenKind::StringType)) {
