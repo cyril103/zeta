@@ -122,7 +122,7 @@ struct Assignment {
 struct IndexAssignment {
     SourceLocation location;
     std::string name;
-    ExprPtr index;
+    std::vector<ExprPtr> indexes;
     ExprPtr value;
 };
 

@@ -119,21 +119,25 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     elementBytes);
             } else if constexpr (std::is_same_v<T, IrIndexStore>) {
                 const IrSlot& slot = program.slots[item.slot];
-                const std::size_t elementBytes = valueTypeSize(*item.arrayType.element);
-                out << "    movsxd rax, dword [rbp-" << valueOffset(program, item.index) << "]\n"
-                    << "    test rax, rax\n"
-                    << "    js ir_array_bounds_error\n"
-                    << "    cmp rax, " << item.arrayType.length << "\n"
-                    << "    jae ir_array_bounds_error\n"
-                    << "    imul rax, " << elementBytes << "\n";
                 if (slot.global)
                     out << "    lea rdi, [global_slot_" << item.slot << "]\n";
                 else
                     out << "    lea rdi, [rbp-" << slotOffset(program, item.slot) << "]\n";
-                out << "    add rdi, rax\n";
+                ValueType indexedType = item.arrayType;
+                for (ValueId index : item.indexes) {
+                    const std::size_t elementBytes = valueTypeSize(*indexedType.element);
+                    out << "    movsxd rax, dword [rbp-" << valueOffset(program, index) << "]\n"
+                        << "    test rax, rax\n"
+                        << "    js ir_array_bounds_error\n"
+                        << "    cmp rax, " << indexedType.length << "\n"
+                        << "    jae ir_array_bounds_error\n"
+                        << "    imul rax, " << elementBytes << "\n"
+                        << "    add rdi, rax\n";
+                    indexedType = *indexedType.element;
+                }
                 emitBlockCopy(out,
                     "[rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
-                    "[rdi]", elementBytes);
+                    "[rdi]", valueTypeSize(indexedType));
             } else if constexpr (std::is_same_v<T, IrLoad>) {
                 const IrSlot& slot = program.slots[item.slot];
                 const std::string address = slot.global

@@ -42,9 +42,10 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
                                                    found->second.declaration->type});
             } else if constexpr (std::is_same_v<T, IndexAssignment>) {
                 const auto found = symbols_.find(node.name);
-                const ValueId index = expression(*node.index);
+                std::vector<ValueId> indexes;
+                for (const ExprPtr& index : node.indexes) indexes.push_back(expression(*index));
                 const ValueId value = expression(*node.value);
-                ir_.instructions.push_back(IrIndexStore{found->second.slot, index, value,
+                ir_.instructions.push_back(IrIndexStore{found->second.slot, std::move(indexes), value,
                                                         found->second.declaration->type});
             } else if constexpr (std::is_same_v<T, WhileStatement>) {
                 const std::unordered_map<std::string, ValueId> parameterValues;
@@ -137,9 +138,10 @@ IrProgram IrGenerator::generate(const ModuleGraph& graph) {
                                                        found->second.declaration->type});
                 } else if constexpr (std::is_same_v<T, IndexAssignment>) {
                     const auto found = symbols_.find(node.name);
-                    const ValueId index = expression(*node.index);
+                    std::vector<ValueId> indexes;
+                    for (const ExprPtr& index : node.indexes) indexes.push_back(expression(*index));
                     const ValueId value = expression(*node.value);
-                    ir_.instructions.push_back(IrIndexStore{found->second.slot, index, value,
+                    ir_.instructions.push_back(IrIndexStore{found->second.slot, std::move(indexes), value,
                                                             found->second.declaration->type});
                 } else if constexpr (std::is_same_v<T, WhileStatement>) {
                     const std::unordered_map<std::string, ValueId> parameterValues;
@@ -212,9 +214,11 @@ void IrGenerator::emitTailExpression(
                                                        found->second.declaration->type});
                 } else if constexpr (std::is_same_v<T, IndexAssignment>) {
                     const auto found = symbols_.find(item.name);
-                    const ValueId index = expression(*item.index, parameters);
+                    std::vector<ValueId> indexes;
+                    for (const ExprPtr& index : item.indexes)
+                        indexes.push_back(expression(*index, parameters));
                     const ValueId value = expression(*item.value, parameters);
-                    ir_.instructions.push_back(IrIndexStore{found->second.slot, index, value,
+                    ir_.instructions.push_back(IrIndexStore{found->second.slot, std::move(indexes), value,
                                                             found->second.declaration->type});
                 } else if constexpr (std::is_same_v<T, WhileStatement>) {
                     emitLoop(item, parameters);
@@ -293,9 +297,11 @@ void IrGenerator::emitLoop(
                                                    found->second.declaration->type});
             } else if constexpr (std::is_same_v<T, IndexAssignment>) {
                 const auto found = symbols_.find(item.name);
-                const ValueId index = expression(*item.index, parameters);
+                std::vector<ValueId> indexes;
+                for (const ExprPtr& index : item.indexes)
+                    indexes.push_back(expression(*index, parameters));
                 const ValueId value = expression(*item.value, parameters);
-                ir_.instructions.push_back(IrIndexStore{found->second.slot, index, value,
+                ir_.instructions.push_back(IrIndexStore{found->second.slot, std::move(indexes), value,
                                                         found->second.declaration->type});
             } else if constexpr (std::is_same_v<T, WhileStatement>) {
                 emitLoop(item, parameters);
@@ -477,9 +483,11 @@ ValueId IrGenerator::expression(
                                                            found->second.declaration->type});
                     } else if constexpr (std::is_same_v<S, IndexAssignment>) {
                         const auto found = symbols_.find(item.name);
-                        const ValueId index = expression(*item.index, parameters);
+                        std::vector<ValueId> indexes;
+                        for (const ExprPtr& index : item.indexes)
+                            indexes.push_back(expression(*index, parameters));
                         const ValueId value = expression(*item.value, parameters);
-                        ir_.instructions.push_back(IrIndexStore{found->second.slot, index, value,
+                        ir_.instructions.push_back(IrIndexStore{found->second.slot, std::move(indexes), value,
                                                                 found->second.declaration->type});
                     } else if constexpr (std::is_same_v<S, WhileStatement>) {
                         emitLoop(item, parameters);
@@ -559,8 +567,11 @@ std::string IrGenerator::print(const IrProgram& program) {
                 out << "  $" << item.output << " = index " << '$' << item.array
                     << "[$" << item.index << "]\n";
             else if constexpr (std::is_same_v<T, IrIndexStore>)
-                out << "  index_store %" << program.slots[item.slot].name << "[$"
-                    << item.index << "], $" << item.value << '\n';
+            {
+                out << "  index_store %" << program.slots[item.slot].name;
+                for (ValueId index : item.indexes) out << "[$" << index << ']';
+                out << ", $" << item.value << '\n';
+            }
             else if constexpr (std::is_same_v<T, IrLoad>)
                 out << "  $" << item.output << " = load."
                     << suffix(item.type) << " %" << program.slots[item.slot].name << '\n';

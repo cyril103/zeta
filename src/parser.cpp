@@ -335,10 +335,13 @@ std::string Parser::qualifiedName() {
 Statement Parser::assignment() {
     const Token& name = consume(TokenKind::Identifier, "identifiant attendu");
     if (match(TokenKind::LeftBracket)) {
-        ExprPtr index = expression();
-        consume(TokenKind::RightBracket, "']' attendue après l'index");
+        std::vector<ExprPtr> indexes;
+        do {
+            indexes.push_back(expression());
+            consume(TokenKind::RightBracket, "']' attendue après l'index");
+        } while (match(TokenKind::LeftBracket));
         consume(TokenKind::Equal, "'=' attendu après la cible indexée");
-        return IndexAssignment{name.location, name.text, std::move(index), expression()};
+        return IndexAssignment{name.location, name.text, std::move(indexes), expression()};
     }
     consume(TokenKind::Equal, "'=' attendu après l'identifiant");
     return Assignment{name.location, name.text, expression()};

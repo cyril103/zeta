@@ -1,0 +1,5 @@
+def main () : Int = {
+    var matrix : [[Int; 2]; 2] = [[1, 2], [3, 4]]
+    matrix[1][0] = 30
+    if (matrix[0][1] == 2 && matrix[1][0] == 30) 0 else 1
+}

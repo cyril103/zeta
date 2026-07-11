@@ -140,12 +140,18 @@ void SemanticAnalyzer::checkIndexAssignment(IndexAssignment& assignment) {
     if (target->type.kind != ValueType::Kind::Array)
         throw CompileError(assignment.location,
                            "la cible d'une affectation indexée doit être un tableau");
-    checkExpression(*assignment.index, ValueType::Int);
-    if (const auto index = constantInteger(*assignment.index);
-        index && (*index < 0 || static_cast<std::uint64_t>(*index) >= target->type.length))
-        throw CompileError(assignment.index->location, "index " + std::to_string(*index) +
-                           " hors limites pour " + typeName(target->type));
-    checkExpression(*assignment.value, *target->type.element);
+    ValueType indexedType = target->type;
+    for (const ExprPtr& indexExpression : assignment.indexes) {
+        if (indexedType.kind != ValueType::Kind::Array)
+            throw CompileError(indexExpression->location, "trop d'index pour " + typeName(target->type));
+        checkExpression(*indexExpression, ValueType::Int);
+        if (const auto index = constantInteger(*indexExpression);
+            index && (*index < 0 || static_cast<std::uint64_t>(*index) >= indexedType.length))
+            throw CompileError(indexExpression->location, "index " + std::to_string(*index) +
+                               " hors limites pour " + typeName(indexedType));
+        indexedType = *indexedType.element;
+    }
+    checkExpression(*assignment.value, indexedType);
 }
 
 void SemanticAnalyzer::checkStatements(std::vector<StatementPtr>& statements) {

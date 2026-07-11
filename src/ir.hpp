@@ -18,7 +18,7 @@ struct IrDoubleConst { ValueId output; double value; };
 struct IrStringConst { ValueId output; std::string utf8; };
 struct IrArrayConstruct { ValueId output; std::vector<ValueId> elements; ValueType type; };
 struct IrIndexLoad { ValueId output; ValueId array; ValueId index; ValueType arrayType; };
-struct IrIndexStore { SlotId slot; ValueId index; ValueId value; ValueType arrayType; };
+struct IrIndexStore { SlotId slot; std::vector<ValueId> indexes; ValueId value; ValueType arrayType; };
 struct IrLoad { ValueId output; SlotId slot; ValueType type; };
 struct IrConvert { ValueId output; ValueId input; ValueType source; ValueType target; };
 struct IrUnary { ValueId output; std::string op; ValueId operand; ValueType type; };
