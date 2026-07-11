@@ -64,6 +64,7 @@ struct IrProgram {
 class IrGenerator {
 public:
     IrProgram generate(const TypedProgram& program);
+    IrProgram generate(const ModuleGraph& graph);
     static std::string print(const IrProgram& program);
 
 private:
@@ -72,6 +73,7 @@ private:
         BindingKind kind;
         const Declaration* declaration;
         bool global;
+        std::string linkName;
     };
 
     void emitLoop(const WhileStatement& loop,

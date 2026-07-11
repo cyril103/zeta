@@ -18,7 +18,8 @@ private:
 class SemanticAnalyzer {
 public:
     TypedProgram analyze(Program& program,
-        const std::unordered_map<std::string, ModuleInterface>* interfaces = nullptr);
+        const std::unordered_map<std::string, ModuleInterface>* interfaces = nullptr,
+        bool requireMain = true);
 
 private:
     ValueType checkExpression(Expression& expression, ValueType expected);

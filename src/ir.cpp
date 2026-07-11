@@ -26,12 +26,12 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
             if constexpr (std::is_same_v<T, Declaration>) {
                 if (node.kind == BindingKind::Def) {
                     symbols_.emplace(node.name,
-                                     Symbol{0, node.kind, &node, true});
+                                     Symbol{0, node.kind, &node, true, node.name});
                     if (node.callable) functions.push_back(&node);
                 } else {
                     const ValueId value = expression(*node.initializer);
                     const SlotId slot = ir_.slots.size();
-                    symbols_.emplace(node.name, Symbol{slot, node.kind, &node, true});
+                    symbols_.emplace(node.name, Symbol{slot, node.kind, &node, true, node.name});
                     ir_.slots.push_back(IrSlot{node.name, node.type, true});
                     ir_.instructions.push_back(IrStore{slot, value, node.type});
                 }
@@ -72,6 +72,107 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
     return std::move(ir_);
 }
 
+IrProgram IrGenerator::generate(const ModuleGraph& graph) {
+    ir_ = IrProgram{};
+    symbols_.clear();
+    nextLabel_ = 0;
+    loopLabels_.clear();
+    inFunction_ = false;
+    struct FunctionRecord {
+        std::string module;
+        const Declaration* declaration;
+        std::string linkName;
+    };
+    std::vector<FunctionRecord> functions;
+
+    for (const auto& [moduleName, module] : graph.modules) {
+        for (const Statement& statement : module.program.statements) {
+            const auto* declaration = std::get_if<Declaration>(&statement.value);
+            if (declaration == nullptr || declaration->kind != BindingKind::Def) continue;
+            const std::string canonical = moduleName + "." + declaration->name;
+            const std::string linkName = moduleName + "__" + declaration->name;
+            symbols_.emplace(canonical,
+                Symbol{0, declaration->kind, declaration, true, linkName});
+            if (declaration->callable)
+                functions.push_back(FunctionRecord{moduleName, declaration, linkName});
+        }
+    }
+
+    for (const std::string& moduleName : graph.compilationOrder) {
+        const Module& module = graph.modules.at(moduleName);
+        std::vector<std::string> aliases;
+        for (const Statement& statement : module.program.statements) {
+            if (const auto* declaration = std::get_if<Declaration>(&statement.value);
+                declaration != nullptr && declaration->kind == BindingKind::Def) {
+                aliases.push_back(declaration->name);
+                symbols_.insert_or_assign(declaration->name,
+                                          symbols_.at(moduleName + "." + declaration->name));
+            }
+        }
+        for (const Statement& statement : module.program.statements) {
+            std::visit([&](const auto& node) {
+                using T = std::decay_t<decltype(node)>;
+                if constexpr (std::is_same_v<T, Declaration>) {
+                    if (node.kind == BindingKind::Def) return;
+                    const ValueId value = expression(*node.initializer);
+                    const SlotId slot = ir_.slots.size();
+                    const std::string canonical = moduleName + "." + node.name;
+                    const Symbol symbol{slot, node.kind, &node, true,
+                                        moduleName + "__" + node.name};
+                    symbols_.insert_or_assign(canonical, symbol);
+                    symbols_.insert_or_assign(node.name, symbol);
+                    aliases.push_back(node.name);
+                    ir_.slots.push_back(IrSlot{moduleName + "__" + node.name, node.type, true});
+                    ir_.instructions.push_back(IrStore{slot, value, node.type});
+                } else if constexpr (std::is_same_v<T, Assignment>) {
+                    const auto found = symbols_.find(node.name);
+                    const ValueId value = expression(*node.value);
+                    ir_.instructions.push_back(IrStore{found->second.slot, value,
+                                                       found->second.declaration->type});
+                } else if constexpr (std::is_same_v<T, WhileStatement>) {
+                    const std::unordered_map<std::string, ValueId> parameterValues;
+                    emitLoop(node, parameterValues);
+                }
+            }, statement.value);
+        }
+        for (const std::string& alias : aliases) symbols_.erase(alias);
+    }
+
+    const ValueId mainResult = nextValue(ValueType::Int);
+    ir_.instructions.push_back(IrCall{mainResult, graph.root + "__main", {}, {}, ValueType::Int});
+    ir_.instructions.push_back(IrExit{mainResult});
+    ir_.exitValue = mainResult;
+    inFunction_ = true;
+
+    for (const FunctionRecord& record : functions) {
+        const Module& module = graph.modules.at(record.module);
+        std::vector<std::string> aliases;
+        for (const Statement& statement : module.program.statements) {
+            const auto* declaration = std::get_if<Declaration>(&statement.value);
+            if (declaration == nullptr) continue;
+            const auto canonical = symbols_.find(record.module + "." + declaration->name);
+            if (canonical != symbols_.end()) {
+                symbols_.insert_or_assign(declaration->name, canonical->second);
+                aliases.push_back(declaration->name);
+            }
+        }
+        const Declaration* function = record.declaration;
+        ir_.instructions.push_back(IrFunctionStart{record.linkName});
+        std::unordered_map<std::string, ValueId> parameters;
+        std::size_t stackOffset = 16U;
+        for (std::size_t i = 0; i < function->parameters.size(); ++i) {
+            const Parameter& parameter = function->parameters[i];
+            const ValueId value = nextValue(parameter.type);
+            parameters.emplace(parameter.name, value);
+            ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameter.type});
+            stackOffset += parameter.type == ValueType::String ? 16U : 8U;
+        }
+        emitTailExpression(*function->initializer, parameters, *function);
+        for (const std::string& alias : aliases) symbols_.erase(alias);
+    }
+    return std::move(ir_);
+}
+
 void IrGenerator::emitTailExpression(
     const Expression& expressionNode,
     const std::unordered_map<std::string, ValueId>& parameters,
@@ -84,11 +185,11 @@ void IrGenerator::emitTailExpression(
                 if constexpr (std::is_same_v<T, Declaration>) {
                     localNames.push_back(item.name);
                     if (item.kind == BindingKind::Def) {
-                        symbols_.emplace(item.name, Symbol{0, item.kind, &item, false});
+                        symbols_.emplace(item.name, Symbol{0, item.kind, &item, false, item.name});
                     } else {
                         const ValueId value = expression(*item.initializer, parameters);
                         const SlotId slot = ir_.slots.size();
-                        symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false});
+                        symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false, item.name});
                         ir_.slots.push_back(IrSlot{item.name, item.type, false});
                         ir_.instructions.push_back(IrStore{slot, value, item.type});
                     }
@@ -124,7 +225,7 @@ void IrGenerator::emitTailExpression(
             arguments.push_back(expression(*call->arguments[i], parameters));
             argumentTypes.push_back(function.parameters[i].type);
         }
-        ir_.instructions.push_back(IrTailCall{function.name, std::move(arguments),
+        ir_.instructions.push_back(IrTailCall{symbols_.at(function.name).linkName, std::move(arguments),
                                               std::move(argumentTypes)});
         return;
     }
@@ -159,11 +260,11 @@ void IrGenerator::emitLoop(
             if constexpr (std::is_same_v<T, Declaration>) {
                 localNames.push_back(item.name);
                 if (item.kind == BindingKind::Def) {
-                    symbols_.emplace(item.name, Symbol{0, item.kind, &item, false});
+                    symbols_.emplace(item.name, Symbol{0, item.kind, &item, false, item.name});
                 } else {
                     const ValueId value = expression(*item.initializer, parameters);
                     const SlotId slot = ir_.slots.size();
-                    symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false});
+                    symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false, item.name});
                     ir_.slots.push_back(IrSlot{item.name, item.type, false});
                     ir_.instructions.push_back(IrStore{slot, value, item.type});
                 }
@@ -272,7 +373,7 @@ ValueId IrGenerator::expression(
                 argumentTypes.push_back(function.parameters[i].type);
             }
             const ValueId output = nextValue(function.type);
-            ir_.instructions.push_back(IrCall{output, node.name, std::move(arguments),
+            ir_.instructions.push_back(IrCall{output, found->second.linkName, std::move(arguments),
                                               std::move(argumentTypes), function.type});
             return output;
         } else if constexpr (std::is_same_v<T, ConversionExpr>) {
@@ -314,11 +415,11 @@ ValueId IrGenerator::expression(
                     if constexpr (std::is_same_v<S, Declaration>) {
                         localNames.push_back(item.name);
                         if (item.kind == BindingKind::Def) {
-                            symbols_.emplace(item.name, Symbol{0, item.kind, &item, false});
+                            symbols_.emplace(item.name, Symbol{0, item.kind, &item, false, item.name});
                         } else {
                             const ValueId value = expression(*item.initializer, parameters);
                             const SlotId slot = ir_.slots.size();
-                            symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false});
+                            symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false, item.name});
                             ir_.slots.push_back(IrSlot{item.name, item.type, false});
                             ir_.instructions.push_back(IrStore{slot, value, item.type});
                         }

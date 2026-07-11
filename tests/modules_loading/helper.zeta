@@ -1,1 +1,2 @@
-pub def valeur () : Int = 7
+pub val base : Int = 5
+pub def valeur () : Int = base + 2

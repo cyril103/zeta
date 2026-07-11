@@ -77,11 +77,13 @@ int main(int argc, char** argv) {
     try {
         ModuleLoader loader;
         ModuleGraph modules = loader.load(sourcePath);
-        Program& program = modules.modules.at(modules.root).program;
-        SemanticAnalyzer semanticAnalyzer;
-        const TypedProgram typedProgram = semanticAnalyzer.analyze(program, &modules.interfaces);
+        for (const std::string& moduleName : modules.compilationOrder) {
+            SemanticAnalyzer semanticAnalyzer;
+            semanticAnalyzer.analyze(modules.modules.at(moduleName).program, &modules.interfaces,
+                                     moduleName == modules.root);
+        }
         IrGenerator irGenerator;
-        const IrProgram ir = irGenerator.generate(typedProgram);
+        const IrProgram ir = irGenerator.generate(modules);
 
         fs::path irPath = outputPath;
         irPath += ".ir";

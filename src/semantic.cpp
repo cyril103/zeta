@@ -14,7 +14,8 @@ namespace {
 
 TypedProgram SemanticAnalyzer::analyze(
     Program& program,
-    const std::unordered_map<std::string, ModuleInterface>* interfaces) {
+    const std::unordered_map<std::string, ModuleInterface>* interfaces,
+    bool requireMain) {
     symbols_ = SymbolTable{};
     if (interfaces != nullptr) {
         for (const Program::Import& import : program.imports) {
@@ -30,6 +31,7 @@ TypedProgram SemanticAnalyzer::analyze(
     }
     for (Statement& statement : program.statements) checkStatement(statement, true);
 
+    if (!requireMain) return TypedProgram(program);
     const SemanticSymbol* main = symbols_.lookup("main");
     if (main == nullptr) {
         throw CompileError(SourceLocation{1, 1},
