@@ -35,6 +35,7 @@ private:
     ExprPtr addition();
     ExprPtr multiplication();
     ExprPtr unary();
+    ExprPtr postfix();
     ExprPtr primary();
     ExprPtr blockExpression(SourceLocation location);
     ExprPtr ifExpression(SourceLocation location);

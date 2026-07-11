@@ -104,6 +104,15 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         (i == 0 ? "]" : "+" + std::to_string(i * elementBytes) + "]");
                     emitBlockCopy(out, source, target, elementBytes);
                 }
+            } else if constexpr (std::is_same_v<T, IrIndexLoad>) {
+                const std::size_t elementBytes = valueTypeSize(*item.arrayType.element);
+                out << "    movsxd rax, dword [rbp-" << valueOffset(program, item.index) << "]\n"
+                    << "    imul rax, " << elementBytes << "\n"
+                    << "    lea rsi, [rbp-" << valueOffset(program, item.array) << "]\n"
+                    << "    add rsi, rax\n";
+                emitBlockCopy(out, "[rsi]",
+                    "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]",
+                    elementBytes);
             } else if constexpr (std::is_same_v<T, IrLoad>) {
                 const IrSlot& slot = program.slots[item.slot];
                 const std::string address = slot.global

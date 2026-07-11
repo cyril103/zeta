@@ -17,6 +17,7 @@ struct IrConst { ValueId output; std::int32_t value; ValueType type; };
 struct IrDoubleConst { ValueId output; double value; };
 struct IrStringConst { ValueId output; std::string utf8; };
 struct IrArrayConstruct { ValueId output; std::vector<ValueId> elements; ValueType type; };
+struct IrIndexLoad { ValueId output; ValueId array; ValueId index; ValueType arrayType; };
 struct IrLoad { ValueId output; SlotId slot; ValueType type; };
 struct IrConvert { ValueId output; ValueId input; ValueType source; ValueType target; };
 struct IrUnary { ValueId output; std::string op; ValueId operand; ValueType type; };
@@ -49,7 +50,7 @@ struct IrExit { ValueId value; };
 struct IrBranch { ValueId condition; bool jumpWhenTrue; std::size_t label; };
 struct IrJump { std::size_t label; };
 struct IrLabel { std::size_t label; };
-using IrInstruction = std::variant<IrConst, IrDoubleConst, IrStringConst, IrArrayConstruct, IrLoad, IrConvert, IrUnary, IrBinary,
+using IrInstruction = std::variant<IrConst, IrDoubleConst, IrStringConst, IrArrayConstruct, IrIndexLoad, IrLoad, IrConvert, IrUnary, IrBinary,
                                    IrStore, IrCopy, IrCall, IrTailCall, IrFunctionStart, IrParameter,
                                    IrReturn, IrExit, IrBranch, IrJump, IrLabel>;
 

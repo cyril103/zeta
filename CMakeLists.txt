@@ -259,6 +259,12 @@ if(BUILD_TESTING)
     add_test(NAME run_array_copy COMMAND ${CMAKE_CURRENT_BINARY_DIR}/array-copy)
     set_tests_properties(run_array_copy PROPERTIES DEPENDS compile_array_copy)
 
+    add_test(NAME compile_array_index COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_index.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/array-index)
+    add_test(NAME run_array_index COMMAND ${CMAKE_CURRENT_BINARY_DIR}/array-index)
+    set_tests_properties(run_array_index PROPERTIES DEPENDS compile_array_index)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment

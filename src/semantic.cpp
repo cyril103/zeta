@@ -146,6 +146,10 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
             return ValueType(std::make_shared<ValueType>(inferType(*node.elements.front())),
                              node.elements.size());
         }
+        else if constexpr (std::is_same_v<T, IndexExpr>) {
+            const ValueType arrayType = inferType(*node.array);
+            return arrayType.kind == ValueType::Kind::Array ? *arrayType.element : ValueType::Int;
+        }
         else if constexpr (std::is_same_v<T, NameExpr> || std::is_same_v<T, CallExpr>) {
             const SemanticSymbol* symbol = symbols_.lookup(node.name);
             return symbol == nullptr ? ValueType::Int : symbol->type;
@@ -204,6 +208,15 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 }
             }
             return expected;
+        }
+        else if constexpr (std::is_same_v<T, IndexExpr>) {
+            const ValueType arrayType = inferType(*node.array);
+            if (arrayType.kind != ValueType::Kind::Array)
+                throw CompileError(node.array->location,
+                                   "l'indexation exige une valeur de type tableau");
+            checkExpression(*node.array, arrayType);
+            checkExpression(*node.index, ValueType::Int);
+            return *arrayType.element;
         }
         else if constexpr (std::is_same_v<T, NameExpr>) {
             const SemanticSymbol* symbol = symbols_.lookup(node.name);

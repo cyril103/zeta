@@ -419,7 +419,21 @@ ExprPtr Parser::unary() {
         return std::make_unique<Expression>(Expression{
             op.location, UnaryExpr{op.text, unary()}});
     }
-    return primary();
+    return postfix();
+}
+
+ExprPtr Parser::postfix() {
+    ExprPtr expr = primary();
+    while (match(TokenKind::LeftBracket)) {
+        const Token token = previous();
+        expressionContinuation();
+        ExprPtr index = expression();
+        expressionContinuation();
+        consume(TokenKind::RightBracket, "']' attendue après l'index");
+        expr = std::make_unique<Expression>(Expression{
+            token.location, IndexExpr{std::move(expr), std::move(index)}});
+    }
+    return expr;
 }
 
 ExprPtr Parser::primary() {

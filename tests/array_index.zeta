@@ -1,0 +1,6 @@
+val globals : [Int; 3] = [10, 20, 30]
+
+def main () : Int = {
+    val locals : [Int; 2] = [4, 8]
+    if (globals[0] == 10 && globals[2] == 30 && locals[1] == 8 && [7, 9][0] == 7) 0 else 1
+}

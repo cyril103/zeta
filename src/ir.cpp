@@ -337,6 +337,13 @@ ValueId IrGenerator::expression(
             ir_.instructions.push_back(IrArrayConstruct{output, std::move(elements),
                                                         expressionNode.inferredType});
             return output;
+        } else if constexpr (std::is_same_v<T, IndexExpr>) {
+            const ValueId array = expression(*node.array, parameters);
+            const ValueId index = expression(*node.index, parameters);
+            const ValueId output = nextValue(expressionNode.inferredType);
+            ir_.instructions.push_back(IrIndexLoad{output, array, index,
+                                                   node.array->inferredType});
+            return output;
         } else if constexpr (std::is_same_v<T, NameExpr>) {
             if (const auto parameter = parameters.find(node.name);
                 parameter != parameters.end()) {
@@ -518,6 +525,9 @@ std::string IrGenerator::print(const IrProgram& program) {
                 }
                 out << "]\n";
             }
+            else if constexpr (std::is_same_v<T, IrIndexLoad>)
+                out << "  $" << item.output << " = index " << '$' << item.array
+                    << "[$" << item.index << "]\n";
             else if constexpr (std::is_same_v<T, IrLoad>)
                 out << "  $" << item.output << " = load."
                     << suffix(item.type) << " %" << program.slots[item.slot].name << '\n';
