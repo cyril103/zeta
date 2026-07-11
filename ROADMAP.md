@@ -73,6 +73,9 @@ Critères de validation :
 
 ## Phase 2 — Conversions explicites
 
+État : terminée. Les conversions numériques explicites sont représentées dans
+l'AST typé et l'IR, puis émises nativement par le backend x86-64.
+
 Syntaxe envisagée :
 
 ```zeta

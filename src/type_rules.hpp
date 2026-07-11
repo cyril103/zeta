@@ -13,6 +13,9 @@ inline bool isOrdering(std::string_view op) {
 }
 inline bool isComparison(std::string_view op) { return isEquality(op) || isOrdering(op); }
 inline bool isNumeric(ValueType type) { return type != ValueType::Bool; }
+inline bool canExplicitlyConvert(ValueType source, ValueType target) {
+    return isNumeric(source) && isNumeric(target);
+}
 
 inline ValueType commonOperandType(ValueType left, ValueType right) {
     if (left == right) return left;

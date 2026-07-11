@@ -71,6 +71,28 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     out << "    mov eax, dword [rbp-" << slotOffset(program, item.slot) << "]\n";
                     out << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
                 }
+            } else if constexpr (std::is_same_v<T, IrConvert>) {
+                if (item.source == item.target) {
+                    if (item.target == ValueType::Double) {
+                        out << "    mov rax, qword [rbp-" << valueOffset(program, item.input) << "]\n"
+                            << "    mov qword [rbp-" << valueOffset(program, item.output) << "], rax\n";
+                    } else {
+                        out << "    mov eax, dword [rbp-" << valueOffset(program, item.input) << "]\n"
+                            << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
+                    }
+                } else if (item.target == ValueType::Double) {
+                    out << "    mov eax, dword [rbp-" << valueOffset(program, item.input) << "]\n"
+                        << "    cvtsi2sd xmm0, eax\n"
+                        << "    movsd qword [rbp-" << valueOffset(program, item.output) << "], xmm0\n";
+                } else if (item.source == ValueType::Double) {
+                    out << "    cvttsd2si eax, qword [rbp-" << valueOffset(program, item.input) << "]\n";
+                    if (item.target == ValueType::Byte) out << "    and eax, 255\n";
+                    out << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
+                } else {
+                    out << "    mov eax, dword [rbp-" << valueOffset(program, item.input) << "]\n";
+                    if (item.target == ValueType::Byte) out << "    and eax, 255\n";
+                    out << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
+                }
             } else if constexpr (std::is_same_v<T, IrUnary>) {
                 if (item.type == ValueType::Double) {
                     out << "    mov rax, qword [rbp-" << valueOffset(program, item.operand) << "]\n";

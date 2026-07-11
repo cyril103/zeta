@@ -156,6 +156,12 @@ ValueId IrGenerator::expression(
                                            expression(*node.arguments[i], parameters));
             }
             return expression(*function.initializer, arguments);
+        } else if constexpr (std::is_same_v<T, ConversionExpr>) {
+            const ValueId input = expression(*node.operand, parameters);
+            const ValueId output = nextValue(node.target);
+            ir_.instructions.push_back(IrConvert{output, input,
+                                                  node.operand->inferredType, node.target});
+            return output;
         } else if constexpr (std::is_same_v<T, UnaryExpr>) {
             const ValueId operand = expression(*node.operand, parameters);
             const ValueId output = nextValue(expressionNode.inferredType);
@@ -265,6 +271,10 @@ std::string IrGenerator::print(const IrProgram& program) {
             else if constexpr (std::is_same_v<T, IrLoad>)
                 out << "  $" << item.output << " = load."
                     << suffix(item.type) << " %" << program.slots[item.slot].name << '\n';
+            else if constexpr (std::is_same_v<T, IrConvert>)
+                out << "  $" << item.output << " = convert."
+                    << suffix(item.source) << ".to." << suffix(item.target)
+                    << " $" << item.input << '\n';
             else if constexpr (std::is_same_v<T, IrUnary>)
                 out << "  $" << item.output << " = "
                     << (item.op == "-" ? "neg" : item.op == "!" ? "not" : "copy")

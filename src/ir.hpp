@@ -15,6 +15,7 @@ using SlotId = std::size_t;
 struct IrConst { ValueId output; std::int32_t value; ValueType type; };
 struct IrDoubleConst { ValueId output; double value; };
 struct IrLoad { ValueId output; SlotId slot; ValueType type; };
+struct IrConvert { ValueId output; ValueId input; ValueType source; ValueType target; };
 struct IrUnary { ValueId output; std::string op; ValueId operand; ValueType type; };
 struct IrBinary {
     ValueId output;
@@ -29,7 +30,7 @@ struct IrCopy { ValueId output; ValueId input; ValueType type; };
 struct IrBranch { ValueId condition; bool jumpWhenTrue; std::size_t label; };
 struct IrJump { std::size_t label; };
 struct IrLabel { std::size_t label; };
-using IrInstruction = std::variant<IrConst, IrDoubleConst, IrLoad, IrUnary, IrBinary,
+using IrInstruction = std::variant<IrConst, IrDoubleConst, IrLoad, IrConvert, IrUnary, IrBinary,
                                    IrStore, IrCopy, IrBranch, IrJump, IrLabel>;
 
 struct IrSlot { std::string name; ValueType type; };

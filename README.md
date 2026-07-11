@@ -29,9 +29,22 @@ val grand : Double = 1e+12
 val petit : Double = 2.5e-3
 ```
 
-Il n'existe pas encore de conversion implicite entre `Int`, `Byte` et `Double`,
-mais un littéral entier est accepté dans une expression `Double` et un littéral
-est accepté comme `Byte` lorsqu'il tient dans l'intervalle attendu.
+Il n'existe pas de conversion implicite entre `Int`, `Byte` et `Double`, mais les
+conversions explicites utilisent le nom du type comme une fonction :
+
+```text
+val entier : Int = Int(3.9)       // 3, troncature vers zéro
+val octet : Byte = Byte(300)      // 44, réduction modulo 256
+val flottant : Double = Double(entier)
+```
+
+Les six conversions entre types numériques sont disponibles, ainsi que les
+conversions identité. `Int` vers `Double` conserve la valeur lorsque celle-ci est
+représentable exactement. `Double` vers `Int` tronque vers zéro ; une valeur non
+finie ou hors de l'intervalle Int produit `-2147483648`. Une conversion vers
+`Byte` conserve ensuite les 8 bits de poids faible. Toute conversion depuis ou
+vers `Bool` est interdite. Un littéral entier reste accepté directement dans une
+expression `Double`, ou comme `Byte` lorsqu'il tient dans l'intervalle attendu.
 
 `Bool` représente une valeur logique et n'accepte que les deux littéraux `true` et
 `false` :

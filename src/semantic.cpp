@@ -102,6 +102,8 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
         else if constexpr (std::is_same_v<T, NameExpr> || std::is_same_v<T, CallExpr>) {
             const SemanticSymbol* symbol = symbols_.lookup(node.name);
             return symbol == nullptr ? ValueType::Int : symbol->type;
+        } else if constexpr (std::is_same_v<T, ConversionExpr>) {
+            return node.target;
         } else if constexpr (std::is_same_v<T, UnaryExpr>) {
             return node.op == "!" ? ValueType::Bool : inferType(*node.operand);
         } else if constexpr (std::is_same_v<T, BinaryExpr>) {
@@ -152,6 +154,15 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             for (std::size_t i = 0; i < node.arguments.size(); ++i)
                 checkExpression(*node.arguments[i], function.parameters[i].type);
             return symbol->type;
+        } else if constexpr (std::is_same_v<T, ConversionExpr>) {
+            const ValueType source = inferType(*node.operand);
+            if (!TypeRules::canExplicitlyConvert(source, node.target)) {
+                throw CompileError(expression.location,
+                    "conversion explicite de " + typeName(source) + " vers " +
+                    typeName(node.target) + " interdite");
+            }
+            checkExpression(*node.operand, source);
+            return node.target;
         } else if constexpr (std::is_same_v<T, UnaryExpr>) {
             if (node.op == "!") {
                 checkExpression(*node.operand, ValueType::Bool);

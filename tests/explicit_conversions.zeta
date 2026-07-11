@@ -1,0 +1,11 @@
+def main () : Int = {
+    val tronque : Int = Int(3.9)
+    val modulo : Byte = Byte(300)
+    val negatifModulo : Byte = Byte(-1)
+    val entierEtendu : Int = Int(modulo)
+    val flottant : Double = Double(negatifModulo)
+    val flottantSigne : Double = Double(-12)
+    val octetDepuisFlottant : Byte = Byte(258.9)
+    if (tronque == 3 && entierEtendu == 44 && negatifModulo == 255 &&
+        flottant == 255.0 && flottantSigne == -12.0 && octetDepuisFlottant == 2) 0 else 1
+}

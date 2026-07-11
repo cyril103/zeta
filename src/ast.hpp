@@ -27,6 +27,7 @@ struct DoubleExpr { double value; };
 struct BoolExpr { bool value; };
 struct NameExpr { std::string name; };
 struct CallExpr { std::string name; std::vector<ExprPtr> arguments; };
+struct ConversionExpr { ValueType target; ExprPtr operand; };
 struct UnaryExpr { std::string op; ExprPtr operand; };
 struct BinaryExpr { std::string op; ExprPtr left; ExprPtr right; };
 struct BlockExpr { std::vector<StatementPtr> statements; ExprPtr result; };
@@ -34,8 +35,8 @@ struct IfExpr { ExprPtr condition; ExprPtr thenBranch; ExprPtr elseBranch; };
 
 struct Expression {
     SourceLocation location;
-    std::variant<IntegerExpr, DoubleExpr, BoolExpr, NameExpr, CallExpr, UnaryExpr,
-                 BinaryExpr, BlockExpr, IfExpr> value;
+    std::variant<IntegerExpr, DoubleExpr, BoolExpr, NameExpr, CallExpr, ConversionExpr,
+                 UnaryExpr, BinaryExpr, BlockExpr, IfExpr> value;
     ValueType inferredType{ValueType::Int};
     bool typed{false};
 };

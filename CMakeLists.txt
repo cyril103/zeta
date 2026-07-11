@@ -120,6 +120,14 @@ if(BUILD_TESTING)
     add_test(NAME run_while_loops COMMAND ${CMAKE_CURRENT_BINARY_DIR}/while-loops)
     set_tests_properties(run_while_loops PROPERTIES DEPENDS compile_while_loops)
 
+    add_test(
+        NAME compile_explicit_conversions
+        COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/explicit_conversions.zeta
+                -o ${CMAKE_CURRENT_BINARY_DIR}/explicit-conversions
+    )
+    add_test(NAME run_explicit_conversions COMMAND ${CMAKE_CURRENT_BINARY_DIR}/explicit-conversions)
+    set_tests_properties(run_explicit_conversions PROPERTIES DEPENDS compile_explicit_conversions)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -157,7 +165,9 @@ if(BUILD_TESTING)
             while_non_bool_predicate
             while_missing_do
             while_scope
-            while_as_expression)
+            while_as_expression
+            bool_conversion_source
+            bool_conversion_target)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

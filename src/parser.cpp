@@ -230,6 +230,20 @@ ExprPtr Parser::primary() {
     if (match(TokenKind::LeftBrace)) {
         return blockExpression(previous().location);
     }
+    if (match(TokenKind::IntType) || match(TokenKind::ByteType) ||
+        match(TokenKind::DoubleType) || match(TokenKind::BoolType)) {
+        const Token token = previous();
+        const ValueType target = token.kind == TokenKind::IntType ? ValueType::Int :
+            token.kind == TokenKind::ByteType ? ValueType::Byte :
+            token.kind == TokenKind::DoubleType ? ValueType::Double : ValueType::Bool;
+        consume(TokenKind::LeftParen, "'(' attendue après le type de conversion");
+        expressionContinuation();
+        ExprPtr operand = expression();
+        expressionContinuation();
+        consume(TokenKind::RightParen, "')' attendue après la valeur à convertir");
+        return std::make_unique<Expression>(Expression{
+            token.location, ConversionExpr{target, std::move(operand)}});
+    }
     if (match(TokenKind::Integer)) {
         const Token token = previous();
         std::int64_t value{};
