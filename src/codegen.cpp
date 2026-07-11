@@ -392,3 +392,18 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
     }
     return out.str();
 }
+
+std::string FasmCodeGenerator::generateObject(const IrProgram& program) {
+    std::string assembly = generate(program);
+    const std::string executableHeader =
+        "format ELF64 executable 3\nentry start\n\nsegment readable executable\n";
+    assembly.replace(0, executableHeader.size(),
+                     "format ELF64\nsection '.text' executable\npublic start\n");
+    const auto replaceSegment = [&](const std::string& from, const std::string& to) {
+        if (const std::size_t position = assembly.find(from); position != std::string::npos)
+            assembly.replace(position, from.size(), to);
+    };
+    replaceSegment("\nsegment readable writeable\n", "\nsection '.data' writeable\n");
+    replaceSegment("\nsegment readable\n", "\nsection '.rodata'\n");
+    return assembly;
+}

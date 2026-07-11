@@ -91,6 +91,25 @@ int main(int argc, char** argv) {
         assemblyPath += ".asm";
         writeFile(irPath, IrGenerator::print(ir));
         writeFile(assemblyPath, FasmCodeGenerator::generate(ir));
+
+        fs::path objectAssemblyPath = outputPath;
+        objectAssemblyPath += ".object.asm";
+        fs::path objectPath = outputPath;
+        objectPath += ".o";
+        writeFile(objectAssemblyPath, FasmCodeGenerator::generateObject(ir));
+        runFasm(objectAssemblyPath, objectPath);
+
+        fs::path moduleDirectory = outputPath;
+        moduleDirectory += ".modules";
+        fs::create_directories(moduleDirectory);
+        for (const std::string& moduleName : modules.compilationOrder) {
+            const std::string symbol = "zeta_module_" + moduleName;
+            const fs::path moduleAssembly = moduleDirectory / (moduleName + ".asm");
+            const fs::path moduleObject = moduleDirectory / (moduleName + ".o");
+            writeFile(moduleAssembly,
+                "format ELF64\nsection '.rodata'\npublic " + symbol + "\n" + symbol + ": db 0\n");
+            runFasm(moduleAssembly, moduleObject);
+        }
         runFasm(assemblyPath, outputPath);
         fs::permissions(outputPath,
                         fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
@@ -98,6 +117,7 @@ int main(int argc, char** argv) {
 
         std::cout << "IR créé          : " << irPath << '\n'
                   << "Assembleur créé : " << assemblyPath << '\n'
+                  << "Objet ELF64 créé : " << objectPath << '\n'
                   << "Executable créé : " << outputPath << '\n';
         return 0;
     } catch (const std::exception& error) {
