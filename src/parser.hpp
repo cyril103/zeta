@@ -26,6 +26,7 @@ private:
     Declaration declaration(BindingKind kind);
     std::string qualifiedName();
     Statement assignment();
+    Statement dereferenceAssignment();
     WhileStatement whileStatement();
     std::vector<StatementPtr> loopBody();
     ExprPtr expression();

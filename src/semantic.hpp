@@ -28,6 +28,7 @@ private:
     void checkDeclaration(Declaration& declaration, bool allowRecursion);
     void checkAssignment(Assignment& assignment);
     void checkIndexAssignment(IndexAssignment& assignment);
+    void checkDereferenceAssignment(DereferenceAssignment& assignment);
     void checkLoop(WhileStatement& loop);
     void checkStatements(std::vector<StatementPtr>& statements);
 

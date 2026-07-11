@@ -1,0 +1,6 @@
+def main () : Int = {
+    var value : Int = 1
+    val reference : &mut Int = &mut value
+    *reference = 42
+    if (value == 42 && *reference == 42) 0 else 1
+}

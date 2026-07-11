@@ -62,6 +62,8 @@ void SemanticAnalyzer::checkStatement(Statement& statement, bool global) {
         if constexpr (std::is_same_v<T, Declaration>) checkDeclaration(node, global);
         else if constexpr (std::is_same_v<T, Assignment>) checkAssignment(node);
         else if constexpr (std::is_same_v<T, IndexAssignment>) checkIndexAssignment(node);
+        else if constexpr (std::is_same_v<T, DereferenceAssignment>)
+            checkDereferenceAssignment(node);
         else if constexpr (std::is_same_v<T, WhileStatement>) checkLoop(node);
         else if constexpr (std::is_same_v<T, ExpressionStatement>) {
             if (global) {
@@ -170,6 +172,15 @@ void SemanticAnalyzer::checkIndexAssignment(IndexAssignment& assignment) {
         indexedType = *indexedType.element;
     }
     checkExpression(*assignment.value, indexedType);
+}
+
+void SemanticAnalyzer::checkDereferenceAssignment(DereferenceAssignment& assignment) {
+    const ValueType reference = inferType(*assignment.reference);
+    if (reference.kind != ValueType::Kind::Reference || !reference.mutableReference)
+        throw CompileError(assignment.location,
+                           "l'affectation déréférencée exige une référence '&mut'");
+    checkExpression(*assignment.reference, reference);
+    checkExpression(*assignment.value, *reference.element);
 }
 
 void SemanticAnalyzer::checkStatements(std::vector<StatementPtr>& statements) {

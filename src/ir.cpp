@@ -47,6 +47,11 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
                 const ValueId value = expression(*node.value);
                 ir_.instructions.push_back(IrIndexStore{found->second.slot, std::move(indexes), value,
                                                         found->second.declaration->type});
+            } else if constexpr (std::is_same_v<T, DereferenceAssignment>) {
+                const ValueId reference = expression(*node.reference);
+                const ValueId value = expression(*node.value);
+                ir_.instructions.push_back(IrDereferenceStore{
+                    reference, value, node.value->inferredType});
             } else if constexpr (std::is_same_v<T, WhileStatement>) {
                 const std::unordered_map<std::string, ValueId> parameterValues;
                 emitLoop(node, parameterValues);
@@ -143,6 +148,11 @@ IrProgram IrGenerator::generate(const ModuleGraph& graph) {
                     const ValueId value = expression(*node.value);
                     ir_.instructions.push_back(IrIndexStore{found->second.slot, std::move(indexes), value,
                                                             found->second.declaration->type});
+                } else if constexpr (std::is_same_v<T, DereferenceAssignment>) {
+                    const ValueId reference = expression(*node.reference);
+                    const ValueId value = expression(*node.value);
+                    ir_.instructions.push_back(IrDereferenceStore{
+                        reference, value, node.value->inferredType});
                 } else if constexpr (std::is_same_v<T, WhileStatement>) {
                     const std::unordered_map<std::string, ValueId> parameterValues;
                     emitLoop(node, parameterValues);
@@ -220,6 +230,11 @@ void IrGenerator::emitTailExpression(
                     const ValueId value = expression(*item.value, parameters);
                     ir_.instructions.push_back(IrIndexStore{found->second.slot, std::move(indexes), value,
                                                             found->second.declaration->type});
+                } else if constexpr (std::is_same_v<T, DereferenceAssignment>) {
+                    const ValueId reference = expression(*item.reference, parameters);
+                    const ValueId value = expression(*item.value, parameters);
+                    ir_.instructions.push_back(IrDereferenceStore{
+                        reference, value, item.value->inferredType});
                 } else if constexpr (std::is_same_v<T, WhileStatement>) {
                     emitLoop(item, parameters);
                 } else if constexpr (std::is_same_v<T, ExpressionStatement>) {
@@ -303,6 +318,11 @@ void IrGenerator::emitLoop(
                 const ValueId value = expression(*item.value, parameters);
                 ir_.instructions.push_back(IrIndexStore{found->second.slot, std::move(indexes), value,
                                                         found->second.declaration->type});
+            } else if constexpr (std::is_same_v<T, DereferenceAssignment>) {
+                const ValueId reference = expression(*item.reference, parameters);
+                const ValueId value = expression(*item.value, parameters);
+                ir_.instructions.push_back(IrDereferenceStore{
+                    reference, value, item.value->inferredType});
             } else if constexpr (std::is_same_v<T, WhileStatement>) {
                 emitLoop(item, parameters);
             } else if constexpr (std::is_same_v<T, ExpressionStatement>) {
@@ -503,6 +523,11 @@ ValueId IrGenerator::expression(
                         const ValueId value = expression(*item.value, parameters);
                         ir_.instructions.push_back(IrIndexStore{found->second.slot, std::move(indexes), value,
                                                                 found->second.declaration->type});
+                    } else if constexpr (std::is_same_v<S, DereferenceAssignment>) {
+                        const ValueId reference = expression(*item.reference, parameters);
+                        const ValueId value = expression(*item.value, parameters);
+                        ir_.instructions.push_back(IrDereferenceStore{
+                            reference, value, item.value->inferredType});
                     } else if constexpr (std::is_same_v<S, WhileStatement>) {
                         emitLoop(item, parameters);
                     } else if constexpr (std::is_same_v<S, ExpressionStatement>) {
@@ -591,6 +616,8 @@ std::string IrGenerator::print(const IrProgram& program) {
                     << program.slots[item.slot].name << '\n';
             else if constexpr (std::is_same_v<T, IrDereference>)
                 out << "  $" << item.output << " = dereference $" << item.reference << '\n';
+            else if constexpr (std::is_same_v<T, IrDereferenceStore>)
+                out << "  dereference_store $" << item.reference << ", $" << item.value << '\n';
             else if constexpr (std::is_same_v<T, IrLoad>)
                 out << "  $" << item.output << " = load."
                     << suffix(item.type) << " %" << program.slots[item.slot].name << '\n';

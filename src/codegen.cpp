@@ -151,6 +151,11 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 emitBlockCopy(out, "[rsi]",
                     "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]",
                     valueTypeSize(item.type));
+            } else if constexpr (std::is_same_v<T, IrDereferenceStore>) {
+                out << "    mov rdi, qword [rbp-" << valueOffset(program, item.reference) << "]\n";
+                emitBlockCopy(out,
+                    "[rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
+                    "[rdi]", valueTypeSize(item.type));
             } else if constexpr (std::is_same_v<T, IrLoad>) {
                 const IrSlot& slot = program.slots[item.slot];
                 const std::string address = slot.global

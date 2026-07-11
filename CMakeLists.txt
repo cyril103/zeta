@@ -297,6 +297,12 @@ if(BUILD_TESTING)
     add_test(NAME run_reference_read COMMAND ${CMAKE_CURRENT_BINARY_DIR}/reference-read)
     set_tests_properties(run_reference_read PROPERTIES DEPENDS compile_reference_read)
 
+    add_test(NAME compile_reference_write COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/reference_write.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/reference-write)
+    add_test(NAME run_reference_write COMMAND ${CMAKE_CURRENT_BINARY_DIR}/reference-write)
+    set_tests_properties(run_reference_write PROPERTIES DEPENDS compile_reference_write)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -366,7 +372,8 @@ if(BUILD_TESTING)
             reference_mutable_val
             reference_temporary
             reference_global
-            reference_return)
+            reference_return
+            reference_shared_write)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

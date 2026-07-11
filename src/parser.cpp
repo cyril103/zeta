@@ -254,9 +254,20 @@ Statement Parser::statement() {
     }
     if (match(TokenKind::Break)) return BreakStatement{previous().location};
     if (match(TokenKind::Continue)) return ContinueStatement{previous().location};
+    if (check(TokenKind::Star)) return dereferenceAssignment();
     if (check(TokenKind::Identifier)) return assignment();
     throw CompileError(peek().location,
                        "instruction attendue ('val', 'var', 'def' ou affectation)");
+}
+
+Statement Parser::dereferenceAssignment() {
+    const Token& star = consume(TokenKind::Star, "'*' attendu");
+    const Token& name = consume(TokenKind::Identifier,
+                                "référence attendue après '*'");
+    consume(TokenKind::Equal, "'=' attendu après la référence déréférencée");
+    auto reference = std::make_unique<Expression>(Expression{
+        name.location, NameExpr{name.text}});
+    return DereferenceAssignment{star.location, std::move(reference), expression()};
 }
 
 WhileStatement Parser::whileStatement() {
@@ -281,7 +292,11 @@ std::vector<StatementPtr> Parser::loopBody() {
             check(TokenKind::Def) || check(TokenKind::While) || check(TokenKind::Return) ||
             check(TokenKind::Break) || check(TokenKind::Continue) ||
             startsAssignment();
-        if (startsStatement) {
+        const bool startsDereferenceAssignment = check(TokenKind::Star) &&
+            current_ + 2 < tokens_.size() &&
+            tokens_[current_ + 1].kind == TokenKind::Identifier &&
+            tokens_[current_ + 2].kind == TokenKind::Equal;
+        if (startsStatement || startsDereferenceAssignment) {
             body.push_back(std::make_unique<Statement>(statement()));
         } else {
             const SourceLocation location = peek().location;
@@ -607,7 +622,11 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
                                        check(TokenKind::Def) || check(TokenKind::While) ||
                                        check(TokenKind::Return) || check(TokenKind::Break) ||
                                        check(TokenKind::Continue);
-        if (!startsDeclaration && !startsAssignment()) break;
+        const bool startsDereferenceAssignment = check(TokenKind::Star) &&
+            current_ + 2 < tokens_.size() &&
+            tokens_[current_ + 1].kind == TokenKind::Identifier &&
+            tokens_[current_ + 2].kind == TokenKind::Equal;
+        if (!startsDeclaration && !startsAssignment() && !startsDereferenceAssignment) break;
 
         statements.push_back(std::make_unique<Statement>(statement()));
         if (!check(TokenKind::RightBrace) && !matchSeparator()) {
