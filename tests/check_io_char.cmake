@@ -1,0 +1,5 @@
+execute_process(COMMAND "${PROGRAM}" RESULT_VARIABLE result OUTPUT_VARIABLE output)
+set(expected "Aé🚀\n")
+if(NOT result EQUAL 0 OR NOT output STREQUAL expected)
+    message(FATAL_ERROR "printChar invalide: code=${result}, sortie=[${output}]")
+endif()

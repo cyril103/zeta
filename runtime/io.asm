@@ -4,6 +4,7 @@ section '.text' executable
 
 public zeta_fn_io__print
 public zeta_fn_io__println
+public zeta_fn_io__printChar
 
 ; ABI Zeta : une String est passée sur la pile sous la forme {adresse, longueur}.
 zeta_fn_io__print:
@@ -25,6 +26,71 @@ zeta_fn_io__println:
     js .return
     add rax, r9
 .return:
+    ret
+
+zeta_fn_io__printChar:
+    sub rsp, 8
+    mov r10d, dword [rsp+16]
+    cmp r10d, 7Fh
+    ja .two
+    mov byte [rsp], r10b
+    mov edx, 1
+    jmp .write
+.two:
+    cmp r10d, 7FFh
+    ja .three
+    mov eax, r10d
+    shr eax, 6
+    or al, 0C0h
+    mov byte [rsp], al
+    mov eax, r10d
+    and al, 3Fh
+    or al, 80h
+    mov byte [rsp+1], al
+    mov edx, 2
+    jmp .write
+.three:
+    cmp r10d, 0FFFFh
+    ja .four
+    mov eax, r10d
+    shr eax, 12
+    or al, 0E0h
+    mov byte [rsp], al
+    mov eax, r10d
+    shr eax, 6
+    and al, 3Fh
+    or al, 80h
+    mov byte [rsp+1], al
+    mov eax, r10d
+    and al, 3Fh
+    or al, 80h
+    mov byte [rsp+2], al
+    mov edx, 3
+    jmp .write
+.four:
+    mov eax, r10d
+    shr eax, 18
+    or al, 0F0h
+    mov byte [rsp], al
+    mov eax, r10d
+    shr eax, 12
+    and al, 3Fh
+    or al, 80h
+    mov byte [rsp+1], al
+    mov eax, r10d
+    shr eax, 6
+    and al, 3Fh
+    or al, 80h
+    mov byte [rsp+2], al
+    mov eax, r10d
+    and al, 3Fh
+    or al, 80h
+    mov byte [rsp+3], al
+    mov edx, 4
+.write:
+    mov rsi, rsp
+    call io_write_all
+    add rsp, 8
     ret
 
 io_write_all:

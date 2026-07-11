@@ -1,0 +1,9 @@
+import io
+
+def main () : Int = {
+    val ascii : Int = io.printChar('A')
+    val accent : Int = io.printChar('é')
+    val emoji : Int = io.printChar('🚀')
+    val newline : Int = io.println("")
+    if (ascii == 1 && accent == 2 && emoji == 4 && newline == 1) 0 else 1
+}
