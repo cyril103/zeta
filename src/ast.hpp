@@ -8,7 +8,38 @@
 #include <variant>
 #include <vector>
 
-enum class ValueType { Int, Byte, Double, Bool, Char, String };
+struct ValueType {
+    enum class Kind { Int, Byte, Double, Bool, Char, String, Array };
+
+    Kind kind;
+    std::shared_ptr<const ValueType> element;
+    std::size_t length{0};
+
+    explicit ValueType(Kind primitive) : kind(primitive) {}
+    ValueType(std::shared_ptr<const ValueType> elementType, std::size_t arrayLength)
+        : kind(Kind::Array), element(std::move(elementType)), length(arrayLength) {}
+
+    static const ValueType Int;
+    static const ValueType Byte;
+    static const ValueType Double;
+    static const ValueType Bool;
+    static const ValueType Char;
+    static const ValueType String;
+
+    friend bool operator==(const ValueType& left, const ValueType& right) {
+        if (left.kind != right.kind) return false;
+        if (left.kind != Kind::Array) return true;
+        return left.length == right.length && left.element != nullptr && right.element != nullptr &&
+               *left.element == *right.element;
+    }
+};
+
+inline const ValueType ValueType::Int{ValueType::Kind::Int};
+inline const ValueType ValueType::Byte{ValueType::Kind::Byte};
+inline const ValueType ValueType::Double{ValueType::Kind::Double};
+inline const ValueType ValueType::Bool{ValueType::Kind::Bool};
+inline const ValueType ValueType::Char{ValueType::Kind::Char};
+inline const ValueType ValueType::String{ValueType::Kind::String};
 
 inline std::string typeName(ValueType type) {
     if (type == ValueType::Int) return "Int";
@@ -16,7 +47,8 @@ inline std::string typeName(ValueType type) {
     if (type == ValueType::Double) return "Double";
     if (type == ValueType::Bool) return "Bool";
     if (type == ValueType::Char) return "Char";
-    return "String";
+    if (type == ValueType::String) return "String";
+    return "[" + typeName(*type.element) + "; " + std::to_string(type.length) + "]";
 }
 
 struct Expression;
