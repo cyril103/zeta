@@ -1,0 +1,3 @@
+import b
+
+pub def a () : Int = 1

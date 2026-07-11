@@ -29,6 +29,8 @@ struct ModuleGraph {
     std::string root;
     std::unordered_map<std::string, Module> modules;
     std::unordered_map<std::string, ModuleInterface> interfaces;
+    std::unordered_map<std::string, std::vector<std::string>> dependencies;
+    std::vector<std::string> compilationOrder;
 };
 
 class ModuleLoader {
@@ -38,6 +40,7 @@ public:
 private:
     void loadModule(const std::string& name, const std::filesystem::path& path);
     void buildInterfaces();
+    void buildDependencyGraph();
     std::filesystem::path sourceDirectory_;
     ModuleGraph graph_;
 };

@@ -3,8 +3,10 @@
 #include "lexer.hpp"
 #include "parser.hpp"
 
+#include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <functional>
 #include <stdexcept>
 
 namespace {
@@ -32,7 +34,40 @@ ModuleGraph ModuleLoader::load(const std::filesystem::path& rootPath) {
         throw std::runtime_error("nom de module invalide : " + graph_.root);
     loadModule(graph_.root, absolute);
     buildInterfaces();
+    buildDependencyGraph();
     return std::move(graph_);
+}
+
+void ModuleLoader::buildDependencyGraph() {
+    for (const auto& [name, module] : graph_.modules) {
+        auto& dependencies = graph_.dependencies[name];
+        for (const Program::Import& import : module.program.imports)
+            dependencies.push_back(import.module);
+    }
+
+    enum class State { Unvisited, Visiting, Visited };
+    std::unordered_map<std::string, State> states;
+    std::vector<std::string> path;
+    std::function<void(const std::string&)> visit = [&](const std::string& name) {
+        if (states[name] == State::Visited) return;
+        if (states[name] == State::Visiting) {
+            const auto begin = std::find(path.begin(), path.end(), name);
+            std::string message = "cycle d'import détecté : ";
+            for (auto current = begin; current != path.end(); ++current) {
+                if (current != begin) message += " -> ";
+                message += *current;
+            }
+            message += " -> " + name;
+            throw std::runtime_error(message);
+        }
+        states[name] = State::Visiting;
+        path.push_back(name);
+        for (const std::string& dependency : graph_.dependencies[name]) visit(dependency);
+        path.pop_back();
+        states[name] = State::Visited;
+        graph_.compilationOrder.push_back(name);
+    };
+    visit(graph_.root);
 }
 
 void ModuleLoader::loadModule(const std::string& name, const std::filesystem::path& path) {

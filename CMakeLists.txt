@@ -191,6 +191,11 @@ if(BUILD_TESTING)
         set_tests_properties(reject_module_${module_error} PROPERTIES WILL_FAIL TRUE)
     endforeach()
 
+    add_test(NAME reject_module_cycle COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/modules_cycle/main.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/invalid-module-cycle)
+    set_tests_properties(reject_module_cycle PROPERTIES WILL_FAIL TRUE)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
