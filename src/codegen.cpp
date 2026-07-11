@@ -107,6 +107,10 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
             } else if constexpr (std::is_same_v<T, IrIndexLoad>) {
                 const std::size_t elementBytes = valueTypeSize(*item.arrayType.element);
                 out << "    movsxd rax, dword [rbp-" << valueOffset(program, item.index) << "]\n"
+                    << "    test rax, rax\n"
+                    << "    js ir_array_bounds_error\n"
+                    << "    cmp rax, " << item.arrayType.length << "\n"
+                    << "    jae ir_array_bounds_error\n"
                     << "    imul rax, " << elementBytes << "\n"
                     << "    lea rsi, [rbp-" << valueOffset(program, item.array) << "]\n"
                     << "    add rsi, rax\n";
@@ -411,6 +415,16 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 out << "ir_label_" << item.label << ":\n";
             }
         }, instruction);
+    }
+
+    bool hasArrayAccess = false;
+    for (const IrInstruction& instruction : program.instructions)
+        hasArrayAccess = hasArrayAccess || std::holds_alternative<IrIndexLoad>(instruction);
+    if (hasArrayAccess) {
+        out << "\nir_array_bounds_error:\n"
+               "    mov edi, 101\n"
+               "    mov eax, 60\n"
+               "    syscall\n";
     }
 
     bool hasDoubleConstants = false;

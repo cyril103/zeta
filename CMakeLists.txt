@@ -265,6 +265,14 @@ if(BUILD_TESTING)
     add_test(NAME run_array_index COMMAND ${CMAKE_CURRENT_BINARY_DIR}/array-index)
     set_tests_properties(run_array_index PROPERTIES DEPENDS compile_array_index)
 
+    add_test(NAME compile_array_dynamic_bounds COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_dynamic_bounds.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/array-dynamic-bounds)
+    add_test(NAME run_array_dynamic_bounds COMMAND ${CMAKE_COMMAND}
+        -DPROGRAM=${CMAKE_CURRENT_BINARY_DIR}/array-dynamic-bounds
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_exit_101.cmake)
+    set_tests_properties(run_array_dynamic_bounds PROPERTIES DEPENDS compile_array_dynamic_bounds)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
