@@ -9,6 +9,7 @@ add_executable(zeta
     src/main.cpp
     src/lexer.cpp
     src/parser.cpp
+    src/module.cpp
     src/semantic.cpp
     src/ir.cpp
     src/codegen.cpp
@@ -172,6 +173,12 @@ if(BUILD_TESTING)
     add_test(NAME run_public_declaration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/public-declaration)
     set_tests_properties(run_public_declaration PROPERTIES DEPENDS compile_public_declaration)
 
+    add_test(NAME compile_module_loading COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/modules_loading/main.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/module-loading)
+    add_test(NAME run_module_loading COMMAND ${CMAKE_CURRENT_BINARY_DIR}/module-loading)
+    set_tests_properties(run_module_loading PROPERTIES DEPENDS compile_module_loading)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -225,7 +232,8 @@ if(BUILD_TESTING)
             string_invalid_escape
             string_arithmetic
             string_ordering
-            string_type_mismatch)
+            string_type_mismatch
+            module_missing)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

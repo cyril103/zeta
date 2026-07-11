@@ -1,0 +1,3 @@
+import absent
+
+def main () : Int = 0

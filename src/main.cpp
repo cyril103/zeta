@@ -1,8 +1,7 @@
 #include "codegen.hpp"
 #include "diagnostic.hpp"
 #include "ir.hpp"
-#include "lexer.hpp"
-#include "parser.hpp"
+#include "module.hpp"
 #include "semantic.hpp"
 
 #include <filesystem>
@@ -16,12 +15,6 @@
 namespace fs = std::filesystem;
 
 namespace {
-std::string readFile(const fs::path& path) {
-    std::ifstream input(path, std::ios::binary);
-    if (!input) throw std::runtime_error("impossible d'ouvrir " + path.string());
-    return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
-}
-
 void writeFile(const fs::path& path, const std::string& content) {
     if (!path.parent_path().empty()) fs::create_directories(path.parent_path());
     std::ofstream output(path, std::ios::binary);
@@ -82,10 +75,9 @@ int main(int argc, char** argv) {
     }
 
     try {
-        const std::string source = readFile(sourcePath);
-        Lexer lexer(source);
-        Parser parser(lexer.scan());
-        Program program = parser.parse();
+        ModuleLoader loader;
+        ModuleGraph modules = loader.load(sourcePath);
+        Program& program = modules.modules.at(modules.root).program;
         SemanticAnalyzer semanticAnalyzer;
         const TypedProgram typedProgram = semanticAnalyzer.analyze(program);
         IrGenerator irGenerator;
