@@ -193,9 +193,18 @@ Statement Parser::statement() {
             throw CompileError(previous().location,
                                "'pub' est autorisé uniquement au niveau global");
         publicDeclaration_ = true;
-        if (!check(TokenKind::Val) && !check(TokenKind::Var) && !check(TokenKind::Def))
+        if (!check(TokenKind::Native) && !check(TokenKind::Val) &&
+            !check(TokenKind::Var) && !check(TokenKind::Def))
             throw CompileError(peek().location,
                                "'val', 'var' ou 'def' attendu après 'pub'");
+    }
+    if (match(TokenKind::Native)) {
+        if (blockDepth_ != 0)
+            throw CompileError(previous().location,
+                               "'native' est autorisé uniquement au niveau global");
+        nativeDeclaration_ = true;
+        if (!check(TokenKind::Def))
+            throw CompileError(peek().location, "'def' attendu après 'native'");
     }
     if (match(TokenKind::Val)) return declaration(BindingKind::Val);
     if (match(TokenKind::Var)) return declaration(BindingKind::Var);
@@ -229,7 +238,8 @@ std::vector<StatementPtr> Parser::loopBody() {
     ++blockDepth_;
     skipSeparators();
     while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
-        const bool startsStatement = check(TokenKind::Pub) || check(TokenKind::Val) || check(TokenKind::Var) ||
+        const bool startsStatement = check(TokenKind::Pub) || check(TokenKind::Native) ||
+            check(TokenKind::Val) || check(TokenKind::Var) ||
             check(TokenKind::Def) || check(TokenKind::While) || check(TokenKind::Return) ||
             check(TokenKind::Break) || check(TokenKind::Continue) ||
             (check(TokenKind::Identifier) && current_ + 1 < tokens_.size() &&
@@ -276,11 +286,19 @@ Declaration Parser::declaration(BindingKind kind) {
     }
     consume(TokenKind::Colon, "':' attendu après l'identifiant");
     const ValueType type = consumeType("type attendu");
-    consume(TokenKind::Equal, "'=' attendu après le type");
     const bool publicSymbol = publicDeclaration_;
+    const bool nativeSymbol = nativeDeclaration_;
     publicDeclaration_ = false;
-    return Declaration{start.location, name.text, type, kind, publicSymbol, callable,
-                       std::move(parameters), expression()};
+    nativeDeclaration_ = false;
+    if (nativeSymbol) {
+        if (!callable)
+            throw CompileError(start.location, "une déclaration native doit être une fonction");
+        return Declaration{start.location, name.text, type, kind, publicSymbol, true,
+                           callable, std::move(parameters), nullptr};
+    }
+    consume(TokenKind::Equal, "'=' attendu après le type");
+    return Declaration{start.location, name.text, type, kind, publicSymbol, false,
+                       callable, std::move(parameters), expression()};
 }
 
 std::string Parser::qualifiedName() {

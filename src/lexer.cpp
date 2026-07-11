@@ -151,6 +151,7 @@ std::vector<Token> Lexer::scan() {
             if (text == "def") kind = TokenKind::Def;
             if (text == "import") kind = TokenKind::Import;
             if (text == "pub") kind = TokenKind::Pub;
+            if (text == "native") kind = TokenKind::Native;
             if (text == "Int") kind = TokenKind::IntType;
             if (text == "Byte") kind = TokenKind::ByteType;
             if (text == "Double") kind = TokenKind::DoubleType;

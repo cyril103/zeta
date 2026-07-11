@@ -10,6 +10,7 @@ enum class TokenKind {
     Def,
     Import,
     Pub,
+    Native,
     IntType,
     ByteType,
     DoubleType,
@@ -68,6 +69,7 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::Def: return "'def'";
     case TokenKind::Import: return "'import'";
     case TokenKind::Pub: return "'pub'";
+    case TokenKind::Native: return "'native'";
     case TokenKind::IntType: return "'Int'";
     case TokenKind::ByteType: return "'Byte'";
     case TokenKind::DoubleType: return "'Double'";

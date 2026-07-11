@@ -41,4 +41,5 @@ private:
     std::size_t current_{0};
     std::size_t blockDepth_{0};
     bool publicDeclaration_{false};
+    bool nativeDeclaration_{false};
 };

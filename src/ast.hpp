@@ -59,6 +59,7 @@ struct Declaration {
     ValueType type;
     BindingKind kind;
     bool publicSymbol;
+    bool nativeSymbol;
     bool callable;
     std::vector<Parameter> parameters;
     ExprPtr initializer;
