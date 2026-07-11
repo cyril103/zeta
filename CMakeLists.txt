@@ -222,6 +222,10 @@ if(BUILD_TESTING)
     add_test(NAME run_io_interface COMMAND ${CMAKE_CURRENT_BINARY_DIR}/io-interface)
     set_tests_properties(run_io_interface PROPERTIES DEPENDS compile_io_interface)
 
+    add_test(NAME assemble_runtime_io COMMAND fasm
+        ${CMAKE_CURRENT_SOURCE_DIR}/runtime/io.asm
+        ${CMAKE_CURRENT_BINARY_DIR}/runtime-io.o)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
