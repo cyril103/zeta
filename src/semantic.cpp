@@ -61,6 +61,7 @@ void SemanticAnalyzer::checkStatement(Statement& statement, bool global) {
         using T = std::decay_t<decltype(node)>;
         if constexpr (std::is_same_v<T, Declaration>) checkDeclaration(node, global);
         else if constexpr (std::is_same_v<T, Assignment>) checkAssignment(node);
+        else if constexpr (std::is_same_v<T, IndexAssignment>) checkIndexAssignment(node);
         else if constexpr (std::is_same_v<T, WhileStatement>) checkLoop(node);
         else if constexpr (std::is_same_v<T, ExpressionStatement>) {
             if (global) {
@@ -127,6 +128,24 @@ void SemanticAnalyzer::checkAssignment(Assignment& assignment) {
         throw CompileError(assignment.location, subject + assignment.name + "' est immuable");
     }
     checkExpression(*assignment.value, target->type);
+}
+
+void SemanticAnalyzer::checkIndexAssignment(IndexAssignment& assignment) {
+    const SemanticSymbol* target = symbols_.lookup(assignment.name);
+    if (target == nullptr)
+        throw CompileError(assignment.location, "identifiant inconnu '" + assignment.name + "'");
+    if (target->parameter || target->kind != BindingKind::Var)
+        throw CompileError(assignment.location,
+                           "le tableau '" + assignment.name + "' est immuable");
+    if (target->type.kind != ValueType::Kind::Array)
+        throw CompileError(assignment.location,
+                           "la cible d'une affectation indexée doit être un tableau");
+    checkExpression(*assignment.index, ValueType::Int);
+    if (const auto index = constantInteger(*assignment.index);
+        index && (*index < 0 || static_cast<std::uint64_t>(*index) >= target->type.length))
+        throw CompileError(assignment.index->location, "index " + std::to_string(*index) +
+                           " hors limites pour " + typeName(target->type));
+    checkExpression(*assignment.value, *target->type.element);
 }
 
 void SemanticAnalyzer::checkStatements(std::vector<StatementPtr>& statements) {

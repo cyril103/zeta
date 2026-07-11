@@ -273,6 +273,12 @@ if(BUILD_TESTING)
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_exit_101.cmake)
     set_tests_properties(run_array_dynamic_bounds PROPERTIES DEPENDS compile_array_dynamic_bounds)
 
+    add_test(NAME compile_array_mutation COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_mutation.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/array-mutation)
+    add_test(NAME run_array_mutation COMMAND ${CMAKE_CURRENT_BINARY_DIR}/array-mutation)
+    set_tests_properties(run_array_mutation PROPERTIES DEPENDS compile_array_mutation)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -335,7 +341,8 @@ if(BUILD_TESTING)
             array_length_mismatch
             array_element_mismatch
             array_index_too_large
-            array_index_negative)
+            array_index_negative
+            array_immutable_mutation)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

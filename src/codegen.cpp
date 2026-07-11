@@ -117,6 +117,23 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 emitBlockCopy(out, "[rsi]",
                     "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]",
                     elementBytes);
+            } else if constexpr (std::is_same_v<T, IrIndexStore>) {
+                const IrSlot& slot = program.slots[item.slot];
+                const std::size_t elementBytes = valueTypeSize(*item.arrayType.element);
+                out << "    movsxd rax, dword [rbp-" << valueOffset(program, item.index) << "]\n"
+                    << "    test rax, rax\n"
+                    << "    js ir_array_bounds_error\n"
+                    << "    cmp rax, " << item.arrayType.length << "\n"
+                    << "    jae ir_array_bounds_error\n"
+                    << "    imul rax, " << elementBytes << "\n";
+                if (slot.global)
+                    out << "    lea rdi, [global_slot_" << item.slot << "]\n";
+                else
+                    out << "    lea rdi, [rbp-" << slotOffset(program, item.slot) << "]\n";
+                out << "    add rdi, rax\n";
+                emitBlockCopy(out,
+                    "[rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
+                    "[rdi]", elementBytes);
             } else if constexpr (std::is_same_v<T, IrLoad>) {
                 const IrSlot& slot = program.slots[item.slot];
                 const std::string address = slot.global
@@ -419,7 +436,8 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
 
     bool hasArrayAccess = false;
     for (const IrInstruction& instruction : program.instructions)
-        hasArrayAccess = hasArrayAccess || std::holds_alternative<IrIndexLoad>(instruction);
+        hasArrayAccess = hasArrayAccess || std::holds_alternative<IrIndexLoad>(instruction) ||
+                         std::holds_alternative<IrIndexStore>(instruction);
     if (hasArrayAccess) {
         out << "\nir_array_bounds_error:\n"
                "    mov edi, 101\n"

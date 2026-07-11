@@ -262,7 +262,8 @@ std::vector<StatementPtr> Parser::loopBody() {
             check(TokenKind::Def) || check(TokenKind::While) || check(TokenKind::Return) ||
             check(TokenKind::Break) || check(TokenKind::Continue) ||
             (check(TokenKind::Identifier) && current_ + 1 < tokens_.size() &&
-             tokens_[current_ + 1].kind == TokenKind::Equal);
+             (tokens_[current_ + 1].kind == TokenKind::Equal ||
+              tokens_[current_ + 1].kind == TokenKind::LeftBracket));
         if (startsStatement) {
             body.push_back(std::make_unique<Statement>(statement()));
         } else {
@@ -331,8 +332,14 @@ std::string Parser::qualifiedName() {
     return name;
 }
 
-Assignment Parser::assignment() {
+Statement Parser::assignment() {
     const Token& name = consume(TokenKind::Identifier, "identifiant attendu");
+    if (match(TokenKind::LeftBracket)) {
+        ExprPtr index = expression();
+        consume(TokenKind::RightBracket, "']' attendue après l'index");
+        consume(TokenKind::Equal, "'=' attendu après la cible indexée");
+        return IndexAssignment{name.location, name.text, std::move(index), expression()};
+    }
     consume(TokenKind::Equal, "'=' attendu après l'identifiant");
     return Assignment{name.location, name.text, expression()};
 }
@@ -571,7 +578,8 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
                                        check(TokenKind::Continue);
         const bool startsAssignment = check(TokenKind::Identifier) &&
                                       current_ + 1 < tokens_.size() &&
-                                      tokens_[current_ + 1].kind == TokenKind::Equal;
+                                      (tokens_[current_ + 1].kind == TokenKind::Equal ||
+                                       tokens_[current_ + 1].kind == TokenKind::LeftBracket);
         if (!startsDeclaration && !startsAssignment) break;
 
         statements.push_back(std::make_unique<Statement>(statement()));

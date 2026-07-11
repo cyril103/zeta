@@ -24,7 +24,7 @@ private:
     Statement statement();
     Declaration declaration(BindingKind kind);
     std::string qualifiedName();
-    Assignment assignment();
+    Statement assignment();
     WhileStatement whileStatement();
     std::vector<StatementPtr> loopBody();
     ExprPtr expression();

@@ -1,0 +1,9 @@
+var globalValues : [Int; 2] = [1, 2]
+
+def main () : Int = {
+    var localValues : [Int; 3] = [3, 4, 5]
+    var index : Int = 1
+    localValues[index] = 40
+    globalValues[0] = 10
+    if (localValues[1] == 40 && globalValues[0] == 10) 0 else 1
+}
