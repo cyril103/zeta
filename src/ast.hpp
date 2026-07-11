@@ -51,6 +51,21 @@ inline std::string typeName(ValueType type) {
     return "[" + typeName(*type.element) + "; " + std::to_string(type.length) + "]";
 }
 
+inline std::size_t valueTypeSize(const ValueType& type) {
+    if (type == ValueType::Byte || type == ValueType::Bool) return 1U;
+    if (type == ValueType::Int || type == ValueType::Char) return 4U;
+    if (type == ValueType::Double) return 8U;
+    if (type == ValueType::String) return 16U;
+    return valueTypeSize(*type.element) * type.length;
+}
+
+inline std::size_t valueTypeAlignment(const ValueType& type) {
+    if (type == ValueType::Byte || type == ValueType::Bool) return 1U;
+    if (type == ValueType::Int || type == ValueType::Char) return 4U;
+    if (type == ValueType::Double || type == ValueType::String) return 8U;
+    return valueTypeAlignment(*type.element);
+}
+
 struct Expression;
 struct Statement;
 using ExprPtr = std::unique_ptr<Expression>;

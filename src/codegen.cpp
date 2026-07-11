@@ -9,11 +9,10 @@
 namespace {
 std::size_t align16(std::size_t value) { return (value + 15U) & ~std::size_t{15U}; }
 std::size_t typeSize(ValueType type) {
-    if (type == ValueType::Byte || type == ValueType::Bool) return 1U;
-    if (type == ValueType::String) return 16U;
-    return type == ValueType::Double ? 8U : 4U;
+    return valueTypeSize(type);
 }
 std::size_t valueSize(ValueType type) {
+    if (type.kind == ValueType::Kind::Array) return valueTypeSize(type);
     if (type == ValueType::String) return 16U;
     return type == ValueType::Double ? 8U : 4U;
 }
