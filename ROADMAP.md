@@ -219,6 +219,10 @@ Disponible :
 - liaison finale avec `ld` ;
 - cache invalidé par le source, l'interface et les dépendances.
 
+Le module standard `io` valide désormais cette chaîne avec des fonctions natives
+liées depuis un objet runtime : affichage de `String`, `Char` et `Int`, gestion des
+écritures partielles et reprise après `EINTR`.
+
 Une évolution future pourra déplacer davantage de code de l'unité IR fusionnée
 vers les objets propres à chaque module, puis sérialiser les interfaces pour ne
 plus reparcourir les sources inchangés.

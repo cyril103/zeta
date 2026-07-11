@@ -3,3 +3,5 @@
 pub native def print (value : String) : Int
 pub native def println (value : String) : Int
 pub native def printChar (value : Char) : Int
+pub native def printInt (value : Int) : Int
+pub native def printlnInt (value : Int) : Int

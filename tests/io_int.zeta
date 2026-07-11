@@ -1,0 +1,10 @@
+import io
+
+def main () : Int = {
+    val zero : Int = io.printInt(0)
+    val space1 : Int = io.print(" ")
+    val minimum : Int = io.printInt(-2147483647 - 1)
+    val space2 : Int = io.print(" ")
+    val positive : Int = io.printlnInt(42)
+    if (zero == 1 && space1 == 1 && minimum == 11 && space2 == 1 && positive == 3) 0 else 1
+}

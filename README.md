@@ -250,6 +250,37 @@ Le dossier `<sortie>.cache/` conserve les objets et leurs empreintes. Une emprei
 dépend du source, de l'interface publique, des interfaces importées et de la
 version du format de cache. Un objet inchangé est réutilisé automatiquement.
 
+## Entrées-sorties standard
+
+Le module standard `io` fournit les premières fonctions natives du runtime :
+
+```text
+import io
+
+def main () : Int = {
+    val greeting : Int = io.println("Bonjour Zeta 🚀")
+    val number : Int = io.printlnInt(-42)
+    val character : Int = io.printChar('é')
+    0
+}
+```
+
+L'API disponible est :
+
+- `io.print(String)` et `io.println(String)` ;
+- `io.printChar(Char)` ;
+- `io.printInt(Int)` et `io.printlnInt(Int)`.
+
+Chaque fonction retourne le nombre d'octets UTF-8 écrits. Une erreur de l'appel
+système Linux `write` est retournée sous forme de valeur négative. Les écritures
+partielles sont poursuivies et une interruption `EINTR` est automatiquement
+relancée. Aucune terminaison NUL, allocation ou copie de `String` n'est requise.
+
+Une déclaration `native def` décrit une fonction fournie par un objet runtime et
+ne possède pas de corps Zeta. Elle est réservée aux déclarations globales ; le
+compilateur exporte sa signature, génère une référence ELF externe, assemble
+l'objet correspondant depuis `runtime/`, le met en cache et le transmet à `ld`.
+
 ## Expressions sur plusieurs lignes
 
 Une expression sur plusieurs lignes doit être placée entre accolades. Le bloc
