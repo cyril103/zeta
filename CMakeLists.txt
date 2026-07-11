@@ -310,7 +310,10 @@ if(BUILD_TESTING)
             module_missing
             native_main
             array_type_syntax
-            array_literal_syntax)
+            array_literal_syntax
+            array_zero_length
+            array_length_mismatch
+            array_element_mismatch)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

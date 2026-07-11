@@ -141,8 +141,11 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
         else if constexpr (std::is_same_v<T, BoolExpr>) return ValueType::Bool;
         else if constexpr (std::is_same_v<T, CharacterExpr>) return ValueType::Char;
         else if constexpr (std::is_same_v<T, StringExpr>) return ValueType::String;
-        else if constexpr (std::is_same_v<T, ArrayExpr>)
-            return node.elements.empty() ? ValueType::Int : inferType(*node.elements.front());
+        else if constexpr (std::is_same_v<T, ArrayExpr>) {
+            if (node.elements.empty()) return ValueType(std::make_shared<ValueType>(ValueType::Int), 0);
+            return ValueType(std::make_shared<ValueType>(inferType(*node.elements.front())),
+                             node.elements.size());
+        }
         else if constexpr (std::is_same_v<T, NameExpr> || std::is_same_v<T, CallExpr>) {
             const SemanticSymbol* symbol = symbols_.lookup(node.name);
             return symbol == nullptr ? ValueType::Int : symbol->type;
@@ -180,7 +183,28 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
         else if constexpr (std::is_same_v<T, BoolExpr>) return ValueType::Bool;
         else if constexpr (std::is_same_v<T, CharacterExpr>) return ValueType::Char;
         else if constexpr (std::is_same_v<T, StringExpr>) return ValueType::String;
-        else if constexpr (std::is_same_v<T, ArrayExpr>) return expected;
+        else if constexpr (std::is_same_v<T, ArrayExpr>) {
+            if (expected.kind != ValueType::Kind::Array)
+                return ValueType(std::make_shared<ValueType>(
+                    node.elements.empty() ? ValueType::Int : inferType(*node.elements.front())),
+                    node.elements.size());
+            if (expected.length == 0)
+                throw CompileError(expression.location,
+                                   "la taille d'un tableau doit être supérieure à zéro");
+            if (node.elements.size() != expected.length)
+                throw CompileError(expression.location, typeName(expected) + " attend " +
+                    std::to_string(expected.length) + " élément(s), reçu " +
+                    std::to_string(node.elements.size()));
+            for (std::size_t i = 0; i < node.elements.size(); ++i) {
+                try {
+                    checkExpression(*node.elements[i], *expected.element);
+                } catch (const CompileError&) {
+                    throw CompileError(node.elements[i]->location, "élément " +
+                        std::to_string(i) + " : " + typeName(*expected.element) + " attendu");
+                }
+            }
+            return expected;
+        }
         else if constexpr (std::is_same_v<T, NameExpr>) {
             const SemanticSymbol* symbol = symbols_.lookup(node.name);
             if (symbol == nullptr)
