@@ -1,0 +1,13 @@
+val integers : [Int; 3] = [1, 2, 3]
+
+def main () : Int = {
+    var characters : [Char; 2] = ['A', 'é']
+    var strings : [String; 2] = ["avant", "Zeta"]
+    var nested : [[String; 2]; 2] = [["a", "b"], ["c", "d"]]
+    characters[1] = '🚀'
+    strings[0] = "après"
+    nested[1][1] = "fini"
+    if (integers[2] == 3 && characters[1] == '🚀' &&
+        strings[0] == "après" && strings[1] == "Zeta" &&
+        nested[0][1] == "b" && nested[1][1] == "fini") 0 else 1
+}

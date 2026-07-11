@@ -285,6 +285,12 @@ if(BUILD_TESTING)
     add_test(NAME run_nested_arrays COMMAND ${CMAKE_CURRENT_BINARY_DIR}/nested-arrays)
     set_tests_properties(run_nested_arrays PROPERTIES DEPENDS compile_nested_arrays)
 
+    add_test(NAME compile_array_types COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_types.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/array-types)
+    add_test(NAME run_array_types COMMAND ${CMAKE_CURRENT_BINARY_DIR}/array-types)
+    set_tests_properties(run_array_types PROPERTIES DEPENDS compile_array_types)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
