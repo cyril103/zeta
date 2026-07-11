@@ -184,6 +184,13 @@ if(BUILD_TESTING)
         -o ${CMAKE_CURRENT_BINARY_DIR}/invalid-module-duplicate-export)
     set_tests_properties(reject_module_duplicate_export PROPERTIES WILL_FAIL TRUE)
 
+    foreach(module_error IN ITEMS private wrong_arity)
+        add_test(NAME reject_module_${module_error} COMMAND zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/modules_${module_error}/main.zeta
+            -o ${CMAKE_CURRENT_BINARY_DIR}/invalid-module-${module_error})
+        set_tests_properties(reject_module_${module_error} PROPERTIES WILL_FAIL TRUE)
+    endforeach()
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment

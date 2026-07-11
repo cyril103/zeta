@@ -12,7 +12,22 @@ namespace {
 }
 }
 
-TypedProgram SemanticAnalyzer::analyze(Program& program) {
+TypedProgram SemanticAnalyzer::analyze(
+    Program& program,
+    const std::unordered_map<std::string, ModuleInterface>* interfaces) {
+    symbols_ = SymbolTable{};
+    if (interfaces != nullptr) {
+        for (const Program::Import& import : program.imports) {
+            const auto module = interfaces->find(import.module);
+            if (module == interfaces->end())
+                throw CompileError(import.location, "module inconnu '" + import.module + "'");
+            for (const auto& [name, exported] : module->second.exports) {
+                symbols_.define(import.module + "." + name,
+                    SemanticSymbol{exported.type, exported.kind, exported.callable,
+                                   nullptr, false, exported.parameterTypes});
+            }
+        }
+    }
     for (Statement& statement : program.statements) checkStatement(statement, true);
 
     const SemanticSymbol* main = symbols_.lookup("main");
@@ -57,7 +72,7 @@ void SemanticAnalyzer::checkStatement(Statement& statement, bool global) {
 
 void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecursion) {
     const SemanticSymbol declarationSymbol{declaration.type, declaration.kind,
-                                            declaration.callable, &declaration, false};
+                                            declaration.callable, &declaration, false, {}};
     if (declaration.callable && allowRecursion &&
         !symbols_.define(declaration.name, declarationSymbol)) {
         throw CompileError(declaration.location,
@@ -66,7 +81,7 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
     symbols_.pushScope();
     for (const Parameter& parameter : declaration.parameters) {
         if (!symbols_.defineParameter(parameter.name,
-                SemanticSymbol{parameter.type, BindingKind::Val, false, nullptr, true})) {
+                SemanticSymbol{parameter.type, BindingKind::Val, false, nullptr, true, {}})) {
             throw CompileError(parameter.location,
                                "paramètre '" + parameter.name + "' déclaré plusieurs fois");
         }
@@ -173,13 +188,17 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 throw CompileError(expression.location, "fonction inconnue '" + node.name + "'");
             if (symbol->kind != BindingKind::Def || !symbol->callable)
                 throw CompileError(expression.location, "'" + node.name + "' n'est pas une fonction");
-            const Declaration& function = *symbol->declaration;
-            if (node.arguments.size() != function.parameters.size())
+            const std::size_t parameterCount = symbol->declaration != nullptr
+                ? symbol->declaration->parameters.size() : symbol->parameterTypes.size();
+            if (node.arguments.size() != parameterCount)
                 throw CompileError(expression.location, "la fonction '" + node.name + "' attend " +
-                    std::to_string(function.parameters.size()) + " argument(s), reçu " +
+                    std::to_string(parameterCount) + " argument(s), reçu " +
                     std::to_string(node.arguments.size()));
-            for (std::size_t i = 0; i < node.arguments.size(); ++i)
-                checkExpression(*node.arguments[i], function.parameters[i].type);
+            for (std::size_t i = 0; i < node.arguments.size(); ++i) {
+                const ValueType parameterType = symbol->declaration != nullptr
+                    ? symbol->declaration->parameters[i].type : symbol->parameterTypes[i];
+                checkExpression(*node.arguments[i], parameterType);
+            }
             return symbol->type;
         } else if constexpr (std::is_same_v<T, ConversionExpr>) {
             const ValueType source = inferType(*node.operand);

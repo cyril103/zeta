@@ -1,0 +1,3 @@
+import helper
+
+def main () : Int = helper.secret()

@@ -1,0 +1,1 @@
+pub def publicValue () : Int = 0

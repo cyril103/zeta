@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ast.hpp"
+#include "module.hpp"
 #include "symbol_table.hpp"
 #include <optional>
 
@@ -16,7 +17,8 @@ private:
 
 class SemanticAnalyzer {
 public:
-    TypedProgram analyze(Program& program);
+    TypedProgram analyze(Program& program,
+        const std::unordered_map<std::string, ModuleInterface>* interfaces = nullptr);
 
 private:
     ValueType checkExpression(Expression& expression, ValueType expected);

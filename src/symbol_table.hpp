@@ -12,6 +12,7 @@ struct SemanticSymbol {
     bool callable;
     const Declaration* declaration;
     bool parameter{false};
+    std::vector<ValueType> parameterTypes;
 };
 
 class SymbolTable {

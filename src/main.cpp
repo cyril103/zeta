@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
         ModuleGraph modules = loader.load(sourcePath);
         Program& program = modules.modules.at(modules.root).program;
         SemanticAnalyzer semanticAnalyzer;
-        const TypedProgram typedProgram = semanticAnalyzer.analyze(program);
+        const TypedProgram typedProgram = semanticAnalyzer.analyze(program, &modules.interfaces);
         IrGenerator irGenerator;
         const IrProgram ir = irGenerator.generate(typedProgram);
 
