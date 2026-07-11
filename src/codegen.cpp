@@ -210,11 +210,23 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     out << "    movsd qword [rbp-" << valueOffset(program, item.output) << "], xmm0\n";
                 else
                     out << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
+            } else if constexpr (std::is_same_v<T, IrTailCall>) {
+                for (std::size_t i = 0; i < item.arguments.size(); ++i) {
+                    if (item.argumentTypes[i] == ValueType::Double) {
+                        out << "    movsd xmm0, qword [rbp-" << valueOffset(program, item.arguments[i]) << "]\n"
+                            << "    movsd qword [rbp+" << 16U + i * 8U << "], xmm0\n";
+                    } else {
+                        out << "    mov eax, dword [rbp-" << valueOffset(program, item.arguments[i]) << "]\n"
+                            << "    mov dword [rbp+" << 16U + i * 8U << "], eax\n";
+                    }
+                }
+                out << "    jmp zeta_fn_" << item.function << "_body\n";
             } else if constexpr (std::is_same_v<T, IrFunctionStart>) {
                 out << "\nzeta_fn_" << item.name << ":\n"
                     << "    push rbp\n"
                     << "    mov rbp, rsp\n";
                 if (frameSize != 0) out << "    sub rsp, " << frameSize << '\n';
+                out << "zeta_fn_" << item.name << "_body:\n";
             } else if constexpr (std::is_same_v<T, IrParameter>) {
                 if (item.type == ValueType::Double) {
                     out << "    movsd xmm0, qword [rbp+" << 16U + item.index * 8U << "]\n"

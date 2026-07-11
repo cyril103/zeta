@@ -34,6 +34,11 @@ struct IrCall {
     std::vector<ValueType> argumentTypes;
     ValueType returnType;
 };
+struct IrTailCall {
+    std::string function;
+    std::vector<ValueId> arguments;
+    std::vector<ValueType> argumentTypes;
+};
 struct IrFunctionStart { std::string name; };
 struct IrParameter { ValueId output; std::size_t index; ValueType type; };
 struct IrReturn { ValueId value; ValueType type; };
@@ -42,7 +47,7 @@ struct IrBranch { ValueId condition; bool jumpWhenTrue; std::size_t label; };
 struct IrJump { std::size_t label; };
 struct IrLabel { std::size_t label; };
 using IrInstruction = std::variant<IrConst, IrDoubleConst, IrLoad, IrConvert, IrUnary, IrBinary,
-                                   IrStore, IrCopy, IrCall, IrFunctionStart, IrParameter,
+                                   IrStore, IrCopy, IrCall, IrTailCall, IrFunctionStart, IrParameter,
                                    IrReturn, IrExit, IrBranch, IrJump, IrLabel>;
 
 struct IrSlot { std::string name; ValueType type; bool global; };
@@ -72,6 +77,9 @@ private:
     ValueId expression(const Expression& expression);
     ValueId expression(const Expression& expression,
                        const std::unordered_map<std::string, ValueId>& parameters);
+    void emitTailExpression(const Expression& expression,
+                            const std::unordered_map<std::string, ValueId>& parameters,
+                            const Declaration& function);
     ValueId nextValue(ValueType type);
     IrProgram ir_;
     std::unordered_map<std::string, Symbol> symbols_;

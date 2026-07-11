@@ -64,10 +64,71 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
             parameters.emplace(parameter.name, value);
             ir_.instructions.push_back(IrParameter{value, i, parameter.type});
         }
-        const ValueId result = expression(*function->initializer, parameters);
-        ir_.instructions.push_back(IrReturn{result, function->type});
+        emitTailExpression(*function->initializer, parameters, *function);
     }
     return std::move(ir_);
+}
+
+void IrGenerator::emitTailExpression(
+    const Expression& expressionNode,
+    const std::unordered_map<std::string, ValueId>& parameters,
+    const Declaration& function) {
+    if (const auto* block = std::get_if<BlockExpr>(&expressionNode.value)) {
+        std::vector<std::string> localNames;
+        for (const StatementPtr& statement : block->statements) {
+            std::visit([&](const auto& item) {
+                using T = std::decay_t<decltype(item)>;
+                if constexpr (std::is_same_v<T, Declaration>) {
+                    localNames.push_back(item.name);
+                    if (item.kind == BindingKind::Def) {
+                        symbols_.emplace(item.name, Symbol{0, item.kind, &item, false});
+                    } else {
+                        const ValueId value = expression(*item.initializer, parameters);
+                        const SlotId slot = ir_.slots.size();
+                        symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false});
+                        ir_.slots.push_back(IrSlot{item.name, item.type, false});
+                        ir_.instructions.push_back(IrStore{slot, value, item.type});
+                    }
+                } else if constexpr (std::is_same_v<T, Assignment>) {
+                    const auto found = symbols_.find(item.name);
+                    const ValueId value = expression(*item.value, parameters);
+                    ir_.instructions.push_back(IrStore{found->second.slot, value,
+                                                       found->second.declaration->type});
+                } else if constexpr (std::is_same_v<T, WhileStatement>) {
+                    emitLoop(item, parameters);
+                } else {
+                    expression(*item.expression, parameters);
+                }
+            }, statement->value);
+        }
+        emitTailExpression(*block->result, parameters, function);
+        for (auto name = localNames.rbegin(); name != localNames.rend(); ++name)
+            symbols_.erase(*name);
+        return;
+    }
+    if (const auto* call = std::get_if<CallExpr>(&expressionNode.value);
+        call != nullptr && call->name == function.name) {
+        std::vector<ValueId> arguments;
+        std::vector<ValueType> argumentTypes;
+        for (std::size_t i = 0; i < call->arguments.size(); ++i) {
+            arguments.push_back(expression(*call->arguments[i], parameters));
+            argumentTypes.push_back(function.parameters[i].type);
+        }
+        ir_.instructions.push_back(IrTailCall{function.name, std::move(arguments),
+                                              std::move(argumentTypes)});
+        return;
+    }
+    if (const auto* conditional = std::get_if<IfExpr>(&expressionNode.value)) {
+        const ValueId condition = expression(*conditional->condition, parameters);
+        const std::size_t elseLabel = nextLabel_++;
+        ir_.instructions.push_back(IrBranch{condition, false, elseLabel});
+        emitTailExpression(*conditional->thenBranch, parameters, function);
+        ir_.instructions.push_back(IrLabel{elseLabel});
+        emitTailExpression(*conditional->elseBranch, parameters, function);
+        return;
+    }
+    const ValueId result = expression(expressionNode, parameters);
+    ir_.instructions.push_back(IrReturn{result, function.type});
 }
 
 
@@ -334,6 +395,13 @@ std::string IrGenerator::print(const IrProgram& program) {
                         out << '$' << item.arguments[i];
                     }
                     out << ") : " << suffix(item.returnType) << '\n';
+                } else if constexpr (std::is_same_v<T, IrTailCall>) {
+                    out << "  tail_call " << item.function << '(';
+                    for (std::size_t i = 0; i < item.arguments.size(); ++i) {
+                        if (i != 0) out << ", ";
+                        out << '$' << item.arguments[i];
+                    }
+                    out << ")\n";
                 } else if constexpr (std::is_same_v<T, IrFunctionStart>)
                     out << "\n  function " << item.name << ":\n";
                 else if constexpr (std::is_same_v<T, IrParameter>)

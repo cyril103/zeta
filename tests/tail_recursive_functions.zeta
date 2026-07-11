@@ -1,0 +1,6 @@
+def compte (reste : Int, total : Int) : Int = {
+    val suivant : Int = total + 1
+    if (reste == 0) total else compte(reste - 1, suivant)
+}
+
+def main () : Int = if (compte(1000000, 0) == 1000000) 0 else 1

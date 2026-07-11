@@ -151,6 +151,12 @@ locale peut capturer les variables de son bloc ; elle reste pour l'instant
 développée au point d'appel, en attendant une représentation dédiée des
 fermetures.
 
+Un auto-appel placé directement en position de retour est optimisé en boucle,
+y compris lorsqu'il se trouve dans une branche terminale de `if`. Le compilateur
+réécrit alors les paramètres de la frame courante et saute au début du corps : la
+pile d'appels ne grandit pas. Les appels non terminaux, par exemple
+`n * factorielle(n - 1)`, conservent une récursion classique.
+
 ## Expressions sur plusieurs lignes
 
 Une expression sur plusieurs lignes doit être placée entre accolades. Le bloc
