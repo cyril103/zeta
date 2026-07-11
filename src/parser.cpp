@@ -440,6 +440,17 @@ ExprPtr Parser::multiplication() {
 }
 
 ExprPtr Parser::unary() {
+    if (match(TokenKind::Ampersand)) {
+        const Token token = previous();
+        const bool mutableBorrow = match(TokenKind::Mut);
+        return std::make_unique<Expression>(Expression{
+            token.location, AddressExpr{mutableBorrow, unary()}});
+    }
+    if (match(TokenKind::Star)) {
+        const Token token = previous();
+        return std::make_unique<Expression>(Expression{
+            token.location, DereferenceExpr{unary()}});
+    }
     if (match(TokenKind::Minus) || match(TokenKind::Plus) || match(TokenKind::Bang)) {
         const Token op = previous();
         expressionContinuation();

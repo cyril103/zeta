@@ -374,6 +374,10 @@ ValueId IrGenerator::expression(
             ir_.instructions.push_back(IrIndexLoad{output, array, index,
                                                    node.array->inferredType});
             return output;
+        } else if constexpr (std::is_same_v<T, AddressExpr> ||
+                             std::is_same_v<T, DereferenceExpr>) {
+            throw CompileError(expressionNode.location,
+                               "la génération des références n'est pas encore disponible");
         } else if constexpr (std::is_same_v<T, NameExpr>) {
             if (const auto parameter = parameters.find(node.name);
                 parameter != parameters.end()) {

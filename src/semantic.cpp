@@ -192,6 +192,13 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
             const ValueType arrayType = inferType(*node.array);
             return arrayType.kind == ValueType::Kind::Array ? *arrayType.element : ValueType::Int;
         }
+        else if constexpr (std::is_same_v<T, AddressExpr>)
+            return ValueType(std::make_shared<ValueType>(inferType(*node.operand)),
+                             node.mutableBorrow);
+        else if constexpr (std::is_same_v<T, DereferenceExpr>) {
+            const ValueType reference = inferType(*node.operand);
+            return reference.kind == ValueType::Kind::Reference ? *reference.element : ValueType::Int;
+        }
         else if constexpr (std::is_same_v<T, NameExpr> || std::is_same_v<T, CallExpr>) {
             const SemanticSymbol* symbol = symbols_.lookup(node.name);
             return symbol == nullptr ? ValueType::Int : symbol->type;
@@ -264,6 +271,19 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                     " hors limites pour " + typeName(arrayType));
             }
             return *arrayType.element;
+        }
+        else if constexpr (std::is_same_v<T, AddressExpr>) {
+            const ValueType operandType = inferType(*node.operand);
+            checkExpression(*node.operand, operandType);
+            return ValueType(std::make_shared<ValueType>(operandType), node.mutableBorrow);
+        }
+        else if constexpr (std::is_same_v<T, DereferenceExpr>) {
+            const ValueType reference = inferType(*node.operand);
+            if (reference.kind != ValueType::Kind::Reference)
+                throw CompileError(expression.location,
+                                   "le déréférencement exige une référence");
+            checkExpression(*node.operand, reference);
+            return *reference.element;
         }
         else if constexpr (std::is_same_v<T, NameExpr>) {
             const SemanticSymbol* symbol = symbols_.lookup(node.name);

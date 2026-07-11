@@ -89,6 +89,8 @@ struct CharacterExpr { std::uint32_t value; };
 struct StringExpr { std::string utf8; };
 struct ArrayExpr { std::vector<ExprPtr> elements; };
 struct IndexExpr { ExprPtr array; ExprPtr index; };
+struct AddressExpr { bool mutableBorrow; ExprPtr operand; };
+struct DereferenceExpr { ExprPtr operand; };
 struct NameExpr { std::string name; };
 struct CallExpr { std::string name; std::vector<ExprPtr> arguments; };
 struct ConversionExpr { ValueType target; ExprPtr operand; };
@@ -99,7 +101,7 @@ struct IfExpr { ExprPtr condition; ExprPtr thenBranch; ExprPtr elseBranch; };
 
 struct Expression {
     SourceLocation location;
-    std::variant<IntegerExpr, DoubleExpr, BoolExpr, CharacterExpr, StringExpr, ArrayExpr, IndexExpr, NameExpr, CallExpr, ConversionExpr,
+    std::variant<IntegerExpr, DoubleExpr, BoolExpr, CharacterExpr, StringExpr, ArrayExpr, IndexExpr, AddressExpr, DereferenceExpr, NameExpr, CallExpr, ConversionExpr,
                  UnaryExpr, BinaryExpr, BlockExpr, IfExpr> value;
     ValueType inferredType{ValueType::Int};
     bool typed{false};
