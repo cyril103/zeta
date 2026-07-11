@@ -1,0 +1,4 @@
+// Entrées/sorties standard de Zeta.
+// Les fonctions renvoient le nombre d'octets écrits, ou un code système négatif.
+pub native def print (value : String) : Int
+pub native def println (value : String) : Int

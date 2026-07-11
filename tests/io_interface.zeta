@@ -1,0 +1,3 @@
+import io
+
+def main () : Int = 0

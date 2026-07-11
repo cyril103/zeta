@@ -216,6 +216,12 @@ if(BUILD_TESTING)
     add_test(NAME run_stdlib_lookup COMMAND ${CMAKE_CURRENT_BINARY_DIR}/stdlib-lookup)
     set_tests_properties(run_stdlib_lookup PROPERTIES DEPENDS compile_stdlib_lookup)
 
+    add_test(NAME compile_io_interface COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/io_interface.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/io-interface)
+    add_test(NAME run_io_interface COMMAND ${CMAKE_CURRENT_BINARY_DIR}/io-interface)
+    set_tests_properties(run_io_interface PROPERTIES DEPENDS compile_io_interface)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
