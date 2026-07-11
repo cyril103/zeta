@@ -11,6 +11,7 @@
 #include <string>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -35,6 +36,23 @@ void runFasm(const fs::path& assembly, const fs::path& executable) {
     if (waitpid(child, &status, 0) < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
         throw std::runtime_error("FASM n'a pas pu produire l'exécutable");
     }
+}
+
+void runLinker(const std::vector<fs::path>& objects, const fs::path& executable) {
+    const pid_t child = fork();
+    if (child < 0) throw std::runtime_error("impossible de lancer ld");
+    if (child == 0) {
+        std::vector<std::string> arguments{"ld", "-e", "start", "-o", executable.string()};
+        for (const fs::path& object : objects) arguments.push_back(object.string());
+        std::vector<char*> rawArguments;
+        for (std::string& argument : arguments) rawArguments.push_back(argument.data());
+        rawArguments.push_back(nullptr);
+        execvp("ld", rawArguments.data());
+        _exit(127);
+    }
+    int status{};
+    if (waitpid(child, &status, 0) < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0)
+        throw std::runtime_error("ld n'a pas pu lier l'exécutable");
 }
 
 void usage() {
@@ -102,6 +120,7 @@ int main(int argc, char** argv) {
         fs::path moduleDirectory = outputPath;
         moduleDirectory += ".modules";
         fs::create_directories(moduleDirectory);
+        std::vector<fs::path> objects{objectPath};
         for (const std::string& moduleName : modules.compilationOrder) {
             const std::string symbol = "zeta_module_" + moduleName;
             const fs::path moduleAssembly = moduleDirectory / (moduleName + ".asm");
@@ -109,8 +128,9 @@ int main(int argc, char** argv) {
             writeFile(moduleAssembly,
                 "format ELF64\nsection '.rodata'\npublic " + symbol + "\n" + symbol + ": db 0\n");
             runFasm(moduleAssembly, moduleObject);
+            objects.push_back(moduleObject);
         }
-        runFasm(assemblyPath, outputPath);
+        runLinker(objects, outputPath);
         fs::permissions(outputPath,
                         fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
                         fs::perm_options::add);
