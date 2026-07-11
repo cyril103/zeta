@@ -13,10 +13,12 @@ enum class TokenKind {
     DoubleType,
     BoolType,
     CharType,
+    StringType,
     Identifier,
     Integer,
     Floating,
     Character,
+    String,
     True,
     False,
     If,
@@ -66,10 +68,12 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::DoubleType: return "'Double'";
     case TokenKind::BoolType: return "'Bool'";
     case TokenKind::CharType: return "'Char'";
+    case TokenKind::StringType: return "'String'";
     case TokenKind::Identifier: return "un identifiant";
     case TokenKind::Integer: return "un entier";
     case TokenKind::Floating: return "un nombre à virgule flottante";
     case TokenKind::Character: return "un caractère";
+    case TokenKind::String: return "une chaîne de caractères";
     case TokenKind::True: return "'true'";
     case TokenKind::False: return "'false'";
     case TokenKind::If: return "'if'";

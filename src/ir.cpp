@@ -59,11 +59,13 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
     for (const Declaration* function : functions) {
         ir_.instructions.push_back(IrFunctionStart{function->name});
         std::unordered_map<std::string, ValueId> parameters;
+        std::size_t stackOffset = 16U;
         for (std::size_t i = 0; i < function->parameters.size(); ++i) {
             const Parameter& parameter = function->parameters[i];
             const ValueId value = nextValue(parameter.type);
             parameters.emplace(parameter.name, value);
-            ir_.instructions.push_back(IrParameter{value, i, parameter.type});
+            ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameter.type});
+            stackOffset += parameter.type == ValueType::String ? 16U : 8U;
         }
         emitTailExpression(*function->initializer, parameters, *function);
     }
@@ -222,6 +224,10 @@ ValueId IrGenerator::expression(
             ir_.instructions.push_back(IrConst{output, static_cast<std::int32_t>(node.value),
                                                ValueType::Char});
             return output;
+        } else if constexpr (std::is_same_v<T, StringExpr>) {
+            const ValueId output = nextValue(ValueType::String);
+            ir_.instructions.push_back(IrStringConst{output, node.utf8});
+            return output;
         } else if constexpr (std::is_same_v<T, NameExpr>) {
             if (const auto parameter = parameters.find(node.name);
                 parameter != parameters.end()) {
@@ -375,7 +381,8 @@ std::string IrGenerator::print(const IrProgram& program) {
         if (type == ValueType::Byte) return "u8";
         if (type == ValueType::Double) return "f64";
         if (type == ValueType::Bool) return "i1";
-        return "u32";
+        if (type == ValueType::Char) return "u32";
+        return "string";
     };
     out << "module {\n";
     for (std::size_t i = 0; i < program.slots.size(); ++i) {
@@ -391,6 +398,9 @@ std::string IrGenerator::print(const IrProgram& program) {
                     << ' ' << item.value << '\n';
             else if constexpr (std::is_same_v<T, IrDoubleConst>)
                 out << "  $" << item.output << " = const.f64 " << item.value << '\n';
+            else if constexpr (std::is_same_v<T, IrStringConst>)
+                out << "  $" << item.output << " = const.string " << item.utf8.size()
+                    << " bytes\n";
             else if constexpr (std::is_same_v<T, IrLoad>)
                 out << "  $" << item.output << " = load."
                     << suffix(item.type) << " %" << program.slots[item.slot].name << '\n';

@@ -7,6 +7,81 @@
 #include <limits>
 
 namespace {
+void appendUtf8(std::string& output, std::uint32_t value) {
+    if (value <= 0x7FU) output.push_back(static_cast<char>(value));
+    else if (value <= 0x7FFU) {
+        output.push_back(static_cast<char>(0xC0U | (value >> 6U)));
+        output.push_back(static_cast<char>(0x80U | (value & 0x3FU)));
+    } else if (value <= 0xFFFFU) {
+        output.push_back(static_cast<char>(0xE0U | (value >> 12U)));
+        output.push_back(static_cast<char>(0x80U | ((value >> 6U) & 0x3FU)));
+        output.push_back(static_cast<char>(0x80U | (value & 0x3FU)));
+    } else {
+        output.push_back(static_cast<char>(0xF0U | (value >> 18U)));
+        output.push_back(static_cast<char>(0x80U | ((value >> 12U) & 0x3FU)));
+        output.push_back(static_cast<char>(0x80U | ((value >> 6U) & 0x3FU)));
+        output.push_back(static_cast<char>(0x80U | (value & 0x3FU)));
+    }
+}
+
+std::pair<std::uint32_t, std::size_t> decodeUtf8(std::string_view text, std::size_t offset) {
+    const auto first = static_cast<unsigned char>(text[offset]);
+    if (first < 0x80) return {first, 1};
+    const std::size_t length = (first & 0xE0) == 0xC0 ? 2 :
+        (first & 0xF0) == 0xE0 ? 3 : (first & 0xF8) == 0xF0 ? 4 : 0;
+    if (length == 0 || offset + length > text.size()) return {0, 0};
+    std::uint32_t value = first & ((1U << (7U - static_cast<unsigned>(length))) - 1U);
+    for (std::size_t i = 1; i < length; ++i) {
+        const auto next = static_cast<unsigned char>(text[offset + i]);
+        if ((next & 0xC0) != 0x80) return {0, 0};
+        value = (value << 6U) | (next & 0x3FU);
+    }
+    const std::uint32_t minimum = length == 2 ? 0x80U : length == 3 ? 0x800U : 0x10000U;
+    if (value < minimum || value > 0x10FFFFU || (value >= 0xD800U && value <= 0xDFFFU))
+        return {0, 0};
+    return {value, length};
+}
+
+std::string decodeString(const Token& token) {
+    const std::string_view body = std::string_view(token.text).substr(1, token.text.size() - 2);
+    std::string output;
+    for (std::size_t i = 0; i < body.size();) {
+        if (body[i] != '\\') {
+            const auto [value, length] = decodeUtf8(body, i);
+            if (length == 0)
+                throw CompileError(token.location, "séquence UTF-8 invalide dans le littéral String");
+            appendUtf8(output, value);
+            i += length;
+            continue;
+        }
+        if (++i >= body.size())
+            throw CompileError(token.location, "échappement incomplet dans le littéral String");
+        const char escape = body[i++];
+        if (escape == 'n') output.push_back('\n');
+        else if (escape == 'r') output.push_back('\r');
+        else if (escape == 't') output.push_back('\t');
+        else if (escape == '0') output.push_back('\0');
+        else if (escape == '\\') output.push_back('\\');
+        else if (escape == '"') output.push_back('"');
+        else if (escape == 'u' && i < body.size() && body[i] == '{') {
+            const std::size_t digitsBegin = ++i;
+            while (i < body.size() && body[i] != '}') ++i;
+            std::uint32_t value = 0;
+            const auto result = std::from_chars(body.data() + digitsBegin, body.data() + i,
+                                                value, 16);
+            if (digitsBegin == i || i == body.size() || result.ec != std::errc{} ||
+                result.ptr != body.data() + i || value > 0x10FFFFU ||
+                (value >= 0xD800U && value <= 0xDFFFU))
+                throw CompileError(token.location, "échappement Unicode invalide dans le littéral String");
+            ++i;
+            appendUtf8(output, value);
+        } else {
+            throw CompileError(token.location, "échappement inconnu dans le littéral String");
+        }
+    }
+    return output;
+}
+
 std::uint32_t decodeCharacter(const Token& token) {
     const std::string_view text(token.text);
     const std::string_view body = text.substr(1, text.size() - 2);
@@ -73,6 +148,7 @@ ValueType Parser::consumeType(const std::string& message) {
     if (match(TokenKind::DoubleType)) return ValueType::Double;
     if (match(TokenKind::BoolType)) return ValueType::Bool;
     if (match(TokenKind::CharType)) return ValueType::Char;
+    if (match(TokenKind::StringType)) return ValueType::String;
     throw CompileError(peek().location, message + ", reçu " + tokenName(peek().kind));
 }
 
@@ -172,7 +248,7 @@ Declaration Parser::declaration(BindingKind kind) {
                                                      "nom de paramètre attendu");
                 consume(TokenKind::Colon, "':' attendu après le paramètre");
                 const ValueType parameterType = consumeType(
-                    "type 'Int', 'Byte', 'Double' ou 'Bool' attendu pour le paramètre");
+                    "type attendu pour le paramètre");
                 parameters.push_back(Parameter{parameterName.location,
                                                parameterName.text,
                                                parameterType});
@@ -181,7 +257,7 @@ Declaration Parser::declaration(BindingKind kind) {
         consume(TokenKind::RightParen, "')' attendue après les paramètres");
     }
     consume(TokenKind::Colon, "':' attendu après l'identifiant");
-    const ValueType type = consumeType("type 'Int', 'Byte', 'Double' ou 'Bool' attendu");
+    const ValueType type = consumeType("type attendu");
     consume(TokenKind::Equal, "'=' attendu après le type");
     return Declaration{start.location, name.text, type, kind, callable,
                        std::move(parameters), expression()};
@@ -287,12 +363,13 @@ ExprPtr Parser::primary() {
     }
     if (match(TokenKind::IntType) || match(TokenKind::ByteType) ||
         match(TokenKind::DoubleType) || match(TokenKind::BoolType) ||
-        match(TokenKind::CharType)) {
+        match(TokenKind::CharType) || match(TokenKind::StringType)) {
         const Token token = previous();
         const ValueType target = token.kind == TokenKind::IntType ? ValueType::Int :
             token.kind == TokenKind::ByteType ? ValueType::Byte :
             token.kind == TokenKind::DoubleType ? ValueType::Double :
-            token.kind == TokenKind::BoolType ? ValueType::Bool : ValueType::Char;
+            token.kind == TokenKind::BoolType ? ValueType::Bool :
+            token.kind == TokenKind::CharType ? ValueType::Char : ValueType::String;
         consume(TokenKind::LeftParen, "'(' attendue après le type de conversion");
         expressionContinuation();
         ExprPtr operand = expression();
@@ -314,6 +391,11 @@ ExprPtr Parser::primary() {
         const Token token = previous();
         return std::make_unique<Expression>(Expression{
             token.location, CharacterExpr{decodeCharacter(token)}});
+    }
+    if (match(TokenKind::String)) {
+        const Token token = previous();
+        return std::make_unique<Expression>(Expression{
+            token.location, StringExpr{decodeString(token)}});
     }
     if (match(TokenKind::Floating)) {
         const Token token = previous();

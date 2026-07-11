@@ -9,9 +9,13 @@ namespace {
 std::size_t align16(std::size_t value) { return (value + 15U) & ~std::size_t{15U}; }
 std::size_t typeSize(ValueType type) {
     if (type == ValueType::Byte || type == ValueType::Bool) return 1U;
+    if (type == ValueType::String) return 16U;
     return type == ValueType::Double ? 8U : 4U;
 }
-std::size_t valueSize(ValueType type) { return type == ValueType::Double ? 8U : 4U; }
+std::size_t valueSize(ValueType type) {
+    if (type == ValueType::String) return 16U;
+    return type == ValueType::Double ? 8U : 4U;
+}
 std::size_t slotBytes(const IrProgram& program) {
     std::size_t size = 0;
     for (const IrSlot& slot : program.slots)
@@ -62,12 +66,23 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
             } else if constexpr (std::is_same_v<T, IrDoubleConst>) {
                 out << "    movsd xmm0, qword [double_const_" << item.output << "]\n"
                     << "    movsd qword [rbp-" << valueOffset(program, item.output) << "], xmm0\n";
+            } else if constexpr (std::is_same_v<T, IrStringConst>) {
+                const std::size_t offset = valueOffset(program, item.output);
+                out << "    lea rax, [string_const_" << item.output << "]\n"
+                    << "    mov qword [rbp-" << offset << "], rax\n"
+                    << "    mov qword [rbp-" << offset - 8U << "], " << item.utf8.size() << '\n';
             } else if constexpr (std::is_same_v<T, IrLoad>) {
                 const IrSlot& slot = program.slots[item.slot];
                 const std::string address = slot.global
                     ? "[global_slot_" + std::to_string(item.slot) + "]"
                     : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
-                if (item.type == ValueType::Double) {
+                if (item.type == ValueType::String) {
+                    const std::size_t offset = valueOffset(program, item.output);
+                    out << "    mov rax, qword " << address << "\n"
+                        << "    mov qword [rbp-" << offset << "], rax\n"
+                        << "    mov rax, qword " << address.substr(0, address.size() - 1) << "+8]\n"
+                        << "    mov qword [rbp-" << offset - 8U << "], rax\n";
+                } else if (item.type == ValueType::Double) {
                     out << "    movsd xmm0, qword " << address << "\n"
                         << "    movsd qword [rbp-" << valueOffset(program, item.output) << "], xmm0\n";
                 } else if (item.type == ValueType::Byte || item.type == ValueType::Bool) {
@@ -79,7 +94,14 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 }
             } else if constexpr (std::is_same_v<T, IrConvert>) {
                 if (item.source == item.target) {
-                    if (item.target == ValueType::Double) {
+                    if (item.target == ValueType::String) {
+                        const std::size_t input = valueOffset(program, item.input);
+                        const std::size_t output = valueOffset(program, item.output);
+                        out << "    mov rax, qword [rbp-" << input << "]\n"
+                            << "    mov qword [rbp-" << output << "], rax\n"
+                            << "    mov rax, qword [rbp-" << input - 8U << "]\n"
+                            << "    mov qword [rbp-" << output - 8U << "], rax\n";
+                    } else if (item.target == ValueType::Double) {
                         out << "    mov rax, qword [rbp-" << valueOffset(program, item.input) << "]\n"
                             << "    mov qword [rbp-" << valueOffset(program, item.output) << "], rax\n";
                     } else {
@@ -129,6 +151,31 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     out << "    mov eax, dword [rbp-" << valueOffset(program, item.left) << "]\n"
                         << "    " << (item.op == "&&" ? "and" : "or")
                         << " eax, dword [rbp-" << valueOffset(program, item.right) << "]\n"
+                        << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
+                    return;
+                }
+                if (comparison && item.operandType == ValueType::String) {
+                    const std::size_t left = valueOffset(program, item.left);
+                    const std::size_t right = valueOffset(program, item.right);
+                    out << "    mov rcx, qword [rbp-" << left - 8U << "]\n"
+                        << "    cmp rcx, qword [rbp-" << right - 8U << "]\n"
+                        << "    jne ir_string_different_" << item.output << "\n"
+                        << "    mov rsi, qword [rbp-" << left << "]\n"
+                        << "    mov rdi, qword [rbp-" << right << "]\n"
+                        << "    test rcx, rcx\n"
+                        << "    je ir_string_equal_" << item.output << "\n"
+                        << "ir_string_compare_" << item.output << ":\n"
+                        << "    mov al, byte [rsi]\n"
+                        << "    cmp al, byte [rdi]\n"
+                        << "    jne ir_string_different_" << item.output << "\n"
+                        << "    inc rsi\n    inc rdi\n    dec rcx\n"
+                        << "    jne ir_string_compare_" << item.output << "\n"
+                        << "ir_string_equal_" << item.output << ":\n"
+                        << "    mov eax, " << (item.op == "==" ? 1 : 0) << "\n"
+                        << "    jmp ir_string_done_" << item.output << "\n"
+                        << "ir_string_different_" << item.output << ":\n"
+                        << "    mov eax, " << (item.op == "==" ? 0 : 1) << "\n"
+                        << "ir_string_done_" << item.output << ":\n"
                         << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
                     return;
                 }
@@ -188,7 +235,13 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 const std::string address = slot.global
                     ? "[global_slot_" + std::to_string(item.slot) + "]"
                     : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
-                if (item.type == ValueType::Double) {
+                if (item.type == ValueType::String) {
+                    const std::size_t source = valueOffset(program, item.value);
+                    out << "    mov rax, qword [rbp-" << source << "]\n"
+                        << "    mov qword " << address << ", rax\n"
+                        << "    mov rax, qword [rbp-" << source - 8U << "]\n"
+                        << "    mov qword " << address.substr(0, address.size() - 1) << "+8], rax\n";
+                } else if (item.type == ValueType::Double) {
                     out << "    movsd xmm0, qword [rbp-" << valueOffset(program, item.value) << "]\n"
                         << "    movsd qword " << address << ", xmm0\n";
                 } else {
@@ -198,7 +251,14 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         << (item.type == ValueType::Byte || item.type == ValueType::Bool ? "al\n" : "eax\n");
                 }
             } else if constexpr (std::is_same_v<T, IrCopy>) {
-                if (item.type == ValueType::Double) {
+                if (item.type == ValueType::String) {
+                    const std::size_t input = valueOffset(program, item.input);
+                    const std::size_t output = valueOffset(program, item.output);
+                    out << "    mov rax, qword [rbp-" << input << "]\n"
+                        << "    mov qword [rbp-" << output << "], rax\n"
+                        << "    mov rax, qword [rbp-" << input - 8U << "]\n"
+                        << "    mov qword [rbp-" << output - 8U << "], rax\n";
+                } else if (item.type == ValueType::Double) {
                     out << "    mov rax, qword [rbp-" << valueOffset(program, item.input) << "]\n"
                         << "    mov qword [rbp-" << valueOffset(program, item.output) << "], rax\n";
                 } else {
@@ -207,7 +267,11 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 }
             } else if constexpr (std::is_same_v<T, IrCall>) {
                 for (std::size_t i = item.arguments.size(); i-- > 0;) {
-                    if (item.argumentTypes[i] == ValueType::Double) {
+                    if (item.argumentTypes[i] == ValueType::String) {
+                        const std::size_t offset = valueOffset(program, item.arguments[i]);
+                        out << "    push qword [rbp-" << offset - 8U << "]\n"
+                            << "    push qword [rbp-" << offset << "]\n";
+                    } else if (item.argumentTypes[i] == ValueType::Double) {
                         out << "    sub rsp, 8\n"
                             << "    movsd xmm0, qword [rbp-" << valueOffset(program, item.arguments[i]) << "]\n"
                             << "    movsd qword [rsp], xmm0\n";
@@ -217,20 +281,35 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     }
                 }
                 out << "    call zeta_fn_" << item.function << '\n';
-                if (!item.arguments.empty()) out << "    add rsp, " << item.arguments.size() * 8U << '\n';
-                if (item.returnType == ValueType::Double)
+                std::size_t argumentBytes = 0;
+                for (ValueType type : item.argumentTypes)
+                    argumentBytes += type == ValueType::String ? 16U : 8U;
+                if (argumentBytes != 0) out << "    add rsp, " << argumentBytes << '\n';
+                if (item.returnType == ValueType::String) {
+                    const std::size_t offset = valueOffset(program, item.output);
+                    out << "    mov qword [rbp-" << offset << "], rax\n"
+                        << "    mov qword [rbp-" << offset - 8U << "], rdx\n";
+                } else if (item.returnType == ValueType::Double)
                     out << "    movsd qword [rbp-" << valueOffset(program, item.output) << "], xmm0\n";
                 else
                     out << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
             } else if constexpr (std::is_same_v<T, IrTailCall>) {
+                std::size_t stackOffset = 16U;
                 for (std::size_t i = 0; i < item.arguments.size(); ++i) {
-                    if (item.argumentTypes[i] == ValueType::Double) {
+                    if (item.argumentTypes[i] == ValueType::String) {
+                        const std::size_t source = valueOffset(program, item.arguments[i]);
+                        out << "    mov rax, qword [rbp-" << source << "]\n"
+                            << "    mov rdx, qword [rbp-" << source - 8U << "]\n"
+                            << "    mov qword [rbp+" << stackOffset << "], rax\n"
+                            << "    mov qword [rbp+" << stackOffset + 8U << "], rdx\n";
+                    } else if (item.argumentTypes[i] == ValueType::Double) {
                         out << "    movsd xmm0, qword [rbp-" << valueOffset(program, item.arguments[i]) << "]\n"
-                            << "    movsd qword [rbp+" << 16U + i * 8U << "], xmm0\n";
+                            << "    movsd qword [rbp+" << stackOffset << "], xmm0\n";
                     } else {
                         out << "    mov eax, dword [rbp-" << valueOffset(program, item.arguments[i]) << "]\n"
-                            << "    mov dword [rbp+" << 16U + i * 8U << "], eax\n";
+                            << "    mov dword [rbp+" << stackOffset << "], eax\n";
                     }
+                    stackOffset += item.argumentTypes[i] == ValueType::String ? 16U : 8U;
                 }
                 out << "    jmp zeta_fn_" << item.function << "_body\n";
             } else if constexpr (std::is_same_v<T, IrFunctionStart>) {
@@ -240,15 +319,25 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 if (frameSize != 0) out << "    sub rsp, " << frameSize << '\n';
                 out << "zeta_fn_" << item.name << "_body:\n";
             } else if constexpr (std::is_same_v<T, IrParameter>) {
-                if (item.type == ValueType::Double) {
-                    out << "    movsd xmm0, qword [rbp+" << 16U + item.index * 8U << "]\n"
+                if (item.type == ValueType::String) {
+                    const std::size_t offset = valueOffset(program, item.output);
+                    out << "    mov rax, qword [rbp+" << item.stackOffset << "]\n"
+                        << "    mov qword [rbp-" << offset << "], rax\n"
+                        << "    mov rax, qword [rbp+" << item.stackOffset + 8U << "]\n"
+                        << "    mov qword [rbp-" << offset - 8U << "], rax\n";
+                } else if (item.type == ValueType::Double) {
+                    out << "    movsd xmm0, qword [rbp+" << item.stackOffset << "]\n"
                         << "    movsd qword [rbp-" << valueOffset(program, item.output) << "], xmm0\n";
                 } else {
-                    out << "    mov eax, dword [rbp+" << 16U + item.index * 8U << "]\n"
+                    out << "    mov eax, dword [rbp+" << item.stackOffset << "]\n"
                         << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
                 }
             } else if constexpr (std::is_same_v<T, IrReturn>) {
-                if (item.type == ValueType::Double)
+                if (item.type == ValueType::String) {
+                    const std::size_t offset = valueOffset(program, item.value);
+                    out << "    mov rax, qword [rbp-" << offset << "]\n"
+                        << "    mov rdx, qword [rbp-" << offset - 8U << "]\n";
+                } else if (item.type == ValueType::Double)
                     out << "    movsd xmm0, qword [rbp-" << valueOffset(program, item.value) << "]\n";
                 else
                     out << "    mov eax, dword [rbp-" << valueOffset(program, item.value) << "]\n";
@@ -270,21 +359,33 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
     }
 
     bool hasDoubleConstants = false;
+    bool hasStringConstants = false;
     for (const IrInstruction& instruction : program.instructions)
-        hasDoubleConstants = hasDoubleConstants || std::holds_alternative<IrDoubleConst>(instruction);
+        if (std::holds_alternative<IrDoubleConst>(instruction)) hasDoubleConstants = true;
+        else if (std::holds_alternative<IrStringConst>(instruction)) hasStringConstants = true;
     bool hasGlobals = false;
     for (const IrSlot& slot : program.slots) hasGlobals = hasGlobals || slot.global;
-    if (hasDoubleConstants || hasGlobals) {
+    if (hasDoubleConstants || hasStringConstants || hasGlobals) {
         out << "\nsegment readable" << (hasGlobals ? " writeable" : "") << "\n";
         for (const IrInstruction& instruction : program.instructions) {
             if (const auto* item = std::get_if<IrDoubleConst>(&instruction))
                 out << "double_const_" << item->output << ": dq "
                     << formatDouble(item->value) << '\n';
+            if (const auto* item = std::get_if<IrStringConst>(&instruction)) {
+                out << "string_const_" << item->output << ": db ";
+                if (item->utf8.empty()) out << '0';
+                else for (std::size_t i = 0; i < item->utf8.size(); ++i) {
+                    if (i != 0) out << ", ";
+                    out << static_cast<unsigned>(static_cast<unsigned char>(item->utf8[i]));
+                }
+                out << '\n';
+            }
         }
         for (std::size_t i = 0; i < program.slots.size(); ++i) {
             if (!program.slots[i].global) continue;
             out << "global_slot_" << i << ": "
-                << (program.slots[i].type == ValueType::Double ? "rq 1" :
+                << (program.slots[i].type == ValueType::String ? "rq 2" :
+                    program.slots[i].type == ValueType::Double ? "rq 1" :
                     (program.slots[i].type == ValueType::Int ||
                      program.slots[i].type == ValueType::Char) ? "rd 1" : "rb 1") << '\n';
         }

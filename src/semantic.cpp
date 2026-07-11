@@ -121,6 +121,7 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
         else if constexpr (std::is_same_v<T, DoubleExpr>) return ValueType::Double;
         else if constexpr (std::is_same_v<T, BoolExpr>) return ValueType::Bool;
         else if constexpr (std::is_same_v<T, CharacterExpr>) return ValueType::Char;
+        else if constexpr (std::is_same_v<T, StringExpr>) return ValueType::String;
         else if constexpr (std::is_same_v<T, NameExpr> || std::is_same_v<T, CallExpr>) {
             const SemanticSymbol* symbol = symbols_.lookup(node.name);
             return symbol == nullptr ? ValueType::Int : symbol->type;
@@ -151,11 +152,13 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (expected == ValueType::Byte && node.value > 255)
                 throw CompileError(expression.location, "le littéral " +
                     std::to_string(node.value) + " dépasse l'intervalle Byte (0..255)");
-            if (expected == ValueType::Char) return ValueType::Int;
+            if (expected == ValueType::Char || expected == ValueType::String)
+                return ValueType::Int;
             return expected;
         } else if constexpr (std::is_same_v<T, DoubleExpr>) return ValueType::Double;
         else if constexpr (std::is_same_v<T, BoolExpr>) return ValueType::Bool;
         else if constexpr (std::is_same_v<T, CharacterExpr>) return ValueType::Char;
+        else if constexpr (std::is_same_v<T, StringExpr>) return ValueType::String;
         else if constexpr (std::is_same_v<T, NameExpr>) {
             const SemanticSymbol* symbol = symbols_.lookup(node.name);
             if (symbol == nullptr)
@@ -206,9 +209,11 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (TypeRules::isComparison(node.op)) {
                 const ValueType operands = TypeRules::commonOperandType(
                     inferType(*node.left), inferType(*node.right));
-                if (TypeRules::isOrdering(node.op) && operands == ValueType::Bool)
+                if (TypeRules::isOrdering(node.op) &&
+                    (operands == ValueType::Bool || operands == ValueType::String))
                     throw CompileError(expression.location,
-                                       "seuls '==' et '!=' sont autorisés sur Bool");
+                                       "seuls '==' et '!=' sont autorisés sur " +
+                                           typeName(operands));
                 checkExpression(*node.left, operands);
                 checkExpression(*node.right, operands);
                 return ValueType::Bool;

@@ -1,0 +1,12 @@
+val salutation : String = "hé🚀"
+val equivalent : String = "h\u{E9}\u{1F680}"
+val vide : String = ""
+
+def choisir (code : Int, texte : String, actif : Bool) : String = if (actif && code == 7) texte else "erreur"
+def transmettre (n : Int, texte : String) : String = if (n == 0) texte else transmettre(n - 1, texte)
+
+def main () : Int = {
+    var copie : String = salutation
+    copie = transmettre(4, choisir(7, equivalent, true))
+    if (copie == salutation && vide == "" && copie != "erreur") 0 else 1
+}

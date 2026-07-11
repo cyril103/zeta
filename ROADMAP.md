@@ -25,7 +25,7 @@ Le langage prend actuellement en charge :
 - `var` pour les variables réaffectables ;
 - `def` pour les définitions paresseuses et les fonctions typées ;
 - les blocs d'expressions avec portée locale ;
-- les types `Int`, `Byte`, `Double` et `Bool` ;
+- les types `Int`, `Byte`, `Double`, `Bool`, `Char` et `String` ;
 - l'arithmétique `+`, `-`, `*`, `/` ;
 - les comparaisons `==`, `!=`, `<`, `>`, `<=`, `>=` ;
 - les opérateurs logiques `&&`, `||`, `!` avec court-circuit ;
@@ -157,10 +157,10 @@ continue
 
 Une boucle `for` pourra être étudiée après stabilisation de ces instructions.
 
-## Phase 6 — Type String
+## Phase 6 — Type String (en cours)
 
-Le type `Char`, représentant un point de code Unicode sur 32 bits, est disponible
-en préparation de cette phase. Les futures chaînes utiliseront UTF-8.
+Le type `String` immuable est disponible. Il utilise UTF-8 et une représentation
+de 16 octets `{adresse, longueur en octets}`.
 
 Syntaxe envisagée :
 
@@ -168,13 +168,20 @@ Syntaxe envisagée :
 val message : String = "Bonjour Zeta"
 ```
 
-Travail nécessaire :
+Disponible :
 
-- lexer les chaînes et leurs séquences d'échappement ;
-- choisir une représentation mémoire avec adresse et longueur ;
-- générer les constantes dans une section de données ;
-- ajouter l'affichage ;
-- définir l'égalité et la concaténation.
+- littéraux et séquences d'échappement avec validation Unicode stricte ;
+- constantes dans la section de données ;
+- variables globales et locales ;
+- paramètres et retours de fonctions ;
+- égalité et différence exactes sur les octets UTF-8.
+
+Prochaines étapes :
+
+- exposer les longueurs en octets et en points de code ;
+- ajouter l'accès contrôlé à un `Char` ;
+- introduire un runtime et une politique de propriété pour la concaténation ;
+- ajouter l'affichage et les sous-chaînes.
 
 ## Phase 7 — Structures de données
 

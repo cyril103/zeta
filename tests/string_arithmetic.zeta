@@ -1,0 +1,4 @@
+def main () : Int = {
+    val invalide : String = "a" + "b"
+    0
+}

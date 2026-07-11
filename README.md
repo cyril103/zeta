@@ -59,7 +59,7 @@ Un `Bool` occupe un octet sur la stack. Il n'existe aucune conversion implicite
 avec les types numériques. Les opérateurs disponibles sont :
 
 - `==` et `!=` pour l'égalité et la différence sur tous les types ;
-- `<`, `>`, `<=` et `>=` pour l'ordre sur `Int`, `Byte` et `Double` ;
+- `<`, `>`, `<=` et `>=` pour l'ordre sur `Int`, `Byte`, `Double` et `Char` ;
 - `&&` et `||` pour le et/ou logique avec court-circuit ;
 - `!` pour la négation logique.
 
@@ -81,6 +81,39 @@ Les substituts `U+D800..U+DFFF` ne sont pas des valeurs `Char`. L'égalité et l
 comparaisons d'ordre sont disponibles, mais pas l'arithmétique. `Int(char)` donne
 le point de code et `Char(entier)` effectue la conversion inverse. Une valeur
 entière invalide est normalisée vers le caractère de remplacement `U+FFFD`.
+
+## Chaînes UTF-8
+
+`String` représente une chaîne immuable encodée en UTF-8. Une valeur occupe
+16 octets et contient deux champs machine : l'adresse du premier octet et la
+longueur en octets. La longueur ne compte donc ni les points de code Unicode ni
+les caractères visibles. Par exemple, `"hé🚀"` contient trois points de code mais
+sept octets.
+
+```text
+val vide : String = ""
+val message : String = "hé🚀"
+val equivalent : String = "h\u{E9}\u{1F680}"
+val ligne : String = "première\nseconde"
+```
+
+Les échappements disponibles sont `\n`, `\r`, `\t`, `\0`, `\\`, `\"` et
+`\u{...}`. Le compilateur valide strictement l'UTF-8 et les points de code ; les
+substituts `U+D800..U+DFFF` sont refusés. Les littéraux sont stockés dans la
+section de données de l'exécutable et restent valides pendant toute son
+exécution.
+
+Les chaînes peuvent être globales ou locales, affectées à une `var`, passées à
+une fonction et retournées par celle-ci. `==` et `!=` comparent d'abord la
+longueur, puis chaque octet. Cette égalité est exacte : aucune normalisation
+Unicode n'est effectuée, donc deux suites de points de code visuellement
+identiques peuvent rester différentes.
+
+`String` est pour l'instant non possédée : elle référence des données immuables
+et ne réalise aucune allocation dynamique. La concaténation, les sous-chaînes,
+la longueur publique et l'accès à un `Char` seront ajoutés avec le runtime de
+chaînes. En conséquence, l'arithmétique et les comparaisons d'ordre sont encore
+interdites sur `String`.
 
 ## Expressions conditionnelles
 
@@ -121,7 +154,7 @@ ne retourne aucune valeur.
 
 Un identifiant commence par une lettre ou `_`, puis contient des lettres, chiffres
 ou `_`. Les mots `val`, `var`, `def`, `if`, `else`, `while`, `do`, `Int`, `Byte`, `Double`,
-`Bool`, `true` et `false` sont réservés. Un identifiant
+`Bool`, `Char`, `String`, `true` et `false` sont réservés. Un identifiant
 ne peut jamais être redéclaré. Une déclaration `val` est
 immuable, tandis qu'une déclaration `var` peut être réaffectée sans créer un
 nouveau slot sur la stack :
