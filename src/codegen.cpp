@@ -618,7 +618,10 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 out << "double_const_" << item->output << ": dq "
                     << formatDouble(item->value) << '\n';
             if (const auto* item = std::get_if<IrStringConst>(&instruction)) {
-                out << "string_const_" << item->output << ": db ";
+                out << "string_object_" << item->output << ":\n"
+                    << "    dq -1\n"
+                    << "    dq " << item->utf8.size() << "\n"
+                    << "string_const_" << item->output << ": db ";
                 if (item->utf8.empty()) out << '0';
                 else for (std::size_t i = 0; i < item->utf8.size(); ++i) {
                     if (i != 0) out << ", ";

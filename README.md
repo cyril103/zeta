@@ -109,8 +109,9 @@ longueur, puis chaque octet. Cette égalité est exacte : aucune normalisation
 Unicode n'est effectuée, donc deux suites de points de code visuellement
 identiques peuvent rester différentes.
 
-`String` est pour l'instant non possédée : elle référence des données immuables
-et ne réalise aucune allocation dynamique. La concaténation, les sous-chaînes,
+`String` utilise une vue ABI `{données, longueur}`. Les octets des littéraux sont
+précédés par un en-tête statique compatible avec les futures chaînes allouées.
+La concaténation, les sous-chaînes,
 la longueur publique et l'accès à un `Char` seront ajoutés avec le runtime de
 chaînes. En conséquence, l'arithmétique et les comparaisons d'ordre sont encore
 interdites sur `String`.
