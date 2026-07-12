@@ -383,9 +383,19 @@ native def inspecte (values : Slice[Int]) : Int
 native def modifie (values : SliceMut[Byte]) : Int
 ```
 
-La création depuis un tableau, l'indexation et le passage effectif dans l'ABI
-seront activés dans les prochaines étapes. Les invariants retenus sont détaillés
-dans `docs/SLICE_DESIGN.md`.
+Une slice locale se crée explicitement depuis un tableau fixe emprunté :
+
+```text
+val lecture : Slice[Int] = Slice(&tableau)
+val écriture : SliceMut[Int] = SliceMut(&mut tableauMutable)
+```
+
+Cette opération ne copie aucun élément. La slice conserve l'emprunt du tableau
+jusqu'à sa dernière utilisation connue. Une `Slice[T]` peut être copiée et chaque
+copie prolonge cet emprunt ; une `SliceMut[T]` reste exclusive et non copiable. Le
+stockage global et le retour de slices restent interdits. L'indexation et le
+passage effectif dans l'ABI seront activés à l'étape suivante. Les invariants sont
+détaillés dans `docs/SLICE_DESIGN.md`.
 
 ## Expressions sur plusieurs lignes
 

@@ -516,6 +516,19 @@ ExprPtr Parser::primary() {
         return std::make_unique<Expression>(Expression{
             token.location, ArrayExpr{std::move(elements)}});
     }
+    if (match(TokenKind::SliceType) || match(TokenKind::SliceMutType)) {
+        const Token token = previous();
+        const bool mutableView = token.kind == TokenKind::SliceMutType;
+        const ValueType target(ValueType::Kind::Slice,
+                               std::make_shared<ValueType>(ValueType::Int), mutableView);
+        consume(TokenKind::LeftParen, "'(' attendue après le type de slice");
+        expressionContinuation();
+        ExprPtr operand = expression();
+        expressionContinuation();
+        consume(TokenKind::RightParen, "')' attendue après le tableau emprunté");
+        return std::make_unique<Expression>(Expression{
+            token.location, ConversionExpr{target, std::move(operand)}});
+    }
     if (match(TokenKind::IntType) || match(TokenKind::ByteType) ||
         match(TokenKind::DoubleType) || match(TokenKind::BoolType) ||
         match(TokenKind::CharType) || match(TokenKind::StringType)) {

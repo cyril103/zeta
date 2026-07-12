@@ -197,6 +197,59 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
             }
         }
     }
+    if (declaration.type.kind == ValueType::Kind::Slice && !declaration.nativeSymbol) {
+        if (declaration.callable)
+            throw CompileError(declaration.location,
+                               "le retour de slices n'est pas encore autorisé");
+        if (allowRecursion)
+            throw CompileError(declaration.location,
+                               "une slice ne peut pas être stockée globalement");
+        if (declaration.kind != BindingKind::Val)
+            throw CompileError(declaration.location,
+                               "une slice locale doit être déclarée avec 'val'");
+        const auto* source = std::get_if<NameExpr>(&declaration.initializer->value);
+        if (source != nullptr) {
+            if (declaration.type.mutableReference)
+                throw CompileError(declaration.location,
+                                   "une 'SliceMut' ne peut pas être copiée");
+            if (const auto original = referenceBorrows_.find(source->name);
+                original != referenceBorrows_.end()) {
+                ++borrows_[original->second.target].shared;
+                referenceBorrows_.insert_or_assign(declaration.name,
+                    ReferenceBorrow{original->second.target, false});
+                borrowScopes_.back().push_back(declaration.name);
+            }
+        }
+        const auto* conversion = std::get_if<ConversionExpr>(&declaration.initializer->value);
+        const auto* address = conversion == nullptr ? nullptr
+            : std::get_if<AddressExpr>(&conversion->operand->value);
+        const auto* borrowedName = address == nullptr ? nullptr
+            : std::get_if<NameExpr>(&address->operand->value);
+        if (source == nullptr &&
+            (conversion == nullptr || conversion->target.kind != ValueType::Kind::Slice ||
+             borrowedName == nullptr))
+            throw CompileError(declaration.location,
+                               "une slice doit être créée depuis un tableau emprunté");
+        if (borrowedName != nullptr) {
+            BorrowState& state = borrows_[borrowedName->name];
+            if (conversion->target.mutableReference) {
+                if (state.mutableBorrow || state.shared != 0)
+                    throw CompileError(declaration.location,
+                                       "emprunt mutable exclusif impossible pour '" +
+                                       borrowedName->name + "'");
+                state.mutableBorrow = true;
+            } else {
+                if (state.mutableBorrow)
+                    throw CompileError(declaration.location,
+                                       "'" + borrowedName->name +
+                                       "' possède déjà un emprunt mutable");
+                ++state.shared;
+            }
+            referenceBorrows_.insert_or_assign(declaration.name,
+                ReferenceBorrow{borrowedName->name, conversion->target.mutableReference});
+            borrowScopes_.back().push_back(declaration.name);
+        }
+    }
     if (declaration.callable && declaration.type.kind == ValueType::Kind::Array)
         throw CompileError(declaration.location,
                            "le retour d'un tableau par valeur n'est pas encore pris en charge");
@@ -539,10 +592,19 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             for (std::size_t i = 0; i < node.arguments.size(); ++i) {
                 const ValueType parameterType = symbol->declaration != nullptr
                     ? symbol->declaration->parameters[i].type : symbol->parameterTypes[i];
+                if (parameterType.kind == ValueType::Kind::Slice)
+                    throw CompileError(node.arguments[i]->location,
+                                       "le passage de slices dans l'ABI n'est pas encore disponible");
                 checkExpression(*node.arguments[i], parameterType);
             }
             return symbol->type;
         } else if constexpr (std::is_same_v<T, ConversionExpr>) {
+            if (node.target.kind == ValueType::Kind::Slice) {
+                if (expected.kind != ValueType::Kind::Slice ||
+                    expected.mutableReference != node.target.mutableReference)
+                    return node.target;
+                node.target = expected;
+            }
             const ValueType source = inferType(*node.operand);
             if (!TypeRules::canExplicitlyConvert(source, node.target)) {
                 throw CompileError(expression.location,

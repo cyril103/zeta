@@ -1,0 +1,7 @@
+def main () : Int = {
+    var values : [Int; 2] = [1, 2]
+    val view : Slice[Int] = Slice(&values)
+    values[0] = 42
+    val copy : Slice[Int] = view
+    0
+}

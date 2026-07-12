@@ -372,6 +372,14 @@ if(BUILD_TESTING)
     set_tests_properties(run_slice_type_syntax PROPERTIES
         DEPENDS compile_slice_type_syntax)
 
+    add_test(NAME compile_slice_creation COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/slice_creation.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/slice-creation)
+    add_test(NAME run_slice_creation
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/slice-creation)
+    set_tests_properties(run_slice_creation PROPERTIES
+        DEPENDS compile_slice_creation)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -451,7 +459,14 @@ if(BUILD_TESTING)
             reference_mutable_alias
             reference_mutable_direct_read
             slice_type_missing_element
-            slice_type_missing_bracket)
+            slice_type_missing_bracket
+            slice_element_mismatch
+            slice_mut_requires_mut_borrow
+            slice_mut_immutable_source
+            slice_global
+            slice_borrowed_mutation
+            slice_mut_borrowed_read
+            slice_mut_copy)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

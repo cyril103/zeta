@@ -105,6 +105,11 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         (i == 0 ? "]" : "+" + std::to_string(i * elementBytes) + "]");
                     emitBlockCopy(out, source, target, elementBytes);
                 }
+            } else if constexpr (std::is_same_v<T, IrSliceConstruct>) {
+                const std::size_t output = valueOffset(program, item.output);
+                out << "    mov rax, qword [rbp-" << valueOffset(program, item.reference) << "]\n"
+                    << "    mov qword [rbp-" << output << "], rax\n"
+                    << "    mov qword [rbp-" << output - 8U << "], " << item.length << "\n";
             } else if constexpr (std::is_same_v<T, IrIndexLoad>) {
                 const std::size_t elementBytes = valueTypeSize(*item.arrayType.element);
                 out << "    movsxd rax, dword [rbp-" << valueOffset(program, item.index) << "]\n"
@@ -168,7 +173,8 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 const std::string address = slot.global
                     ? "[global_slot_" + std::to_string(item.slot) + "]"
                     : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
-                if (item.type.kind == ValueType::Kind::Array) {
+                if (item.type.kind == ValueType::Kind::Array ||
+                    item.type.kind == ValueType::Kind::Slice) {
                     emitBlockCopy(out, address,
                         "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]",
                         valueTypeSize(item.type));
@@ -334,7 +340,8 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 const std::string address = slot.global
                     ? "[global_slot_" + std::to_string(item.slot) + "]"
                     : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
-                if (item.type.kind == ValueType::Kind::Array) {
+                if (item.type.kind == ValueType::Kind::Array ||
+                    item.type.kind == ValueType::Kind::Slice) {
                     emitBlockCopy(out,
                         "[rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
                         address, valueTypeSize(item.type));
@@ -357,7 +364,8 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         << (item.type == ValueType::Byte || item.type == ValueType::Bool ? "al\n" : "eax\n");
                 }
             } else if constexpr (std::is_same_v<T, IrCopy>) {
-                if (item.type.kind == ValueType::Kind::Array) {
+                if (item.type.kind == ValueType::Kind::Array ||
+                    item.type.kind == ValueType::Kind::Slice) {
                     emitBlockCopy(out,
                         "[rbp-" + std::to_string(valueOffset(program, item.input)) + "]",
                         "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]",

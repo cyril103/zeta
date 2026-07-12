@@ -473,8 +473,13 @@ ValueId IrGenerator::expression(
         } else if constexpr (std::is_same_v<T, ConversionExpr>) {
             const ValueId input = expression(*node.operand, parameters);
             const ValueId output = nextValue(node.target);
-            ir_.instructions.push_back(IrConvert{output, input,
-                                                  node.operand->inferredType, node.target});
+            if (node.target.kind == ValueType::Kind::Slice) {
+                ir_.instructions.push_back(IrSliceConstruct{
+                    output, input, node.operand->inferredType.element->length, node.target});
+            } else {
+                ir_.instructions.push_back(IrConvert{output, input,
+                                                      node.operand->inferredType, node.target});
+            }
             return output;
         } else if constexpr (std::is_same_v<T, UnaryExpr>) {
             const ValueId operand = expression(*node.operand, parameters);
@@ -611,6 +616,9 @@ std::string IrGenerator::print(const IrProgram& program) {
                 }
                 out << "]\n";
             }
+            else if constexpr (std::is_same_v<T, IrSliceConstruct>)
+                out << "  $" << item.output << " = slice $" << item.reference
+                    << ", " << item.length << '\n';
             else if constexpr (std::is_same_v<T, IrIndexLoad>)
                 out << "  $" << item.output << " = index " << '$' << item.array
                     << "[$" << item.index << "]\n";

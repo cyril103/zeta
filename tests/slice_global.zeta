@@ -1,0 +1,3 @@
+val values : [Int; 2] = [1, 2]
+val view : Slice[Int] = Slice(&values)
+def main () : Int = 0

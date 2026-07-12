@@ -16,6 +16,12 @@ inline bool isNumeric(ValueType type) {
     return type == ValueType::Int || type == ValueType::Byte || type == ValueType::Double;
 }
 inline bool canExplicitlyConvert(ValueType source, ValueType target) {
+    if (target.kind == ValueType::Kind::Slice) {
+        return source.kind == ValueType::Kind::Reference &&
+               source.element->kind == ValueType::Kind::Array &&
+               *source.element->element == *target.element &&
+               source.mutableReference == target.mutableReference;
+    }
     return (isNumeric(source) && isNumeric(target)) ||
            (source == ValueType::Char && target == ValueType::Int) ||
            (source == ValueType::Int && target == ValueType::Char) || source == target;

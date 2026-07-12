@@ -1,0 +1,7 @@
+def main () : Int = {
+    var values : [Int; 2] = [1, 2]
+    val view : SliceMut[Int] = SliceMut(&mut values)
+    val first : Int = values[0]
+    val copy : SliceMut[Int] = view
+    first + 1
+}

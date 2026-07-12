@@ -1,0 +1,8 @@
+def main () : Int = {
+    var values : [Int; 3] = [10, 20, 30]
+    val shared : Slice[Int] = Slice(&values)
+    val sharedCopy : Slice[Int] = shared
+    val mutable : SliceMut[Int] = SliceMut(&mut values)
+    values[0] = 42
+    if (values[0] == 42) 0 else 1
+}
