@@ -623,6 +623,26 @@ ExprPtr Parser::primary() {
     if (match(TokenKind::Identifier)) {
         const Token token = previous();
         const std::string name = qualifiedName();
+        std::vector<ValueType> typeArguments;
+        bool hasTypeArguments = false;
+        if (check(TokenKind::LeftBracket)) {
+            std::size_t cursor = current_;
+            std::size_t depth = 0;
+            do {
+                if (tokens_[cursor].kind == TokenKind::LeftBracket) ++depth;
+                else if (tokens_[cursor].kind == TokenKind::RightBracket) --depth;
+                ++cursor;
+            } while (cursor < tokens_.size() && depth != 0);
+            hasTypeArguments = cursor < tokens_.size() &&
+                tokens_[cursor].kind == TokenKind::LeftParen;
+        }
+        if (hasTypeArguments) {
+            consume(TokenKind::LeftBracket, "'[' attendue avant les arguments de type");
+            do {
+                typeArguments.push_back(consumeType("argument de type attendu"));
+            } while (match(TokenKind::Comma));
+            consume(TokenKind::RightBracket, "']' attendue après les arguments de type");
+        }
         if (match(TokenKind::LeftParen)) {
             std::vector<ExprPtr> arguments;
             expressionContinuation();
@@ -639,8 +659,11 @@ ExprPtr Parser::primary() {
             expressionContinuation();
             consume(TokenKind::RightParen, "')' attendue après les arguments");
             return std::make_unique<Expression>(Expression{
-                token.location, CallExpr{name, std::move(arguments)}});
+                token.location, CallExpr{name, std::move(typeArguments), std::move(arguments)}});
         }
+        if (hasTypeArguments)
+            throw CompileError(token.location,
+                               "une instanciation générique doit être suivie d'un appel");
         return std::make_unique<Expression>(Expression{token.location, NameExpr{name}});
     }
     if (match(TokenKind::LeftParen)) {

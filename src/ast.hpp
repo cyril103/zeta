@@ -112,7 +112,11 @@ struct IndexExpr { ExprPtr array; ExprPtr index; };
 struct AddressExpr { bool mutableBorrow; ExprPtr operand; };
 struct DereferenceExpr { ExprPtr operand; };
 struct NameExpr { std::string name; };
-struct CallExpr { std::string name; std::vector<ExprPtr> arguments; };
+struct CallExpr {
+    std::string name;
+    std::vector<ValueType> typeArguments;
+    std::vector<ExprPtr> arguments;
+};
 struct ConversionExpr { ValueType target; ExprPtr operand; };
 struct UnaryExpr { std::string op; ExprPtr operand; };
 struct BinaryExpr { std::string op; ExprPtr left; ExprPtr right; };

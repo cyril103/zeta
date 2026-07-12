@@ -53,4 +53,5 @@ private:
     std::unordered_map<std::string, ReferenceBorrow> referenceBorrows_;
     std::vector<std::vector<std::string>> borrowScopes_;
     std::unordered_set<std::string> movedBoxes_;
+    bool insideGenericDeclaration_{false};
 };

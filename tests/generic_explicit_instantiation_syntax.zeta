@@ -1,0 +1,5 @@
+def identity[T] (value : T) : T = value
+
+def syntaxProbe[U] (value : Int) : Int = identity[Int](value)
+
+def main () : Int = 0

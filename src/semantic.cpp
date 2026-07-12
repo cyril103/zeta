@@ -20,6 +20,25 @@ std::optional<std::int64_t> constantInteger(const Expression& expression) {
     }
     return std::nullopt;
 }
+ValueType substituteType(
+    const ValueType& type,
+    const std::unordered_map<std::string, ValueType>& substitutions) {
+    if (type.kind == ValueType::Kind::TypeParameter) return substitutions.at(type.typeParameter);
+    if (type.kind == ValueType::Kind::Array)
+        return ValueType(std::make_shared<ValueType>(substituteType(*type.element, substitutions)),
+                         type.length);
+    if (type.kind == ValueType::Kind::Reference)
+        return ValueType(std::make_shared<ValueType>(substituteType(*type.element, substitutions)),
+                         type.mutableReference);
+    if (type.kind == ValueType::Kind::Slice)
+        return ValueType(ValueType::Kind::Slice,
+            std::make_shared<ValueType>(substituteType(*type.element, substitutions)),
+            type.mutableReference);
+    if (type.kind == ValueType::Kind::Box)
+        return ValueType(ValueType::Kind::Box,
+            std::make_shared<ValueType>(substituteType(*type.element, substitutions)));
+    return type;
+}
 
 void collectExpressionNames(const Expression& expression,
                             std::unordered_map<std::string, std::size_t>& uses);
@@ -283,6 +302,8 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
         }
     }
     const auto previousReturnType = returnType_;
+    const bool previousGenericDeclaration = insideGenericDeclaration_;
+    insideGenericDeclaration_ = !declaration.typeParameters.empty();
     const auto previousMovedBoxes = movedBoxes_;
     if (declaration.callable)
         for (const Parameter& parameter : declaration.parameters)
@@ -295,6 +316,7 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
             movedBoxes_.insert(source->name);
     }
     returnType_ = previousReturnType;
+    insideGenericDeclaration_ = previousGenericDeclaration;
     if (declaration.callable) movedBoxes_ = previousMovedBoxes;
     symbols_.popScope();
 
@@ -629,10 +651,23 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 throw CompileError(expression.location, "fonction inconnue '" + node.name + "'");
             if (symbol->kind != BindingKind::Def || !symbol->callable)
                 throw CompileError(expression.location, "'" + node.name + "' n'est pas une fonction");
-            if (symbol->declaration != nullptr &&
-                !symbol->declaration->typeParameters.empty())
+            const Declaration* generic = symbol->declaration != nullptr &&
+                !symbol->declaration->typeParameters.empty() ? symbol->declaration : nullptr;
+            if (generic == nullptr && !node.typeArguments.empty())
+                throw CompileError(expression.location,
+                                   "la fonction '" + node.name + "' n'est pas générique");
+            if (generic != nullptr && node.typeArguments.empty())
                 throw CompileError(expression.location,
                                    "l'appel d'une fonction générique exige une instanciation explicite");
+            std::unordered_map<std::string, ValueType> substitutions;
+            if (generic != nullptr) {
+                if (node.typeArguments.size() != generic->typeParameters.size())
+                    throw CompileError(expression.location, "la fonction générique '" + node.name +
+                        "' attend " + std::to_string(generic->typeParameters.size()) +
+                        " argument(s) de type, reçu " + std::to_string(node.typeArguments.size()));
+                for (std::size_t i = 0; i < node.typeArguments.size(); ++i)
+                    substitutions.emplace(generic->typeParameters[i], node.typeArguments[i]);
+            }
             const std::size_t parameterCount = symbol->declaration != nullptr
                 ? symbol->declaration->parameters.size() : symbol->parameterTypes.size();
             if (node.arguments.size() != parameterCount)
@@ -663,15 +698,21 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 }
             }
             for (std::size_t i = 0; i < node.arguments.size(); ++i) {
-                const ValueType parameterType = symbol->declaration != nullptr
+                const ValueType declaredParameterType = symbol->declaration != nullptr
                     ? symbol->declaration->parameters[i].type : symbol->parameterTypes[i];
+                const ValueType parameterType = generic == nullptr ? declaredParameterType
+                    : substituteType(declaredParameterType, substitutions);
                 checkExpression(*node.arguments[i], parameterType);
                 if (parameterType.kind == ValueType::Kind::Box) {
                     if (const auto* moved = std::get_if<NameExpr>(&node.arguments[i]->value))
                         movedBoxes_.insert(moved->name);
                 }
             }
-            return symbol->type;
+            if (generic != nullptr && !insideGenericDeclaration_)
+                throw CompileError(expression.location,
+                                   "la monomorphisation des appels génériques arrive à l'étape suivante");
+            return generic == nullptr ? symbol->type
+                                      : substituteType(symbol->type, substitutions);
         } else if constexpr (std::is_same_v<T, ConversionExpr>) {
             if (node.target.kind == ValueType::Kind::Slice) {
                 if (expected.kind != ValueType::Kind::Slice ||

@@ -336,6 +336,14 @@ if(BUILD_TESTING)
     set_tests_properties(run_generic_function_syntax PROPERTIES
         DEPENDS compile_generic_function_syntax)
 
+    add_test(NAME compile_generic_explicit_instantiation_syntax COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_explicit_instantiation_syntax.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/generic-explicit-instantiation-syntax)
+    add_test(NAME run_generic_explicit_instantiation_syntax
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/generic-explicit-instantiation-syntax)
+    set_tests_properties(run_generic_explicit_instantiation_syntax PROPERTIES
+        DEPENDS compile_generic_explicit_instantiation_syntax)
+
     add_test(NAME compile_box_content_borrow COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/box_content_borrow.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/box-content-borrow)
@@ -589,7 +597,9 @@ if(BUILD_TESTING)
             box_owner_reassignment
             box_asymmetric_move
             generic_duplicate_type_parameter
-            generic_call_without_instantiation)
+            generic_call_without_instantiation
+            generic_type_arity
+            generic_arguments_on_regular_function)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

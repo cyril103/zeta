@@ -1,0 +1,3 @@
+def identity[T] (value : T) : T = value
+def invalid[U] (value : Int) : Int = identity[Int, Byte](value)
+def main () : Int = 0
