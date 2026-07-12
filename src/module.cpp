@@ -106,9 +106,21 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
         if (!std::filesystem::exists(objectPath))
             throw std::runtime_error("objet précompilé manquant : " + objectPath.string());
         Program program;
+        if (!persisted.genericSource.empty()) {
+            Lexer lexer(persisted.genericSource);
+            Parser parser(lexer.scan());
+            program = parser.parse();
+        }
+        program.imports.clear();
         for (const std::string& import : persisted.imports)
             program.imports.push_back(Program::Import{SourceLocation{}, import});
         for (const auto& [symbolName, symbol] : persisted.interface.exports) {
+            const auto existing = std::find_if(program.statements.begin(), program.statements.end(),
+                [&](const Statement& statement) {
+                    const auto* declaration = std::get_if<Declaration>(&statement.value);
+                    return declaration != nullptr && declaration->name == symbolName;
+                });
+            if (existing != program.statements.end()) continue;
             std::vector<Parameter> parameters;
             for (std::size_t i = 0; i < symbol.parameterTypes.size(); ++i)
                 parameters.push_back(Parameter{SourceLocation{}, "p" + std::to_string(i),
@@ -118,13 +130,14 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
                 std::move(parameters), {}, {}, nullptr});
         }
         graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source),
-                                            true, objectPath});
+                                            true, objectPath, persisted.genericSource});
         ModuleInterface& storedInterface = graph_.interfaces.emplace(
             name, std::move(persisted.interface)).first->second;
         Module& storedModule = graph_.modules.at(name);
         for (Statement& statement : storedModule.program.statements) {
             auto* declaration = std::get_if<Declaration>(&statement.value);
-            storedInterface.exports.at(declaration->name).declaration = declaration;
+            if (declaration != nullptr && storedInterface.exports.contains(declaration->name))
+                storedInterface.exports.at(declaration->name).declaration = declaration;
         }
         graph_.interfaceFingerprints.emplace(name, persisted.fingerprint);
         for (const Program::Import& import : storedModule.program.imports)
@@ -136,7 +149,7 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
     Program program = parser.parse();
     std::vector<Program::Import> imports = program.imports;
     graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source),
-                                        false, {}});
+                                        false, {}, source});
     for (const Program::Import& import : imports)
         loadModule(import.module, resolveImport(import.module));
 }

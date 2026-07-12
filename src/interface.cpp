@@ -22,7 +22,7 @@ std::string encodeType(const ValueType& type) {
     case ValueType::Kind::Slice:
         return std::string(type.mutableReference ? "VM(" : "V(") + encodeType(*type.element) + ")";
     case ValueType::Kind::Box: return "O(" + encodeType(*type.element) + ")";
-    case ValueType::Kind::TypeParameter: return "T" + type.typeParameter;
+    case ValueType::Kind::TypeParameter: return "T(" + type.typeParameter + ")";
     case ValueType::Kind::Struct:
         throw std::runtime_error("les structures publiques ne sont pas encore sérialisables");
     }
@@ -38,7 +38,16 @@ ValueType decodeType(const std::string& encoded, std::size_t& cursor) {
     if (kind == 'B') return ValueType::Bool;
     if (kind == 'C') return ValueType::Char;
     if (kind == 'S') return ValueType::String;
-    if (kind == 'T') return ValueType(ValueType::Kind::TypeParameter, encoded.substr(cursor));
+    if (kind == 'T') {
+        if (cursor >= encoded.size() || encoded[cursor++] != '(')
+            throw std::runtime_error("paramètre de type invalide dans l'interface");
+        const std::size_t end = encoded.find(')', cursor);
+        if (end == std::string::npos)
+            throw std::runtime_error("paramètre de type non fermé dans l'interface");
+        const std::string name = encoded.substr(cursor, end - cursor);
+        cursor = end + 1U;
+        return ValueType(ValueType::Kind::TypeParameter, name);
+    }
     bool mutableView = false;
     if ((kind == 'R' || kind == 'V') && cursor < encoded.size() && encoded[cursor] == 'M') {
         mutableView = true;
@@ -72,16 +81,42 @@ ValueType decodeType(const std::string& encoded) {
     if (cursor != encoded.size()) throw std::runtime_error("suffixe de type invalide dans l'interface");
     return type;
 }
+
+std::string hexEncode(std::string_view value) {
+    static constexpr char digits[] = "0123456789abcdef";
+    std::string encoded;
+    encoded.reserve(value.size() * 2U);
+    for (const unsigned char byte : value) {
+        encoded.push_back(digits[byte >> 4U]);
+        encoded.push_back(digits[byte & 0x0FU]);
+    }
+    return encoded;
+}
+
+std::string hexDecode(const std::string& encoded) {
+    if (encoded.size() % 2U != 0) throw std::runtime_error("source générique .zti invalide");
+    const auto nibble = [](char value) -> unsigned {
+        if (value >= '0' && value <= '9') return static_cast<unsigned>(value - '0');
+        if (value >= 'a' && value <= 'f') return static_cast<unsigned>(value - 'a' + 10);
+        throw std::runtime_error("source générique .zti invalide");
+    };
+    std::string decoded;
+    decoded.reserve(encoded.size() / 2U);
+    for (std::size_t i = 0; i < encoded.size(); i += 2U)
+        decoded.push_back(static_cast<char>((nibble(encoded[i]) << 4U) | nibble(encoded[i + 1U])));
+    return decoded;
+}
 }
 
 std::string InterfaceCodec::serialize(
     const ModuleInterface& interface, const std::string& fingerprint,
-    const std::vector<std::string>& imports) {
+    const std::vector<std::string>& imports, const std::string& genericSource) {
     std::ostringstream output;
     output << "ZTI 1\nmodule " << std::quoted(interface.name) << '\n'
            << "fingerprint " << fingerprint << '\n';
     for (const std::string& import : imports)
         output << "import " << std::quoted(import) << '\n';
+    if (!genericSource.empty()) output << "generic_source " << hexEncode(genericSource) << '\n';
     std::vector<std::string> names;
     for (const auto& [name, symbol] : interface.exports) {
         static_cast<void>(symbol);
@@ -128,6 +163,12 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
             std::string name;
             if (!(input >> std::quoted(name))) throw std::runtime_error("import .zti invalide");
             result.imports.push_back(std::move(name));
+            continue;
+        }
+        if (word == "generic_source") {
+            std::string encoded;
+            if (!(input >> encoded)) throw std::runtime_error("source générique .zti absente");
+            result.genericSource = hexDecode(encoded);
             continue;
         }
         if (word != "export") throw std::runtime_error("entrée .zti inconnue : " + word);

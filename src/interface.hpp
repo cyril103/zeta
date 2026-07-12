@@ -9,12 +9,14 @@ struct PersistedInterface {
     ModuleInterface interface;
     std::string fingerprint;
     std::vector<std::string> imports;
+    std::string genericSource;
 };
 
 class InterfaceCodec {
 public:
     static std::string serialize(const ModuleInterface& interface,
                                  const std::string& fingerprint,
-                                 const std::vector<std::string>& imports = {});
+                                 const std::vector<std::string>& imports = {},
+                                 const std::string& genericSource = {});
     static PersistedInterface deserialize(const std::string& contents);
 };
