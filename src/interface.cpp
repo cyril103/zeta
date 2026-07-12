@@ -1,4 +1,5 @@
 #include "interface.hpp"
+#include "version.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -112,7 +113,8 @@ std::string InterfaceCodec::serialize(
     const ModuleInterface& interface, const std::string& fingerprint,
     const std::vector<std::string>& imports, const std::string& genericSource) {
     std::ostringstream output;
-    output << "ZTI 1\nmodule " << std::quoted(interface.name) << '\n'
+    output << "ZTI " << ZetaVersion::InterfaceFormat << "\nmodule "
+           << std::quoted(interface.name) << '\n'
            << "fingerprint " << fingerprint << '\n';
     for (const std::string& import : imports)
         output << "import " << std::quoted(import) << '\n';
@@ -150,7 +152,8 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
     std::istringstream input(contents);
     std::string word;
     int version = 0;
-    if (!(input >> word >> version) || word != "ZTI" || version != 1)
+    if (!(input >> word >> version) || word != "ZTI" ||
+        version != ZetaVersion::InterfaceFormat)
         throw std::runtime_error("format .zti inconnu ou incompatible");
     PersistedInterface result;
     if (!(input >> word) || word != "module" || !(input >> std::quoted(result.interface.name)))

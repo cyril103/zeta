@@ -4,6 +4,7 @@
 #include "interface.hpp"
 #include "module.hpp"
 #include "semantic.hpp"
+#include "version.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -151,7 +152,9 @@ int main(int argc, char** argv) {
         const fs::path startObject = moduleDirectory / "start.o";
         const fs::path cachedStartObject = cacheDirectory / "start.o";
         const fs::path startStamp = cacheDirectory / "start.stamp";
-        std::string startFingerprint = "zeta-start-v1:" + modules.root;
+        std::string startFingerprint = "zeta-start-v" +
+            std::string(ZetaVersion::StartCache) + ":abi-" +
+            std::string(ZetaVersion::Abi) + ":" + modules.root;
         for (const std::string& moduleName : modules.compilationOrder)
             startFingerprint += ":" + moduleName;
         if (!fs::exists(cachedStartObject) ||
@@ -182,7 +185,8 @@ int main(int argc, char** argv) {
             const fs::path moduleObject = moduleDirectory / (moduleName + ".o");
             const fs::path cachedModuleObject = cacheDirectory / (moduleName + ".o");
             const fs::path moduleStamp = cacheDirectory / (moduleName + ".stamp");
-            const std::string fingerprint = "zeta-module-object-v2:" +
+            const std::string fingerprint = "zeta-module-object-v" +
+                std::string(ZetaVersion::ModuleCache) + ":" +
                 modules.fingerprints.at(moduleName);
             writeFile(moduleIrPath, IrGenerator::print(moduleIr));
             writeFile(moduleInterfacePath, InterfaceCodec::serialize(

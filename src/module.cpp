@@ -3,6 +3,7 @@
 #include "lexer.hpp"
 #include "parser.hpp"
 #include "interface.hpp"
+#include "version.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -169,7 +170,9 @@ std::filesystem::path ModuleLoader::resolveImport(const std::string& name) const
 
 void ModuleLoader::buildFingerprints() {
     for (const auto& [name, module] : graph_.modules) {
-        std::uint64_t interfaceHash = hashText("zeta-interface-v2");
+        std::uint64_t interfaceHash = hashText("zeta-interface-v" +
+            std::to_string(ZetaVersion::InterfaceFormat) + ":abi-" +
+            std::string(ZetaVersion::Abi));
         std::vector<std::string> exports;
         bool exportsGenericBody = false;
         for (const auto& [symbolName, symbol] : graph_.interfaces.at(name).exports) {
@@ -201,7 +204,8 @@ void ModuleLoader::buildFingerprints() {
         std::uint64_t hash = module.sourceHash;
         for (const std::string& dependency : graph_.dependencies.at(name))
             hash = hashText(graph_.interfaceFingerprints.at(dependency), hash);
-        hash = hashText("zeta-module-object-v3", hash);
+        hash = hashText("zeta-module-object-v" + std::string(ZetaVersion::ModuleCache) +
+                        ":abi-" + std::string(ZetaVersion::Abi), hash);
         graph_.fingerprints.emplace(name, hexHash(hash));
     }
 }
