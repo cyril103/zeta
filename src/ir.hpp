@@ -83,7 +83,7 @@ using IrInstruction = std::variant<IrConst, IrDoubleConst, IrStringConst, IrStri
                                    IrStore, IrCopy, IrCall, IrTailCall, IrFunctionStart, IrParameter,
                                    IrReturn, IrDrop, IrRetain, IrExit, IrBranch, IrJump, IrLabel>;
 
-struct IrSlot { std::string name; ValueType type; bool global; };
+struct IrSlot { std::string name; ValueType type; bool global; bool external{false}; };
 struct IrProgram {
     std::vector<IrSlot> slots;
     std::vector<IrInstruction> instructions;

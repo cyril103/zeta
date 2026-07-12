@@ -8,6 +8,7 @@
 #include <type_traits>
 
 namespace {
+std::string globalLabel(const IrSlot& slot) { return "zeta_global_" + slot.name; }
 std::size_t align16(std::size_t value) { return (value + 15U) & ~std::size_t{15U}; }
 bool isPairValue(ValueType type) {
     return type == ValueType::String || type.kind == ValueType::Kind::Slice;
@@ -220,7 +221,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 } else {
                     const IrSlot& slot = program.slots[item.slot];
                     if (slot.global)
-                        out << "    lea rdi, [global_slot_" << item.slot << "]\n";
+                        out << "    lea rdi, [" << globalLabel(program.slots[item.slot]) << "]\n";
                     else
                         out << "    lea rdi, [rbp-" << slotOffset(program, item.slot) << "]\n";
                 }
@@ -247,7 +248,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
             } else if constexpr (std::is_same_v<T, IrAddressOf>) {
                 const IrSlot& slot = program.slots[item.slot];
                 if (slot.global)
-                    out << "    lea rax, [global_slot_" << item.slot << "]\n";
+                    out << "    lea rax, [" << globalLabel(program.slots[item.slot]) << "]\n";
                 else
                     out << "    lea rax, [rbp-" << slotOffset(program, item.slot) << "]\n";
                 out << "    mov qword [rbp-" << valueOffset(program, item.output) << "], rax\n";
@@ -264,7 +265,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
             } else if constexpr (std::is_same_v<T, IrLoad>) {
                 const IrSlot& slot = program.slots[item.slot];
                 const std::string address = slot.global
-                    ? "[global_slot_" + std::to_string(item.slot) + "]"
+                    ? "[" + globalLabel(slot) + "]"
                     : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
                 if (item.type.kind == ValueType::Kind::Array ||
                     item.type.kind == ValueType::Kind::Struct ||
@@ -555,7 +556,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
             } else if constexpr (std::is_same_v<T, IrStore>) {
                 const IrSlot& slot = program.slots[item.slot];
                 const std::string address = slot.global
-                    ? "[global_slot_" + std::to_string(item.slot) + "]"
+                    ? "[" + globalLabel(slot) + "]"
                     : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
                 if (item.type.kind == ValueType::Kind::Array ||
                     item.type.kind == ValueType::Kind::Struct ||
@@ -844,8 +845,8 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
             out << "string_double_million: dq 1000000.0\n"
                    "string_double_half: dq 0.5\n";
         for (std::size_t i = 0; i < program.slots.size(); ++i) {
-            if (!program.slots[i].global) continue;
-            out << "global_slot_" << i << ": ";
+            if (!program.slots[i].global || program.slots[i].external) continue;
+            out << globalLabel(program.slots[i]) << ": ";
             if (program.slots[i].type.kind == ValueType::Kind::Array)
                 out << "rb " << valueTypeSize(program.slots[i].type) << '\n';
             else out << (program.slots[i].type == ValueType::String ? "rq 2" :
@@ -879,6 +880,11 @@ std::string FasmCodeGenerator::generateObject(const IrProgram& program, bool ent
         externals += "public zeta_fn_" + definition + "\n";
     for (const std::string& call : calls)
         if (!definitions.contains(call)) externals += "extrn zeta_fn_" + call + "\n";
+    for (const IrSlot& slot : program.slots) {
+        if (!slot.global) continue;
+        externals += std::string(slot.external ? "extrn " : "public ") +
+            globalLabel(slot) + "\n";
+    }
     assembly.insert(assembly.find("start:"), externals);
     const auto replaceSegment = [&](const std::string& from, const std::string& to) {
         if (const std::size_t position = assembly.find(from); position != std::string::npos)

@@ -203,6 +203,21 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
         }
     }
 
+    if (moduleFilter_) {
+        for (const auto& [moduleName, module] : graph.modules) {
+            for (const Statement& statement : module.program.statements) {
+                const auto* declaration = std::get_if<Declaration>(&statement.value);
+                if (declaration == nullptr || declaration->kind == BindingKind::Def) continue;
+                const SlotId slot = ir_.slots.size();
+                const std::string canonical = moduleName + "." + declaration->name;
+                symbols_.insert_or_assign(canonical, Symbol{slot, declaration->kind,
+                    declaration, true, moduleName + "__" + declaration->name});
+                ir_.slots.push_back(IrSlot{moduleName + "__" + declaration->name,
+                    declaration->type, true, moduleName != *moduleFilter_});
+            }
+        }
+    }
+
     for (const std::string& moduleName : graph.compilationOrder) {
         if (moduleFilter_ && *moduleFilter_ != moduleName) continue;
         const Module& module = graph.modules.at(moduleName);
@@ -221,14 +236,21 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
                 if constexpr (std::is_same_v<T, Declaration>) {
                     if (node.kind == BindingKind::Def) return;
                     const ValueId value = expression(*node.initializer);
-                    const SlotId slot = ir_.slots.size();
                     const std::string canonical = moduleName + "." + node.name;
-                    const Symbol symbol{slot, node.kind, &node, true,
+                    SlotId slot;
+                    Symbol symbol;
+                    if (moduleFilter_) {
+                        symbol = symbols_.at(canonical);
+                        slot = symbol.slot;
+                    } else {
+                        slot = ir_.slots.size();
+                        symbol = Symbol{slot, node.kind, &node, true,
                                         moduleName + "__" + node.name};
-                    symbols_.insert_or_assign(canonical, symbol);
+                        symbols_.insert_or_assign(canonical, symbol);
+                        ir_.slots.push_back(IrSlot{moduleName + "__" + node.name, node.type, true});
+                    }
                     symbols_.insert_or_assign(node.name, symbol);
                     aliases.push_back(node.name);
-                    ir_.slots.push_back(IrSlot{moduleName + "__" + node.name, node.type, true});
                     ir_.instructions.push_back(IrStore{slot, value, node.type});
                 } else if constexpr (std::is_same_v<T, Assignment>) {
                     const auto found = symbols_.find(node.name);
