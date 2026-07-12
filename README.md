@@ -336,13 +336,19 @@ val écriture : &mut Int = &mut valeur
 `*référence = valeur`. Une référence est toujours non nulle, occupe 8 octets sur
 x86-64 et ne réalise aucune allocation dynamique.
 
-Les emprunts suivent actuellement des portées lexicales conservatrices :
+Les emprunts locaux se terminent après la dernière utilisation connue de leur
+référence dans le bloc. Une référence inutilisée libère donc immédiatement son
+emprunt. Les références capturées par une fonction locale restent conservées
+jusqu'à la fin de la portée, faute de fermetures explicites. Les règles sont :
 
 - plusieurs emprunts partagés `&T` peuvent coexister ;
 - un emprunt `&mut T` doit être unique et exclut toute lecture ou mutation directe ;
-- une valeur empruntée ne peut pas être réaffectée avant la fin du bloc ;
+- une valeur empruntée ne peut pas être réaffectée avant la dernière utilisation
+  de la référence ;
 - seuls les identifiants de données peuvent être empruntés ;
 - `&mut` exige une variable déclarée avec `var` ;
+- une référence partagée peut être copiée et chaque copie prolonge l'emprunt ;
+- une référence mutable ne peut pas être copiée ;
 - deux arguments incompatibles ne peuvent pas emprunter la même valeur dans un appel.
 
 Les références peuvent être passées aux fonctions et évitent notamment la copie

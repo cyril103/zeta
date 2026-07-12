@@ -31,15 +31,24 @@ private:
     void checkIndexAssignment(IndexAssignment& assignment);
     void checkDereferenceAssignment(DereferenceAssignment& assignment);
     void checkLoop(WhileStatement& loop);
-    void checkStatements(std::vector<StatementPtr>& statements);
+    void checkStatements(std::vector<StatementPtr>& statements,
+                         const Expression* trailingExpression = nullptr);
     void pushBorrowScope();
     void popBorrowScope();
+    void releaseBorrow(const std::string& referenceName);
 
     struct BorrowState { std::size_t shared{0}; bool mutableBorrow{false}; };
+    struct ReferenceBorrow {
+        std::string target;
+        bool mutableBorrow;
+        bool active{true};
+        bool captured{false};
+    };
 
     SymbolTable symbols_;
     std::optional<ValueType> returnType_;
     std::size_t loopDepth_{0};
     std::unordered_map<std::string, BorrowState> borrows_;
-    std::vector<std::vector<std::pair<std::string, bool>>> borrowScopes_;
+    std::unordered_map<std::string, ReferenceBorrow> referenceBorrows_;
+    std::vector<std::vector<std::string>> borrowScopes_;
 };

@@ -348,6 +348,22 @@ if(BUILD_TESTING)
             DEPENDS compile_reference_${reference_case})
     endforeach()
 
+    add_test(NAME compile_reference_last_use COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/reference_last_use.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/reference-last-use)
+    add_test(NAME run_reference_last_use
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/reference-last-use)
+    set_tests_properties(run_reference_last_use PROPERTIES
+        DEPENDS compile_reference_last_use)
+
+    add_test(NAME compile_reference_shared_alias_last_use COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/reference_shared_alias_last_use.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/reference-shared-alias-last-use)
+    add_test(NAME run_reference_shared_alias_last_use
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/reference-shared-alias-last-use)
+    set_tests_properties(run_reference_shared_alias_last_use PROPERTIES
+        DEPENDS compile_reference_shared_alias_last_use)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -424,6 +440,7 @@ if(BUILD_TESTING)
             reference_borrowed_assignment
             reference_call_alias
             reference_shared_array_mutation
+            reference_mutable_alias
             reference_mutable_direct_read)
         add_test(
             NAME reject_${invalid_case}

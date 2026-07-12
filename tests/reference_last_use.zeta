@@ -1,0 +1,17 @@
+def main () : Int = {
+    var first : Int = 10
+    val shared : &Int = &first
+    val observed : Int = *shared
+    first = 20
+
+    var second : Int = 1
+    val exclusive : &mut Int = &mut second
+    *exclusive = 41
+    second = second + 1
+
+    var unused : Int = 5
+    val unusedReference : &mut Int = &mut unused
+    unused = 6
+
+    if (observed == 10 && first == 20 && second == 42 && unused == 6) 0 else 1
+}

@@ -2,5 +2,5 @@ def main () : Int = {
     var value : Int = 1
     val shared : &Int = &value
     val exclusive : &mut Int = &mut value
-    0
+    *shared
 }

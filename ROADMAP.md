@@ -193,7 +193,8 @@ Les références empruntées sont également disponibles : `&T`, `&mut T`, prise
 d'adresse, lecture et écriture par déréférencement, paramètres sur 64 bits et
 indexation sans copie d'un tableau reçu par référence. L'analyse impose plusieurs
 emprunts partagés ou un unique emprunt mutable, refuse les alias mutables dans un
-appel et conserve pour l'instant les emprunts jusqu'à la fin de leur bloc lexical.
+appel et réduit les emprunts locaux après la dernière utilisation connue. Les
+références capturées restent lexicales.
 
 Limites actuelles des références :
 
@@ -274,7 +275,8 @@ Consolider d'abord les références et préparer les vues dynamiques :
    `values : &mut [T; N]` — terminé ;
 2. ajouter des tests de références vers `String`, `Char`, tableaux imbriqués et
    appels récursifs — terminé ;
-3. réduire les emprunts lexicaux lorsque leur dernière utilisation est connue ;
+3. réduire les emprunts lexicaux lorsque leur dernière utilisation est connue —
+   terminé ;
 4. concevoir `Slice[T]` et `SliceMut[T]` comme `{adresse, longueur}` sans
    allocation ;
 5. permettre de créer une slice depuis un tableau fixe emprunté ;

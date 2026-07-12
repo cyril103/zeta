@@ -4,6 +4,7 @@
 #include "type_rules.hpp"
 
 #include <type_traits>
+#include <unordered_map>
 
 namespace {
 [[noreturn]] void mismatch(SourceLocation location, ValueType expected, ValueType actual) {
@@ -19,6 +20,68 @@ std::optional<std::int64_t> constantInteger(const Expression& expression) {
     }
     return std::nullopt;
 }
+
+void collectExpressionNames(const Expression& expression,
+                            std::unordered_map<std::string, std::size_t>& uses);
+
+void collectStatementNames(const Statement& statement,
+                           std::unordered_map<std::string, std::size_t>& uses) {
+    std::visit([&](const auto& node) {
+        using T = std::decay_t<decltype(node)>;
+        if constexpr (std::is_same_v<T, Declaration>) {
+            collectExpressionNames(*node.initializer, uses);
+        } else if constexpr (std::is_same_v<T, Assignment>) {
+            collectExpressionNames(*node.value, uses);
+        } else if constexpr (std::is_same_v<T, IndexAssignment>) {
+            ++uses[node.name];
+            for (const ExprPtr& index : node.indexes) collectExpressionNames(*index, uses);
+            collectExpressionNames(*node.value, uses);
+        } else if constexpr (std::is_same_v<T, DereferenceAssignment>) {
+            collectExpressionNames(*node.reference, uses);
+            collectExpressionNames(*node.value, uses);
+        } else if constexpr (std::is_same_v<T, WhileStatement>) {
+            collectExpressionNames(*node.condition, uses);
+            for (const StatementPtr& item : node.body) collectStatementNames(*item, uses);
+        } else if constexpr (std::is_same_v<T, ExpressionStatement>) {
+            collectExpressionNames(*node.expression, uses);
+        } else if constexpr (std::is_same_v<T, ReturnStatement>) {
+            collectExpressionNames(*node.value, uses);
+        }
+    }, statement.value);
+}
+
+void collectExpressionNames(const Expression& expression,
+                            std::unordered_map<std::string, std::size_t>& uses) {
+    std::visit([&](const auto& node) {
+        using T = std::decay_t<decltype(node)>;
+        if constexpr (std::is_same_v<T, ArrayExpr>) {
+            for (const ExprPtr& element : node.elements) collectExpressionNames(*element, uses);
+        } else if constexpr (std::is_same_v<T, IndexExpr>) {
+            collectExpressionNames(*node.array, uses);
+            collectExpressionNames(*node.index, uses);
+        } else if constexpr (std::is_same_v<T, AddressExpr> ||
+                             std::is_same_v<T, DereferenceExpr> ||
+                             std::is_same_v<T, ConversionExpr> ||
+                             std::is_same_v<T, UnaryExpr>) {
+            collectExpressionNames(*node.operand, uses);
+        } else if constexpr (std::is_same_v<T, NameExpr>) {
+            ++uses[node.name];
+        } else if constexpr (std::is_same_v<T, CallExpr>) {
+            for (const ExprPtr& argument : node.arguments) collectExpressionNames(*argument, uses);
+        } else if constexpr (std::is_same_v<T, BinaryExpr>) {
+            collectExpressionNames(*node.left, uses);
+            collectExpressionNames(*node.right, uses);
+        } else if constexpr (std::is_same_v<T, BlockExpr>) {
+            for (const StatementPtr& statement : node.statements)
+                collectStatementNames(*statement, uses);
+            if (node.result) collectExpressionNames(*node.result, uses);
+        } else if constexpr (std::is_same_v<T, IfExpr>) {
+            collectExpressionNames(*node.condition, uses);
+            collectExpressionNames(*node.thenBranch, uses);
+            collectExpressionNames(*node.elseBranch, uses);
+        }
+    }, expression.value);
+}
 }
 
 TypedProgram SemanticAnalyzer::analyze(
@@ -27,6 +90,7 @@ TypedProgram SemanticAnalyzer::analyze(
     bool requireMain) {
     symbols_ = SymbolTable{};
     borrows_.clear();
+    referenceBorrows_.clear();
     borrowScopes_ = {{}};
     if (interfaces != nullptr) {
         for (const Program::Import& import : program.imports) {
@@ -117,7 +181,20 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
                                        "'" + name + "' possède déjà un emprunt mutable");
                 ++state.shared;
             }
-            borrowScopes_.back().push_back({name, address->mutableBorrow});
+            referenceBorrows_.insert_or_assign(declaration.name,
+                ReferenceBorrow{name, address->mutableBorrow});
+            borrowScopes_.back().push_back(declaration.name);
+        } else if (const auto* source = std::get_if<NameExpr>(&declaration.initializer->value)) {
+            if (declaration.type.mutableReference)
+                throw CompileError(declaration.location,
+                                   "une référence '&mut' ne peut pas être copiée");
+            if (const auto original = referenceBorrows_.find(source->name);
+                original != referenceBorrows_.end()) {
+                ++borrows_[original->second.target].shared;
+                referenceBorrows_.insert_or_assign(declaration.name,
+                    ReferenceBorrow{original->second.target, false});
+                borrowScopes_.back().push_back(declaration.name);
+            }
         }
     }
     if (declaration.callable && declaration.type.kind == ValueType::Kind::Array)
@@ -223,8 +300,37 @@ void SemanticAnalyzer::checkDereferenceAssignment(DereferenceAssignment& assignm
     checkExpression(*assignment.value, *reference.element);
 }
 
-void SemanticAnalyzer::checkStatements(std::vector<StatementPtr>& statements) {
-    for (StatementPtr& statement : statements) checkStatement(*statement, false);
+void SemanticAnalyzer::checkStatements(std::vector<StatementPtr>& statements,
+                                       const Expression* trailingExpression) {
+    std::unordered_map<std::string, std::size_t> remainingUses;
+    for (const StatementPtr& statement : statements)
+        collectStatementNames(*statement, remainingUses);
+    if (trailingExpression != nullptr)
+        collectExpressionNames(*trailingExpression, remainingUses);
+
+    for (StatementPtr& statement : statements) {
+        if (const auto* declaration = std::get_if<Declaration>(&statement->value);
+            declaration != nullptr && declaration->callable) {
+            std::unordered_map<std::string, std::size_t> capturedNames;
+            collectExpressionNames(*declaration->initializer, capturedNames);
+            for (const auto& [name, count] : capturedNames) {
+                (void)count;
+                if (auto found = referenceBorrows_.find(name);
+                    found != referenceBorrows_.end())
+                    found->second.captured = true;
+            }
+        }
+        checkStatement(*statement, false);
+        std::unordered_map<std::string, std::size_t> statementUses;
+        collectStatementNames(*statement, statementUses);
+        for (const auto& [name, count] : statementUses) remainingUses[name] -= count;
+        for (const std::string& referenceName : borrowScopes_.back()) {
+            const auto borrow = referenceBorrows_.find(referenceName);
+            if (borrow != referenceBorrows_.end() && borrow->second.active &&
+                !borrow->second.captured && remainingUses[referenceName] == 0)
+                releaseBorrow(referenceName);
+        }
+    }
 }
 
 void SemanticAnalyzer::checkLoop(WhileStatement& loop) {
@@ -240,12 +346,20 @@ void SemanticAnalyzer::checkLoop(WhileStatement& loop) {
 
 void SemanticAnalyzer::pushBorrowScope() { borrowScopes_.emplace_back(); }
 
+void SemanticAnalyzer::releaseBorrow(const std::string& referenceName) {
+    ReferenceBorrow& reference = referenceBorrows_.at(referenceName);
+    if (!reference.active) return;
+    BorrowState& state = borrows_.at(reference.target);
+    if (reference.mutableBorrow) state.mutableBorrow = false;
+    else --state.shared;
+    if (!state.mutableBorrow && state.shared == 0) borrows_.erase(reference.target);
+    reference.active = false;
+}
+
 void SemanticAnalyzer::popBorrowScope() {
-    for (const auto& [name, mutableBorrow] : borrowScopes_.back()) {
-        BorrowState& state = borrows_.at(name);
-        if (mutableBorrow) state.mutableBorrow = false;
-        else --state.shared;
-        if (!state.mutableBorrow && state.shared == 0) borrows_.erase(name);
+    for (const std::string& referenceName : borrowScopes_.back()) {
+        releaseBorrow(referenceName);
+        referenceBorrows_.erase(referenceName);
     }
     borrowScopes_.pop_back();
 }
@@ -480,7 +594,7 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
         } else if constexpr (std::is_same_v<T, BlockExpr>) {
             symbols_.pushScope();
             pushBorrowScope();
-            checkStatements(node.statements);
+            checkStatements(node.statements, node.result.get());
             if (node.result) checkExpression(*node.result, expected);
             popBorrowScope();
             symbols_.popScope();

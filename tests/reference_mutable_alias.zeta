@@ -1,6 +1,6 @@
 def main () : Int = {
     var value : Int = 1
     val first : &mut Int = &mut value
-    val second : &mut Int = &mut value
-    *first + *second
+    val second : &mut Int = first
+    *second
 }

@@ -1,5 +1,6 @@
 def main () : Int = {
     var value : Int = 1
     val reference : &mut Int = &mut value
-    value
+    val direct : Int = value
+    *reference + direct
 }
