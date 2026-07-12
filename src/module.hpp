@@ -36,6 +36,7 @@ struct ModuleGraph {
     std::unordered_map<std::string, std::vector<std::string>> dependencies;
     std::vector<std::string> compilationOrder;
     std::unordered_map<std::string, std::string> fingerprints;
+    std::unordered_map<std::string, std::string> interfaceFingerprints;
 };
 
 class ModuleLoader {

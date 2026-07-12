@@ -22,6 +22,9 @@ target_compile_options(zeta PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
 include(CTest)
 if(BUILD_TESTING)
+    add_test(NAME separate_compilation_cache
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/separate_compilation_cache.sh
+            $<TARGET_FILE:zeta> ${CMAKE_CURRENT_SOURCE_DIR}/tests/modules_integration)
     add_test(NAME compile_string_double_conversion COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_double_conversion.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/string-double-conversion)

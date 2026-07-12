@@ -113,24 +113,40 @@ std::filesystem::path ModuleLoader::resolveImport(const std::string& name) const
 }
 
 void ModuleLoader::buildFingerprints() {
-    for (const std::string& name : graph_.compilationOrder) {
-        const Module& module = graph_.modules.at(name);
-        std::uint64_t hash = module.sourceHash;
+    for (const auto& [name, module] : graph_.modules) {
+        std::uint64_t interfaceHash = hashText("zeta-interface-v2");
         std::vector<std::string> exports;
+        bool exportsGenericBody = false;
         for (const auto& [symbolName, symbol] : graph_.interfaces.at(name).exports) {
             std::string signature = symbolName + ":" + typeName(symbol.type) + ":" +
                 std::to_string(static_cast<int>(symbol.kind)) + ":" +
-                (symbol.callable ? "call" : "value");
-            signature += symbol.nativeSymbol ? ":native" : ":zeta";
+                (symbol.callable ? "call" : "value") +
+                (symbol.nativeSymbol ? ":native" : ":zeta");
             for (ValueType parameter : symbol.parameterTypes)
                 signature += ":" + typeName(parameter);
+            if (symbol.declaration != nullptr) {
+                for (std::size_t i = 0; i < symbol.declaration->typeParameters.size(); ++i) {
+                    signature += ":generic:" + symbol.declaration->typeParameters[i] + ":" +
+                        symbol.declaration->typeConstraints[i];
+                }
+                exportsGenericBody = exportsGenericBody ||
+                    !symbol.declaration->typeParameters.empty();
+            }
             exports.push_back(std::move(signature));
         }
         std::sort(exports.begin(), exports.end());
-        for (const std::string& signature : exports) hash = hashText(signature, hash);
+        for (const std::string& signature : exports)
+            interfaceHash = hashText(signature, interfaceHash);
+        if (exportsGenericBody) interfaceHash = hashText(hexHash(module.sourceHash), interfaceHash);
+        graph_.interfaceFingerprints.emplace(name, hexHash(interfaceHash));
+    }
+
+    for (const std::string& name : graph_.compilationOrder) {
+        const Module& module = graph_.modules.at(name);
+        std::uint64_t hash = module.sourceHash;
         for (const std::string& dependency : graph_.dependencies.at(name))
-            hash = hashText(graph_.fingerprints.at(dependency), hash);
-        hash = hashText("zeta-module-cache-v1", hash);
+            hash = hashText(graph_.interfaceFingerprints.at(dependency), hash);
+        hash = hashText("zeta-module-object-v3", hash);
         graph_.fingerprints.emplace(name, hexHash(hash));
     }
 }
