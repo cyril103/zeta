@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <variant>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -95,6 +96,7 @@ class IrGenerator {
 public:
     IrProgram generate(const TypedProgram& program);
     IrProgram generate(const ModuleGraph& graph);
+    IrProgram generateModule(const ModuleGraph& graph, const std::string& module);
     static std::string print(const IrProgram& program);
 
 private:
@@ -143,4 +145,6 @@ private:
     std::unordered_map<std::string, ValueType> typeSubstitutions_;
     std::vector<GenericInstance> genericInstances_;
     std::unordered_set<std::string> genericInstanceNames_;
+    std::optional<std::string> moduleFilter_;
+    bool emitEntryPoint_{true};
 };

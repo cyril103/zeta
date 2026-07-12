@@ -160,6 +160,16 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
 }
 
 IrProgram IrGenerator::generate(const ModuleGraph& graph) {
+    moduleFilter_.reset();
+    emitEntryPoint_ = true;
+    return generateModule(graph, {});
+}
+
+IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::string& moduleFilter) {
+    if (!moduleFilter.empty()) {
+        moduleFilter_ = moduleFilter;
+        emitEntryPoint_ = false;
+    }
     ir_ = IrProgram{};
     symbols_.clear();
     movedBoxes_.clear();
@@ -186,13 +196,15 @@ IrProgram IrGenerator::generate(const ModuleGraph& graph) {
             const std::string linkName = moduleName + "__" + declaration->name;
             symbols_.emplace(canonical,
                 Symbol{0, declaration->kind, declaration, true, linkName});
-            if (declaration->callable && !declaration->nativeSymbol &&
+            if ((!moduleFilter_ || *moduleFilter_ == moduleName) &&
+                declaration->callable && !declaration->nativeSymbol &&
                 declaration->typeParameters.empty())
                 functions.push_back(FunctionRecord{moduleName, declaration, linkName});
         }
     }
 
     for (const std::string& moduleName : graph.compilationOrder) {
+        if (moduleFilter_ && *moduleFilter_ != moduleName) continue;
         const Module& module = graph.modules.at(moduleName);
         std::vector<std::string> aliases;
         for (const Statement& statement : module.program.statements) {
@@ -241,10 +253,12 @@ IrProgram IrGenerator::generate(const ModuleGraph& graph) {
         for (const std::string& alias : aliases) symbols_.erase(alias);
     }
 
-    const ValueId mainResult = nextValue(ValueType::Int);
-    ir_.instructions.push_back(IrCall{mainResult, graph.root + "__main", {}, {}, ValueType::Int});
-    ir_.instructions.push_back(IrExit{mainResult});
-    ir_.exitValue = mainResult;
+    if (emitEntryPoint_) {
+        const ValueId mainResult = nextValue(ValueType::Int);
+        ir_.instructions.push_back(IrCall{mainResult, graph.root + "__main", {}, {}, ValueType::Int});
+        ir_.instructions.push_back(IrExit{mainResult});
+        ir_.exitValue = mainResult;
+    }
     inFunction_ = true;
 
     for (const FunctionRecord& record : functions) {
