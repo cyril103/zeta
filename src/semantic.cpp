@@ -313,11 +313,15 @@ void SemanticAnalyzer::checkIndexAssignment(IndexAssignment& assignment) {
     if (target == nullptr)
         throw CompileError(assignment.location, "identifiant inconnu '" + assignment.name + "'");
     const bool throughReference = target->type.kind == ValueType::Kind::Reference;
+    const bool throughSlice = target->type.kind == ValueType::Kind::Slice;
+    if (throughSlice && !target->type.mutableReference)
+        throw CompileError(assignment.location,
+                           "l'affectation indexée exige une 'SliceMut'");
     if (throughReference) {
         if (!target->type.mutableReference || target->type.element->kind != ValueType::Kind::Array)
             throw CompileError(assignment.location,
                                "l'affectation indexée exige un tableau mutable ou une référence '&mut' vers un tableau");
-    } else {
+    } else if (!throughSlice) {
         if (target->parameter || target->kind != BindingKind::Var)
             throw CompileError(assignment.location,
                                "le tableau '" + assignment.name + "' est immuable");
@@ -327,16 +331,18 @@ void SemanticAnalyzer::checkIndexAssignment(IndexAssignment& assignment) {
             throw CompileError(assignment.location,
                                "le tableau '" + assignment.name + "' est emprunté");
     }
-    if (!throughReference && target->type.kind != ValueType::Kind::Array)
+    if (!throughReference && !throughSlice && target->type.kind != ValueType::Kind::Array)
         throw CompileError(assignment.location,
                            "la cible d'une affectation indexée doit être un tableau");
     ValueType indexedType = throughReference ? *target->type.element : target->type;
     for (const ExprPtr& indexExpression : assignment.indexes) {
-        if (indexedType.kind != ValueType::Kind::Array)
+        if (indexedType.kind != ValueType::Kind::Array &&
+            indexedType.kind != ValueType::Kind::Slice)
             throw CompileError(indexExpression->location, "trop d'index pour " + typeName(target->type));
         checkExpression(*indexExpression, ValueType::Int);
         if (const auto index = constantInteger(*indexExpression);
-            index && (*index < 0 || static_cast<std::uint64_t>(*index) >= indexedType.length))
+            indexedType.kind == ValueType::Kind::Array && index &&
+            (*index < 0 || static_cast<std::uint64_t>(*index) >= indexedType.length))
             throw CompileError(indexExpression->location, "index " + std::to_string(*index) +
                                " hors limites pour " + typeName(indexedType));
         indexedType = *indexedType.element;
@@ -434,7 +440,8 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
         else if constexpr (std::is_same_v<T, IndexExpr>) {
             ValueType arrayType = inferType(*node.array);
             if (arrayType.kind == ValueType::Kind::Reference) arrayType = *arrayType.element;
-            return arrayType.kind == ValueType::Kind::Array ? *arrayType.element : ValueType::Int;
+            return arrayType.kind == ValueType::Kind::Array ||
+                arrayType.kind == ValueType::Kind::Slice ? *arrayType.element : ValueType::Int;
         }
         else if constexpr (std::is_same_v<T, AddressExpr>)
             return ValueType(std::make_shared<ValueType>(inferType(*node.operand)),
@@ -506,13 +513,15 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             const ValueType operandType = inferType(*node.array);
             ValueType arrayType = operandType;
             if (arrayType.kind == ValueType::Kind::Reference) arrayType = *arrayType.element;
-            if (arrayType.kind != ValueType::Kind::Array)
+            if (arrayType.kind != ValueType::Kind::Array &&
+                arrayType.kind != ValueType::Kind::Slice)
                 throw CompileError(node.array->location,
                                    "l'indexation exige une valeur de type tableau");
             checkExpression(*node.array, operandType);
             checkExpression(*node.index, ValueType::Int);
             if (const auto index = constantInteger(*node.index);
-                index && (*index < 0 || static_cast<std::uint64_t>(*index) >= arrayType.length)) {
+                arrayType.kind == ValueType::Kind::Array && index &&
+                (*index < 0 || static_cast<std::uint64_t>(*index) >= arrayType.length)) {
                 throw CompileError(node.index->location, "index " + std::to_string(*index) +
                     " hors limites pour " + typeName(arrayType));
             }
@@ -592,9 +601,6 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             for (std::size_t i = 0; i < node.arguments.size(); ++i) {
                 const ValueType parameterType = symbol->declaration != nullptr
                     ? symbol->declaration->parameters[i].type : symbol->parameterTypes[i];
-                if (parameterType.kind == ValueType::Kind::Slice)
-                    throw CompileError(node.arguments[i]->location,
-                                       "le passage de slices dans l'ABI n'est pas encore disponible");
                 checkExpression(*node.arguments[i], parameterType);
             }
             return symbol->type;

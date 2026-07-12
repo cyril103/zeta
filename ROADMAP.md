@@ -280,7 +280,8 @@ Consolider d'abord les références et préparer les vues dynamiques :
 4. concevoir `Slice[T]` et `SliceMut[T]` comme `{adresse, longueur}` sans
    allocation — terminé, voir `docs/SLICE_DESIGN.md` ;
 5. permettre de créer une slice depuis un tableau fixe emprunté — terminé ;
-6. passer et indexer les slices dans l'ABI avec les mêmes contrôles de limites ;
+6. passer et indexer les slices dans l'ABI avec les mêmes contrôles de limites —
+   terminé ;
 7. utiliser ensuite les slices pour les buffers d'E/S et les futures chaînes
    construites dynamiquement.
 

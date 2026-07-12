@@ -1,0 +1,11 @@
+def update (rows : SliceMut[[Int; 2]], row : Int, column : Int) : Int = {
+    rows[row][column] = 40
+    rows[row][column]
+}
+
+def main () : Int = {
+    var matrix : [[Int; 2]; 2] = [[1, 2], [3, 4]]
+    val rows : SliceMut[[Int; 2]] = SliceMut(&mut matrix)
+    val changed : Int = update(rows, 1, 0)
+    if (changed == 40 && matrix[1][0] == 40) 0 else 1
+}

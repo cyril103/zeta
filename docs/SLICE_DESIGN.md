@@ -45,5 +45,5 @@ comme l'indexation des tableaux fixes.
 1. types et syntaxe `Slice[T]` / `SliceMut[T]` — terminé ;
 2. création depuis `&[T; N]` et `&mut [T; N]` sans allocation — terminé,
    avec `Slice(&tableau)` et `SliceMut(&mut tableau)` ;
-3. passage, retour et indexation dans l'IR et l'ABI ;
+3. passage et indexation dans l'IR et l'ABI — terminé ;
 4. sous-slices, puis utilisation par les buffers d'E/S.

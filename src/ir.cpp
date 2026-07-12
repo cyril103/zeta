@@ -72,7 +72,8 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
             const ValueId value = nextValue(parameter.type);
             parameters.emplace(parameter.name, value);
             ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameter.type});
-            stackOffset += parameter.type == ValueType::String ? 16U : 8U;
+            stackOffset += parameter.type == ValueType::String ||
+                parameter.type.kind == ValueType::Kind::Slice ? 16U : 8U;
         }
         emitTailExpression(*function->initializer, parameters, *function);
     }
@@ -179,7 +180,8 @@ IrProgram IrGenerator::generate(const ModuleGraph& graph) {
             const ValueId value = nextValue(parameter.type);
             parameters.emplace(parameter.name, value);
             ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameter.type});
-            stackOffset += parameter.type == ValueType::String ? 16U : 8U;
+            stackOffset += parameter.type == ValueType::String ||
+                parameter.type.kind == ValueType::Kind::Slice ? 16U : 8U;
         }
         emitTailExpression(*function->initializer, parameters, *function);
         for (const std::string& alias : aliases) symbols_.erase(alias);
@@ -197,10 +199,11 @@ void IrGenerator::emitIndexStore(
         ? ir_.valueTypes[parameter->second]
         : symbol->second.declaration->type;
     const bool throughReference = targetType.kind == ValueType::Kind::Reference;
+    const bool throughSlice = targetType.kind == ValueType::Kind::Slice;
 
     ValueId array = 0;
     SlotId slot = 0;
-    if (throughReference) {
+    if (throughReference || throughSlice) {
         if (isParameter) {
             array = parameter->second;
         } else {
@@ -217,7 +220,7 @@ void IrGenerator::emitIndexStore(
     const ValueId value = expression(*assignment.value, parameters);
     const ValueType arrayType = throughReference ? *targetType.element : targetType;
     ir_.instructions.push_back(IrIndexStore{slot, array, std::move(indexes), value,
-                                            arrayType, throughReference});
+                                            arrayType, throughReference, throughSlice});
 }
 
 void IrGenerator::emitTailExpression(
@@ -404,10 +407,12 @@ ValueId IrGenerator::expression(
             const ValueId output = nextValue(expressionNode.inferredType);
             const bool arrayIsReference =
                 node.array->inferredType.kind == ValueType::Kind::Reference;
+            const bool arrayIsSlice =
+                node.array->inferredType.kind == ValueType::Kind::Slice;
             const ValueType arrayType = arrayIsReference
                 ? *node.array->inferredType.element : node.array->inferredType;
             ir_.instructions.push_back(IrIndexLoad{output, array, index, arrayType,
-                                                   arrayIsReference});
+                                                   arrayIsReference, arrayIsSlice});
             return output;
         } else if constexpr (std::is_same_v<T, AddressExpr>) {
             const auto& name = std::get<NameExpr>(node.operand->value);

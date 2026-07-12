@@ -380,6 +380,25 @@ if(BUILD_TESTING)
     set_tests_properties(run_slice_creation PROPERTIES
         DEPENDS compile_slice_creation)
 
+    foreach(slice_case IN ITEMS index_abi nested_index)
+        add_test(NAME compile_slice_${slice_case} COMMAND zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/slice_${slice_case}.zeta
+            -o ${CMAKE_CURRENT_BINARY_DIR}/slice-${slice_case})
+        add_test(NAME run_slice_${slice_case}
+            COMMAND ${CMAKE_CURRENT_BINARY_DIR}/slice-${slice_case})
+        set_tests_properties(run_slice_${slice_case} PROPERTIES
+            DEPENDS compile_slice_${slice_case})
+    endforeach()
+
+    add_test(NAME compile_slice_dynamic_bounds COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/slice_dynamic_bounds.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/slice-dynamic-bounds)
+    add_test(NAME run_slice_dynamic_bounds COMMAND ${CMAKE_COMMAND}
+        -DPROGRAM=${CMAKE_CURRENT_BINARY_DIR}/slice-dynamic-bounds
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_exit_101.cmake)
+    set_tests_properties(run_slice_dynamic_bounds PROPERTIES
+        DEPENDS compile_slice_dynamic_bounds)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -466,7 +485,8 @@ if(BUILD_TESTING)
             slice_global
             slice_borrowed_mutation
             slice_mut_borrowed_read
-            slice_mut_copy)
+            slice_mut_copy
+            slice_shared_mutation)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

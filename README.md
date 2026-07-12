@@ -393,9 +393,23 @@ val écriture : SliceMut[Int] = SliceMut(&mut tableauMutable)
 Cette opération ne copie aucun élément. La slice conserve l'emprunt du tableau
 jusqu'à sa dernière utilisation connue. Une `Slice[T]` peut être copiée et chaque
 copie prolonge cet emprunt ; une `SliceMut[T]` reste exclusive et non copiable. Le
-stockage global et le retour de slices restent interdits. L'indexation et le
-passage effectif dans l'ABI seront activés à l'étape suivante. Les invariants sont
-détaillés dans `docs/SLICE_DESIGN.md`.
+stockage global et le retour de slices restent interdits.
+
+Les slices peuvent être passées aux fonctions et indexées. Une `Slice[T]` permet
+la lecture, tandis qu'une `SliceMut[T]` permet également l'écriture :
+
+```text
+def premier (values : Slice[Int]) : Int = values[0]
+
+def remplace (values : SliceMut[Int], index : Int, value : Int) : Int = {
+    values[index] = value
+    values[index]
+}
+```
+
+Chaque accès vérifie dynamiquement `0 <= index < longueur` et termine avec le code
+`101` en cas d'échec. Les slices d'éléments tableaux acceptent aussi l'indexation
+imbriquée. Les invariants sont détaillés dans `docs/SLICE_DESIGN.md`.
 
 ## Expressions sur plusieurs lignes
 

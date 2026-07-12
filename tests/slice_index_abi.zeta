@@ -1,0 +1,20 @@
+def weighted (prefix : Int, values : Slice[Int], suffix : Int) : Int = prefix + values[0] + values[1] + values[2] + suffix
+
+def replace (values : SliceMut[Int], index : Int, value : Int) : Int = {
+    values[index] = value
+    values[index]
+}
+
+def lastRecursive (values : Slice[Int], index : Int) : Int = if (index == 2) values[index] else lastRecursive(values, index + 1)
+
+def main () : Int = {
+    var values : [Int; 3] = [10, 20, 5]
+    val read : Slice[Int] = Slice(&values)
+    val total : Int = weighted(3, read, 4)
+    val last : Int = lastRecursive(read, 0)
+
+    val write : SliceMut[Int] = SliceMut(&mut values)
+    val changed : Int = replace(write, 1, 42)
+
+    if (total == 42 && last == 5 && changed == 42 && values[1] == 42) 0 else 1
+}

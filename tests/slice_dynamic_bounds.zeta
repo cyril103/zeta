@@ -1,0 +1,7 @@
+def read (values : Slice[Int], index : Int) : Int = values[index]
+
+def main () : Int = {
+    val values : [Int; 2] = [1, 2]
+    val view : Slice[Int] = Slice(&values)
+    read(view, 2)
+}

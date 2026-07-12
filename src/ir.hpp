@@ -24,6 +24,7 @@ struct IrIndexLoad {
     ValueId index;
     ValueType arrayType;
     bool arrayIsReference;
+    bool arrayIsSlice;
 };
 struct IrIndexStore {
     SlotId slot;
@@ -32,6 +33,7 @@ struct IrIndexStore {
     ValueId value;
     ValueType arrayType;
     bool arrayIsReference;
+    bool arrayIsSlice;
 };
 struct IrAddressOf { ValueId output; SlotId slot; };
 struct IrDereference { ValueId output; ValueId reference; ValueType type; };

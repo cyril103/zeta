@@ -1,0 +1,6 @@
+def invalid (values : Slice[Int]) : Int = {
+    values[0] = 42
+    0
+}
+
+def main () : Int = 0
