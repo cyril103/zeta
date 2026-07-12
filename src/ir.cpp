@@ -86,6 +86,8 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
                                                    found->second.declaration->type});
             } else if constexpr (std::is_same_v<T, IndexAssignment>) {
                 emitIndexStore(node, {});
+            } else if constexpr (std::is_same_v<T, FieldAssignment>) {
+                emitFieldStore(node, {});
             } else if constexpr (std::is_same_v<T, DereferenceAssignment>) {
                 const ValueId reference = expression(*node.reference);
                 const ValueId value = expression(*node.value);
@@ -121,8 +123,9 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
                 boxParameters_.insert_or_assign(parameter.name,
                                                  std::pair{value, parameter.type});
             ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameter.type});
-            stackOffset += parameter.type == ValueType::String ||
-                parameter.type.kind == ValueType::Kind::Slice ? 16U : 8U;
+            stackOffset += parameter.type.kind == ValueType::Kind::Struct
+                ? (valueTypeSize(parameter.type) + 7U) / 8U * 8U
+                : parameter.type == ValueType::String || parameter.type.kind == ValueType::Kind::Slice ? 16U : 8U;
         }
         emitTailExpression(*function->initializer, parameters, *function);
     }
@@ -146,8 +149,9 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
                 boxParameters_.insert_or_assign(parameter.name,
                                                  std::pair{value, parameterType});
             ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameterType});
-            stackOffset += parameterType == ValueType::String ||
-                parameterType.kind == ValueType::Kind::Slice ? 16U : 8U;
+            stackOffset += parameterType.kind == ValueType::Kind::Struct
+                ? (valueTypeSize(parameterType) + 7U) / 8U * 8U
+                : parameterType == ValueType::String || parameterType.kind == ValueType::Kind::Slice ? 16U : 8U;
         }
         emitTailExpression(*function.initializer, parameters, function);
     }
@@ -221,6 +225,8 @@ IrProgram IrGenerator::generate(const ModuleGraph& graph) {
                                                        found->second.declaration->type});
                 } else if constexpr (std::is_same_v<T, IndexAssignment>) {
                     emitIndexStore(node, {});
+                } else if constexpr (std::is_same_v<T, FieldAssignment>) {
+                    emitFieldStore(node, {});
                 } else if constexpr (std::is_same_v<T, DereferenceAssignment>) {
                     const ValueId reference = expression(*node.reference);
                     const ValueId value = expression(*node.value);
@@ -267,8 +273,9 @@ IrProgram IrGenerator::generate(const ModuleGraph& graph) {
                 boxParameters_.insert_or_assign(parameter.name,
                                                  std::pair{value, parameter.type});
             ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameter.type});
-            stackOffset += parameter.type == ValueType::String ||
-                parameter.type.kind == ValueType::Kind::Slice ? 16U : 8U;
+            stackOffset += parameter.type.kind == ValueType::Kind::Struct
+                ? (valueTypeSize(parameter.type) + 7U) / 8U * 8U
+                : parameter.type == ValueType::String || parameter.type.kind == ValueType::Kind::Slice ? 16U : 8U;
         }
         emitTailExpression(*function->initializer, parameters, *function);
         for (const std::string& alias : aliases) symbols_.erase(alias);
@@ -292,8 +299,9 @@ IrProgram IrGenerator::generate(const ModuleGraph& graph) {
                 boxParameters_.insert_or_assign(function.parameters[i].name,
                                                  std::pair{value, parameterType});
             ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameterType});
-            stackOffset += parameterType == ValueType::String ||
-                parameterType.kind == ValueType::Kind::Slice ? 16U : 8U;
+            stackOffset += parameterType.kind == ValueType::Kind::Struct
+                ? (valueTypeSize(parameterType) + 7U) / 8U * 8U
+                : parameterType == ValueType::String || parameterType.kind == ValueType::Kind::Slice ? 16U : 8U;
         }
         emitTailExpression(*function.initializer, parameters, function);
     }
@@ -333,6 +341,20 @@ void IrGenerator::emitIndexStore(
     const ValueType arrayType = throughReference ? *targetType.element : targetType;
     ir_.instructions.push_back(IrIndexStore{slot, array, std::move(indexes), value,
                                             arrayType, throughReference, throughSlice});
+}
+
+void IrGenerator::emitFieldStore(
+    const FieldAssignment& assignment,
+    const std::unordered_map<std::string, ValueId>& parameters) {
+    const auto symbol = symbols_.find(assignment.name);
+    const ValueType type = symbol->second.declaration->type;
+    const auto& fields = type.structure->fields;
+    const auto field = std::find_if(fields.begin(), fields.end(), [&](const StructField& candidate) {
+        return candidate.name == assignment.field;
+    });
+    ir_.instructions.push_back(IrFieldStore{symbol->second.slot,
+        expression(*assignment.value, parameters), type,
+        static_cast<std::size_t>(field - fields.begin())});
 }
 
 void IrGenerator::emitBoxDrops(const std::vector<std::string>& names) {
@@ -394,6 +416,8 @@ void IrGenerator::emitTailExpression(
                                                        found->second.declaration->type});
                 } else if constexpr (std::is_same_v<T, IndexAssignment>) {
                     emitIndexStore(item, parameters);
+                } else if constexpr (std::is_same_v<T, FieldAssignment>) {
+                    emitFieldStore(item, parameters);
                 } else if constexpr (std::is_same_v<T, DereferenceAssignment>) {
                     const ValueId reference = expression(*item.reference, parameters);
                     const ValueId value = expression(*item.value, parameters);
@@ -504,6 +528,8 @@ void IrGenerator::emitLoop(
                                                    found->second.declaration->type});
             } else if constexpr (std::is_same_v<T, IndexAssignment>) {
                 emitIndexStore(item, parameters);
+            } else if constexpr (std::is_same_v<T, FieldAssignment>) {
+                emitFieldStore(item, parameters);
             } else if constexpr (std::is_same_v<T, DereferenceAssignment>) {
                 const ValueId reference = expression(*item.reference, parameters);
                 const ValueId value = expression(*item.value, parameters);
@@ -773,6 +799,8 @@ ValueId IrGenerator::expression(
                                                            found->second.declaration->type});
                     } else if constexpr (std::is_same_v<S, IndexAssignment>) {
                         emitIndexStore(item, parameters);
+                    } else if constexpr (std::is_same_v<S, FieldAssignment>) {
+                        emitFieldStore(item, parameters);
                     } else if constexpr (std::is_same_v<S, DereferenceAssignment>) {
                         const ValueId reference = expression(*item.reference, parameters);
                         const ValueId value = expression(*item.value, parameters);
@@ -871,6 +899,9 @@ std::string IrGenerator::print(const IrProgram& program) {
             else if constexpr (std::is_same_v<T, IrFieldLoad>)
                 out << "  $" << item.output << " = field $" << item.object
                     << '.' << item.objectType.structure->fields[item.field].name << '\n';
+            else if constexpr (std::is_same_v<T, IrFieldStore>)
+                out << "  field_store %" << program.slots[item.slot].name << '.'
+                    << item.objectType.structure->fields[item.field].name << ", $" << item.value << '\n';
             else if constexpr (std::is_same_v<T, IrSliceConstruct>)
                 out << "  $" << item.output << " = slice $" << item.reference
                     << ", " << item.length << '\n';

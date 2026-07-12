@@ -97,6 +97,9 @@ void collectStatementNames(const Statement& statement,
             ++uses[node.name];
             for (const ExprPtr& index : node.indexes) collectExpressionNames(*index, uses);
             collectExpressionNames(*node.value, uses);
+        } else if constexpr (std::is_same_v<T, FieldAssignment>) {
+            ++uses[node.name];
+            collectExpressionNames(*node.value, uses);
         } else if constexpr (std::is_same_v<T, DereferenceAssignment>) {
             collectExpressionNames(*node.reference, uses);
             collectExpressionNames(*node.value, uses);
@@ -194,6 +197,7 @@ void SemanticAnalyzer::checkStatement(Statement& statement, bool global) {
         if constexpr (std::is_same_v<T, Declaration>) checkDeclaration(node, global);
         else if constexpr (std::is_same_v<T, Assignment>) checkAssignment(node);
         else if constexpr (std::is_same_v<T, IndexAssignment>) checkIndexAssignment(node);
+        else if constexpr (std::is_same_v<T, FieldAssignment>) checkFieldAssignment(node);
         else if constexpr (std::is_same_v<T, DereferenceAssignment>)
             checkDereferenceAssignment(node);
         else if constexpr (std::is_same_v<T, WhileStatement>) checkLoop(node);
@@ -334,6 +338,10 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
     if (declaration.callable && declaration.type.kind == ValueType::Kind::Array)
         throw CompileError(declaration.location,
                            "le retour d'un tableau par valeur n'est pas encore pris en charge");
+    if (declaration.callable && declaration.type.kind == ValueType::Kind::Struct &&
+        valueTypeSize(declaration.type) > 16U)
+        throw CompileError(declaration.location,
+                           "le retour ABI d'une structure est limité à 16 octets");
     for (const Parameter& parameter : declaration.parameters)
         if (parameter.type.kind == ValueType::Kind::Array)
             throw CompileError(parameter.location,
@@ -451,6 +459,22 @@ void SemanticAnalyzer::checkIndexAssignment(IndexAssignment& assignment) {
         indexedType = *indexedType.element;
     }
     checkExpression(*assignment.value, indexedType);
+}
+
+void SemanticAnalyzer::checkFieldAssignment(FieldAssignment& assignment) {
+    const SemanticSymbol* target = symbols_.lookup(assignment.name);
+    if (target == nullptr)
+        throw CompileError(assignment.location, "identifiant inconnu '" + assignment.name + "'");
+    if (target->parameter || target->kind != BindingKind::Var)
+        throw CompileError(assignment.location, "la structure '" + assignment.name + "' est immuable");
+    if (target->type.kind != ValueType::Kind::Struct)
+        throw CompileError(assignment.location, "l'affectation de champ exige une structure");
+    for (const StructField& field : target->type.structure->fields)
+        if (field.name == assignment.field) {
+            checkExpression(*assignment.value, field.type);
+            return;
+        }
+    throw CompileError(assignment.location, "champ inconnu '" + assignment.field + "'");
 }
 
 void SemanticAnalyzer::checkDereferenceAssignment(DereferenceAssignment& assignment) {

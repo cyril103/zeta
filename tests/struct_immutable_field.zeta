@@ -1,0 +1,6 @@
+struct Point { x: Int }
+def main(): Int = {
+    val point: Point = Point { x: 1 }
+    point.x = 2
+    point.x
+}

@@ -8,8 +8,14 @@ struct Pixel {
     visible: Bool
 }
 
+def moveX(point: Point, delta: Int): Point = Point { x: point.x + delta, y: point.y }
+
+def sum(point: Point): Int = point.x + point.y
+
 def main(): Int = {
     val point: Point = Point { x: 19, y: 23 }
     val pixel: Pixel = Pixel { position: point, visible: true }
-    if (pixel.position.x + pixel.position.y == 42) { 0 } else { 1 }
+    var moved: Point = moveX(pixel.position, 1)
+    moved.y = 24
+    if (sum(moved) == 44) { 0 } else { 1 }
 }

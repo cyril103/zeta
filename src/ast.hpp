@@ -190,6 +190,7 @@ struct IndexAssignment {
     std::vector<ExprPtr> indexes;
     ExprPtr value;
 };
+struct FieldAssignment { SourceLocation location; std::string name; std::string field; ExprPtr value; };
 struct DereferenceAssignment {
     SourceLocation location;
     ExprPtr reference;
@@ -211,12 +212,13 @@ struct BreakStatement { SourceLocation location; };
 struct ContinueStatement { SourceLocation location; };
 
 struct Statement {
-    std::variant<Declaration, Assignment, IndexAssignment, DereferenceAssignment, WhileStatement, ExpressionStatement, ReturnStatement,
+    std::variant<Declaration, Assignment, IndexAssignment, FieldAssignment, DereferenceAssignment, WhileStatement, ExpressionStatement, ReturnStatement,
                  BreakStatement, ContinueStatement> value;
 
     Statement(Declaration declaration) : value(std::move(declaration)) {}
     Statement(Assignment assignment) : value(std::move(assignment)) {}
     Statement(IndexAssignment assignment) : value(std::move(assignment)) {}
+    Statement(FieldAssignment assignment) : value(std::move(assignment)) {}
     Statement(DereferenceAssignment assignment) : value(std::move(assignment)) {}
     Statement(WhileStatement loop) : value(std::move(loop)) {}
     Statement(ExpressionStatement expression) : value(std::move(expression)) {}
