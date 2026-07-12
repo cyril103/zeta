@@ -708,9 +708,6 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                         movedBoxes_.insert(moved->name);
                 }
             }
-            if (generic != nullptr && !insideGenericDeclaration_)
-                throw CompileError(expression.location,
-                                   "la monomorphisation des appels génériques arrive à l'étape suivante");
             return generic == nullptr ? symbol->type
                                       : substituteType(symbol->type, substitutions);
         } else if constexpr (std::is_same_v<T, ConversionExpr>) {

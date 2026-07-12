@@ -445,10 +445,11 @@ def identity[T] (value : T) : T = value
 def keepBox[T] (value : Box[T]) : Box[T] = value
 ```
 
-L'instanciation explicite s'écrit `identity[Int](42)`. Sa syntaxe, son arité et la
-substitution de signature sont validées ; la génération des unités spécialisées
-arrive à l'étape suivante. Une fonction générique non instanciée ne produit pas
-encore de code machine. Le plan complet est décrit dans `docs/GENERICS_DESIGN.md`.
+L'instanciation explicite s'écrit `identity[Int](42)`. Chaque combinaison utilisée
+produit une unité machine spécialisée et manglée ; deux appels avec les mêmes
+types réutilisent la même instance. Une fonction générique non instanciée ne
+produit aucun code machine. Le plan complet est décrit dans
+`docs/GENERICS_DESIGN.md`.
 
 ## Expressions sur plusieurs lignes
 

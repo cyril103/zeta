@@ -1,0 +1,11 @@
+def identity[T] (value : T) : T = value
+
+def main () : Int = {
+    val first : Int = identity[Int](20)
+    val second : Int = identity[Int](22)
+    val byte : Byte = identity[Byte](Byte(255))
+    val text : String = identity[String]("Zeta")
+    val boxed : Box[Int] = Box(42)
+    val moved : Box[Int] = identity[Box[Int]](boxed)
+    if (first + second == 42 && byte == Byte(255) && text == "Zeta" && *moved == 42) 0 else 1
+}

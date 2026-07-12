@@ -93,6 +93,11 @@ public:
     static std::string print(const IrProgram& program);
 
 private:
+    struct GenericInstance {
+        const Declaration* declaration;
+        std::vector<ValueType> types;
+        std::string linkName;
+    };
     struct Symbol {
         SlotId slot;
         BindingKind kind;
@@ -115,6 +120,11 @@ private:
                             const std::unordered_map<std::string, ValueId>& parameters,
                             const Declaration& function);
     ValueId nextValue(ValueType type);
+    ValueType resolveType(const ValueType& type) const;
+    std::string genericLinkName(const Declaration& declaration,
+                                const std::vector<ValueType>& types) const;
+    void registerGenericInstance(const Declaration& declaration,
+                                 const std::vector<ValueType>& types);
     IrProgram ir_;
     std::unordered_map<std::string, Symbol> symbols_;
     bool inFunction_{false};
@@ -123,4 +133,7 @@ private:
     std::unordered_set<std::string> movedBoxes_;
     std::vector<std::vector<std::string>> boxScopes_;
     std::unordered_map<std::string, std::pair<ValueId, ValueType>> boxParameters_;
+    std::unordered_map<std::string, ValueType> typeSubstitutions_;
+    std::vector<GenericInstance> genericInstances_;
+    std::unordered_set<std::string> genericInstanceNames_;
 };

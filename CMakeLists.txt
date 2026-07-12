@@ -344,6 +344,19 @@ if(BUILD_TESTING)
     set_tests_properties(run_generic_explicit_instantiation_syntax PROPERTIES
         DEPENDS compile_generic_explicit_instantiation_syntax)
 
+    add_test(NAME compile_generic_monomorphization COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_monomorphization.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/generic-monomorphization)
+    add_test(NAME run_generic_monomorphization
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/generic-monomorphization)
+    set_tests_properties(run_generic_monomorphization PROPERTIES
+        DEPENDS compile_generic_monomorphization)
+    add_test(NAME check_generic_instances COMMAND ${CMAKE_COMMAND}
+        -DIR_FILE=${CMAKE_CURRENT_BINARY_DIR}/generic-monomorphization.ir
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_generic_instances.cmake)
+    set_tests_properties(check_generic_instances PROPERTIES
+        DEPENDS compile_generic_monomorphization)
+
     add_test(NAME compile_box_content_borrow COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/box_content_borrow.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/box-content-borrow)

@@ -3,14 +3,50 @@
 #include "diagnostic.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <iomanip>
 #include <limits>
 #include <sstream>
 #include <type_traits>
 
 ValueId IrGenerator::nextValue(ValueType type) {
-    ir_.valueTypes.push_back(type);
+    ir_.valueTypes.push_back(resolveType(type));
     return ir_.valueCount++;
+}
+
+ValueType IrGenerator::resolveType(const ValueType& type) const {
+    if (type.kind == ValueType::Kind::TypeParameter) return typeSubstitutions_.at(type.typeParameter);
+    if (type.kind == ValueType::Kind::Array)
+        return ValueType(std::make_shared<ValueType>(resolveType(*type.element)), type.length);
+    if (type.kind == ValueType::Kind::Reference)
+        return ValueType(std::make_shared<ValueType>(resolveType(*type.element)),
+                         type.mutableReference);
+    if (type.kind == ValueType::Kind::Slice)
+        return ValueType(ValueType::Kind::Slice,
+                         std::make_shared<ValueType>(resolveType(*type.element)),
+                         type.mutableReference);
+    if (type.kind == ValueType::Kind::Box)
+        return ValueType(ValueType::Kind::Box,
+                         std::make_shared<ValueType>(resolveType(*type.element)));
+    return type;
+}
+
+std::string IrGenerator::genericLinkName(
+    const Declaration& declaration, const std::vector<ValueType>& types) const {
+    std::string name = declaration.name;
+    for (const ValueType& type : types) {
+        name += "__";
+        for (char character : typeName(type))
+            name += std::isalnum(static_cast<unsigned char>(character)) ? character : '_';
+    }
+    return name;
+}
+
+void IrGenerator::registerGenericInstance(
+    const Declaration& declaration, const std::vector<ValueType>& types) {
+    const std::string linkName = genericLinkName(declaration, types);
+    if (genericInstanceNames_.insert(linkName).second)
+        genericInstances_.push_back(GenericInstance{&declaration, types, linkName});
 }
 
 IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
@@ -20,6 +56,9 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
     movedBoxes_.clear();
     boxScopes_.clear();
     boxParameters_.clear();
+    typeSubstitutions_.clear();
+    genericInstances_.clear();
+    genericInstanceNames_.clear();
     nextLabel_ = 0;
     loopLabels_.clear();
     inFunction_ = false;
@@ -87,6 +126,32 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
         }
         emitTailExpression(*function->initializer, parameters, *function);
     }
+    for (std::size_t instanceIndex = 0; instanceIndex < genericInstances_.size(); ++instanceIndex) {
+        const GenericInstance instance = genericInstances_[instanceIndex];
+        const Declaration& function = *instance.declaration;
+        typeSubstitutions_.clear();
+        for (std::size_t i = 0; i < function.typeParameters.size(); ++i)
+            typeSubstitutions_.emplace(function.typeParameters[i], instance.types[i]);
+        boxParameters_.clear();
+        movedBoxes_.clear();
+        ir_.instructions.push_back(IrFunctionStart{instance.linkName});
+        std::unordered_map<std::string, ValueId> parameters;
+        std::size_t stackOffset = 16U;
+        for (std::size_t i = 0; i < function.parameters.size(); ++i) {
+            const Parameter& parameter = function.parameters[i];
+            const ValueType parameterType = resolveType(parameter.type);
+            const ValueId value = nextValue(parameterType);
+            parameters.emplace(parameter.name, value);
+            if (parameterType.kind == ValueType::Kind::Box)
+                boxParameters_.insert_or_assign(parameter.name,
+                                                 std::pair{value, parameterType});
+            ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameterType});
+            stackOffset += parameterType == ValueType::String ||
+                parameterType.kind == ValueType::Kind::Slice ? 16U : 8U;
+        }
+        emitTailExpression(*function.initializer, parameters, function);
+    }
+    typeSubstitutions_.clear();
     return std::move(ir_);
 }
 
@@ -96,6 +161,9 @@ IrProgram IrGenerator::generate(const ModuleGraph& graph) {
     movedBoxes_.clear();
     boxScopes_.clear();
     boxParameters_.clear();
+    typeSubstitutions_.clear();
+    genericInstances_.clear();
+    genericInstanceNames_.clear();
     nextLabel_ = 0;
     loopLabels_.clear();
     inFunction_ = false;
@@ -205,6 +273,31 @@ IrProgram IrGenerator::generate(const ModuleGraph& graph) {
         emitTailExpression(*function->initializer, parameters, *function);
         for (const std::string& alias : aliases) symbols_.erase(alias);
     }
+    for (std::size_t instanceIndex = 0; instanceIndex < genericInstances_.size(); ++instanceIndex) {
+        const GenericInstance instance = genericInstances_[instanceIndex];
+        const Declaration& function = *instance.declaration;
+        typeSubstitutions_.clear();
+        for (std::size_t i = 0; i < function.typeParameters.size(); ++i)
+            typeSubstitutions_.emplace(function.typeParameters[i], instance.types[i]);
+        boxParameters_.clear();
+        movedBoxes_.clear();
+        ir_.instructions.push_back(IrFunctionStart{instance.linkName});
+        std::unordered_map<std::string, ValueId> parameters;
+        std::size_t stackOffset = 16U;
+        for (std::size_t i = 0; i < function.parameters.size(); ++i) {
+            const ValueType parameterType = resolveType(function.parameters[i].type);
+            const ValueId value = nextValue(parameterType);
+            parameters.emplace(function.parameters[i].name, value);
+            if (parameterType.kind == ValueType::Kind::Box)
+                boxParameters_.insert_or_assign(function.parameters[i].name,
+                                                 std::pair{value, parameterType});
+            ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameterType});
+            stackOffset += parameterType == ValueType::String ||
+                parameterType.kind == ValueType::Kind::Slice ? 16U : 8U;
+        }
+        emitTailExpression(*function.initializer, parameters, function);
+    }
+    typeSubstitutions_.clear();
     return std::move(ir_);
 }
 
@@ -367,11 +460,12 @@ void IrGenerator::emitTailExpression(
         return;
     }
     const ValueId result = expression(expressionNode, parameters);
-    if (function.type.kind == ValueType::Kind::Box)
+    const ValueType resolvedFunctionType = resolveType(function.type);
+    if (resolvedFunctionType.kind == ValueType::Kind::Box)
         if (const auto* moved = std::get_if<NameExpr>(&expressionNode.value))
             movedBoxes_.insert(moved->name);
     emitBoxParameterDrops();
-    ir_.instructions.push_back(IrReturn{result, function.type});
+    ir_.instructions.push_back(IrReturn{result, resolvedFunctionType});
 }
 
 
@@ -560,16 +654,33 @@ ValueId IrGenerator::expression(
             }
             std::vector<ValueId> arguments;
             std::vector<ValueType> argumentTypes;
+            std::string linkName = found->second.linkName;
+            auto callSubstitutions = typeSubstitutions_;
+            if (!function.typeParameters.empty()) {
+                std::vector<ValueType> instanceTypes;
+                for (const ValueType& type : node.typeArguments)
+                    instanceTypes.push_back(resolveType(type));
+                registerGenericInstance(function, instanceTypes);
+                linkName = genericLinkName(function, instanceTypes);
+                callSubstitutions.clear();
+                for (std::size_t i = 0; i < function.typeParameters.size(); ++i)
+                    callSubstitutions.emplace(function.typeParameters[i], instanceTypes[i]);
+            }
+            const auto outerSubstitutions = typeSubstitutions_;
+            typeSubstitutions_ = callSubstitutions;
             for (std::size_t i = 0; i < node.arguments.size(); ++i) {
                 arguments.push_back(expression(*node.arguments[i], parameters));
-                argumentTypes.push_back(function.parameters[i].type);
-                if (function.parameters[i].type.kind == ValueType::Kind::Box)
+                const ValueType argumentType = resolveType(function.parameters[i].type);
+                argumentTypes.push_back(argumentType);
+                if (argumentType.kind == ValueType::Kind::Box)
                     if (const auto* moved = std::get_if<NameExpr>(&node.arguments[i]->value))
                         movedBoxes_.insert(moved->name);
             }
-            const ValueId output = nextValue(function.type);
-            ir_.instructions.push_back(IrCall{output, found->second.linkName, std::move(arguments),
-                                              std::move(argumentTypes), function.type});
+            const ValueType returnType = resolveType(function.type);
+            const ValueId output = nextValue(returnType);
+            typeSubstitutions_ = outerSubstitutions;
+            ir_.instructions.push_back(IrCall{output, linkName, std::move(arguments),
+                                              std::move(argumentTypes), returnType});
             return output;
         } else if constexpr (std::is_same_v<T, ConversionExpr>) {
             const ValueId input = expression(*node.operand, parameters);
