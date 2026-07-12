@@ -271,6 +271,7 @@ Program Parser::parse() {
         const Token& module = consume(TokenKind::Identifier,
                                       "nom de module attendu après 'import'");
         program.imports.push_back(Program::Import{start.location, module.text});
+        importedModules_.insert(module.text);
         if (!check(TokenKind::End) && !matchSeparator())
             throw CompileError(peek().location, "fin d'instruction attendue après l'import");
         skipSeparators();
@@ -440,6 +441,11 @@ Declaration Parser::declaration(BindingKind kind) {
 
 std::string Parser::qualifiedName() {
     std::string name = previous().text;
+    const bool moduleName = importedModules_.contains(name);
+    std::size_t cursor = current_;
+    while (cursor + 1 < tokens_.size() && tokens_[cursor].kind == TokenKind::Dot &&
+           tokens_[cursor + 1].kind == TokenKind::Identifier) cursor += 2;
+    if (!moduleName && (cursor >= tokens_.size() || tokens_[cursor].kind != TokenKind::LeftParen)) return name;
     while (match(TokenKind::Dot)) {
         const Token& part = consume(TokenKind::Identifier,
                                     "identifiant attendu après '.'");
@@ -562,7 +568,14 @@ ExprPtr Parser::unary() {
 
 ExprPtr Parser::postfix() {
     ExprPtr expr = primary();
-    while (match(TokenKind::LeftBracket)) {
+    while (check(TokenKind::LeftBracket) || check(TokenKind::Dot)) {
+        if (match(TokenKind::Dot)) {
+            const Token& field = consume(TokenKind::Identifier, "nom de champ attendu après '.'");
+            expr = std::make_unique<Expression>(Expression{
+                field.location, FieldExpr{std::move(expr), field.text}});
+            continue;
+        }
+        consume(TokenKind::LeftBracket, "'[' attendue");
         const Token token = previous();
         expressionContinuation();
         ExprPtr index = expression();
@@ -672,6 +685,35 @@ ExprPtr Parser::primary() {
     }
     if (match(TokenKind::Identifier)) {
         const Token token = previous();
+        if (const auto structure = structures_.find(token.text);
+            structure != structures_.end() && check(TokenKind::LeftBrace)) {
+            consume(TokenKind::LeftBrace, "'{' attendue");
+            skipSeparators();
+            std::vector<ExprPtr> fields(structure->second->fields.size());
+            std::unordered_set<std::string> initialized;
+            while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
+                const Token& field = consume(TokenKind::Identifier, "nom de champ attendu");
+                const auto found = std::find_if(structure->second->fields.begin(),
+                    structure->second->fields.end(), [&](const StructField& candidate) {
+                        return candidate.name == field.text;
+                    });
+                if (found == structure->second->fields.end())
+                    throw CompileError(field.location, "champ inconnu '" + field.text + "' pour " + token.text);
+                if (!initialized.insert(field.text).second)
+                    throw CompileError(field.location, "champ '" + field.text + "' initialisé plusieurs fois");
+                consume(TokenKind::Colon, "':' attendu après le nom du champ");
+                fields[static_cast<std::size_t>(found - structure->second->fields.begin())] = expression();
+                if (!check(TokenKind::RightBrace) && !match(TokenKind::Comma) && !matchSeparator())
+                    throw CompileError(peek().location, "fin de ligne, ',' ou '}' attendue");
+                skipSeparators();
+            }
+            consume(TokenKind::RightBrace, "'}' attendue après les champs");
+            for (std::size_t i = 0; i < fields.size(); ++i)
+                if (!fields[i]) throw CompileError(token.location, "champ '" +
+                    structure->second->fields[i].name + "' manquant pour " + token.text);
+            return std::make_unique<Expression>(Expression{
+                token.location, StructExpr{structure->second, std::move(fields)}});
+        }
         const std::string name = qualifiedName();
         std::vector<ValueType> typeArguments;
         bool hasTypeArguments = false;

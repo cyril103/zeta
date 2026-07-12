@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
         fs::path cacheDirectory = outputPath;
         cacheDirectory += ".cache";
         fs::create_directories(cacheDirectory);
-        std::string programFingerprint = "zeta-program-cache-v4-generics";
+        std::string programFingerprint = "zeta-program-cache-v5-structs";
         for (const std::string& moduleName : modules.compilationOrder)
             programFingerprint += ":" + moduleName + ":" + modules.fingerprints.at(moduleName);
         const fs::path cachedProgramObject = cacheDirectory / "program.o";

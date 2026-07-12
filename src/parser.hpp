@@ -52,4 +52,5 @@ private:
     bool nativeDeclaration_{false};
     std::unordered_set<std::string> activeTypeParameters_;
     std::unordered_map<std::string, std::shared_ptr<StructType>> structures_;
+    std::unordered_set<std::string> importedModules_;
 };

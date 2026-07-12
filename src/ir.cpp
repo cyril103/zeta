@@ -581,6 +581,20 @@ ValueId IrGenerator::expression(
             ir_.instructions.push_back(IrArrayConstruct{output, std::move(elements),
                                                         expressionNode.inferredType});
             return output;
+        } else if constexpr (std::is_same_v<T, StructExpr>) {
+            std::vector<ValueId> fields;
+            for (const ExprPtr& field : node.fields) fields.push_back(expression(*field, parameters));
+            const ValueId output = nextValue(expressionNode.inferredType);
+            ir_.instructions.push_back(IrStructConstruct{output, std::move(fields), expressionNode.inferredType});
+            return output;
+        } else if constexpr (std::is_same_v<T, FieldExpr>) {
+            const ValueId object = expression(*node.object, parameters);
+            const auto& fields = node.object->inferredType.structure->fields;
+            const auto found = std::find_if(fields.begin(), fields.end(), [&](const StructField& field) { return field.name == node.field; });
+            const ValueId output = nextValue(expressionNode.inferredType);
+            ir_.instructions.push_back(IrFieldLoad{output, object, node.object->inferredType,
+                static_cast<std::size_t>(found - fields.begin())});
+            return output;
         } else if constexpr (std::is_same_v<T, IndexExpr>) {
             const ValueId array = expression(*node.array, parameters);
             const ValueId index = expression(*node.index, parameters);
@@ -846,6 +860,17 @@ std::string IrGenerator::print(const IrProgram& program) {
                 }
                 out << "]\n";
             }
+            else if constexpr (std::is_same_v<T, IrStructConstruct>) {
+                out << "  $" << item.output << " = struct " << typeName(item.type) << " [";
+                for (std::size_t i = 0; i < item.fields.size(); ++i) {
+                    if (i != 0) out << ", ";
+                    out << '$' << item.fields[i];
+                }
+                out << "]\n";
+            }
+            else if constexpr (std::is_same_v<T, IrFieldLoad>)
+                out << "  $" << item.output << " = field $" << item.object
+                    << '.' << item.objectType.structure->fields[item.field].name << '\n';
             else if constexpr (std::is_same_v<T, IrSliceConstruct>)
                 out << "  $" << item.output << " = slice $" << item.reference
                     << ", " << item.length << '\n';

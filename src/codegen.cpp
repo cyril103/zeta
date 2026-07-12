@@ -16,7 +16,7 @@ std::size_t typeSize(ValueType type) {
     return valueTypeSize(type);
 }
 std::size_t valueSize(ValueType type) {
-    if (type.kind == ValueType::Kind::Array) return valueTypeSize(type);
+    if (type.kind == ValueType::Kind::Array || type.kind == ValueType::Kind::Struct) return valueTypeSize(type);
     if (type.kind == ValueType::Kind::Reference || type.kind == ValueType::Kind::Box) return 8U;
     if (type == ValueType::String || type.kind == ValueType::Kind::Slice) return 16U;
     return type == ValueType::Double ? 8U : 4U;
@@ -122,6 +122,18 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         (i == 0 ? "]" : "+" + std::to_string(i * elementBytes) + "]");
                     emitBlockCopy(out, source, target, elementBytes);
                 }
+            } else if constexpr (std::is_same_v<T, IrStructConstruct>) {
+                const std::size_t output = valueOffset(program, item.output);
+                for (std::size_t i = 0; i < item.fields.size(); ++i) {
+                    const StructField& field = item.type.structure->fields[i];
+                    emitBlockCopy(out, "[rbp-" + std::to_string(valueOffset(program, item.fields[i])) + "]",
+                        "[rbp-" + std::to_string(output) + "+" + std::to_string(field.offset) + "]",
+                        valueTypeSize(field.type));
+                }
+            } else if constexpr (std::is_same_v<T, IrFieldLoad>) {
+                const StructField& field = item.objectType.structure->fields[item.field];
+                emitBlockCopy(out, "[rbp-" + std::to_string(valueOffset(program, item.object)) + "+" + std::to_string(field.offset) + "]",
+                    "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]", valueTypeSize(field.type));
             } else if constexpr (std::is_same_v<T, IrSliceConstruct>) {
                 const std::size_t output = valueOffset(program, item.output);
                 out << "    mov rax, qword [rbp-" << valueOffset(program, item.reference) << "]\n"
@@ -215,6 +227,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     ? "[global_slot_" + std::to_string(item.slot) + "]"
                     : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
                 if (item.type.kind == ValueType::Kind::Array ||
+                    item.type.kind == ValueType::Kind::Struct ||
                     item.type.kind == ValueType::Kind::Slice) {
                     emitBlockCopy(out, address,
                         "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]",
@@ -383,6 +396,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     ? "[global_slot_" + std::to_string(item.slot) + "]"
                     : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
                 if (item.type.kind == ValueType::Kind::Array ||
+                    item.type.kind == ValueType::Kind::Struct ||
                     item.type.kind == ValueType::Kind::Slice) {
                     emitBlockCopy(out,
                         "[rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
@@ -408,6 +422,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 }
             } else if constexpr (std::is_same_v<T, IrCopy>) {
                 if (item.type.kind == ValueType::Kind::Array ||
+                    item.type.kind == ValueType::Kind::Struct ||
                     item.type.kind == ValueType::Kind::Slice) {
                     emitBlockCopy(out,
                         "[rbp-" + std::to_string(valueOffset(program, item.input)) + "]",

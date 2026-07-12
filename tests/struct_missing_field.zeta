@@ -1,0 +1,2 @@
+struct Point { x: Int, y: Int }
+def main(): Int = Point { x: 1 }.y

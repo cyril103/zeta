@@ -117,6 +117,10 @@ void collectExpressionNames(const Expression& expression,
         using T = std::decay_t<decltype(node)>;
         if constexpr (std::is_same_v<T, ArrayExpr>) {
             for (const ExprPtr& element : node.elements) collectExpressionNames(*element, uses);
+        } else if constexpr (std::is_same_v<T, StructExpr>) {
+            for (const ExprPtr& field : node.fields) collectExpressionNames(*field, uses);
+        } else if constexpr (std::is_same_v<T, FieldExpr>) {
+            collectExpressionNames(*node.object, uses);
         } else if constexpr (std::is_same_v<T, IndexExpr>) {
             collectExpressionNames(*node.array, uses);
             collectExpressionNames(*node.index, uses);
@@ -547,6 +551,14 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
             return ValueType(std::make_shared<ValueType>(inferType(*node.elements.front())),
                              node.elements.size());
         }
+        else if constexpr (std::is_same_v<T, StructExpr>) return ValueType(node.type);
+        else if constexpr (std::is_same_v<T, FieldExpr>) {
+            const ValueType object = inferType(*node.object);
+            if (object.kind != ValueType::Kind::Struct) return ValueType::Int;
+            for (const StructField& field : object.structure->fields)
+                if (field.name == node.field) return field.type;
+            return ValueType::Int;
+        }
         else if constexpr (std::is_same_v<T, IndexExpr>) {
             ValueType arrayType = inferType(*node.array);
             if (arrayType.kind == ValueType::Kind::Reference) arrayType = *arrayType.element;
@@ -619,6 +631,22 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 }
             }
             return expected;
+        }
+        else if constexpr (std::is_same_v<T, StructExpr>) {
+            const ValueType type(node.type);
+            for (std::size_t i = 0; i < node.fields.size(); ++i)
+                checkExpression(*node.fields[i], node.type->fields[i].type);
+            return type;
+        }
+        else if constexpr (std::is_same_v<T, FieldExpr>) {
+            const ValueType object = inferType(*node.object);
+            if (object.kind != ValueType::Kind::Struct)
+                throw CompileError(node.object->location, "l'accès à un champ exige une structure");
+            checkExpression(*node.object, object);
+            for (const StructField& field : object.structure->fields)
+                if (field.name == node.field) return field.type;
+            throw CompileError(expression.location, "champ inconnu '" + node.field +
+                "' pour " + typeName(object));
         }
         else if constexpr (std::is_same_v<T, IndexExpr>) {
             const ValueType operandType = inferType(*node.array);

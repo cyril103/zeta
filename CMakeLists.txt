@@ -639,7 +639,8 @@ if(BUILD_TESTING)
             generic_numeric_string
             generic_unknown_constraint
             generic_unconstrained_operator
-            struct_duplicate_field)
+            struct_duplicate_field
+            struct_missing_field)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta
