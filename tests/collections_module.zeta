@@ -1,0 +1,11 @@
+import collections
+
+def main(): Int = {
+    val numbers: [Int; 3] = [10, 20, 12]
+    val view: Slice[Int] = Slice(&numbers)
+    if (collections.first(view) + collections.second(view) + collections.at(view, 2) == 42) {
+        0
+    } else {
+        1
+    }
+}

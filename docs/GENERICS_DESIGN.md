@@ -13,7 +13,9 @@ Plan d'implémentation :
 3. monomorphisation avec noms manglés et cache des instances — terminé ;
 4. inférence récursive des types depuis les arguments — terminé ;
 5. contraintes intégrées `Copy`, `Numeric`, `Ordered` et `Equatable` — terminé ;
-6. structures génériques puis traits définissables par l'utilisateur.
+6. structures génériques et fonctions génériques exportées — disponibles ;
+7. traits définissables par l'utilisateur.
 
-La première étape est disponible. Les fonctions génériques sont analysées mais ne
-produisent pas encore d'unité IR avant leur instanciation explicite.
+Les fonctions et structures génériques sont monomorphisées à la demande. Les
+fonctions génériques peuvent être exportées par un module, comme celles de
+`stdlib/collections.zeta`.

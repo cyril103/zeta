@@ -467,6 +467,17 @@ def copyValue[T : Copy] (value : T) : T = value
 `Copy` exclut notamment `Box[T]`, `Numeric` couvre `Byte`, `Int` et `Double`,
 `Ordered` ajoute `Char`, et `Equatable` couvre les types primitifs comparables.
 
+Les structures, y compris génériques, utilisent des champs nommés :
+
+```text
+struct Pair[A, B] { first: A, second: B }
+var pair: Pair[Int, Bool] = Pair[Int, Bool] { first: 42, second: true }
+pair.first = 43
+```
+
+Le module standard `collections` fournit les premiers algorithmes génériques sur
+`Slice[T]` : `first`, `second` et `at`.
+
 ## Expressions sur plusieurs lignes
 
 Une expression sur plusieurs lignes doit être placée entre accolades. Le bloc

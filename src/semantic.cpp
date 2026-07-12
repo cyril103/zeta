@@ -160,6 +160,8 @@ TypedProgram SemanticAnalyzer::analyze(
     borrows_.clear();
     referenceBorrows_.clear();
     movedBoxes_.clear();
+    insideGenericDeclaration_ = false;
+    activeTypeConstraints_.clear();
     borrowScopes_ = {{}};
     if (interfaces != nullptr) {
         for (const Program::Import& import : program.imports) {
@@ -169,7 +171,7 @@ TypedProgram SemanticAnalyzer::analyze(
             for (const auto& [name, exported] : module->second.exports) {
                 symbols_.define(import.module + "." + name,
                     SemanticSymbol{exported.type, exported.kind, exported.callable,
-                                   nullptr, false, exported.parameterTypes});
+                                   exported.declaration, false, exported.parameterTypes});
             }
         }
     }
@@ -229,9 +231,6 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
             throw CompileError(declaration.location,
                                "contrainte générique inconnue '" +
                                declaration.typeConstraints[i] + "'");
-    if (!declaration.typeParameters.empty() && declaration.publicSymbol)
-        throw CompileError(declaration.location,
-                           "l'export des fonctions génériques attend la monomorphisation");
     if (declaration.type.kind == ValueType::Kind::Reference) {
         if (declaration.callable)
             throw CompileError(declaration.location,
@@ -597,9 +596,25 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
             return reference.kind == ValueType::Kind::Reference ||
                 reference.kind == ValueType::Kind::Box ? *reference.element : ValueType::Int;
         }
-        else if constexpr (std::is_same_v<T, NameExpr> || std::is_same_v<T, CallExpr>) {
+        else if constexpr (std::is_same_v<T, NameExpr>) {
             const SemanticSymbol* symbol = symbols_.lookup(node.name);
             return symbol == nullptr ? ValueType::Int : symbol->type;
+        } else if constexpr (std::is_same_v<T, CallExpr>) {
+            const SemanticSymbol* symbol = symbols_.lookup(node.name);
+            if (symbol == nullptr) return ValueType::Int;
+            const Declaration* declaration = symbol->declaration;
+            if (declaration == nullptr || declaration->typeParameters.empty()) return symbol->type;
+            std::unordered_map<std::string, ValueType> substitutions;
+            if (!node.typeArguments.empty()) {
+                for (std::size_t i = 0; i < node.typeArguments.size(); ++i)
+                    substitutions.emplace(declaration->typeParameters[i], node.typeArguments[i]);
+            } else {
+                for (std::size_t i = 0; i < node.arguments.size(); ++i)
+                    inferTypeArguments(declaration->parameters[i].type,
+                                       inferType(*node.arguments[i]), substitutions);
+            }
+            return substitutions.size() == declaration->typeParameters.size()
+                ? substituteType(declaration->type, substitutions) : symbol->type;
         } else if constexpr (std::is_same_v<T, ConversionExpr>) {
             return node.target;
         } else if constexpr (std::is_same_v<T, UnaryExpr>) {

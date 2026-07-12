@@ -147,7 +147,7 @@ void ModuleLoader::buildInterfaces() {
             if (!interface.exports.emplace(declaration->name,
                     ExportedSymbol{declaration->kind, declaration->type,
                                    declaration->callable, declaration->nativeSymbol,
-                                   std::move(parameterTypes)}).second) {
+                                   std::move(parameterTypes), declaration}).second) {
                 throw CompileError(declaration->location,
                     "symbole public '" + declaration->name + "' exporté plusieurs fois par " + name);
             }

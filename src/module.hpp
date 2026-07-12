@@ -14,6 +14,7 @@ struct ExportedSymbol {
     bool callable;
     bool nativeSymbol;
     std::vector<ValueType> parameterTypes;
+    const Declaration* declaration;
 };
 
 struct ModuleInterface {

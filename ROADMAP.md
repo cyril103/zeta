@@ -207,9 +207,9 @@ Ordre recommandé :
 
 1. tableaux de taille fixe — terminé ;
 2. références empruntées `&T` et `&mut T` — disponibles localement et en paramètres ;
-3. structures ;
+3. structures — disponibles, y compris construction, champs, ABI et généricité ;
 4. énumérations ;
-5. tableaux dynamiques.
+5. tableaux dynamiques — amorcés par le module générique `collections` sur `Slice[T]`.
 
 Exemple envisagé :
 

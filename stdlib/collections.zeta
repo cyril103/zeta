@@ -1,0 +1,4 @@
+// Premiers algorithmes génériques de collection pour les vues Slice.
+pub def first[T: Copy](values: Slice[T]): T = values[0]
+pub def second[T: Copy](values: Slice[T]): T = values[1]
+pub def at[T: Copy](values: Slice[T], index: Int): T = values[index]
