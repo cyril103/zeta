@@ -64,6 +64,20 @@ void runLinker(const std::vector<fs::path>& objects, const fs::path& executable)
 void usage() {
     std::cerr << "Usage: zeta <source.zeta> [-o executable]\n";
 }
+
+std::string startAssembly(const ModuleGraph& modules) {
+    std::string assembly = "format ELF64\nsection '.text' executable\npublic start\n";
+    for (const std::string& module : modules.compilationOrder)
+        assembly += "extrn zeta_init_" + module + "\n";
+    assembly += "extrn zeta_fn_" + modules.root + "__main\nstart:\n";
+    for (const std::string& module : modules.compilationOrder)
+        assembly += "    call zeta_init_" + module + "\n";
+    assembly += "    call zeta_fn_" + modules.root + "__main\n"
+                "    mov edi, eax\n"
+                "    mov eax, 60\n"
+                "    syscall\n";
+    return assembly;
+}
 }
 
 int main(int argc, char** argv) {
@@ -116,39 +130,42 @@ int main(int argc, char** argv) {
         writeFile(irPath, IrGenerator::print(ir));
         writeFile(assemblyPath, FasmCodeGenerator::generate(ir));
 
-        fs::path objectAssemblyPath = outputPath;
-        objectAssemblyPath += ".object.asm";
-        fs::path objectPath = outputPath;
-        objectPath += ".o";
         fs::path cacheDirectory = outputPath;
         cacheDirectory += ".cache";
         fs::create_directories(cacheDirectory);
-        std::string programFingerprint = "zeta-program-cache-v5-structs";
-        for (const std::string& moduleName : modules.compilationOrder)
-            programFingerprint += ":" + moduleName + ":" + modules.fingerprints.at(moduleName);
-        const fs::path cachedProgramObject = cacheDirectory / "program.o";
-        const fs::path programStamp = cacheDirectory / "program.stamp";
-        if (!fs::exists(cachedProgramObject) || readOptionalFile(programStamp) != programFingerprint) {
-            writeFile(objectAssemblyPath, FasmCodeGenerator::generateObject(ir));
-            runFasm(objectAssemblyPath, cachedProgramObject);
-            writeFile(programStamp, programFingerprint);
-        }
-        fs::copy_file(cachedProgramObject, objectPath, fs::copy_options::overwrite_existing);
 
         fs::path moduleDirectory = outputPath;
         moduleDirectory += ".modules";
         fs::create_directories(moduleDirectory);
-        std::vector<fs::path> objects{objectPath};
+        const fs::path startSource = moduleDirectory / "start.asm";
+        const fs::path startObject = moduleDirectory / "start.o";
+        const fs::path cachedStartObject = cacheDirectory / "start.o";
+        const fs::path startStamp = cacheDirectory / "start.stamp";
+        std::string startFingerprint = "zeta-start-v1:" + modules.root;
+        for (const std::string& moduleName : modules.compilationOrder)
+            startFingerprint += ":" + moduleName;
+        if (!fs::exists(cachedStartObject) ||
+            readOptionalFile(startStamp) != startFingerprint) {
+            writeFile(startSource, startAssembly(modules));
+            runFasm(startSource, cachedStartObject);
+            writeFile(startStamp, startFingerprint);
+        }
+        fs::copy_file(cachedStartObject, startObject, fs::copy_options::overwrite_existing);
+        std::vector<fs::path> objects{startObject};
         for (const std::string& moduleName : modules.compilationOrder) {
-            const std::string symbol = "zeta_module_" + moduleName;
+            IrGenerator moduleGenerator;
+            const IrProgram moduleIr = moduleGenerator.generateModule(modules, moduleName);
+            const fs::path moduleIrPath = moduleDirectory / (moduleName + ".ir");
             const fs::path moduleAssembly = moduleDirectory / (moduleName + ".asm");
             const fs::path moduleObject = moduleDirectory / (moduleName + ".o");
             const fs::path cachedModuleObject = cacheDirectory / (moduleName + ".o");
             const fs::path moduleStamp = cacheDirectory / (moduleName + ".stamp");
-            const std::string& fingerprint = modules.fingerprints.at(moduleName);
+            const std::string fingerprint = "zeta-module-object-v2:" +
+                modules.fingerprints.at(moduleName);
+            writeFile(moduleIrPath, IrGenerator::print(moduleIr));
             if (!fs::exists(cachedModuleObject) || readOptionalFile(moduleStamp) != fingerprint) {
                 writeFile(moduleAssembly,
-                    "format ELF64\nsection '.rodata'\npublic " + symbol + "\n" + symbol + ": db 0\n");
+                    FasmCodeGenerator::generateObject(moduleIr, false, moduleName));
                 runFasm(moduleAssembly, cachedModuleObject);
                 writeFile(moduleStamp, fingerprint);
             }
@@ -189,7 +206,7 @@ int main(int argc, char** argv) {
 
         std::cout << "IR créé          : " << irPath << '\n'
                   << "Assembleur créé : " << assemblyPath << '\n'
-                  << "Objet ELF64 créé : " << objectPath << '\n'
+                  << "Objets ELF64 créés : " << moduleDirectory << '\n'
                   << "Executable créé : " << outputPath << '\n';
         return 0;
     } catch (const std::exception& error) {

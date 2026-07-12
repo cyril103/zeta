@@ -858,13 +858,25 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
     return out.str();
 }
 
-std::string FasmCodeGenerator::generateObject(const IrProgram& program, bool entryPoint) {
+std::string FasmCodeGenerator::generateObject(
+    const IrProgram& program, bool entryPoint, const std::string& initializer) {
     std::string assembly = generate(program);
     const std::string executableHeader =
         "format ELF64 executable 3\nentry start\n\nsegment readable executable\n";
     assembly.replace(0, executableHeader.size(),
                      "format ELF64\nsection '.text' executable\n" +
-                     std::string(entryPoint ? "public start\n" : ""));
+                     std::string(entryPoint ? "public start\n" :
+                         initializer.empty() ? "" : "public zeta_init_" + initializer + "\n"));
+    if (!initializer.empty()) {
+        assembly.replace(assembly.find("start:"), 6U, "zeta_init_" + initializer + ":");
+        const std::string initializerLabel = "zeta_init_" + initializer + ":\n";
+        assembly.insert(assembly.find(initializerLabel) + initializerLabel.size(), "    push rbp\n");
+        if (const std::size_t firstFunction = assembly.find("\nzeta_fn_");
+            firstFunction != std::string::npos)
+            assembly.insert(firstFunction, "    leave\n    ret\n");
+        else
+            assembly += "    leave\n    ret\n";
+    }
     std::set<std::string> definitions;
     std::set<std::string> calls;
     for (const IrInstruction& instruction : program.instructions) {
@@ -885,7 +897,8 @@ std::string FasmCodeGenerator::generateObject(const IrProgram& program, bool ent
         externals += std::string(slot.external ? "extrn " : "public ") +
             globalLabel(slot) + "\n";
     }
-    assembly.insert(assembly.find("start:"), externals);
+    const std::string entryLabel = initializer.empty() ? "start:" : "zeta_init_" + initializer + ":";
+    assembly.insert(assembly.find(entryLabel), externals);
     const auto replaceSegment = [&](const std::string& from, const std::string& to) {
         if (const std::size_t position = assembly.find(from); position != std::string::npos)
             assembly.replace(position, from.size(), to);

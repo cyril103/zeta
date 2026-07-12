@@ -7,5 +7,6 @@
 class FasmCodeGenerator {
 public:
     static std::string generate(const IrProgram& program);
-    static std::string generateObject(const IrProgram& program, bool entryPoint = true);
+    static std::string generateObject(const IrProgram& program, bool entryPoint = true,
+                                      const std::string& initializer = {});
 };
