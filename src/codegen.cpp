@@ -407,7 +407,8 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         const std::size_t offset = valueOffset(program, item.arguments[i]);
                         out << "    push qword [rbp-" << offset - 8U << "]\n"
                             << "    push qword [rbp-" << offset << "]\n";
-                    } else if (item.argumentTypes[i].kind == ValueType::Kind::Reference) {
+                    } else if (item.argumentTypes[i].kind == ValueType::Kind::Reference ||
+                               item.argumentTypes[i].kind == ValueType::Kind::Box) {
                         out << "    push qword [rbp-"
                             << valueOffset(program, item.arguments[i]) << "]\n";
                     } else if (item.argumentTypes[i] == ValueType::Double) {
@@ -428,7 +429,9 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     const std::size_t offset = valueOffset(program, item.output);
                     out << "    mov qword [rbp-" << offset << "], rax\n"
                         << "    mov qword [rbp-" << offset - 8U << "], rdx\n";
-                } else if (item.returnType == ValueType::Double)
+                } else if (item.returnType.kind == ValueType::Kind::Box)
+                    out << "    mov qword [rbp-" << valueOffset(program, item.output) << "], rax\n";
+                else if (item.returnType == ValueType::Double)
                     out << "    movsd qword [rbp-" << valueOffset(program, item.output) << "], xmm0\n";
                 else
                     out << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
@@ -441,7 +444,8 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                             << "    mov rdx, qword [rbp-" << source - 8U << "]\n"
                             << "    mov qword [rbp+" << stackOffset << "], rax\n"
                             << "    mov qword [rbp+" << stackOffset + 8U << "], rdx\n";
-                    } else if (item.argumentTypes[i].kind == ValueType::Kind::Reference) {
+                    } else if (item.argumentTypes[i].kind == ValueType::Kind::Reference ||
+                               item.argumentTypes[i].kind == ValueType::Kind::Box) {
                         out << "    mov rax, qword [rbp-"
                             << valueOffset(program, item.arguments[i]) << "]\n"
                             << "    mov qword [rbp+" << stackOffset << "], rax\n";
@@ -484,7 +488,9 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     const std::size_t offset = valueOffset(program, item.value);
                     out << "    mov rax, qword [rbp-" << offset << "]\n"
                         << "    mov rdx, qword [rbp-" << offset - 8U << "]\n";
-                } else if (item.type == ValueType::Double)
+                } else if (item.type.kind == ValueType::Kind::Box)
+                    out << "    mov rax, qword [rbp-" << valueOffset(program, item.value) << "]\n";
+                else if (item.type == ValueType::Double)
                     out << "    movsd xmm0, qword [rbp-" << valueOffset(program, item.value) << "]\n";
                 else
                     out << "    mov eax, dword [rbp-" << valueOffset(program, item.value) << "]\n";

@@ -1,0 +1,5 @@
+def consumeBoth (first : Box[Int], second : Box[Int]) : Int = 0
+
+def invalid (value : Box[Int]) : Int = consumeBoth(value, value)
+
+def main () : Int = 0

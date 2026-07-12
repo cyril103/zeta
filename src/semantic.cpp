@@ -616,6 +616,10 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 const ValueType parameterType = symbol->declaration != nullptr
                     ? symbol->declaration->parameters[i].type : symbol->parameterTypes[i];
                 checkExpression(*node.arguments[i], parameterType);
+                if (parameterType.kind == ValueType::Kind::Box) {
+                    if (const auto* moved = std::get_if<NameExpr>(&node.arguments[i]->value))
+                        movedBoxes_.insert(moved->name);
+                }
             }
             return symbol->type;
         } else if constexpr (std::is_same_v<T, ConversionExpr>) {

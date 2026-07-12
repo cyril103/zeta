@@ -1,0 +1,9 @@
+def consume (value : Box[Int]) : Int = 0
+
+def invalid (value : Box[Int]) : Int = {
+    val first : Int = consume(value)
+    val second : Int = consume(value)
+    first + second
+}
+
+def main () : Int = 0

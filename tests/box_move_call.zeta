@@ -1,0 +1,5 @@
+def consume (value : Box[Int]) : Int = 0
+
+def relay (value : Box[Int]) : Int = consume(value)
+
+def main () : Int = 0

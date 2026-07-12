@@ -286,6 +286,12 @@ if(BUILD_TESTING)
     set_tests_properties(run_box_move_declaration PROPERTIES
         DEPENDS compile_box_move_declaration)
 
+    add_test(NAME compile_box_move_call COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/box_move_call.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/box-move-call)
+    add_test(NAME run_box_move_call COMMAND ${CMAKE_CURRENT_BINARY_DIR}/box-move-call)
+    set_tests_properties(run_box_move_call PROPERTIES DEPENDS compile_box_move_call)
+
     add_test(NAME compile_array_copy COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_copy.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/array-copy)
@@ -523,7 +529,9 @@ if(BUILD_TESTING)
             box_type_missing_element
             box_type_missing_bracket
             box_use_after_move
-            box_conditional_move)
+            box_conditional_move
+            box_use_after_call
+            box_duplicate_call_argument)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta
