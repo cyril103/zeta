@@ -335,6 +335,56 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         << "ir_string_char_done_" << item.output << ":\n"
                         << "    mov qword [rbp-" << output << "], rdi\n"
                         << "    mov qword [rbp-" << output - 8U << "], rdx\n    pop r12\n";
+                } else if (item.target == ValueType::String && item.source == ValueType::Double) {
+                    const std::size_t output = valueOffset(program, item.output);
+                    const std::string id = std::to_string(item.output);
+                    out << "    push r12\n    push r13\n    push r14\n    push r15\n"
+                        << "    sub rsp, 64\n"
+                        << "    movsd xmm0, qword [rbp-" << valueOffset(program, item.input) << "]\n"
+                        << "    movq rax, xmm0\n    xor r15d, r15d\n"
+                        << "    bt rax, 63\n    jnc ir_string_double_abs_" << id << "\n"
+                        << "    mov byte [rsp], '-'\n    inc r15d\n    btr rax, 63\n    movq xmm0, rax\n"
+                        << "ir_string_double_abs_" << id << ":\n"
+                        << "    mov rdx, 7FF0000000000000h\n    mov rcx, rax\n    and rcx, rdx\n    cmp rcx, rdx\n"
+                        << "    jne ir_string_double_finite_" << id << "\n"
+                        << "    mov rdx, 000FFFFFFFFFFFFFh\n    test rax, rdx\n    jnz ir_string_double_nan_" << id << "\n"
+                        << "    mov byte [rsp+r15], 'i'\n    mov byte [rsp+r15+1], 'n'\n    mov byte [rsp+r15+2], 'f'\n"
+                        << "    add r15d, 3\n    jmp ir_string_double_allocate_" << id << "\n"
+                        << "ir_string_double_nan_" << id << ":\n    xor r15d, r15d\n"
+                        << "    mov byte [rsp], 'n'\n    mov byte [rsp+1], 'a'\n    mov byte [rsp+2], 'n'\n    mov r15d, 3\n"
+                        << "    jmp ir_string_double_allocate_" << id << "\n"
+                        << "ir_string_double_finite_" << id << ":\n"
+                        << "    cvttsd2si r12, xmm0\n"
+                        << "    cvtsi2sd xmm1, r12\n    subsd xmm0, xmm1\n"
+                        << "    mulsd xmm0, qword [string_double_million]\n"
+                        << "    addsd xmm0, qword [string_double_half]\n    cvttsd2si r13, xmm0\n"
+                        << "    cmp r13, 1000000\n    jb ir_string_double_integer_" << id << "\n"
+                        << "    xor r13d, r13d\n    inc r12\n"
+                        << "ir_string_double_integer_" << id << ":\n"
+                        << "    lea r14, [rsp+32]\n    xor ecx, ecx\n    mov rax, r12\n    mov r11, 10\n"
+                        << "ir_string_double_integer_loop_" << id << ":\n"
+                        << "    xor edx, edx\n    div r11\n    add dl, '0'\n    dec r14\n    mov byte [r14], dl\n    inc ecx\n"
+                        << "    test rax, rax\n    jnz ir_string_double_integer_loop_" << id << "\n"
+                        << "    mov rdi, rsp\n    add rdi, r15\n    mov rsi, r14\n    rep movsb\n"
+                        << "    mov r15, rdi\n    sub r15, rsp\n    test r13, r13\n    jz ir_string_double_allocate_" << id << "\n"
+                        << "    mov byte [rsp+r15], '.'\n    inc r15d\n"
+                        << "    lea r14, [rsp+48]\n    mov ecx, 6\n    mov rax, r13\n"
+                        << "ir_string_double_fraction_loop_" << id << ":\n"
+                        << "    xor edx, edx\n    div r11\n    add dl, '0'\n    dec r14\n    mov byte [r14], dl\n    loop ir_string_double_fraction_loop_" << id << "\n"
+                        << "    mov ecx, 6\n"
+                        << "ir_string_double_trim_" << id << ":\n"
+                        << "    cmp byte [r14+rcx-1], '0'\n    jne ir_string_double_copy_fraction_" << id << "\n"
+                        << "    dec ecx\n    jnz ir_string_double_trim_" << id << "\n"
+                        << "ir_string_double_copy_fraction_" << id << ":\n"
+                        << "    mov rdi, rsp\n    add rdi, r15\n    mov rsi, r14\n    add r15d, ecx\n    rep movsb\n"
+                        << "ir_string_double_allocate_" << id << ":\n"
+                        << "    mov eax, 9\n    xor edi, edi\n    mov esi, 80\n    mov edx, 3\n    mov r10d, 34\n"
+                        << "    mov r8, -1\n    xor r9d, r9d\n    syscall\n    test rax, rax\n    js ir_string_allocation_error\n"
+                        << "    mov qword [rax], 1\n    mov qword [rax+8], 64\n    lea r12, [rax+16]\n"
+                        << "    mov rdi, r12\n    mov rsi, rsp\n    mov rcx, r15\n    rep movsb\n"
+                        << "    mov qword [rbp-" << output << "], r12\n"
+                        << "    mov qword [rbp-" << output - 8U << "], r15\n"
+                        << "    add rsp, 64\n    pop r15\n    pop r14\n    pop r13\n    pop r12\n";
                 } else if (item.target == ValueType::String &&
                            (item.source == ValueType::Int || item.source == ValueType::Byte)) {
                     const std::size_t output = valueOffset(program, item.output);
@@ -737,7 +787,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
             const auto* conversion = std::get_if<IrConvert>(&instruction);
             return conversion != nullptr && conversion->target == ValueType::String &&
                 (conversion->source == ValueType::Int || conversion->source == ValueType::Byte ||
-                 conversion->source == ValueType::Char);
+                 conversion->source == ValueType::Char || conversion->source == ValueType::Double);
         })) {
         out << "ir_string_size_error:\n"
                "    mov edi, 103\n"
@@ -752,15 +802,20 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
     bool hasDoubleConstants = false;
     bool hasStringConstants = false;
     bool hasBoolStringConversion = false;
+    bool hasDoubleStringConversion = false;
     for (const IrInstruction& instruction : program.instructions)
         if (std::holds_alternative<IrDoubleConst>(instruction)) hasDoubleConstants = true;
         else if (std::holds_alternative<IrStringConst>(instruction)) hasStringConstants = true;
         else if (const auto* conversion = std::get_if<IrConvert>(&instruction);
                  conversion != nullptr && conversion->target == ValueType::String &&
                  conversion->source == ValueType::Bool) hasBoolStringConversion = true;
+        else if (const auto* conversion = std::get_if<IrConvert>(&instruction);
+                 conversion != nullptr && conversion->target == ValueType::String &&
+                 conversion->source == ValueType::Double) hasDoubleStringConversion = true;
     bool hasGlobals = false;
     for (const IrSlot& slot : program.slots) hasGlobals = hasGlobals || slot.global;
-    if (hasDoubleConstants || hasStringConstants || hasBoolStringConversion || hasGlobals) {
+    if (hasDoubleConstants || hasStringConstants || hasBoolStringConversion ||
+        hasDoubleStringConversion || hasGlobals) {
         out << "\nsegment readable" << (hasGlobals ? " writeable" : "") << "\n";
         for (const IrInstruction& instruction : program.instructions) {
             if (const auto* item = std::get_if<IrDoubleConst>(&instruction))
@@ -785,6 +840,9 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                    "string_bool_false_object: dq -1, 5\n"
                    "string_bool_false: db 'false'\n";
         }
+        if (hasDoubleStringConversion)
+            out << "string_double_million: dq 1000000.0\n"
+                   "string_double_half: dq 0.5\n";
         for (std::size_t i = 0; i < program.slots.size(); ++i) {
             if (!program.slots[i].global) continue;
             out << "global_slot_" << i << ": ";

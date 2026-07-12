@@ -27,6 +27,7 @@ inline bool canExplicitlyConvert(ValueType source, ValueType target) {
     if (target == ValueType::String)
         return source == ValueType::Int || source == ValueType::Byte ||
                source == ValueType::Bool || source == ValueType::Char ||
+               source == ValueType::Double ||
                source == ValueType::String;
     return (isNumeric(source) && isNumeric(target)) ||
            (source == ValueType::Char && target == ValueType::Int) ||

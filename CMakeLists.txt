@@ -22,6 +22,14 @@ target_compile_options(zeta PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
 include(CTest)
 if(BUILD_TESTING)
+    add_test(NAME compile_string_double_conversion COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_double_conversion.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/string-double-conversion)
+    add_test(NAME run_string_double_conversion
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/string-double-conversion)
+    set_tests_properties(run_string_double_conversion PROPERTIES
+        DEPENDS compile_string_double_conversion
+        PASS_REGULAR_EXPRESSION "18.5 / -0.25 / 0")
     add_test(NAME compile_string_primitive_conversions COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_primitive_conversions.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/string-primitive-conversions)

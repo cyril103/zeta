@@ -112,7 +112,7 @@ identiques peuvent rester différentes.
 `String` utilise une vue ABI `{données, longueur}`. Les octets des littéraux sont
 précédés par un en-tête statique compatible avec les futures chaînes allouées.
 La concaténation `left + right` produit une nouvelle chaîne allouée et immuable.
-Les conversions `String(Int)`, `String(Byte)`, `String(Bool)` et `String(Char)`
+Les conversions `String(Int)`, `String(Byte)`, `String(Bool)`, `String(Char)` et `String(Double)`
 permettent de composer directement des messages :
 
 ```text
