@@ -857,12 +857,13 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
     return out.str();
 }
 
-std::string FasmCodeGenerator::generateObject(const IrProgram& program) {
+std::string FasmCodeGenerator::generateObject(const IrProgram& program, bool entryPoint) {
     std::string assembly = generate(program);
     const std::string executableHeader =
         "format ELF64 executable 3\nentry start\n\nsegment readable executable\n";
     assembly.replace(0, executableHeader.size(),
-                     "format ELF64\nsection '.text' executable\npublic start\n");
+                     "format ELF64\nsection '.text' executable\n" +
+                     std::string(entryPoint ? "public start\n" : ""));
     std::set<std::string> definitions;
     std::set<std::string> calls;
     for (const IrInstruction& instruction : program.instructions) {
@@ -874,6 +875,8 @@ std::string FasmCodeGenerator::generateObject(const IrProgram& program) {
             calls.insert(call->function);
     }
     std::string externals;
+    for (const std::string& definition : definitions)
+        externals += "public zeta_fn_" + definition + "\n";
     for (const std::string& call : calls)
         if (!definitions.contains(call)) externals += "extrn zeta_fn_" + call + "\n";
     assembly.insert(assembly.find("start:"), externals);
