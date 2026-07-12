@@ -69,6 +69,8 @@ struct StructField {
 struct StructType {
     SourceLocation location;
     std::string name;
+    std::vector<std::string> typeParameters;
+    std::vector<ValueType> typeArguments;
     std::vector<StructField> fields;
     std::size_t size{0};
     std::size_t alignment{1};
@@ -96,7 +98,18 @@ inline std::string typeName(ValueType type) {
     if (type.kind == ValueType::Kind::Box)
         return "Box[" + typeName(*type.element) + "]";
     if (type.kind == ValueType::Kind::TypeParameter) return type.typeParameter;
-    if (type.kind == ValueType::Kind::Struct) return type.structure->name;
+    if (type.kind == ValueType::Kind::Struct) {
+        std::string name = type.structure->name;
+        if (!type.structure->typeArguments.empty()) {
+            name += '[';
+            for (std::size_t i = 0; i < type.structure->typeArguments.size(); ++i) {
+                if (i != 0) name += ", ";
+                name += typeName(type.structure->typeArguments[i]);
+            }
+            name += ']';
+        }
+        return name;
+    }
     return type.mutableReference ? "&mut " + typeName(*type.element)
                                  : "&" + typeName(*type.element);
 }

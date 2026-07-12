@@ -212,8 +212,17 @@ ValueType Parser::consumeType(const std::string& message) {
     if (check(TokenKind::Identifier)) {
         const auto found = structures_.find(peek().text);
         if (found != structures_.end()) {
+            const Token token = peek();
             ++current_;
-            return ValueType(found->second);
+            std::vector<ValueType> arguments;
+            if (match(TokenKind::LeftBracket)) {
+                if (!check(TokenKind::RightBracket)) {
+                    do arguments.push_back(consumeType("argument de type attendu"));
+                    while (match(TokenKind::Comma));
+                }
+                consume(TokenKind::RightBracket, "']' attendue après les arguments de type");
+            }
+            return ValueType(instantiateStructure(found->second, std::move(arguments), token.location));
         }
     }
     throw CompileError(peek().location, message + ", reçu " + tokenName(peek().kind));
@@ -228,6 +237,16 @@ std::shared_ptr<StructType> Parser::structure() {
     result->location = start.location;
     result->name = name.text;
     structures_.emplace(name.text, result);
+    activeTypeParameters_.clear();
+    if (match(TokenKind::LeftBracket)) {
+        do {
+            const Token& parameter = consume(TokenKind::Identifier, "paramètre de type attendu");
+            if (!activeTypeParameters_.insert(parameter.text).second)
+                throw CompileError(parameter.location, "paramètre de type '" + parameter.text + "' déclaré plusieurs fois");
+            result->typeParameters.push_back(parameter.text);
+        } while (match(TokenKind::Comma));
+        consume(TokenKind::RightBracket, "']' attendue après les paramètres de type");
+    }
     consume(TokenKind::LeftBrace, "'{' attendue après le nom de structure");
     skipSeparators();
     std::unordered_set<std::string> names;
@@ -239,10 +258,10 @@ std::shared_ptr<StructType> Parser::structure() {
         ValueType type = consumeType("type de champ attendu");
         if (type.kind == ValueType::Kind::Struct && type.structure.get() == result.get())
             throw CompileError(field.location, "la structure '" + name.text + "' ne peut pas se contenir directement");
-        const std::size_t alignment = valueTypeAlignment(type);
+        const std::size_t alignment = type.kind == ValueType::Kind::TypeParameter ? 1U : valueTypeAlignment(type);
         const std::size_t offset = (result->size + alignment - 1U) / alignment * alignment;
         result->fields.push_back(StructField{field.location, field.text, type, offset});
-        result->size = offset + valueTypeSize(type);
+        result->size = offset + (type.kind == ValueType::Kind::TypeParameter ? 0U : valueTypeSize(type));
         result->alignment = std::max(result->alignment, alignment);
         if (!check(TokenKind::RightBrace) && !match(TokenKind::Comma) && !matchSeparator())
             throw CompileError(peek().location, "fin de ligne, ',' ou '}' attendue après le champ");
@@ -250,7 +269,41 @@ std::shared_ptr<StructType> Parser::structure() {
     }
     consume(TokenKind::RightBrace, "'}' attendue après les champs");
     result->size = (result->size + result->alignment - 1U) / result->alignment * result->alignment;
+    activeTypeParameters_.clear();
     return result;
+}
+
+std::shared_ptr<StructType> Parser::instantiateStructure(
+    const std::shared_ptr<StructType>& structure, std::vector<ValueType> arguments,
+    SourceLocation location) {
+    if (arguments.size() != structure->typeParameters.size())
+        throw CompileError(location, "la structure '" + structure->name + "' attend " +
+            std::to_string(structure->typeParameters.size()) + " argument(s) de type, reçu " +
+            std::to_string(arguments.size()));
+    if (arguments.empty()) return structure;
+    std::string key = structure->name;
+    for (const ValueType& argument : arguments) key += "[" + typeName(argument) + "]";
+    if (const auto cached = structureInstances_.find(key); cached != structureInstances_.end())
+        return cached->second;
+    auto instance = std::make_shared<StructType>();
+    instance->location = location;
+    instance->name = structure->name;
+    instance->typeArguments = arguments;
+    for (const StructField& field : structure->fields) {
+        ValueType type = field.type;
+        if (type.kind == ValueType::Kind::TypeParameter) {
+            const auto parameter = std::find(structure->typeParameters.begin(), structure->typeParameters.end(), type.typeParameter);
+            type = arguments[static_cast<std::size_t>(parameter - structure->typeParameters.begin())];
+        }
+        const std::size_t alignment = valueTypeAlignment(type);
+        const std::size_t offset = (instance->size + alignment - 1U) / alignment * alignment;
+        instance->fields.push_back(StructField{field.location, field.name, type, offset});
+        instance->size = offset + valueTypeSize(type);
+        instance->alignment = std::max(instance->alignment, alignment);
+    }
+    instance->size = (instance->size + instance->alignment - 1U) / instance->alignment * instance->alignment;
+    structureInstances_.emplace(key, instance);
+    return instance;
 }
 
 void Parser::skipSeparators() {
@@ -693,24 +746,34 @@ ExprPtr Parser::primary() {
     }
     if (match(TokenKind::Identifier)) {
         const Token token = previous();
-        if (const auto structure = structures_.find(token.text);
-            structure != structures_.end() && check(TokenKind::LeftBrace)) {
+        if (const auto definition = structures_.find(token.text);
+            definition != structures_.end() &&
+            (check(TokenKind::LeftBrace) || check(TokenKind::LeftBracket))) {
+            std::vector<ValueType> arguments;
+            if (match(TokenKind::LeftBracket)) {
+                if (!check(TokenKind::RightBracket)) {
+                    do arguments.push_back(consumeType("argument de type attendu"));
+                    while (match(TokenKind::Comma));
+                }
+                consume(TokenKind::RightBracket, "']' attendue après les arguments de type");
+            }
+            auto structure = instantiateStructure(definition->second, std::move(arguments), token.location);
             consume(TokenKind::LeftBrace, "'{' attendue");
             skipSeparators();
-            std::vector<ExprPtr> fields(structure->second->fields.size());
+            std::vector<ExprPtr> fields(structure->fields.size());
             std::unordered_set<std::string> initialized;
             while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
                 const Token& field = consume(TokenKind::Identifier, "nom de champ attendu");
-                const auto found = std::find_if(structure->second->fields.begin(),
-                    structure->second->fields.end(), [&](const StructField& candidate) {
+                const auto found = std::find_if(structure->fields.begin(),
+                    structure->fields.end(), [&](const StructField& candidate) {
                         return candidate.name == field.text;
                     });
-                if (found == structure->second->fields.end())
+                if (found == structure->fields.end())
                     throw CompileError(field.location, "champ inconnu '" + field.text + "' pour " + token.text);
                 if (!initialized.insert(field.text).second)
                     throw CompileError(field.location, "champ '" + field.text + "' initialisé plusieurs fois");
                 consume(TokenKind::Colon, "':' attendu après le nom du champ");
-                fields[static_cast<std::size_t>(found - structure->second->fields.begin())] = expression();
+                fields[static_cast<std::size_t>(found - structure->fields.begin())] = expression();
                 if (!check(TokenKind::RightBrace) && !match(TokenKind::Comma) && !matchSeparator())
                     throw CompileError(peek().location, "fin de ligne, ',' ou '}' attendue");
                 skipSeparators();
@@ -718,9 +781,9 @@ ExprPtr Parser::primary() {
             consume(TokenKind::RightBrace, "'}' attendue après les champs");
             for (std::size_t i = 0; i < fields.size(); ++i)
                 if (!fields[i]) throw CompileError(token.location, "champ '" +
-                    structure->second->fields[i].name + "' manquant pour " + token.text);
+                    structure->fields[i].name + "' manquant pour " + token.text);
             return std::make_unique<Expression>(Expression{
-                token.location, StructExpr{structure->second, std::move(fields)}});
+                token.location, StructExpr{structure, std::move(fields)}});
         }
         const std::string name = qualifiedName();
         std::vector<ValueType> typeArguments;

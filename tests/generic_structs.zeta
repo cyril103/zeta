@@ -1,0 +1,10 @@
+struct Pair[A, B] {
+    first: A
+    second: B
+}
+
+def main(): Int = {
+    var pair: Pair[Int, Bool] = Pair[Int, Bool] { first: 41, second: true }
+    pair.first = pair.first + 1
+    if (pair.first == 42 && pair.second) { 0 } else { 1 }
+}
