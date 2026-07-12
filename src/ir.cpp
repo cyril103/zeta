@@ -2,6 +2,7 @@
 
 #include "diagnostic.hpp"
 
+#include <algorithm>
 #include <iomanip>
 #include <limits>
 #include <sstream>
@@ -16,6 +17,7 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
     const Program& program = typedProgram.ast();
     ir_ = IrProgram{};
     symbols_.clear();
+    movedBoxes_.clear();
     nextLabel_ = 0;
     loopLabels_.clear();
     inFunction_ = false;
@@ -83,6 +85,7 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
 IrProgram IrGenerator::generate(const ModuleGraph& graph) {
     ir_ = IrProgram{};
     symbols_.clear();
+    movedBoxes_.clear();
     nextLabel_ = 0;
     loopLabels_.clear();
     inFunction_ = false;
@@ -223,6 +226,19 @@ void IrGenerator::emitIndexStore(
                                             arrayType, throughReference, throughSlice});
 }
 
+void IrGenerator::emitBoxDrops(const std::vector<std::string>& names) {
+    for (auto name = names.rbegin(); name != names.rend(); ++name) {
+        const auto symbol = symbols_.find(*name);
+        if (symbol == symbols_.end() || symbol->second.declaration->type.kind !=
+                ValueType::Kind::Box || movedBoxes_.contains(*name))
+            continue;
+        const ValueType type = symbol->second.declaration->type;
+        const ValueId value = nextValue(type);
+        ir_.instructions.push_back(IrLoad{value, symbol->second.slot, type});
+        ir_.instructions.push_back(IrDrop{value, type});
+    }
+}
+
 void IrGenerator::emitTailExpression(
     const Expression& expressionNode,
     const std::unordered_map<std::string, ValueId>& parameters,
@@ -238,6 +254,10 @@ void IrGenerator::emitTailExpression(
                         symbols_.emplace(item.name, Symbol{0, item.kind, &item, false, item.name});
                     } else {
                         const ValueId value = expression(*item.initializer, parameters);
+                        if (item.type.kind == ValueType::Kind::Box)
+                            if (const auto* source =
+                                    std::get_if<NameExpr>(&item.initializer->value))
+                                movedBoxes_.insert(source->name);
                         const SlotId slot = ir_.slots.size();
                         symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false, item.name});
                         ir_.slots.push_back(IrSlot{item.name, item.type, false});
@@ -269,7 +289,19 @@ void IrGenerator::emitTailExpression(
                 }
             }, statement->value);
         }
-        if (block->result) emitTailExpression(*block->result, parameters, function);
+        const bool ownsBox = std::any_of(localNames.begin(), localNames.end(), [&](const auto& name) {
+            const auto symbol = symbols_.find(name);
+            return symbol != symbols_.end() &&
+                symbol->second.declaration->type.kind == ValueType::Kind::Box &&
+                !movedBoxes_.contains(name);
+        });
+        if (block->result && ownsBox) {
+            const ValueId result = expression(*block->result, parameters);
+            emitBoxDrops(localNames);
+            ir_.instructions.push_back(IrReturn{result, function.type});
+        } else if (block->result) {
+            emitTailExpression(*block->result, parameters, function);
+        }
         for (auto name = localNames.rbegin(); name != localNames.rend(); ++name)
             symbols_.erase(*name);
         return;
@@ -531,6 +563,10 @@ ValueId IrGenerator::expression(
                             symbols_.emplace(item.name, Symbol{0, item.kind, &item, false, item.name});
                         } else {
                             const ValueId value = expression(*item.initializer, parameters);
+                            if (item.type.kind == ValueType::Kind::Box)
+                                if (const auto* source =
+                                        std::get_if<NameExpr>(&item.initializer->value))
+                                    movedBoxes_.insert(source->name);
                             const SlotId slot = ir_.slots.size();
                             symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false, item.name});
                             ir_.slots.push_back(IrSlot{item.name, item.type, false});
@@ -572,6 +608,7 @@ ValueId IrGenerator::expression(
             }
             const ValueId result = node.result ? expression(*node.result, parameters)
                                                : nextValue(expressionNode.inferredType);
+            emitBoxDrops(localNames);
             for (auto name = localNames.rbegin(); name != localNames.rend(); ++name) {
                 symbols_.erase(*name);
             }
@@ -701,8 +738,10 @@ std::string IrGenerator::print(const IrProgram& program) {
                 else if constexpr (std::is_same_v<T, IrParameter>)
                     out << "  $" << item.output << " = parameter."
                         << suffix(item.type) << ' ' << item.index << '\n';
-                else if constexpr (std::is_same_v<T, IrReturn>)
-                    out << "  return." << suffix(item.type) << " $" << item.value << '\n';
+            else if constexpr (std::is_same_v<T, IrReturn>)
+                out << "  return." << suffix(item.type) << " $" << item.value << '\n';
+            else if constexpr (std::is_same_v<T, IrDrop>)
+                out << "  drop $" << item.value << " : " << typeName(item.type) << '\n';
                 else if constexpr (std::is_same_v<T, IrExit>)
                     out << "  exit.i32 $" << item.value << '\n';
                 else if constexpr (std::is_same_v<T, IrBranch>)

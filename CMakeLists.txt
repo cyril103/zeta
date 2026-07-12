@@ -300,6 +300,12 @@ if(BUILD_TESTING)
         set_tests_properties(run_box_${box_case} PROPERTIES DEPENDS compile_box_${box_case})
     endforeach()
 
+    add_test(NAME check_box_lexical_drop COMMAND ${CMAKE_COMMAND}
+        -DIR_FILE=${CMAKE_CURRENT_BINARY_DIR}/box-construct_dereference.ir
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_box_drop.cmake)
+    set_tests_properties(check_box_lexical_drop PROPERTIES
+        DEPENDS compile_box_construct_dereference)
+
     add_test(NAME compile_box_content_borrow COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/box_content_borrow.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/box-content-borrow)

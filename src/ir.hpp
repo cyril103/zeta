@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <variant>
 #include <utility>
 #include <vector>
@@ -67,13 +68,14 @@ struct IrTailCall {
 struct IrFunctionStart { std::string name; };
 struct IrParameter { ValueId output; std::size_t index; std::size_t stackOffset; ValueType type; };
 struct IrReturn { ValueId value; ValueType type; };
+struct IrDrop { ValueId value; ValueType type; };
 struct IrExit { ValueId value; };
 struct IrBranch { ValueId condition; bool jumpWhenTrue; std::size_t label; };
 struct IrJump { std::size_t label; };
 struct IrLabel { std::size_t label; };
 using IrInstruction = std::variant<IrConst, IrDoubleConst, IrStringConst, IrArrayConstruct, IrSliceConstruct, IrBoxConstruct, IrIndexLoad, IrIndexStore, IrAddressOf, IrDereference, IrDereferenceStore, IrLoad, IrConvert, IrUnary, IrBinary,
                                    IrStore, IrCopy, IrCall, IrTailCall, IrFunctionStart, IrParameter,
-                                   IrReturn, IrExit, IrBranch, IrJump, IrLabel>;
+                                   IrReturn, IrDrop, IrExit, IrBranch, IrJump, IrLabel>;
 
 struct IrSlot { std::string name; ValueType type; bool global; };
 struct IrProgram {
@@ -103,6 +105,7 @@ private:
                   const std::unordered_map<std::string, ValueId>& parameters);
     void emitIndexStore(const IndexAssignment& assignment,
                         const std::unordered_map<std::string, ValueId>& parameters);
+    void emitBoxDrops(const std::vector<std::string>& names);
     ValueId expression(const Expression& expression);
     ValueId expression(const Expression& expression,
                        const std::unordered_map<std::string, ValueId>& parameters);
@@ -115,4 +118,5 @@ private:
     bool inFunction_{false};
     std::vector<std::pair<std::size_t, std::size_t>> loopLabels_;
     std::size_t nextLabel_{0};
+    std::unordered_set<std::string> movedBoxes_;
 };

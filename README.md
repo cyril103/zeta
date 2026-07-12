@@ -430,8 +430,9 @@ machine pointant vers une valeur `T`, et les types sont récursifs comme
 le lire. La mutation `*box = valeur` exige que le propriétaire soit une variable
 `var`. `&*box` emprunte le contenu en lecture et `&mut *box` l'emprunte en écriture
 depuis un propriétaire `var`. Une affectation ou un appel par valeur déplace la propriété sans la copier.
-La destruction automatique sera ajoutée à l'étape suivante. La conception est
-détaillée dans `docs/BOX_DESIGN.md`.
+Une sortie lexicale normale détruit récursivement les propriétaires encore actifs
+avec `munmap`. Le nettoyage des sorties anticipées et des boucles est la prochaine
+étape. La conception est détaillée dans `docs/BOX_DESIGN.md`.
 
 ## Expressions sur plusieurs lignes
 

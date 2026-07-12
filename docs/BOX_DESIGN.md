@@ -11,7 +11,8 @@ La mise en œuvre est volontairement découpée en étapes indépendantes :
 3. déplacement dans les déclarations et les appels — terminé ;
 4. construction `Box(valeur)`, déréférencement et emprunts `&*box` /
    `&mut *box` — terminé ;
-5. instruction IR `drop` et destruction sur toutes les sorties de portée ;
+5. instruction IR `drop` et destruction — disponible sur les sorties lexicales
+   normales ; sorties anticipées et boucles à compléter ;
 6. allocation par `mmap` et libération par `munmap`.
 
 Une `Box[T]` ne sera jamais implicitement copiable. Une opération par valeur

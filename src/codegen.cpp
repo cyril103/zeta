@@ -73,6 +73,19 @@ void emitBlockCopy(std::ostringstream& out, const std::string& source,
         ++offset;
     }
 }
+void emitBoxDrop(std::ostringstream& out, const std::string& source,
+                 const ValueType& boxType) {
+    out << "    mov rdi, " << source << "\n";
+    if (boxType.element->kind == ValueType::Kind::Box) {
+        out << "    push rdi\n"
+            << "    mov rax, qword [rdi]\n";
+        emitBoxDrop(out, "rax", *boxType.element);
+        out << "    pop rdi\n";
+    }
+    out << "    mov rsi, " << valueTypeSize(*boxType.element) << "\n"
+        << "    mov eax, 11\n"
+        << "    syscall\n";
+}
 }
 
 std::string FasmCodeGenerator::generate(const IrProgram& program) {
@@ -512,6 +525,10 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 else
                     out << "    mov eax, dword [rbp-" << valueOffset(program, item.value) << "]\n";
                 out << "    leave\n    ret\n";
+            } else if constexpr (std::is_same_v<T, IrDrop>) {
+                emitBoxDrop(out,
+                    "qword [rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
+                    item.type);
             } else if constexpr (std::is_same_v<T, IrExit>) {
                 out << "    mov edi, dword [rbp-" << valueOffset(program, item.value) << "]\n"
                        "    mov eax, 60\n"
