@@ -1,0 +1,11 @@
+import io
+
+def main(): Int = {
+    val age: Int = 18
+    val small: Byte = 7
+    val enabled: Bool = true
+    val symbol: Char = '🚀'
+    val message: String = "age = " + String(age) + ", byte = " + String(small) + ", actif = " + String(enabled) + ", symbole = " + String(symbol)
+    val written: Int = io.println(message)
+    if (message == "age = 18, byte = 7, actif = true, symbole = 🚀") { 0 } else { 1 }
+}

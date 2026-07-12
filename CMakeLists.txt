@@ -22,6 +22,14 @@ target_compile_options(zeta PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
 include(CTest)
 if(BUILD_TESTING)
+    add_test(NAME compile_string_primitive_conversions COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_primitive_conversions.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/string-primitive-conversions)
+    add_test(NAME run_string_primitive_conversions
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/string-primitive-conversions)
+    set_tests_properties(run_string_primitive_conversions PROPERTIES
+        DEPENDS compile_string_primitive_conversions
+        PASS_REGULAR_EXPRESSION "age = 18, byte = 7, actif = true, symbole = 🚀")
     add_test(NAME compile_string_concat COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_concat.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/string-concat)
