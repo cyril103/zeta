@@ -22,6 +22,13 @@ target_compile_options(zeta PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
 include(CTest)
 if(BUILD_TESTING)
+    add_test(NAME compile_string_concat COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_concat.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/string-concat)
+    add_test(NAME run_string_concat COMMAND ${CMAKE_CURRENT_BINARY_DIR}/string-concat)
+    set_tests_properties(run_string_concat PROPERTIES
+        DEPENDS compile_string_concat
+        PASS_REGULAR_EXPRESSION "Bonjour Zeta")
     add_test(NAME compile_collections_module COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/collections_module.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/collections-module)

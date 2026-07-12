@@ -765,9 +765,12 @@ ValueId IrGenerator::expression(
             const ValueId left = expression(*node.left, parameters);
             const ValueId right = expression(*node.right, parameters);
             const ValueId output = nextValue(expressionNode.inferredType);
-            ir_.instructions.push_back(IrBinary{output, node.op, left, right,
-                                                resolveType(expressionNode.inferredType),
-                                                resolveType(node.left->inferredType)});
+            if (expressionNode.inferredType == ValueType::String && node.op == "+")
+                ir_.instructions.push_back(IrStringConcat{output, left, right});
+            else
+                ir_.instructions.push_back(IrBinary{output, node.op, left, right,
+                                                    resolveType(expressionNode.inferredType),
+                                                    resolveType(node.left->inferredType)});
             return output;
         } else if constexpr (std::is_same_v<T, BlockExpr>) {
             std::vector<std::string> localNames;
@@ -891,6 +894,9 @@ std::string IrGenerator::print(const IrProgram& program) {
             else if constexpr (std::is_same_v<T, IrStringConst>)
                 out << "  $" << item.output << " = const.string " << item.utf8.size()
                     << " bytes\n";
+            else if constexpr (std::is_same_v<T, IrStringConcat>)
+                out << "  $" << item.output << " = concat $" << item.left
+                    << ", $" << item.right << '\n';
             else if constexpr (std::is_same_v<T, IrArrayConstruct>) {
                 out << "  $" << item.output << " = array " << typeName(item.type) << " [";
                 for (std::size_t i = 0; i < item.elements.size(); ++i) {

@@ -17,6 +17,7 @@ using SlotId = std::size_t;
 struct IrConst { ValueId output; std::int32_t value; ValueType type; };
 struct IrDoubleConst { ValueId output; double value; };
 struct IrStringConst { ValueId output; std::string utf8; };
+struct IrStringConcat { ValueId output; ValueId left; ValueId right; };
 struct IrArrayConstruct { ValueId output; std::vector<ValueId> elements; ValueType type; };
 struct IrStructConstruct { ValueId output; std::vector<ValueId> fields; ValueType type; };
 struct IrFieldLoad { ValueId output; ValueId object; ValueType objectType; std::size_t field; };
@@ -77,7 +78,7 @@ struct IrExit { ValueId value; };
 struct IrBranch { ValueId condition; bool jumpWhenTrue; std::size_t label; };
 struct IrJump { std::size_t label; };
 struct IrLabel { std::size_t label; };
-using IrInstruction = std::variant<IrConst, IrDoubleConst, IrStringConst, IrArrayConstruct, IrStructConstruct, IrFieldLoad, IrFieldStore, IrSliceConstruct, IrBoxConstruct, IrIndexLoad, IrIndexStore, IrAddressOf, IrDereference, IrDereferenceStore, IrLoad, IrConvert, IrUnary, IrBinary,
+using IrInstruction = std::variant<IrConst, IrDoubleConst, IrStringConst, IrStringConcat, IrArrayConstruct, IrStructConstruct, IrFieldLoad, IrFieldStore, IrSliceConstruct, IrBoxConstruct, IrIndexLoad, IrIndexStore, IrAddressOf, IrDereference, IrDereferenceStore, IrLoad, IrConvert, IrUnary, IrBinary,
                                    IrStore, IrCopy, IrCall, IrTailCall, IrFunctionStart, IrParameter,
                                    IrReturn, IrDrop, IrRetain, IrExit, IrBranch, IrJump, IrLabel>;
 

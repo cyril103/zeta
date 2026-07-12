@@ -1,0 +1,12 @@
+import io
+
+def join(left: String, right: String): String = left + right
+
+def main(): Int = {
+    val hello: String = "Bonjour"
+    val separator: String = " "
+    val message: String = join(hello + separator, "Zeta")
+    val copy: String = message
+    val written: Int = io.println(copy)
+    if (message == "Bonjour Zeta") { 0 } else { 1 }
+}

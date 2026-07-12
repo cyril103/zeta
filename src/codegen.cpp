@@ -112,6 +112,41 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 out << "    lea rax, [string_const_" << item.output << "]\n"
                     << "    mov qword [rbp-" << offset << "], rax\n"
                     << "    mov qword [rbp-" << offset - 8U << "], " << item.utf8.size() << '\n';
+            } else if constexpr (std::is_same_v<T, IrStringConcat>) {
+                const std::size_t left = valueOffset(program, item.left);
+                const std::size_t right = valueOffset(program, item.right);
+                const std::size_t output = valueOffset(program, item.output);
+                out << "    push r12\n"
+                    << "    push r13\n"
+                    << "    mov r12, qword [rbp-" << left - 8U << "]\n"
+                    << "    add r12, qword [rbp-" << right - 8U << "]\n"
+                    << "    jc ir_string_size_error\n"
+                    << "    mov rsi, r12\n"
+                    << "    add rsi, 16\n"
+                    << "    jc ir_string_size_error\n"
+                    << "    mov eax, 9\n"
+                    << "    xor edi, edi\n"
+                    << "    mov edx, 3\n"
+                    << "    mov r10d, 34\n"
+                    << "    mov r8, -1\n"
+                    << "    xor r9d, r9d\n"
+                    << "    syscall\n"
+                    << "    test rax, rax\n"
+                    << "    js ir_string_allocation_error\n"
+                    << "    mov qword [rax], 1\n"
+                    << "    mov qword [rax+8], r12\n"
+                    << "    lea r13, [rax+16]\n"
+                    << "    mov qword [rbp-" << output << "], r13\n"
+                    << "    mov qword [rbp-" << output - 8U << "], r12\n"
+                    << "    mov rdi, r13\n"
+                    << "    mov rsi, qword [rbp-" << left << "]\n"
+                    << "    mov rcx, qword [rbp-" << left - 8U << "]\n"
+                    << "    rep movsb\n"
+                    << "    mov rsi, qword [rbp-" << right << "]\n"
+                    << "    mov rcx, qword [rbp-" << right - 8U << "]\n"
+                    << "    rep movsb\n"
+                    << "    pop r13\n"
+                    << "    pop r12\n";
             } else if constexpr (std::is_same_v<T, IrArrayConstruct>) {
                 const std::size_t output = valueOffset(program, item.output);
                 const std::size_t elementBytes = valueTypeSize(*item.type.element);
@@ -617,9 +652,23 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
     if (std::any_of(program.instructions.begin(), program.instructions.end(),
                     [](const IrInstruction& instruction) {
                         return std::holds_alternative<IrBoxConstruct>(instruction);
-                    })) {
+    })) {
         out << "ir_box_allocation_error:\n"
                "    mov edi, 102\n"
+               "    mov eax, 60\n"
+               "    syscall\n";
+    }
+
+    if (std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            return std::holds_alternative<IrStringConcat>(instruction);
+        })) {
+        out << "ir_string_size_error:\n"
+               "    mov edi, 103\n"
+               "    mov eax, 60\n"
+               "    syscall\n"
+               "ir_string_allocation_error:\n"
+               "    mov edi, 104\n"
                "    mov eax, 60\n"
                "    syscall\n";
     }

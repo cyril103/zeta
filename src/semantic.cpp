@@ -924,6 +924,11 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             }
             const bool genericNumeric = expected.kind == ValueType::Kind::TypeParameter &&
                 activeTypeConstraints_[expected.typeParameter] == "Numeric";
+            if (expected == ValueType::String && node.op == "+") {
+                checkExpression(*node.left, ValueType::String);
+                checkExpression(*node.right, ValueType::String);
+                return ValueType::String;
+            }
             if (!TypeRules::isNumeric(expected) && !genericNumeric)
                 throw CompileError(expression.location,
                                    "les opérateurs arithmétiques ne s'appliquent pas à Bool");

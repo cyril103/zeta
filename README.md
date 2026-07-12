@@ -111,10 +111,9 @@ identiques peuvent rester différentes.
 
 `String` utilise une vue ABI `{données, longueur}`. Les octets des littéraux sont
 précédés par un en-tête statique compatible avec les futures chaînes allouées.
-La concaténation, les sous-chaînes,
-la longueur publique et l'accès à un `Char` seront ajoutés avec le runtime de
-chaînes. En conséquence, l'arithmétique et les comparaisons d'ordre sont encore
-interdites sur `String`.
+La concaténation `left + right` produit une nouvelle chaîne allouée et immuable.
+Les sous-chaînes, la longueur publique et l'accès à un `Char` restent à ajouter.
+Les autres opérateurs arithmétiques et les comparaisons d'ordre sont interdits.
 
 ## Expressions conditionnelles
 
