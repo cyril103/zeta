@@ -182,18 +182,25 @@ void SemanticAnalyzer::checkIndexAssignment(IndexAssignment& assignment) {
     const SemanticSymbol* target = symbols_.lookup(assignment.name);
     if (target == nullptr)
         throw CompileError(assignment.location, "identifiant inconnu '" + assignment.name + "'");
-    if (target->parameter || target->kind != BindingKind::Var)
-        throw CompileError(assignment.location,
-                           "le tableau '" + assignment.name + "' est immuable");
-    if (const auto borrowed = borrows_.find(assignment.name);
-        borrowed != borrows_.end() &&
-        (borrowed->second.mutableBorrow || borrowed->second.shared != 0))
-        throw CompileError(assignment.location,
-                           "le tableau '" + assignment.name + "' est emprunté");
-    if (target->type.kind != ValueType::Kind::Array)
+    const bool throughReference = target->type.kind == ValueType::Kind::Reference;
+    if (throughReference) {
+        if (!target->type.mutableReference || target->type.element->kind != ValueType::Kind::Array)
+            throw CompileError(assignment.location,
+                               "l'affectation indexée exige un tableau mutable ou une référence '&mut' vers un tableau");
+    } else {
+        if (target->parameter || target->kind != BindingKind::Var)
+            throw CompileError(assignment.location,
+                               "le tableau '" + assignment.name + "' est immuable");
+        if (const auto borrowed = borrows_.find(assignment.name);
+            borrowed != borrows_.end() &&
+            (borrowed->second.mutableBorrow || borrowed->second.shared != 0))
+            throw CompileError(assignment.location,
+                               "le tableau '" + assignment.name + "' est emprunté");
+    }
+    if (!throughReference && target->type.kind != ValueType::Kind::Array)
         throw CompileError(assignment.location,
                            "la cible d'une affectation indexée doit être un tableau");
-    ValueType indexedType = target->type;
+    ValueType indexedType = throughReference ? *target->type.element : target->type;
     for (const ExprPtr& indexExpression : assignment.indexes) {
         if (indexedType.kind != ValueType::Kind::Array)
             throw CompileError(indexExpression->location, "trop d'index pour " + typeName(target->type));

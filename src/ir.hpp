@@ -24,7 +24,14 @@ struct IrIndexLoad {
     ValueType arrayType;
     bool arrayIsReference;
 };
-struct IrIndexStore { SlotId slot; std::vector<ValueId> indexes; ValueId value; ValueType arrayType; };
+struct IrIndexStore {
+    SlotId slot;
+    ValueId array;
+    std::vector<ValueId> indexes;
+    ValueId value;
+    ValueType arrayType;
+    bool arrayIsReference;
+};
 struct IrAddressOf { ValueId output; SlotId slot; };
 struct IrDereference { ValueId output; ValueId reference; ValueType type; };
 struct IrDereferenceStore { ValueId reference; ValueId value; ValueType type; };
@@ -90,6 +97,8 @@ private:
 
     void emitLoop(const WhileStatement& loop,
                   const std::unordered_map<std::string, ValueId>& parameters);
+    void emitIndexStore(const IndexAssignment& assignment,
+                        const std::unordered_map<std::string, ValueId>& parameters);
     ValueId expression(const Expression& expression);
     ValueId expression(const Expression& expression,
                        const std::unordered_map<std::string, ValueId>& parameters);

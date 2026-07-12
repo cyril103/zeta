@@ -1,0 +1,9 @@
+def invalid (values : &[Int; 2]) : Int = {
+    values[0] = 42
+    0
+}
+
+def main () : Int = {
+    val values : [Int; 2] = [1, 2]
+    invalid(&values)
+}

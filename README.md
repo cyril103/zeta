@@ -350,7 +350,17 @@ des tableaux fixes :
 
 ```text
 def somme (values : &[Int; 3]) : Int = values[0] + values[1] + values[2]
+
+def remplace (values : &mut [Int; 3], index : Int, value : Int) : Int = {
+    values[index] = value
+    value
+}
 ```
+
+Une référence `&mut [T; N]` permet la mutation indexée, y compris sur les tableaux
+imbriqués. Les mêmes contrôles de limites statiques et dynamiques que pour un
+tableau direct sont appliqués. Une référence partagée `&[T; N]` reste en lecture
+seule.
 
 Le stockage global, les variables référence mutables et les retours de références
 sont encore interdits. Les slices, `Box[T]`, les pointeurs bruts, l'arithmétique

@@ -321,6 +321,23 @@ if(BUILD_TESTING)
     add_test(NAME run_reference_array COMMAND ${CMAKE_CURRENT_BINARY_DIR}/reference-array)
     set_tests_properties(run_reference_array PROPERTIES DEPENDS compile_reference_array)
 
+    add_test(NAME compile_reference_array_mutation COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/reference_array_mutation.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/reference-array-mutation)
+    add_test(NAME run_reference_array_mutation
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/reference-array-mutation)
+    set_tests_properties(run_reference_array_mutation PROPERTIES
+        DEPENDS compile_reference_array_mutation)
+
+    add_test(NAME compile_reference_array_mutation_bounds COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/reference_array_mutation_bounds.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/reference-array-mutation-bounds)
+    add_test(NAME run_reference_array_mutation_bounds COMMAND ${CMAKE_COMMAND}
+        -DPROGRAM=${CMAKE_CURRENT_BINARY_DIR}/reference-array-mutation-bounds
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_exit_101.cmake)
+    set_tests_properties(run_reference_array_mutation_bounds PROPERTIES
+        DEPENDS compile_reference_array_mutation_bounds)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -396,6 +413,7 @@ if(BUILD_TESTING)
             reference_double_mut
             reference_borrowed_assignment
             reference_call_alias
+            reference_shared_array_mutation
             reference_mutable_direct_read)
         add_test(
             NAME reject_${invalid_case}

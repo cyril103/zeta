@@ -41,12 +41,7 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
                 ir_.instructions.push_back(IrStore{found->second.slot, value,
                                                    found->second.declaration->type});
             } else if constexpr (std::is_same_v<T, IndexAssignment>) {
-                const auto found = symbols_.find(node.name);
-                std::vector<ValueId> indexes;
-                for (const ExprPtr& index : node.indexes) indexes.push_back(expression(*index));
-                const ValueId value = expression(*node.value);
-                ir_.instructions.push_back(IrIndexStore{found->second.slot, std::move(indexes), value,
-                                                        found->second.declaration->type});
+                emitIndexStore(node, {});
             } else if constexpr (std::is_same_v<T, DereferenceAssignment>) {
                 const ValueId reference = expression(*node.reference);
                 const ValueId value = expression(*node.value);
@@ -142,12 +137,7 @@ IrProgram IrGenerator::generate(const ModuleGraph& graph) {
                     ir_.instructions.push_back(IrStore{found->second.slot, value,
                                                        found->second.declaration->type});
                 } else if constexpr (std::is_same_v<T, IndexAssignment>) {
-                    const auto found = symbols_.find(node.name);
-                    std::vector<ValueId> indexes;
-                    for (const ExprPtr& index : node.indexes) indexes.push_back(expression(*index));
-                    const ValueId value = expression(*node.value);
-                    ir_.instructions.push_back(IrIndexStore{found->second.slot, std::move(indexes), value,
-                                                            found->second.declaration->type});
+                    emitIndexStore(node, {});
                 } else if constexpr (std::is_same_v<T, DereferenceAssignment>) {
                     const ValueId reference = expression(*node.reference);
                     const ValueId value = expression(*node.value);
@@ -197,6 +187,39 @@ IrProgram IrGenerator::generate(const ModuleGraph& graph) {
     return std::move(ir_);
 }
 
+void IrGenerator::emitIndexStore(
+    const IndexAssignment& assignment,
+    const std::unordered_map<std::string, ValueId>& parameters) {
+    const auto parameter = parameters.find(assignment.name);
+    const auto symbol = symbols_.find(assignment.name);
+    const bool isParameter = parameter != parameters.end();
+    const ValueType targetType = isParameter
+        ? ir_.valueTypes[parameter->second]
+        : symbol->second.declaration->type;
+    const bool throughReference = targetType.kind == ValueType::Kind::Reference;
+
+    ValueId array = 0;
+    SlotId slot = 0;
+    if (throughReference) {
+        if (isParameter) {
+            array = parameter->second;
+        } else {
+            array = nextValue(targetType);
+            ir_.instructions.push_back(IrLoad{array, symbol->second.slot, targetType});
+        }
+    } else {
+        slot = symbol->second.slot;
+    }
+
+    std::vector<ValueId> indexes;
+    for (const ExprPtr& index : assignment.indexes)
+        indexes.push_back(expression(*index, parameters));
+    const ValueId value = expression(*assignment.value, parameters);
+    const ValueType arrayType = throughReference ? *targetType.element : targetType;
+    ir_.instructions.push_back(IrIndexStore{slot, array, std::move(indexes), value,
+                                            arrayType, throughReference});
+}
+
 void IrGenerator::emitTailExpression(
     const Expression& expressionNode,
     const std::unordered_map<std::string, ValueId>& parameters,
@@ -223,13 +246,7 @@ void IrGenerator::emitTailExpression(
                     ir_.instructions.push_back(IrStore{found->second.slot, value,
                                                        found->second.declaration->type});
                 } else if constexpr (std::is_same_v<T, IndexAssignment>) {
-                    const auto found = symbols_.find(item.name);
-                    std::vector<ValueId> indexes;
-                    for (const ExprPtr& index : item.indexes)
-                        indexes.push_back(expression(*index, parameters));
-                    const ValueId value = expression(*item.value, parameters);
-                    ir_.instructions.push_back(IrIndexStore{found->second.slot, std::move(indexes), value,
-                                                            found->second.declaration->type});
+                    emitIndexStore(item, parameters);
                 } else if constexpr (std::is_same_v<T, DereferenceAssignment>) {
                     const ValueId reference = expression(*item.reference, parameters);
                     const ValueId value = expression(*item.value, parameters);
@@ -311,13 +328,7 @@ void IrGenerator::emitLoop(
                 ir_.instructions.push_back(IrStore{found->second.slot, value,
                                                    found->second.declaration->type});
             } else if constexpr (std::is_same_v<T, IndexAssignment>) {
-                const auto found = symbols_.find(item.name);
-                std::vector<ValueId> indexes;
-                for (const ExprPtr& index : item.indexes)
-                    indexes.push_back(expression(*index, parameters));
-                const ValueId value = expression(*item.value, parameters);
-                ir_.instructions.push_back(IrIndexStore{found->second.slot, std::move(indexes), value,
-                                                        found->second.declaration->type});
+                emitIndexStore(item, parameters);
             } else if constexpr (std::is_same_v<T, DereferenceAssignment>) {
                 const ValueId reference = expression(*item.reference, parameters);
                 const ValueId value = expression(*item.value, parameters);
@@ -520,13 +531,7 @@ ValueId IrGenerator::expression(
                         ir_.instructions.push_back(IrStore{found->second.slot, value,
                                                            found->second.declaration->type});
                     } else if constexpr (std::is_same_v<S, IndexAssignment>) {
-                        const auto found = symbols_.find(item.name);
-                        std::vector<ValueId> indexes;
-                        for (const ExprPtr& index : item.indexes)
-                            indexes.push_back(expression(*index, parameters));
-                        const ValueId value = expression(*item.value, parameters);
-                        ir_.instructions.push_back(IrIndexStore{found->second.slot, std::move(indexes), value,
-                                                                found->second.declaration->type});
+                        emitIndexStore(item, parameters);
                     } else if constexpr (std::is_same_v<S, DereferenceAssignment>) {
                         const ValueId reference = expression(*item.reference, parameters);
                         const ValueId value = expression(*item.value, parameters);
@@ -611,7 +616,10 @@ std::string IrGenerator::print(const IrProgram& program) {
                     << "[$" << item.index << "]\n";
             else if constexpr (std::is_same_v<T, IrIndexStore>)
             {
-                out << "  index_store %" << program.slots[item.slot].name;
+                if (item.arrayIsReference)
+                    out << "  index_store $" << item.array;
+                else
+                    out << "  index_store %" << program.slots[item.slot].name;
                 for (ValueId index : item.indexes) out << "[$" << index << ']';
                 out << ", $" << item.value << '\n';
             }

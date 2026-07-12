@@ -199,7 +199,6 @@ Limites actuelles des références :
 
 - aucun retour ni stockage global de référence ;
 - aucune variable référence réaffectable ;
-- pas encore de mutation indexée directe via `&mut [T; N]` ;
 - pas de slices, pointeurs bruts, `Box`, tas ou allocation dynamique ;
 - pas d'inférence de durées de vie non lexicales.
 
@@ -272,7 +271,7 @@ plus reparcourir les sources inchangés.
 Consolider d'abord les références et préparer les vues dynamiques :
 
 1. autoriser la mutation `values[index] = valeur` lorsque
-   `values : &mut [T; N]` ;
+   `values : &mut [T; N]` — terminé ;
 2. ajouter des tests de références vers `String`, `Char`, tableaux imbriqués et
    appels récursifs ;
 3. réduire les emprunts lexicaux lorsque leur dernière utilisation est connue ;

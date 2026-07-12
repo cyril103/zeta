@@ -1,0 +1,22 @@
+def replace (values : &mut [Int; 3], index : Int, value : Int) : Int = {
+    values[index] = value
+    values[index]
+}
+
+def replaceNested (values : &mut [[Int; 2]; 2]) : Int = {
+    values[1][0] = 30
+    values[1][0]
+}
+
+def main () : Int = {
+    var values : [Int; 3] = [10, 20, 30]
+    val changed : Int = replace(&mut values, 1, 42)
+
+    var matrix : [[Int; 2]; 2] = [[1, 2], [3, 4]]
+    val matrixReference : &mut [[Int; 2]; 2] = &mut matrix
+    matrixReference[0][1] = 20
+    val nested : Int = replaceNested(matrixReference)
+
+    if (changed == 42 && values[1] == 42 &&
+        matrixReference[0][1] == 20 && nested == 30) 0 else 1
+}

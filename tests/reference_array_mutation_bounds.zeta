@@ -1,0 +1,9 @@
+def writeOutside (values : &mut [Int; 2], index : Int) : Int = {
+    values[index] = 99
+    0
+}
+
+def main () : Int = {
+    var values : [Int; 2] = [1, 2]
+    writeOutside(&mut values, 2)
+}

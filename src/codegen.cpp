@@ -122,11 +122,15 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]",
                     elementBytes);
             } else if constexpr (std::is_same_v<T, IrIndexStore>) {
-                const IrSlot& slot = program.slots[item.slot];
-                if (slot.global)
-                    out << "    lea rdi, [global_slot_" << item.slot << "]\n";
-                else
-                    out << "    lea rdi, [rbp-" << slotOffset(program, item.slot) << "]\n";
+                if (item.arrayIsReference) {
+                    out << "    mov rdi, qword [rbp-" << valueOffset(program, item.array) << "]\n";
+                } else {
+                    const IrSlot& slot = program.slots[item.slot];
+                    if (slot.global)
+                        out << "    lea rdi, [global_slot_" << item.slot << "]\n";
+                    else
+                        out << "    lea rdi, [rbp-" << slotOffset(program, item.slot) << "]\n";
+                }
                 ValueType indexedType = item.arrayType;
                 for (ValueId index : item.indexes) {
                     const std::size_t elementBytes = valueTypeSize(*indexedType.element);
