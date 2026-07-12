@@ -239,6 +239,7 @@ Disponible :
 - cache incrémental invalidé par le source et les interfaces réellement importées.
 - interfaces `.zti` versionnées, utilisables avec un `.o` sans source dépendant ;
 - corps génériques publics persistés pour la monomorphisation côté consommateur.
+- précompilation partagée de la stdlib avec manifeste de versions et fallback source.
 
 Le module standard `io` valide désormais cette chaîne avec des fonctions natives
 liées depuis un objet runtime : affichage de `String`, `Char` et `Int`, gestion des

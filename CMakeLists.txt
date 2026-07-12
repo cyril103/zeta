@@ -23,6 +23,12 @@ target_compile_options(zeta PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
 include(CTest)
 if(BUILD_TESTING)
+    add_test(NAME precompiled_standard_library
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/precompiled_stdlib.sh
+            $<TARGET_FILE:zeta>
+            ${CMAKE_CURRENT_SOURCE_DIR}/stdlib
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/io_output.zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/collections_module.zeta)
     add_test(NAME persisted_module_interfaces
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/persisted_interfaces.sh
             $<TARGET_FILE:zeta>

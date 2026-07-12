@@ -267,6 +267,18 @@ source `.zeta` est absent, le compilateur charge les signatures et les imports
 depuis l'interface. Les corps des fonctions génériques publiques sont incorporés
 dans le `.zti` afin d'être monomorphisés dans le module consommateur.
 
+La bibliothèque standard peut être précompilée une fois avec :
+
+```sh
+zeta --build-stdlib
+```
+
+Les artefacts partagés sont écrits dans `stdlib/precompiled/` avec un manifeste
+contenant les versions du compilateur, de l'ABI et du format `.zti`, ainsi que
+l'empreinte de chaque source. Le chargeur les préfère automatiquement et revient
+au `.zeta` correspondant si le manifeste ou l'empreinte n'est plus valable.
+`--stdlib <dossier>` permet de sélectionner une autre bibliothèque standard.
+
 ## Entrées-sorties standard
 
 Le module standard `io` fournit les premières fonctions natives du runtime :

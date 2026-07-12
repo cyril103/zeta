@@ -323,12 +323,22 @@ int main(int argc, char** argv) {
             writeFile(precompiled / "manifest", manifest);
             fs::remove(sourcePath);
             std::cout << "Bibliothèque standard précompilée : " << precompiled << '\n';
+            fs::remove(outputPath);
+            fs::path temporary = outputPath;
+            temporary += ".ir";
+            fs::remove(temporary);
+            temporary = outputPath;
+            temporary += ".asm";
+            fs::remove(temporary);
+            fs::remove_all(cacheDirectory);
+            fs::remove_all(moduleDirectory);
         }
 
-        std::cout << "IR créé          : " << irPath << '\n'
-                  << "Assembleur créé : " << assemblyPath << '\n'
-                  << "Objets ELF64 créés : " << moduleDirectory << '\n'
-                  << "Executable créé : " << outputPath << '\n';
+        if (!buildStandardLibrary)
+            std::cout << "IR créé          : " << irPath << '\n'
+                      << "Assembleur créé : " << assemblyPath << '\n'
+                      << "Objets ELF64 créés : " << moduleDirectory << '\n'
+                      << "Executable créé : " << outputPath << '\n';
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "Erreur: " << error.what() << '\n';
