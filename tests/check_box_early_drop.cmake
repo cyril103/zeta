@@ -1,0 +1,7 @@
+file(READ "${IR_FILE}" ir)
+if(NOT ir MATCHES "drop[^\n]*\n  return")
+    message(FATAL_ERROR "drop manquant avant return dans ${IR_FILE}")
+endif()
+if(NOT ir MATCHES "drop[^\n]*\n  jump")
+    message(FATAL_ERROR "drop manquant avant un saut de boucle dans ${IR_FILE}")
+endif()

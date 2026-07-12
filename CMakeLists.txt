@@ -291,6 +291,10 @@ if(BUILD_TESTING)
         -o ${CMAKE_CURRENT_BINARY_DIR}/box-move-call)
     add_test(NAME run_box_move_call COMMAND ${CMAKE_CURRENT_BINARY_DIR}/box-move-call)
     set_tests_properties(run_box_move_call PROPERTIES DEPENDS compile_box_move_call)
+    add_test(NAME check_box_parameter_drop COMMAND ${CMAKE_COMMAND}
+        -DIR_FILE=${CMAKE_CURRENT_BINARY_DIR}/box-move-call.ir
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_box_drop.cmake)
+    set_tests_properties(check_box_parameter_drop PROPERTIES DEPENDS compile_box_move_call)
 
     foreach(box_case IN ITEMS construct_dereference nested_construct)
         add_test(NAME compile_box_${box_case} COMMAND zeta
@@ -305,6 +309,16 @@ if(BUILD_TESTING)
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_box_drop.cmake)
     set_tests_properties(check_box_lexical_drop PROPERTIES
         DEPENDS compile_box_construct_dereference)
+
+    add_test(NAME compile_box_early_drop COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/box_early_drop.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/box-early-drop)
+    add_test(NAME run_box_early_drop COMMAND ${CMAKE_CURRENT_BINARY_DIR}/box-early-drop)
+    set_tests_properties(run_box_early_drop PROPERTIES DEPENDS compile_box_early_drop)
+    add_test(NAME check_box_early_drop COMMAND ${CMAKE_COMMAND}
+        -DIR_FILE=${CMAKE_CURRENT_BINARY_DIR}/box-early-drop.ir
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_box_early_drop.cmake)
+    set_tests_properties(check_box_early_drop PROPERTIES DEPENDS compile_box_early_drop)
 
     add_test(NAME compile_box_content_borrow COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/box_content_borrow.zeta

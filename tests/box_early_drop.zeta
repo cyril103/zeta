@@ -1,0 +1,15 @@
+def earlyReturn () : Int = {
+    val value : Box[Int] = Box(1)
+    return 7
+}
+
+def main () : Int = {
+    var index : Int = 0
+    while (index < 3) do {
+        val iteration : Box[Int] = Box(index)
+        index = index + 1
+        if (index < 3) { continue } else 0
+        if (index == 3) { break } else 0
+    }
+    if (earlyReturn() == 7 && index == 3) 0 else 1
+}

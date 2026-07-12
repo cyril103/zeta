@@ -106,6 +106,8 @@ private:
     void emitIndexStore(const IndexAssignment& assignment,
                         const std::unordered_map<std::string, ValueId>& parameters);
     void emitBoxDrops(const std::vector<std::string>& names);
+    void emitAllBoxDrops();
+    void emitBoxParameterDrops();
     ValueId expression(const Expression& expression);
     ValueId expression(const Expression& expression,
                        const std::unordered_map<std::string, ValueId>& parameters);
@@ -119,4 +121,6 @@ private:
     std::vector<std::pair<std::size_t, std::size_t>> loopLabels_;
     std::size_t nextLabel_{0};
     std::unordered_set<std::string> movedBoxes_;
+    std::vector<std::vector<std::string>> boxScopes_;
+    std::unordered_map<std::string, std::pair<ValueId, ValueType>> boxParameters_;
 };
