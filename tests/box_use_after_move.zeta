@@ -1,0 +1,7 @@
+def invalid (value : Box[Int]) : Int = {
+    val moved : Box[Int] = value
+    val movedAgain : Box[Int] = value
+    0
+}
+
+def main () : Int = 0

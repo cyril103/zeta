@@ -6,7 +6,8 @@ machine contenant l'adresse d'une unique valeur `T` allouée sur le tas.
 La mise en œuvre est volontairement découpée en étapes indépendantes :
 
 1. type récursif et syntaxe `Box[T]` ;
-2. état sémantique `disponible` ou `déplacé` ;
+2. état sémantique `disponible` ou `déplacé` — disponible pour les déclarations,
+   avec fusion conservatrice des branches ;
 3. déplacement dans les déclarations et les appels ;
 4. construction `Box(valeur)`, déréférencement et emprunts ;
 5. instruction IR `drop` et destruction sur toutes les sorties de portée ;

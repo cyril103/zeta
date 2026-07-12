@@ -1,0 +1,12 @@
+def invalid (value : Box[Int], condition : Bool) : Int = {
+    val result : Int = if (condition) {
+        val moved : Box[Int] = value
+        1
+    } else {
+        2
+    }
+    val movedAgain : Box[Int] = value
+    result
+}
+
+def main () : Int = 0

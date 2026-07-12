@@ -278,6 +278,14 @@ if(BUILD_TESTING)
     add_test(NAME run_box_type_syntax COMMAND ${CMAKE_CURRENT_BINARY_DIR}/box-type-syntax)
     set_tests_properties(run_box_type_syntax PROPERTIES DEPENDS compile_box_type_syntax)
 
+    add_test(NAME compile_box_move_declaration COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/box_move_declaration.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/box-move-declaration)
+    add_test(NAME run_box_move_declaration
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/box-move-declaration)
+    set_tests_properties(run_box_move_declaration PROPERTIES
+        DEPENDS compile_box_move_declaration)
+
     add_test(NAME compile_array_copy COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_copy.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/array-copy)
@@ -513,7 +521,9 @@ if(BUILD_TESTING)
             slice_mut_copy
             slice_shared_mutation
             box_type_missing_element
-            box_type_missing_bracket)
+            box_type_missing_bracket
+            box_use_after_move
+            box_conditional_move)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

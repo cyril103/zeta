@@ -5,6 +5,7 @@
 #include "symbol_table.hpp"
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 
 class TypedProgram {
 public:
@@ -51,4 +52,5 @@ private:
     std::unordered_map<std::string, BorrowState> borrows_;
     std::unordered_map<std::string, ReferenceBorrow> referenceBorrows_;
     std::vector<std::vector<std::string>> borrowScopes_;
+    std::unordered_set<std::string> movedBoxes_;
 };

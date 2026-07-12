@@ -91,6 +91,7 @@ TypedProgram SemanticAnalyzer::analyze(
     symbols_ = SymbolTable{};
     borrows_.clear();
     referenceBorrows_.clear();
+    movedBoxes_.clear();
     borrowScopes_ = {{}};
     if (interfaces != nullptr) {
         for (const Program::Import& import : program.imports) {
@@ -274,9 +275,19 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
         }
     }
     const auto previousReturnType = returnType_;
+    const auto previousMovedBoxes = movedBoxes_;
+    if (declaration.callable)
+        for (const Parameter& parameter : declaration.parameters)
+            if (parameter.type.kind == ValueType::Kind::Box)
+                movedBoxes_.erase(parameter.name);
     if (declaration.callable) returnType_ = declaration.type;
     checkExpression(*declaration.initializer, declaration.type);
+    if (!declaration.callable && declaration.type.kind == ValueType::Kind::Box) {
+        if (const auto* source = std::get_if<NameExpr>(&declaration.initializer->value))
+            movedBoxes_.insert(source->name);
+    }
     returnType_ = previousReturnType;
+    if (declaration.callable) movedBoxes_ = previousMovedBoxes;
     symbols_.popScope();
 
     if ((!declaration.callable || !allowRecursion) &&
@@ -558,6 +569,9 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (symbol->kind == BindingKind::Def && symbol->callable)
                 throw CompileError(expression.location,
                                    "la fonction '" + node.name + "' doit être appelée");
+            if (symbol->type.kind == ValueType::Kind::Box && movedBoxes_.contains(node.name))
+                throw CompileError(expression.location,
+                                   "utilisation de '" + node.name + "' après son déplacement");
             if (const auto borrowed = borrows_.find(node.name);
                 borrowed != borrows_.end() && borrowed->second.mutableBorrow)
                 throw CompileError(expression.location,
@@ -671,8 +685,12 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             return expected;
         } else {
             checkExpression(*node.condition, ValueType::Bool);
+            const auto beforeBranches = movedBoxes_;
             checkExpression(*node.thenBranch, expected);
+            const auto afterThen = movedBoxes_;
+            movedBoxes_ = beforeBranches;
             checkExpression(*node.elseBranch, expected);
+            movedBoxes_.insert(afterThen.begin(), afterThen.end());
             return expected;
         }
     }, expression.value);

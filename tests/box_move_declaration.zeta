@@ -1,0 +1,6 @@
+def consumeLocally (value : Box[Int]) : Int = {
+    val moved : Box[Int] = value
+    0
+}
+
+def main () : Int = 0
