@@ -261,6 +261,12 @@ dépend du source, des interfaces importées et de la version du format de cache
 Une modification privée ne reconstruit que son module ; une modification
 d'interface invalide également ses consommateurs. Un objet inchangé est réutilisé.
 
+Chaque objet est accompagné d'une interface persistante versionnée `.zti`. Une
+dépendance peut être distribuée sous la forme `module.zti` + `module.o` : si son
+source `.zeta` est absent, le compilateur charge les signatures et les imports
+depuis l'interface. Les corps des fonctions génériques publiques sont incorporés
+dans le `.zti` afin d'être monomorphisés dans le module consommateur.
+
 ## Entrées-sorties standard
 
 Le module standard `io` fournit les premières fonctions natives du runtime :

@@ -237,13 +237,15 @@ Disponible :
 - objet de démarrage minimal et initialisation topologique des modules ;
 - liaison finale avec `ld` ;
 - cache incrémental invalidé par le source et les interfaces réellement importées.
+- interfaces `.zti` versionnées, utilisables avec un `.o` sans source dépendant ;
+- corps génériques publics persistés pour la monomorphisation côté consommateur.
 
 Le module standard `io` valide désormais cette chaîne avec des fonctions natives
 liées depuis un objet runtime : affichage de `String`, `Char` et `Int`, gestion des
 écritures partielles et reprise après `EINTR`.
 
-Une évolution future pourra sérialiser les interfaces dans des fichiers `.zti`
-pour ne plus reparcourir les sources inchangées.
+Une évolution future pourra exporter les structures publiques dans les `.zti` et
+remplacer l'inclusion textuelle des corps génériques par une AST sérialisée compacte.
 
 ## Phase 9 — Optimisations IR
 
