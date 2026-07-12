@@ -4,6 +4,7 @@
 #include "token.hpp"
 
 #include <vector>
+#include <unordered_set>
 
 class Parser {
 public:
@@ -47,4 +48,5 @@ private:
     std::size_t blockDepth_{0};
     bool publicDeclaration_{false};
     bool nativeDeclaration_{false};
+    std::unordered_set<std::string> activeTypeParameters_;
 };

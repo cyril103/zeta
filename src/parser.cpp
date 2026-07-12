@@ -163,6 +163,10 @@ const Token& Parser::consume(TokenKind kind, const std::string& message) {
 }
 
 ValueType Parser::consumeType(const std::string& message) {
+    if (check(TokenKind::Identifier) && activeTypeParameters_.contains(peek().text)) {
+        const std::string name = tokens_[current_++].text;
+        return ValueType(ValueType::Kind::TypeParameter, name);
+    }
     if (match(TokenKind::Ampersand)) {
         const bool mutableBorrow = match(TokenKind::Mut);
         const ValueType referenced = consumeType("type référencé attendu après '&'");
@@ -333,7 +337,20 @@ Declaration Parser::declaration(BindingKind kind) {
     const Token& name = consume(TokenKind::Identifier,
                                 "identifiant attendu après '" + start.text + "'");
     bool callable = false;
+    std::vector<std::string> typeParameters;
     std::vector<Parameter> parameters;
+    activeTypeParameters_.clear();
+    if (kind == BindingKind::Def && match(TokenKind::LeftBracket)) {
+        do {
+            const Token& parameter = consume(TokenKind::Identifier,
+                                             "nom de paramètre de type attendu");
+            if (!activeTypeParameters_.insert(parameter.text).second)
+                throw CompileError(parameter.location,
+                                   "paramètre de type '" + parameter.text + "' déclaré plusieurs fois");
+            typeParameters.push_back(parameter.text);
+        } while (match(TokenKind::Comma));
+        consume(TokenKind::RightBracket, "']' attendue après les paramètres de type");
+    }
     if (kind == BindingKind::Def && match(TokenKind::LeftParen)) {
         callable = true;
         if (!check(TokenKind::RightParen)) {
@@ -359,12 +376,16 @@ Declaration Parser::declaration(BindingKind kind) {
     if (nativeSymbol) {
         if (!callable)
             throw CompileError(start.location, "une déclaration native doit être une fonction");
+        activeTypeParameters_.clear();
         return Declaration{start.location, name.text, type, kind, publicSymbol, true,
-                           callable, std::move(parameters), nullptr};
+                           callable, std::move(parameters), std::move(typeParameters), nullptr};
     }
     consume(TokenKind::Equal, "'=' attendu après le type");
+    ExprPtr initializer = expression();
+    activeTypeParameters_.clear();
     return Declaration{start.location, name.text, type, kind, publicSymbol, false,
-                       callable, std::move(parameters), expression()};
+                       callable, std::move(parameters), std::move(typeParameters),
+                       std::move(initializer)};
 }
 
 std::string Parser::qualifiedName() {

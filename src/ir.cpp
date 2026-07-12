@@ -31,7 +31,8 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
                 if (node.kind == BindingKind::Def) {
                     symbols_.emplace(node.name,
                                      Symbol{0, node.kind, &node, true, node.name});
-                    if (node.callable && !node.nativeSymbol) functions.push_back(&node);
+                    if (node.callable && !node.nativeSymbol && node.typeParameters.empty())
+                        functions.push_back(&node);
                 } else {
                     const ValueId value = expression(*node.initializer);
                     const SlotId slot = ir_.slots.size();
@@ -113,7 +114,8 @@ IrProgram IrGenerator::generate(const ModuleGraph& graph) {
             const std::string linkName = moduleName + "__" + declaration->name;
             symbols_.emplace(canonical,
                 Symbol{0, declaration->kind, declaration, true, linkName});
-            if (declaration->callable && !declaration->nativeSymbol)
+            if (declaration->callable && !declaration->nativeSymbol &&
+                declaration->typeParameters.empty())
                 functions.push_back(FunctionRecord{moduleName, declaration, linkName});
         }
     }

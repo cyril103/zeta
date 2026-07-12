@@ -1,0 +1,5 @@
+def identity[T] (value : T) : T = value
+
+def keepBox[T] (value : Box[T]) : Box[T] = value
+
+def main () : Int = 0

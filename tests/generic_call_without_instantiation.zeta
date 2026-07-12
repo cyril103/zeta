@@ -1,0 +1,2 @@
+def identity[T] (value : T) : T = value
+def main () : Int = identity(42)

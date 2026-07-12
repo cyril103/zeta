@@ -1,0 +1,2 @@
+def invalid[T, T] (value : T) : T = value
+def main () : Int = 0

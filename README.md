@@ -435,6 +435,20 @@ d'itération détruisent récursivement les propriétaires encore actifs avec
 `munmap`. Un échec de `mmap` termine le programme avec le code `102`. La
 conception est détaillée dans `docs/BOX_DESIGN.md`.
 
+## Fonctions génériques
+
+Une fonction peut déclarer des paramètres de type utilisés récursivement dans sa
+signature et son corps :
+
+```text
+def identity[T] (value : T) : T = value
+def keepBox[T] (value : Box[T]) : Box[T] = value
+```
+
+L'appel et la monomorphisation arrivent à l'étape suivante. Une fonction générique
+non instanciée ne produit pas encore de code machine. Le plan complet est décrit
+dans `docs/GENERICS_DESIGN.md`.
+
 ## Expressions sur plusieurs lignes
 
 Une expression sur plusieurs lignes doit être placée entre accolades. Le bloc

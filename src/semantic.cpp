@@ -153,6 +153,9 @@ void SemanticAnalyzer::checkStatement(Statement& statement, bool global) {
 }
 
 void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecursion) {
+    if (!declaration.typeParameters.empty() && declaration.publicSymbol)
+        throw CompileError(declaration.location,
+                           "l'export des fonctions génériques attend la monomorphisation");
     if (declaration.type.kind == ValueType::Kind::Reference) {
         if (declaration.callable)
             throw CompileError(declaration.location,
@@ -626,6 +629,10 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 throw CompileError(expression.location, "fonction inconnue '" + node.name + "'");
             if (symbol->kind != BindingKind::Def || !symbol->callable)
                 throw CompileError(expression.location, "'" + node.name + "' n'est pas une fonction");
+            if (symbol->declaration != nullptr &&
+                !symbol->declaration->typeParameters.empty())
+                throw CompileError(expression.location,
+                                   "l'appel d'une fonction générique exige une instanciation explicite");
             const std::size_t parameterCount = symbol->declaration != nullptr
                 ? symbol->declaration->parameters.size() : symbol->parameterTypes.size();
             if (node.arguments.size() != parameterCount)

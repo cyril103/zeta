@@ -9,12 +9,13 @@
 #include <vector>
 
 struct ValueType {
-    enum class Kind { Int, Byte, Double, Bool, Char, String, Array, Reference, Slice, Box };
+    enum class Kind { Int, Byte, Double, Bool, Char, String, Array, Reference, Slice, Box, TypeParameter };
 
     Kind kind;
     std::shared_ptr<const ValueType> element;
     std::size_t length{0};
     bool mutableReference{false};
+    std::string typeParameter;
 
     explicit ValueType(Kind primitive) : kind(primitive) {}
     ValueType(std::shared_ptr<const ValueType> elementType, std::size_t arrayLength)
@@ -28,6 +29,8 @@ struct ValueType {
           mutableReference(mutableView) {}
     ValueType(Kind ownerKind, std::shared_ptr<const ValueType> elementType)
         : kind(ownerKind), element(std::move(elementType)) {}
+    ValueType(Kind parameterKind, std::string parameterName)
+        : kind(parameterKind), typeParameter(std::move(parameterName)) {}
 
     static const ValueType Int;
     static const ValueType Byte;
@@ -39,7 +42,10 @@ struct ValueType {
     friend bool operator==(const ValueType& left, const ValueType& right) {
         if (left.kind != right.kind) return false;
         if (left.kind != Kind::Array && left.kind != Kind::Reference &&
-            left.kind != Kind::Slice && left.kind != Kind::Box) return true;
+            left.kind != Kind::Slice && left.kind != Kind::Box &&
+            left.kind != Kind::TypeParameter) return true;
+        if (left.kind == Kind::TypeParameter)
+            return left.typeParameter == right.typeParameter;
         if (left.element == nullptr || right.element == nullptr || *left.element != *right.element)
             return false;
         return left.kind == Kind::Array ? left.length == right.length
@@ -68,6 +74,7 @@ inline std::string typeName(ValueType type) {
                typeName(*type.element) + "]";
     if (type.kind == ValueType::Kind::Box)
         return "Box[" + typeName(*type.element) + "]";
+    if (type.kind == ValueType::Kind::TypeParameter) return type.typeParameter;
     return type.mutableReference ? "&mut " + typeName(*type.element)
                                  : "&" + typeName(*type.element);
 }
@@ -137,6 +144,7 @@ struct Declaration {
     bool nativeSymbol;
     bool callable;
     std::vector<Parameter> parameters;
+    std::vector<std::string> typeParameters;
     ExprPtr initializer;
 };
 

@@ -328,6 +328,14 @@ if(BUILD_TESTING)
         set_tests_properties(run_box_${box_case} PROPERTIES DEPENDS compile_box_${box_case})
     endforeach()
 
+    add_test(NAME compile_generic_function_syntax COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_function_syntax.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/generic-function-syntax)
+    add_test(NAME run_generic_function_syntax
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/generic-function-syntax)
+    set_tests_properties(run_generic_function_syntax PROPERTIES
+        DEPENDS compile_generic_function_syntax)
+
     add_test(NAME compile_box_content_borrow COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/box_content_borrow.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/box-content-borrow)
@@ -579,7 +587,9 @@ if(BUILD_TESTING)
             box_content_borrow_conflict
             box_content_mut_borrow_val
             box_owner_reassignment
-            box_asymmetric_move)
+            box_asymmetric_move
+            generic_duplicate_type_parameter
+            generic_call_without_instantiation)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta
