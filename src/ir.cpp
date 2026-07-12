@@ -360,8 +360,10 @@ void IrGenerator::emitFieldStore(
 void IrGenerator::emitBoxDrops(const std::vector<std::string>& names) {
     for (auto name = names.rbegin(); name != names.rend(); ++name) {
         const auto symbol = symbols_.find(*name);
-        if (symbol == symbols_.end() || symbol->second.declaration->type.kind !=
-                ValueType::Kind::Box || movedBoxes_.contains(*name))
+        if (symbol == symbols_.end() ||
+            (symbol->second.declaration->type.kind != ValueType::Kind::Box &&
+             symbol->second.declaration->type != ValueType::String) ||
+            movedBoxes_.contains(*name))
             continue;
         const ValueType type = symbol->second.declaration->type;
         const ValueId value = nextValue(type);
@@ -394,7 +396,7 @@ void IrGenerator::emitTailExpression(
                 using T = std::decay_t<decltype(item)>;
                 if constexpr (std::is_same_v<T, Declaration>) {
                     localNames.push_back(item.name);
-                    if (item.type.kind == ValueType::Kind::Box)
+                    if (item.type.kind == ValueType::Kind::Box || item.type == ValueType::String)
                         boxScopes_.back().push_back(item.name);
                     if (item.kind == BindingKind::Def) {
                         symbols_.emplace(item.name, Symbol{0, item.kind, &item, false, item.name});
@@ -404,6 +406,9 @@ void IrGenerator::emitTailExpression(
                             if (const auto* source =
                                     std::get_if<NameExpr>(&item.initializer->value))
                                 movedBoxes_.insert(source->name);
+                        if (item.type == ValueType::String &&
+                            std::holds_alternative<NameExpr>(item.initializer->value))
+                            ir_.instructions.push_back(IrRetain{value, item.type});
                         const SlotId slot = ir_.slots.size();
                         symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false, item.name});
                         ir_.slots.push_back(IrSlot{item.name, item.type, false});
@@ -510,12 +515,15 @@ void IrGenerator::emitLoop(
             using T = std::decay_t<decltype(item)>;
             if constexpr (std::is_same_v<T, Declaration>) {
                 localNames.push_back(item.name);
-                if (item.type.kind == ValueType::Kind::Box)
+                if (item.type.kind == ValueType::Kind::Box || item.type == ValueType::String)
                     boxScopes_.back().push_back(item.name);
                 if (item.kind == BindingKind::Def) {
                     symbols_.emplace(item.name, Symbol{0, item.kind, &item, false, item.name});
                 } else {
                     const ValueId value = expression(*item.initializer, parameters);
+                    if (item.type == ValueType::String &&
+                        std::holds_alternative<NameExpr>(item.initializer->value))
+                        ir_.instructions.push_back(IrRetain{value, item.type});
                     const SlotId slot = ir_.slots.size();
                     symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false, item.name});
                     ir_.slots.push_back(IrSlot{item.name, item.type, false});
@@ -769,7 +777,7 @@ ValueId IrGenerator::expression(
                     using S = std::decay_t<decltype(item)>;
                     if constexpr (std::is_same_v<S, Declaration>) {
                         localNames.push_back(item.name);
-                        if (item.type.kind == ValueType::Kind::Box)
+                        if (item.type.kind == ValueType::Kind::Box || item.type == ValueType::String)
                             boxScopes_.back().push_back(item.name);
                         if (item.kind == BindingKind::Def) {
                             symbols_.emplace(item.name, Symbol{0, item.kind, &item, false, item.name});
@@ -779,6 +787,9 @@ ValueId IrGenerator::expression(
                                 if (const auto* source =
                                         std::get_if<NameExpr>(&item.initializer->value))
                                     movedBoxes_.insert(source->name);
+                            if (item.type == ValueType::String &&
+                                std::holds_alternative<NameExpr>(item.initializer->value))
+                                ir_.instructions.push_back(IrRetain{value, item.type});
                             const SlotId slot = ir_.slots.size();
                             symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false, item.name});
                             ir_.slots.push_back(IrSlot{item.name, item.type, false});
@@ -977,6 +988,8 @@ std::string IrGenerator::print(const IrProgram& program) {
                 out << "  return." << suffix(item.type) << " $" << item.value << '\n';
             else if constexpr (std::is_same_v<T, IrDrop>)
                 out << "  drop $" << item.value << " : " << typeName(item.type) << '\n';
+            else if constexpr (std::is_same_v<T, IrRetain>)
+                out << "  retain $" << item.value << " : " << typeName(item.type) << '\n';
                 else if constexpr (std::is_same_v<T, IrExit>)
                     out << "  exit.i32 $" << item.value << '\n';
                 else if constexpr (std::is_same_v<T, IrBranch>)

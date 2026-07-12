@@ -565,9 +565,29 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     out << "    mov eax, dword [rbp-" << valueOffset(program, item.value) << "]\n";
                 out << "    leave\n    ret\n";
             } else if constexpr (std::is_same_v<T, IrDrop>) {
-                emitBoxDrop(out,
-                    "qword [rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
-                    item.type);
+                if (item.type == ValueType::String) {
+                    out << "    mov rdi, qword [rbp-" << valueOffset(program, item.value) << "]\n"
+                        << "    cmp qword [rdi-16], -1\n"
+                        << "    je ir_string_drop_done_" << item.value << "\n"
+                        << "    dec qword [rdi-16]\n"
+                        << "    jnz ir_string_drop_done_" << item.value << "\n"
+                        << "    mov rsi, qword [rdi-8]\n"
+                        << "    add rsi, 16\n"
+                        << "    sub rdi, 16\n"
+                        << "    mov eax, 11\n"
+                        << "    syscall\n"
+                        << "ir_string_drop_done_" << item.value << ":\n";
+                } else {
+                    emitBoxDrop(out,
+                        "qword [rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
+                        item.type);
+                }
+            } else if constexpr (std::is_same_v<T, IrRetain>) {
+                out << "    mov rax, qword [rbp-" << valueOffset(program, item.value) << "]\n"
+                    << "    cmp qword [rax-16], -1\n"
+                    << "    je ir_string_retain_done_" << item.value << "\n"
+                    << "    inc qword [rax-16]\n"
+                    << "ir_string_retain_done_" << item.value << ":\n";
             } else if constexpr (std::is_same_v<T, IrExit>) {
                 out << "    mov edi, dword [rbp-" << valueOffset(program, item.value) << "]\n"
                        "    mov eax, 60\n"
