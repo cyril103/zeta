@@ -117,6 +117,7 @@ int main(int argc, char** argv) {
         ModuleLoader loader;
         ModuleGraph modules = loader.load(sourcePath);
         for (const std::string& moduleName : modules.compilationOrder) {
+            if (modules.modules.at(moduleName).precompiled) continue;
             SemanticAnalyzer semanticAnalyzer;
             semanticAnalyzer.analyze(modules.modules.at(moduleName).program, &modules.interfaces,
                                      moduleName == modules.root);
@@ -154,6 +155,17 @@ int main(int argc, char** argv) {
         fs::copy_file(cachedStartObject, startObject, fs::copy_options::overwrite_existing);
         std::vector<fs::path> objects{startObject};
         for (const std::string& moduleName : modules.compilationOrder) {
+            const Module& module = modules.modules.at(moduleName);
+            if (module.precompiled) {
+                const fs::path moduleObject = moduleDirectory / (moduleName + ".o");
+                const fs::path moduleInterface = moduleDirectory / (moduleName + ".zti");
+                fs::copy_file(module.objectPath, moduleObject,
+                              fs::copy_options::overwrite_existing);
+                fs::copy_file(module.path, moduleInterface,
+                              fs::copy_options::overwrite_existing);
+                objects.push_back(moduleObject);
+                continue;
+            }
             IrGenerator moduleGenerator;
             const IrProgram moduleIr = moduleGenerator.generateModule(modules, moduleName);
             const fs::path moduleIrPath = moduleDirectory / (moduleName + ".ir");
@@ -167,7 +179,8 @@ int main(int argc, char** argv) {
             writeFile(moduleIrPath, IrGenerator::print(moduleIr));
             writeFile(moduleInterfacePath, InterfaceCodec::serialize(
                 modules.interfaces.at(moduleName),
-                modules.interfaceFingerprints.at(moduleName)));
+                modules.interfaceFingerprints.at(moduleName),
+                modules.dependencies.at(moduleName)));
             if (!fs::exists(cachedModuleObject) || readOptionalFile(moduleStamp) != fingerprint) {
                 writeFile(moduleAssembly,
                     FasmCodeGenerator::generateObject(moduleIr, false, moduleName));

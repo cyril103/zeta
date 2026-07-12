@@ -27,6 +27,8 @@ struct Module {
     std::filesystem::path path;
     Program program;
     std::uint64_t sourceHash;
+    bool precompiled{false};
+    std::filesystem::path objectPath;
 };
 
 struct ModuleGraph {

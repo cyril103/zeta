@@ -2,6 +2,7 @@
 
 #include "lexer.hpp"
 #include "parser.hpp"
+#include "interface.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -95,11 +96,47 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
     if (!validModuleName(name)) throw std::runtime_error("nom de module invalide : " + name);
 
     const std::string source = readSource(path);
+    if (path.extension() == ".zti") {
+        PersistedInterface persisted = InterfaceCodec::deserialize(source);
+        if (persisted.interface.name != name)
+            throw std::runtime_error("l'interface " + path.string() +
+                                     " décrit le module '" + persisted.interface.name + "'");
+        std::filesystem::path objectPath = path;
+        objectPath.replace_extension(".o");
+        if (!std::filesystem::exists(objectPath))
+            throw std::runtime_error("objet précompilé manquant : " + objectPath.string());
+        Program program;
+        for (const std::string& import : persisted.imports)
+            program.imports.push_back(Program::Import{SourceLocation{}, import});
+        for (const auto& [symbolName, symbol] : persisted.interface.exports) {
+            std::vector<Parameter> parameters;
+            for (std::size_t i = 0; i < symbol.parameterTypes.size(); ++i)
+                parameters.push_back(Parameter{SourceLocation{}, "p" + std::to_string(i),
+                                               symbol.parameterTypes[i]});
+            program.statements.emplace_back(Declaration{SourceLocation{}, symbolName,
+                symbol.type, symbol.kind, true, true, symbol.callable,
+                std::move(parameters), {}, {}, nullptr});
+        }
+        graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source),
+                                            true, objectPath});
+        ModuleInterface& storedInterface = graph_.interfaces.emplace(
+            name, std::move(persisted.interface)).first->second;
+        Module& storedModule = graph_.modules.at(name);
+        for (Statement& statement : storedModule.program.statements) {
+            auto* declaration = std::get_if<Declaration>(&statement.value);
+            storedInterface.exports.at(declaration->name).declaration = declaration;
+        }
+        graph_.interfaceFingerprints.emplace(name, persisted.fingerprint);
+        for (const Program::Import& import : storedModule.program.imports)
+            loadModule(import.module, resolveImport(import.module));
+        return;
+    }
     Lexer lexer(source);
     Parser parser(lexer.scan());
     Program program = parser.parse();
     std::vector<Program::Import> imports = program.imports;
-    graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source)});
+    graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source),
+                                        false, {}});
     for (const Program::Import& import : imports)
         loadModule(import.module, resolveImport(import.module));
 }
@@ -107,8 +144,13 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
 std::filesystem::path ModuleLoader::resolveImport(const std::string& name) const {
     const std::filesystem::path local = sourceDirectory_ / (name + ".zeta");
     if (std::filesystem::exists(local)) return local;
+    const std::filesystem::path localInterface = sourceDirectory_ / (name + ".zti");
+    if (std::filesystem::exists(localInterface)) return localInterface;
     const std::filesystem::path standard = standardLibraryDirectory_ / (name + ".zeta");
     if (!standardLibraryDirectory_.empty() && std::filesystem::exists(standard)) return standard;
+    const std::filesystem::path standardInterface = standardLibraryDirectory_ / (name + ".zti");
+    if (!standardLibraryDirectory_.empty() && std::filesystem::exists(standardInterface))
+        return standardInterface;
     throw std::runtime_error("module introuvable : " + name);
 }
 
@@ -153,6 +195,7 @@ void ModuleLoader::buildFingerprints() {
 
 void ModuleLoader::buildInterfaces() {
     for (const auto& [name, module] : graph_.modules) {
+        if (graph_.interfaces.contains(name)) continue;
         ModuleInterface interface{name, {}};
         for (const Statement& statement : module.program.statements) {
             const auto* declaration = std::get_if<Declaration>(&statement.value);
