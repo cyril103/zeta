@@ -1,301 +1,199 @@
 # Roadmap de Zeta
 
-Ce document sert de point de reprise pour les prochaines sessions de développement
-du langage Zeta et de son compilateur.
+Ce document décrit l'état réel du compilateur et l'ordre recommandé des prochains
+chantiers. Une fonctionnalité n'est considérée comme terminée que si elle possède
+des diagnostics, une génération de code exécutable et des tests positifs et négatifs.
 
-## État actuel
+## Vision
 
-La chaîne de compilation est fonctionnelle :
+Zeta est un langage statiquement typé, compilé vers des exécutables Linux x86-64
+autonomes. Il privilégie une sémantique explicite, la monomorphisation des
+génériques, une propriété déterministe et une compilation séparée simple.
+
+Pipeline actuel :
 
 ```text
-source.zeta
-    -> lexer
-    -> parser
-    -> AST
-    -> analyse sémantique et typage
-    -> IR
-    -> assembleur x86-64
-    -> FASM
-    -> exécutable ELF64
+source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
+       -> IR par module -> assembleur FASM -> objets ELF64 -> ld -> exécutable
 ```
 
-Le langage prend actuellement en charge :
+## Fondations disponibles
 
-- `val` pour les valeurs immuables ;
-- `var` pour les variables réaffectables ;
-- `def` pour les définitions paresseuses et les fonctions typées ;
-- les blocs d'expressions avec portée locale ;
-- les types `Int`, `Byte`, `Double`, `Bool`, `Char` et `String` ;
-- l'arithmétique `+`, `-`, `*`, `/` ;
-- les comparaisons `==`, `!=`, `<`, `>`, `<=`, `>=` ;
-- les opérateurs logiques `&&`, `||`, `!` avec court-circuit ;
-- les expressions `if`, `else if`, `else` ;
-- les instructions `while ... do` et les boucles imbriquées ;
-- un point d'entrée obligatoire `def main () : Int` ;
-- la transmission du résultat de `main` au code de sortie du processus.
+### Langage
 
-Le backend produit des exécutables Linux x86-64 autonomes. Il gère notamment les
-calculs flottants avec SSE2 et le stockage adapté à la taille de chaque type.
+- déclarations `val`, `var` et `def` ;
+- fonctions globales typées, récursion, `return` et appels terminaux ;
+- blocs d'expressions et portées lexicales ;
+- `if`, `else`, `while ... do`, `break` et `continue` ;
+- opérateurs arithmétiques, logiques et comparaisons typées ;
+- conversions explicites entre les types compatibles ;
+- types primitifs `Int`, `Byte`, `Double`, `Bool`, `Char` et `String` ;
+- tableaux fixes `[T; N]`, tableaux imbriqués et contrôles de limites ;
+- références `&T` et `&mut T` avec contrôle des alias ;
+- `Slice[T]` et `SliceMut[T]` sous la forme `{adresse, longueur}` ;
+- `Box[T]`, déplacement sans copie et destruction déterministe ;
+- structures ordinaires et génériques, construction nommée et mutation des champs ;
+- fonctions génériques monomorphisées avec inférence et contraintes intégrées
+  `Copy`, `Numeric`, `Ordered` et `Equatable`.
 
-## Limites actuelles
+### Chaînes
 
-- Il n'existe ni entrée utilisateur, ni affichage, ni runtime Zeta.
-- Les chaînes de caractères ne sont pas disponibles.
-- Il n'existe aucune conversion explicite entre les types.
-- `return`, `break` et `continue` ne sont pas disponibles.
-- La compilation ne gère qu'un fichier source à la fois.
-- L'IR ne possède pas encore de véritable pipeline d'optimisation.
+- UTF-8 validé et échappements Unicode ;
+- représentation ABI `{données, longueur}` et objets gérés par comptage de références ;
+- concaténation avec `+` ;
+- égalité exacte sur les octets ;
+- conversions `String(Int)`, `String(Byte)`, `String(Double)`, `String(Bool)` et
+  `String(Char)` ;
+- passage et retour par valeur, affichage avec le module `io`.
 
-## Phase 1 — Consolider l'architecture
+### Modules et outillage
 
-Priorité recommandée avant d'ajouter beaucoup de syntaxe.
+- imports récursifs, visibilité `pub`, noms qualifiés et détection des cycles ;
+- IR, assembleur et véritable objet ELF64 distincts pour chaque module ;
+- symboles de fonctions et globales liés entre les objets ;
+- objet `start.o` minimal et initialisation topologique des modules ;
+- cache incrémental invalidé par les sources et les interfaces importées ;
+- interfaces persistantes versionnées `.zti` consommables avec un `.o` sans source ;
+- corps génériques publics conservés pour la monomorphisation côté consommateur ;
+- stdlib précompilable avec `zeta --build-stdlib` ;
+- manifeste partagé vérifiant compilateur, ABI, format `.zti` et empreintes des sources ;
+- sélection alternative de la stdlib avec `--stdlib <dossier>`.
 
-État : terminée. Le pipeline passe désormais par un analyseur sémantique et un
-AST typé avant la génération IR ; la résolution utilise une pile de portées et
-les règles de types sont centralisées.
+### Bibliothèque standard
 
-- Séparer l'analyse sémantique de la génération IR.
-- Introduire une véritable table de symboles avec une pile de portées.
-- Produire un AST typé après l'analyse sémantique.
-- Attacher une position source complète à chaque nœud.
-- Centraliser les règles de compatibilité et de conversion des types.
-- Découper l'actuel générateur IR en composants plus petits.
+- `io` : affichage de `String`, `Char`, `Int`, `Byte`, `Bool`, `Double` et
+  `Slice[Byte]` ;
+- `collections` : premiers algorithmes génériques `first`, `second` et `at` sur
+  `Slice[T]`.
 
-Critères de validation :
+## Limites connues
 
-- tous les tests existants continuent de passer ;
-- aucune règle de typage n'est réalisée directement par le backend ;
-- l'IR ne reçoit que des nœuds déjà validés et typés.
+- aucune énumération ni correspondance de motifs ;
+- aucune abstraction sûre comme `Option[T]` pour représenter une absence ;
+- pas de collection dynamique possédée (`Vec[T]`, dictionnaire, ensemble) ;
+- pas encore d'API publique pour la longueur, l'indexation Unicode ou les
+  sous-chaînes de `String` ;
+- les références ne peuvent pas être retournées ni stockées globalement ;
+- les durées de vie restent lexicales avec réduction à la dernière utilisation,
+  sans inférence générale interprocédurale ;
+- les fonctions locales capturantes ne sont pas encore de véritables fermetures ;
+- les structures publiques ne sont pas encore exportées dans les `.zti` ;
+- les corps génériques sont conservés textuellement dans les interfaces, pas sous
+  forme d'AST sérialisée compacte ;
+- l'IR ne possède pas encore de pipeline d'optimisation ;
+- la cible unique reste Linux x86-64 avec FASM et `ld`.
 
-## Phase 2 — Conversions explicites
+## Priorité 1 — Énumérations et Option
 
-État : terminée. Les conversions numériques explicites sont représentées dans
-l'AST typé et l'IR, puis émises nativement par le backend x86-64.
+Objectif : permettre aux APIs de signaler explicitement l'absence ou l'échec.
 
-Syntaxe envisagée :
-
-```zeta
-val entier : Int = Int(octet)
-val octet : Byte = Byte(entier)
-val flottant : Double = Double(entier)
-```
-
-À définir :
-
-- conversions autorisées entre `Int`, `Byte` et `Double` ;
-- contrôles ou comportement en cas de dépassement ;
-- conversion de `Double` vers `Int` ;
-- éventuelles conversions impliquant `Bool`.
-
-## Phase 3 — Runtime minimale et affichage
-
-Objectif : observer les résultats autrement que par le code de sortie.
-
-Syntaxe envisagée :
+Syntaxe à concevoir :
 
 ```zeta
-print(42)
-print(3.1415)
-print(true)
-```
-
-Travail nécessaire :
-
-- créer une petite runtime Zeta ;
-- convertir `Int`, `Byte`, `Double` et `Bool` en texte ;
-- utiliser les syscalls Linux d'écriture ;
-- intégrer la runtime au processus d'assemblage et de liaison ;
-- ajouter des tests qui vérifient la sortie standard.
-
-## Phase 4 — Véritables fonctions
-
-État : terminée pour les fonctions de niveau global. Chacune devient une fonction
-IR distincte avec `call`, paramètres, `return`, label assembleur et stack frame.
-La récursion est prise en charge. Les fonctions locales capturant leur portée
-restent développées sur place jusqu'à l'introduction de véritables fermetures.
-
-Remplacer le développement systématique des fonctions par :
-
-- des fonctions IR distinctes ;
-- une instruction IR `call` ;
-- une instruction IR `return` ;
-- des labels assembleur dédiés ;
-- une convention d'appel ;
-- le passage des paramètres ;
-- une stack frame par appel ;
-- la préservation correcte des registres.
-
-Cette phase devra permettre :
-
-- la récursion ;
-- des binaires plus petits ;
-- des appels multiples sans duplication du corps ;
-- une séparation claire entre les fonctions.
-
-## Phase 5 — Contrôle de flux supplémentaire
-
-État : terminée. `return` est disponible et optionnel ; `break` et `continue`
-contrôlent la boucle englobante la plus proche.
-
-Ajouter `return` après la mise en place des véritables fonctions :
-
-```zeta
-def cherche (x : Int) : Int = {
-    if (x < 0) {
-        return 0
-    }
-    x
+enum Option[T] {
+    Some(value: T)
+    None
 }
 ```
 
-Compléter ensuite les boucles avec :
+Travail prévu :
 
-```zeta
-break
-continue
-```
+1. définir la syntaxe des variantes et leur construction ;
+2. calculer une disposition ABI avec discriminant et charge utile ;
+3. ajouter une expression de correspondance exhaustive ;
+4. diagnostiquer les variantes inconnues, doublons et correspondances incomplètes ;
+5. monomorphiser les énumérations génériques ;
+6. fournir `Option[T]` dans la stdlib ;
+7. remplacer les accès partiels de `collections` par des variantes sûres.
 
-Une boucle `for` pourra être étudiée après stabilisation de ces instructions.
+Critère de sortie : une fonction `first` sûre doit pouvoir retourner `None` pour
+une slice vide sans arrêt du processus.
 
-## Phase 6 — Type String (en cours)
+## Priorité 2 — API String et vues UTF-8
 
-Le type `String` immuable est disponible. Il utilise UTF-8 et une représentation
-de 16 octets `{adresse, longueur en octets}`.
-
-Syntaxe envisagée :
-
-```zeta
-val message : String = "Bonjour Zeta"
-```
-
-Disponible :
-
-- littéraux et séquences d'échappement avec validation Unicode stricte ;
-- constantes dans la section de données ;
-- variables globales et locales ;
-- paramètres et retours de fonctions ;
-- égalité et différence exactes sur les octets UTF-8.
-
-Prochaines étapes :
-
-- exposer les longueurs en octets et en points de code ;
-- ajouter l'accès contrôlé à un `Char` ;
-- introduire un runtime et une politique de propriété pour la concaténation ;
-- ajouter l'affichage et les sous-chaînes.
-
-## Phase 7 — Structures de données
-
-Les tableaux de taille fixe sont disponibles : types récursifs `[T; N]`,
-littéraux, copie par valeur, lecture et mutation indexées, tableaux imbriqués et
-contrôles statiques/dynamiques des limites.
-
-Les références empruntées sont également disponibles : `&T`, `&mut T`, prise
-d'adresse, lecture et écriture par déréférencement, paramètres sur 64 bits et
-indexation sans copie d'un tableau reçu par référence. L'analyse impose plusieurs
-emprunts partagés ou un unique emprunt mutable, refuse les alias mutables dans un
-appel et réduit les emprunts locaux après la dernière utilisation connue. Les
-références capturées restent lexicales.
-
-Limites actuelles des références :
-
-- aucun retour ni stockage global de référence ;
-- aucune variable référence réaffectable ;
-- pas de slices, pointeurs bruts, `Box`, tas ou allocation dynamique ;
-- pas d'inférence de durées de vie non lexicales.
+Objectif : rendre `String` utilisable autrement que par concaténation et affichage.
 
 Ordre recommandé :
 
-1. tableaux de taille fixe — terminé ;
-2. références empruntées `&T` et `&mut T` — disponibles localement et en paramètres ;
-3. structures — disponibles, y compris construction, champs, ABI et généricité ;
-4. énumérations ;
-5. tableaux dynamiques — amorcés par le module générique `collections` sur `Slice[T]`.
+1. `lengthBytes` et `isEmpty` ;
+2. validation et décodage d'un point de code UTF-8 ;
+3. itération contrôlée sur les `Char` ;
+4. type de vue non possédée pour les sous-chaînes ;
+5. recherche et comparaison de vues ;
+6. factorisation complète du formatage entre `String(value)` et `io.print...`.
 
-Exemple envisagé :
+Les APIs d'indexation devront retourner `Option[Char]` plutôt qu'utiliser un index
+d'octet ambigu.
 
-```zeta
-val nombres : [Int; 3] = [1, 2, 3]
-```
+## Priorité 3 — Collections dynamiques
 
-## Phase 8 — Modules et compilation séparée (disponible)
+Objectif : ajouter un premier conteneur possédé, probablement `Vec[T]`.
 
-Syntaxe envisagée :
+Étapes :
 
-```zeta
-import maths
+1. définir la représentation `{adresse, longueur, capacité}` ;
+2. introduire allocation, croissance et libération déterministes ;
+3. appliquer les règles de déplacement aux éléments non `Copy` ;
+4. exposer des vues `Slice[T]` et `SliceMut[T]` sans copie ;
+5. fournir `push`, `pop`, `get`, `set`, `reserve` et `clear` ;
+6. tester les types primitifs, structures, `String` et `Box[T]` ;
+7. intégrer le module à la stdlib précompilée.
 
-def main () : Int = maths.abs(-5)
-```
+Le comportement en cas d'échec d'allocation doit être défini avant l'ajout de
+plusieurs conteneurs.
 
-Disponible :
+## Priorité 4 — Interfaces publiques complètes
 
-- résolution récursive de plusieurs fichiers source ;
-- symboles publics et privés et noms qualifiés ;
-- interfaces de modules et graphe de dépendances sans cycles ;
-- ordre topologique, IR par module et vue IR fusionnée de diagnostic ;
-- vrais objets ELF64 par module, avec fonctions et globales liées entre objets ;
-- objet de démarrage minimal et initialisation topologique des modules ;
-- liaison finale avec `ld` ;
-- cache incrémental invalidé par le source et les interfaces réellement importées.
-- interfaces `.zti` versionnées, utilisables avec un `.o` sans source dépendant ;
-- corps génériques publics persistés pour la monomorphisation côté consommateur.
-- précompilation partagée de la stdlib avec manifeste de versions et fallback source.
+Objectif : stabiliser `.zti` comme véritable format de distribution de bibliothèques.
 
-Le module standard `io` valide désormais cette chaîne avec des fonctions natives
-liées depuis un objet runtime : affichage de `String`, `Char` et `Int`, gestion des
-écritures partielles et reprise après `EINTR`.
+Travail prévu :
 
-Une évolution future pourra exporter les structures publiques dans les `.zti` et
-remplacer l'inclusion textuelle des corps génériques par une AST sérialisée compacte.
+1. visibilité et export des structures et futures énumérations ;
+2. sérialisation de leur disposition, champs, variantes et paramètres génériques ;
+3. remplacement des sources génériques incorporées par une AST versionnée ;
+4. diagnostics précis pour ABI ou interface incompatible ;
+5. commande explicite de construction d'une bibliothèque ;
+6. installation dans un cache partagé indépendant d'un projet ;
+7. déduplication robuste des instances génériques entre consommateurs.
 
-## Phase 9 — Optimisations IR
+## Priorité 5 — Optimisations IR
 
-- évaluation des constantes à la compilation ;
-- propagation des constantes ;
-- suppression du code mort ;
-- suppression des définitions inutilisées ;
-- simplification algébrique ;
-- réutilisation des temporaires ;
-- réduction de l'espace utilisé sur la stack ;
-- inlining contrôlé des petites fonctions.
+À commencer après stabilisation des types de données :
+
+1. vérification structurelle systématique de l'IR ;
+2. évaluation et propagation des constantes ;
+3. simplification algébrique ;
+4. suppression des instructions et fonctions mortes ;
+5. réduction et réutilisation des temporaires de pile ;
+6. élimination des copies d'agrégats inutiles ;
+7. optimisation des appels terminaux et inlining contrôlé ;
+8. mesures reproductibles de taille et de temps de compilation.
+
+## Chantiers ultérieurs
+
+- boucles `for` et protocole d'itération ;
+- traits définissables par l'utilisateur ;
+- fermetures et fonctions de première classe ;
+- gestion d'erreurs structurée ;
+- entrée standard et fichiers ;
+- débogage avec informations de lignes ;
+- autres architectures ou formats objets ;
+- mode bibliothèque et gestionnaire de paquets.
 
 ## Qualité continue
 
-À maintenir pendant toutes les phases :
+Chaque étape doit :
 
-- ajouter des tests positifs et négatifs pour chaque fonctionnalité ;
-- vérifier l'exécutable produit, pas seulement la compilation ;
-- conserver des diagnostics avec ligne et colonne ;
-- documenter les décisions de syntaxe et de sémantique ;
-- préserver la compatibilité avec les programmes Zeta existants ;
-- exécuter `git diff --check`, la construction CMake et tous les tests avant commit.
+- être isolée dans un commit cohérent ;
+- ajouter des tests de compilation, d'exécution et de rejet ;
+- vérifier les frontières ABI et la compilation séparée lorsque concernées ;
+- préserver le fallback source et l'invalidation des artefacts précompilés ;
+- exécuter `git diff --check`, la construction CMake et toute la suite CTest ;
+- mettre à jour le README et les documents de conception associés.
 
 ## Prochaine session recommandée
 
-Consolider d'abord les références et préparer les vues dynamiques :
-
-1. autoriser la mutation `values[index] = valeur` lorsque
-   `values : &mut [T; N]` — terminé ;
-2. ajouter des tests de références vers `String`, `Char`, tableaux imbriqués et
-   appels récursifs — terminé ;
-3. réduire les emprunts lexicaux lorsque leur dernière utilisation est connue —
-   terminé ;
-4. concevoir `Slice[T]` et `SliceMut[T]` comme `{adresse, longueur}` sans
-   allocation — terminé, voir `docs/SLICE_DESIGN.md` ;
-5. permettre de créer une slice depuis un tableau fixe emprunté — terminé ;
-6. passer et indexer les slices dans l'ABI avec les mêmes contrôles de limites —
-   terminé ;
-7. utiliser ensuite les slices pour les buffers d'E/S et les futures chaînes
-   construites dynamiquement — buffers de sortie `Slice[Byte]` disponibles ;
-   entrées et chaînes possédées à poursuivre après le modèle de propriété.
-
-Après stabilisation des slices, choisir explicitement le premier modèle de
-propriété dynamique (`Box[T]`, déplacement sans copie et destruction
-déterministe) avant d'introduire un allocateur fondé sur `mmap`. En parallèle, la
-compilation séparée pourra évoluer de l'IR fusionnée vers du code réellement
-réparti dans les objets propres à chaque module.
-
-Le premier modèle de propriété dynamique est disponible : `Box[T]` est un type
-récursif d'un mot machine, alloué par `mmap`, déplacé sans copie et détruit
-déterministement par `munmap` sur toutes les sorties de portée. Les emprunts de
-son contenu utilisent `&*box` et `&mut *box`.
+Commencer la priorité 1 par un document `docs/ENUM_DESIGN.md` couvrant : syntaxe,
+disposition mémoire, généricité, exhaustivité et interaction avec la propriété.
+Implémenter ensuite les énumérations non génériques avant `Option[T]` et la
+correspondance exhaustive.
