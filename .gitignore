@@ -29,6 +29,7 @@ Testing/
 
 # Generated compiler output
 /generated/
+/stdlib/precompiled/
 *.ir
 *.tmp.asm
 
