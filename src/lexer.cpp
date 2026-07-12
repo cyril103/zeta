@@ -152,6 +152,7 @@ std::vector<Token> Lexer::scan() {
             if (text == "val") kind = TokenKind::Val;
             if (text == "var") kind = TokenKind::Var;
             if (text == "def") kind = TokenKind::Def;
+            if (text == "struct") kind = TokenKind::Struct;
             if (text == "import") kind = TokenKind::Import;
             if (text == "pub") kind = TokenKind::Pub;
             if (text == "native") kind = TokenKind::Native;

@@ -23,6 +23,13 @@ target_compile_options(zeta PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 include(CTest)
 if(BUILD_TESTING)
     add_test(
+        NAME compile_struct_types
+        COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/struct_types.zeta
+                -o ${CMAKE_CURRENT_BINARY_DIR}/struct-types
+    )
+    add_test(NAME run_struct_types COMMAND ${CMAKE_CURRENT_BINARY_DIR}/struct-types)
+    set_tests_properties(run_struct_types PROPERTIES DEPENDS compile_struct_types)
+    add_test(
         NAME compile_example
         COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/examples/basic.zeta
                 -o ${CMAKE_CURRENT_BINARY_DIR}/basic
@@ -631,7 +638,8 @@ if(BUILD_TESTING)
             generic_copy_box
             generic_numeric_string
             generic_unknown_constraint
-            generic_unconstrained_operator)
+            generic_unconstrained_operator
+            struct_duplicate_field)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

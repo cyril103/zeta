@@ -5,6 +5,7 @@
 #include <charconv>
 #include <cmath>
 #include <limits>
+#include <algorithm>
 
 namespace {
 void appendUtf8(std::string& output, std::uint32_t value) {
@@ -205,7 +206,48 @@ ValueType Parser::consumeType(const std::string& message) {
     if (match(TokenKind::BoolType)) return ValueType::Bool;
     if (match(TokenKind::CharType)) return ValueType::Char;
     if (match(TokenKind::StringType)) return ValueType::String;
+    if (check(TokenKind::Identifier)) {
+        const auto found = structures_.find(peek().text);
+        if (found != structures_.end()) {
+            ++current_;
+            return ValueType(found->second);
+        }
+    }
     throw CompileError(peek().location, message + ", reçu " + tokenName(peek().kind));
+}
+
+std::shared_ptr<StructType> Parser::structure() {
+    const Token start = previous();
+    const Token& name = consume(TokenKind::Identifier, "nom de structure attendu");
+    if (structures_.contains(name.text))
+        throw CompileError(name.location, "structure '" + name.text + "' déclarée plusieurs fois");
+    auto result = std::make_shared<StructType>();
+    result->location = start.location;
+    result->name = name.text;
+    structures_.emplace(name.text, result);
+    consume(TokenKind::LeftBrace, "'{' attendue après le nom de structure");
+    skipSeparators();
+    std::unordered_set<std::string> names;
+    while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
+        const Token& field = consume(TokenKind::Identifier, "nom de champ attendu");
+        if (!names.insert(field.text).second)
+            throw CompileError(field.location, "champ '" + field.text + "' déclaré plusieurs fois");
+        consume(TokenKind::Colon, "':' attendu après le nom du champ");
+        ValueType type = consumeType("type de champ attendu");
+        if (type.kind == ValueType::Kind::Struct && type.structure.get() == result.get())
+            throw CompileError(field.location, "la structure '" + name.text + "' ne peut pas se contenir directement");
+        const std::size_t alignment = valueTypeAlignment(type);
+        const std::size_t offset = (result->size + alignment - 1U) / alignment * alignment;
+        result->fields.push_back(StructField{field.location, field.text, type, offset});
+        result->size = offset + valueTypeSize(type);
+        result->alignment = std::max(result->alignment, alignment);
+        if (!check(TokenKind::RightBrace) && !match(TokenKind::Comma) && !matchSeparator())
+            throw CompileError(peek().location, "fin de ligne, ',' ou '}' attendue après le champ");
+        skipSeparators();
+    }
+    consume(TokenKind::RightBrace, "'}' attendue après les champs");
+    result->size = (result->size + result->alignment - 1U) / result->alignment * result->alignment;
+    return result;
 }
 
 void Parser::skipSeparators() {
@@ -234,7 +276,8 @@ Program Parser::parse() {
         skipSeparators();
     }
     while (!check(TokenKind::End)) {
-        program.statements.push_back(statement());
+        if (match(TokenKind::Struct)) program.structures.push_back(structure());
+        else program.statements.push_back(statement());
         if (!check(TokenKind::End) && !matchSeparator()) {
             throw CompileError(peek().location, "fin d'instruction attendue");
         }

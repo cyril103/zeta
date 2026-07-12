@@ -1,0 +1,11 @@
+struct Point {
+    x: Int
+    y: Int
+}
+
+struct Pixel {
+    position: Point
+    visible: Bool
+}
+
+def main(): Int = 0

@@ -8,14 +8,17 @@
 #include <variant>
 #include <vector>
 
+struct StructType;
+
 struct ValueType {
-    enum class Kind { Int, Byte, Double, Bool, Char, String, Array, Reference, Slice, Box, TypeParameter };
+    enum class Kind { Int, Byte, Double, Bool, Char, String, Array, Reference, Slice, Box, TypeParameter, Struct };
 
     Kind kind;
     std::shared_ptr<const ValueType> element;
     std::size_t length{0};
     bool mutableReference{false};
     std::string typeParameter;
+    std::shared_ptr<const StructType> structure;
 
     explicit ValueType(Kind primitive) : kind(primitive) {}
     ValueType(std::shared_ptr<const ValueType> elementType, std::size_t arrayLength)
@@ -31,6 +34,8 @@ struct ValueType {
         : kind(ownerKind), element(std::move(elementType)) {}
     ValueType(Kind parameterKind, std::string parameterName)
         : kind(parameterKind), typeParameter(std::move(parameterName)) {}
+    explicit ValueType(std::shared_ptr<const StructType> structType)
+        : kind(Kind::Struct), structure(std::move(structType)) {}
 
     static const ValueType Int;
     static const ValueType Byte;
@@ -43,7 +48,8 @@ struct ValueType {
         if (left.kind != right.kind) return false;
         if (left.kind != Kind::Array && left.kind != Kind::Reference &&
             left.kind != Kind::Slice && left.kind != Kind::Box &&
-            left.kind != Kind::TypeParameter) return true;
+            left.kind != Kind::TypeParameter && left.kind != Kind::Struct) return true;
+        if (left.kind == Kind::Struct) return left.structure == right.structure;
         if (left.kind == Kind::TypeParameter)
             return left.typeParameter == right.typeParameter;
         if (left.element == nullptr || right.element == nullptr || *left.element != *right.element)
@@ -51,6 +57,21 @@ struct ValueType {
         return left.kind == Kind::Array ? left.length == right.length
                                         : left.mutableReference == right.mutableReference;
     }
+};
+
+struct StructField {
+    SourceLocation location;
+    std::string name;
+    ValueType type;
+    std::size_t offset{0};
+};
+
+struct StructType {
+    SourceLocation location;
+    std::string name;
+    std::vector<StructField> fields;
+    std::size_t size{0};
+    std::size_t alignment{1};
 };
 
 inline const ValueType ValueType::Int{ValueType::Kind::Int};
@@ -75,6 +96,7 @@ inline std::string typeName(ValueType type) {
     if (type.kind == ValueType::Kind::Box)
         return "Box[" + typeName(*type.element) + "]";
     if (type.kind == ValueType::Kind::TypeParameter) return type.typeParameter;
+    if (type.kind == ValueType::Kind::Struct) return type.structure->name;
     return type.mutableReference ? "&mut " + typeName(*type.element)
                                  : "&" + typeName(*type.element);
 }
@@ -85,6 +107,7 @@ inline std::size_t valueTypeSize(const ValueType& type) {
     if (type == ValueType::Double) return 8U;
     if (type == ValueType::String || type.kind == ValueType::Kind::Slice) return 16U;
     if (type.kind == ValueType::Kind::Reference || type.kind == ValueType::Kind::Box) return 8U;
+    if (type.kind == ValueType::Kind::Struct) return type.structure->size;
     return valueTypeSize(*type.element) * type.length;
 }
 
@@ -94,6 +117,7 @@ inline std::size_t valueTypeAlignment(const ValueType& type) {
     if (type == ValueType::Double || type == ValueType::String ||
         type.kind == ValueType::Kind::Slice) return 8U;
     if (type.kind == ValueType::Kind::Reference || type.kind == ValueType::Kind::Box) return 8U;
+    if (type.kind == ValueType::Kind::Struct) return type.structure->alignment;
     return valueTypeAlignment(*type.element);
 }
 
@@ -205,5 +229,6 @@ struct Program {
         std::string module;
     };
     std::vector<Import> imports;
+    std::vector<std::shared_ptr<const StructType>> structures;
     std::vector<Statement> statements;
 };

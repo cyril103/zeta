@@ -5,6 +5,7 @@
 
 #include <vector>
 #include <unordered_set>
+#include <unordered_map>
 
 class Parser {
 public:
@@ -21,6 +22,7 @@ private:
     bool startsAssignment() const;
     const Token& consume(TokenKind kind, const std::string& message);
     ValueType consumeType(const std::string& message);
+    std::shared_ptr<StructType> structure();
     void skipSeparators();
     void expressionContinuation();
     Statement statement();
@@ -49,4 +51,5 @@ private:
     bool publicDeclaration_{false};
     bool nativeDeclaration_{false};
     std::unordered_set<std::string> activeTypeParameters_;
+    std::unordered_map<std::string, std::shared_ptr<StructType>> structures_;
 };

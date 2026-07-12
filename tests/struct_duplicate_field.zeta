@@ -1,0 +1,6 @@
+struct Point {
+    x: Int
+    x: Int
+}
+
+def main(): Int = 0
