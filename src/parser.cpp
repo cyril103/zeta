@@ -535,6 +535,18 @@ ExprPtr Parser::primary() {
         return std::make_unique<Expression>(Expression{
             token.location, ConversionExpr{target, std::move(operand)}});
     }
+    if (match(TokenKind::BoxType)) {
+        const Token token = previous();
+        const ValueType target(ValueType::Kind::Box,
+                               std::make_shared<ValueType>(ValueType::Int));
+        consume(TokenKind::LeftParen, "'(' attendue après 'Box'");
+        expressionContinuation();
+        ExprPtr operand = expression();
+        expressionContinuation();
+        consume(TokenKind::RightParen, "')' attendue après la valeur à allouer");
+        return std::make_unique<Expression>(Expression{
+            token.location, ConversionExpr{target, std::move(operand)}});
+    }
     if (match(TokenKind::IntType) || match(TokenKind::ByteType) ||
         match(TokenKind::DoubleType) || match(TokenKind::BoolType) ||
         match(TokenKind::CharType) || match(TokenKind::StringType)) {

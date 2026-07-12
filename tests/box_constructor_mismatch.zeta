@@ -1,0 +1,4 @@
+def main () : Int = {
+    val value : Box[Int] = Box(true)
+    0
+}

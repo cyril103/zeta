@@ -481,6 +481,8 @@ ValueId IrGenerator::expression(
             if (node.target.kind == ValueType::Kind::Slice) {
                 ir_.instructions.push_back(IrSliceConstruct{
                     output, input, node.operand->inferredType.element->length, node.target});
+            } else if (node.target.kind == ValueType::Kind::Box) {
+                ir_.instructions.push_back(IrBoxConstruct{output, input, *node.target.element});
             } else {
                 ir_.instructions.push_back(IrConvert{output, input,
                                                       node.operand->inferredType, node.target});
@@ -624,6 +626,8 @@ std::string IrGenerator::print(const IrProgram& program) {
             else if constexpr (std::is_same_v<T, IrSliceConstruct>)
                 out << "  $" << item.output << " = slice $" << item.reference
                     << ", " << item.length << '\n';
+            else if constexpr (std::is_same_v<T, IrBoxConstruct>)
+                out << "  $" << item.output << " = box $" << item.value << '\n';
             else if constexpr (std::is_same_v<T, IrIndexLoad>)
                 out << "  $" << item.output << " = index " << '$' << item.array
                     << "[$" << item.index << "]\n";

@@ -424,12 +424,13 @@ imbriquée. Les invariants sont détaillés dans `docs/SLICE_DESIGN.md`.
 
 ## Type propriétaire Box
 
-`Box[T]` est réservé comme premier type propriétaire dynamique. Sa représentation
-est un mot machine pointant vers une valeur `T`, et les types sont récursifs comme
-`Box[Box[Int]]`. La construction et l'allocation ne sont pas encore activées : le
-compilateur introduira d'abord le déplacement sans copie afin qu'une valeur ne
-puisse jamais avoir deux propriétaires. La conception est détaillée dans
-`docs/BOX_DESIGN.md`.
+`Box[T]` est le premier type propriétaire dynamique. Sa représentation est un mot
+machine pointant vers une valeur `T`, et les types sont récursifs comme
+`Box[Box[Int]]`. `Box(valeur)` alloue le contenu avec `mmap`, et `*box` permet de
+le lire. La mutation `*box = valeur` exige que le propriétaire soit une variable
+`var`. Une affectation ou un appel par valeur déplace la propriété sans la copier.
+La destruction automatique sera ajoutée à l'étape suivante. La conception est
+détaillée dans `docs/BOX_DESIGN.md`.
 
 ## Expressions sur plusieurs lignes
 

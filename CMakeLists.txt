@@ -292,6 +292,14 @@ if(BUILD_TESTING)
     add_test(NAME run_box_move_call COMMAND ${CMAKE_CURRENT_BINARY_DIR}/box-move-call)
     set_tests_properties(run_box_move_call PROPERTIES DEPENDS compile_box_move_call)
 
+    foreach(box_case IN ITEMS construct_dereference nested_construct)
+        add_test(NAME compile_box_${box_case} COMMAND zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/box_${box_case}.zeta
+            -o ${CMAKE_CURRENT_BINARY_DIR}/box-${box_case})
+        add_test(NAME run_box_${box_case} COMMAND ${CMAKE_CURRENT_BINARY_DIR}/box-${box_case})
+        set_tests_properties(run_box_${box_case} PROPERTIES DEPENDS compile_box_${box_case})
+    endforeach()
+
     add_test(NAME compile_array_copy COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_copy.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/array-copy)
@@ -531,7 +539,9 @@ if(BUILD_TESTING)
             box_use_after_move
             box_conditional_move
             box_use_after_call
-            box_duplicate_call_argument)
+            box_duplicate_call_argument
+            box_content_immutable
+            box_constructor_mismatch)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

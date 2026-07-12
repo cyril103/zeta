@@ -1,0 +1,5 @@
+def main () : Int = {
+    val inner : Box[Int] = Box(42)
+    val outer : Box[Box[Int]] = Box(inner)
+    if (**outer == 42) 0 else 1
+}

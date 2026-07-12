@@ -1,0 +1,5 @@
+def main () : Int = {
+    val value : Box[Int] = Box(1)
+    *value = 2
+    0
+}

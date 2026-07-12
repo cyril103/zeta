@@ -363,6 +363,17 @@ void SemanticAnalyzer::checkIndexAssignment(IndexAssignment& assignment) {
 
 void SemanticAnalyzer::checkDereferenceAssignment(DereferenceAssignment& assignment) {
     const ValueType reference = inferType(*assignment.reference);
+    if (reference.kind == ValueType::Kind::Box) {
+        if (const auto* name = std::get_if<NameExpr>(&assignment.reference->value)) {
+            const SemanticSymbol* symbol = symbols_.lookup(name->name);
+            if (symbol == nullptr || symbol->kind != BindingKind::Var || symbol->parameter)
+                throw CompileError(assignment.location,
+                                   "la mutation du contenu d'une Box exige une variable 'var'");
+        }
+        checkExpression(*assignment.reference, reference);
+        checkExpression(*assignment.value, *reference.element);
+        return;
+    }
     if (reference.kind != ValueType::Kind::Reference || !reference.mutableReference)
         throw CompileError(assignment.location,
                            "l'affectation déréférencée exige une référence '&mut'");
@@ -459,7 +470,8 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
                              node.mutableBorrow);
         else if constexpr (std::is_same_v<T, DereferenceExpr>) {
             const ValueType reference = inferType(*node.operand);
-            return reference.kind == ValueType::Kind::Reference ? *reference.element : ValueType::Int;
+            return reference.kind == ValueType::Kind::Reference ||
+                reference.kind == ValueType::Kind::Box ? *reference.element : ValueType::Int;
         }
         else if constexpr (std::is_same_v<T, NameExpr> || std::is_same_v<T, CallExpr>) {
             const SemanticSymbol* symbol = symbols_.lookup(node.name);
@@ -556,7 +568,8 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
         }
         else if constexpr (std::is_same_v<T, DereferenceExpr>) {
             const ValueType reference = inferType(*node.operand);
-            if (reference.kind != ValueType::Kind::Reference)
+            if (reference.kind != ValueType::Kind::Reference &&
+                reference.kind != ValueType::Kind::Box)
                 throw CompileError(expression.location,
                                    "le déréférencement exige une référence");
             checkExpression(*node.operand, reference);
@@ -627,6 +640,10 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 if (expected.kind != ValueType::Kind::Slice ||
                     expected.mutableReference != node.target.mutableReference)
                     return node.target;
+                node.target = expected;
+            }
+            if (node.target.kind == ValueType::Kind::Box) {
+                if (expected.kind != ValueType::Kind::Box) return node.target;
                 node.target = expected;
             }
             const ValueType source = inferType(*node.operand);

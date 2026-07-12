@@ -1,5 +1,6 @@
 #include "codegen.hpp"
 
+#include <algorithm>
 #include <iomanip>
 #include <limits>
 #include <sstream>
@@ -113,6 +114,22 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 out << "    mov rax, qword [rbp-" << valueOffset(program, item.reference) << "]\n"
                     << "    mov qword [rbp-" << output << "], rax\n"
                     << "    mov qword [rbp-" << output - 8U << "], " << item.length << "\n";
+            } else if constexpr (std::is_same_v<T, IrBoxConstruct>) {
+                out << "    mov eax, 9\n"
+                    << "    xor edi, edi\n"
+                    << "    mov esi, " << valueTypeSize(item.elementType) << "\n"
+                    << "    mov edx, 3\n"
+                    << "    mov r10d, 34\n"
+                    << "    mov r8, -1\n"
+                    << "    xor r9d, r9d\n"
+                    << "    syscall\n"
+                    << "    test rax, rax\n"
+                    << "    js ir_box_allocation_error\n"
+                    << "    mov qword [rbp-" << valueOffset(program, item.output) << "], rax\n"
+                    << "    mov rdi, rax\n";
+                emitBlockCopy(out,
+                    "[rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
+                    "[rdi]", valueTypeSize(item.elementType));
             } else if constexpr (std::is_same_v<T, IrIndexLoad>) {
                 const std::size_t elementBytes = valueTypeSize(*item.arrayType.element);
                 out << "    movsxd rax, dword [rbp-" << valueOffset(program, item.index) << "]\n"
@@ -518,6 +535,15 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
     if (hasArrayAccess) {
         out << "\nir_array_bounds_error:\n"
                "    mov edi, 101\n"
+               "    mov eax, 60\n"
+               "    syscall\n";
+    }
+    if (std::any_of(program.instructions.begin(), program.instructions.end(),
+                    [](const IrInstruction& instruction) {
+                        return std::holds_alternative<IrBoxConstruct>(instruction);
+                    })) {
+        out << "ir_box_allocation_error:\n"
+               "    mov edi, 102\n"
                "    mov eax, 60\n"
                "    syscall\n";
     }

@@ -22,6 +22,8 @@ inline bool canExplicitlyConvert(ValueType source, ValueType target) {
                *source.element->element == *target.element &&
                source.mutableReference == target.mutableReference;
     }
+    if (target.kind == ValueType::Kind::Box)
+        return source == *target.element;
     return (isNumeric(source) && isNumeric(target)) ||
            (source == ValueType::Char && target == ValueType::Int) ||
            (source == ValueType::Int && target == ValueType::Char) || source == target;
