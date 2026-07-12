@@ -253,6 +253,17 @@ if(BUILD_TESTING)
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_io_int.cmake)
     set_tests_properties(run_io_int PROPERTIES DEPENDS compile_io_int)
 
+    foreach(io_case IN ITEMS byte_bool double)
+        add_test(NAME compile_io_${io_case} COMMAND zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/io_${io_case}.zeta
+            -o ${CMAKE_CURRENT_BINARY_DIR}/io-${io_case})
+        add_test(NAME run_io_${io_case} COMMAND ${CMAKE_COMMAND}
+            -DPROGRAM=${CMAKE_CURRENT_BINARY_DIR}/io-${io_case}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_io_${io_case}.cmake)
+        set_tests_properties(run_io_${io_case} PROPERTIES
+            DEPENDS compile_io_${io_case})
+    endforeach()
+
     add_test(NAME compile_array_copy COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_copy.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/array-copy)

@@ -1,0 +1,12 @@
+import io
+
+def main () : Int = {
+    val zero : Int = io.printByte(Byte(0))
+    val space1 : Int = io.print(" ")
+    val maximum : Int = io.printlnByte(Byte(255))
+    val yes : Int = io.printBool(true)
+    val space2 : Int = io.print(" ")
+    val no : Int = io.printlnBool(false)
+    if (zero == 1 && space1 == 1 && maximum == 4 && yes == 4 &&
+        space2 == 1 && no == 6) 0 else 1
+}

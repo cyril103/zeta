@@ -269,12 +269,19 @@ L'API disponible est :
 
 - `io.print(String)` et `io.println(String)` ;
 - `io.printChar(Char)` ;
-- `io.printInt(Int)` et `io.printlnInt(Int)`.
+- `io.printInt(Int)` et `io.printlnInt(Int)` ;
+- `io.printByte(Byte)` et `io.printlnByte(Byte)` ;
+- `io.printBool(Bool)` et `io.printlnBool(Bool)` ;
+- `io.printDouble(Double)` et `io.printlnDouble(Double)`.
 
 Chaque fonction retourne le nombre d'octets UTF-8 écrits. Une erreur de l'appel
 système Linux `write` est retournée sous forme de valeur négative. Les écritures
 partielles sont poursuivies et une interruption `EINTR` est automatiquement
 relancée. Aucune terminaison NUL, allocation ou copie de `String` n'est requise.
+
+Un `Double` est affiché avec environ sept chiffres significatifs. La notation
+fixe est utilisée pour les exposants décimaux de `-4` à `6`, et la notation
+scientifique au-delà. Les valeurs spéciales sont écrites `inf`, `-inf` et `nan`.
 
 Une déclaration `native def` décrit une fonction fournie par un objet runtime et
 ne possède pas de corps Zeta. Elle est réservée aux déclarations globales ; le

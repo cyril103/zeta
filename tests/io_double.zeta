@@ -1,0 +1,13 @@
+import io
+
+def main () : Int = {
+    val zero : Int = io.printDouble(0.0)
+    val space1 : Int = io.print(" ")
+    val pi : Int = io.printDouble(3.1415926)
+    val space2 : Int = io.print(" ")
+    val negative : Int = io.printDouble(-0.0025)
+    val space3 : Int = io.print(" ")
+    val large : Int = io.printlnDouble(1.25e12)
+    if (zero == 1 && space1 == 1 && pi == 8 && space2 == 1 &&
+        negative == 7 && space3 == 1 && large == 9) 0 else 1
+}
