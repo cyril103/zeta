@@ -1,0 +1,12 @@
+def diagonal (matrix : &[[Int; 2]; 2]) : Int = matrix[0][0] + matrix[1][1]
+
+def update (matrix : &mut [[Int; 2]; 2], row : Int, column : Int) : Int = {
+    matrix[row][column] = 40
+    matrix[0][0] + matrix[1][1]
+}
+
+def main () : Int = {
+    var matrix : [[Int; 2]; 2] = [[1, 2], [3, 4]]
+    val result : Int = update(&mut matrix, 0, 0)
+    if (result == 44 && diagonal(&matrix) == 44) 0 else 1
+}

@@ -1,0 +1,12 @@
+def isRocket (value : &Char) : Bool = *value == '🚀'
+
+def replace (value : &mut Char) : Char = {
+    *value = '🚀'
+    *value
+}
+
+def main () : Int = {
+    var symbol : Char = 'z'
+    val replaced : Char = replace(&mut symbol)
+    if (replaced == '🚀' && isRocket(&symbol)) 0 else 1
+}

@@ -338,6 +338,16 @@ if(BUILD_TESTING)
     set_tests_properties(run_reference_array_mutation_bounds PROPERTIES
         DEPENDS compile_reference_array_mutation_bounds)
 
+    foreach(reference_case IN ITEMS string char nested_array recursive_calls)
+        add_test(NAME compile_reference_${reference_case} COMMAND zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/reference_${reference_case}.zeta
+            -o ${CMAKE_CURRENT_BINARY_DIR}/reference-${reference_case})
+        add_test(NAME run_reference_${reference_case}
+            COMMAND ${CMAKE_CURRENT_BINARY_DIR}/reference-${reference_case})
+        set_tests_properties(run_reference_${reference_case} PROPERTIES
+            DEPENDS compile_reference_${reference_case})
+    endforeach()
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment

@@ -273,7 +273,7 @@ Consolider d'abord les références et préparer les vues dynamiques :
 1. autoriser la mutation `values[index] = valeur` lorsque
    `values : &mut [T; N]` — terminé ;
 2. ajouter des tests de références vers `String`, `Char`, tableaux imbriqués et
-   appels récursifs ;
+   appels récursifs — terminé ;
 3. réduire les emprunts lexicaux lorsque leur dernière utilisation est connue ;
 4. concevoir `Slice[T]` et `SliceMut[T]` comme `{adresse, longueur}` sans
    allocation ;

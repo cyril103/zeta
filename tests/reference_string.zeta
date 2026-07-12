@@ -1,0 +1,12 @@
+def isZeta (value : &String) : Bool = *value == "Zeta"
+
+def replace (value : &mut String) : Bool = {
+    *value = "Zeta"
+    *value == "Zeta"
+}
+
+def main () : Int = {
+    var text : String = "avant"
+    val replaced : Bool = replace(&mut text)
+    if (replaced && isZeta(&text)) 0 else 1
+}

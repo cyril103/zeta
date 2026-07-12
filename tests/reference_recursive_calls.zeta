@@ -1,0 +1,17 @@
+def sum (values : &[Int; 4], index : Int) : Int = if (index == 4) 0 else values[index] + sum(values, index + 1)
+
+def fill (values : &mut [Int; 4], index : Int) : Int = {
+    if (index == 4) {
+        values[3]
+    } else {
+        values[index] = index + 1
+        fill(values, index + 1)
+    }
+}
+
+def main () : Int = {
+    val source : [Int; 4] = [10, 20, 5, 7]
+    var target : [Int; 4] = [0, 0, 0, 0]
+    val last : Int = fill(&mut target, 0)
+    if (sum(&source, 0) == 42 && sum(&target, 0) == 10 && last == 4) 0 else 1
+}
