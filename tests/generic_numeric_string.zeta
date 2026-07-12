@@ -1,0 +1,2 @@
+def add[T : Numeric] (left : T, right : T) : T = left + right
+def main () : Int = if (add("a", "b") == "ab") 0 else 1

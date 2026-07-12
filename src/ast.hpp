@@ -149,6 +149,7 @@ struct Declaration {
     bool callable;
     std::vector<Parameter> parameters;
     std::vector<std::string> typeParameters;
+    std::vector<std::string> typeConstraints;
     ExprPtr initializer;
 };
 

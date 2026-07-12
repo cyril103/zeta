@@ -1,0 +1,2 @@
+def invalid[T] (left : T, right : T) : T = left + right
+def main () : Int = 0

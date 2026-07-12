@@ -1,0 +1,6 @@
+def copyValue[T : Copy] (value : T) : T = value
+def main () : Int = {
+    val boxed : Box[Int] = Box(1)
+    val invalid : Box[Int] = copyValue(boxed)
+    0
+}

@@ -338,6 +338,7 @@ Declaration Parser::declaration(BindingKind kind) {
                                 "identifiant attendu après '" + start.text + "'");
     bool callable = false;
     std::vector<std::string> typeParameters;
+    std::vector<std::string> typeConstraints;
     std::vector<Parameter> parameters;
     activeTypeParameters_.clear();
     if (kind == BindingKind::Def && match(TokenKind::LeftBracket)) {
@@ -348,6 +349,11 @@ Declaration Parser::declaration(BindingKind kind) {
                 throw CompileError(parameter.location,
                                    "paramètre de type '" + parameter.text + "' déclaré plusieurs fois");
             typeParameters.push_back(parameter.text);
+            std::string constraint;
+            if (match(TokenKind::Colon))
+                constraint = consume(TokenKind::Identifier,
+                                     "nom de contrainte attendu après ':'").text;
+            typeConstraints.push_back(std::move(constraint));
         } while (match(TokenKind::Comma));
         consume(TokenKind::RightBracket, "']' attendue après les paramètres de type");
     }
@@ -378,14 +384,15 @@ Declaration Parser::declaration(BindingKind kind) {
             throw CompileError(start.location, "une déclaration native doit être une fonction");
         activeTypeParameters_.clear();
         return Declaration{start.location, name.text, type, kind, publicSymbol, true,
-                           callable, std::move(parameters), std::move(typeParameters), nullptr};
+                           callable, std::move(parameters), std::move(typeParameters),
+                           std::move(typeConstraints), nullptr};
     }
     consume(TokenKind::Equal, "'=' attendu après le type");
     ExprPtr initializer = expression();
     activeTypeParameters_.clear();
     return Declaration{start.location, name.text, type, kind, publicSymbol, false,
                        callable, std::move(parameters), std::move(typeParameters),
-                       std::move(initializer)};
+                       std::move(typeConstraints), std::move(initializer)};
 }
 
 std::string Parser::qualifiedName() {

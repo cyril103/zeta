@@ -365,6 +365,12 @@ if(BUILD_TESTING)
     set_tests_properties(run_generic_type_inference PROPERTIES
         DEPENDS compile_generic_type_inference)
 
+    add_test(NAME compile_generic_constraints COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_constraints.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/generic-constraints)
+    add_test(NAME run_generic_constraints COMMAND ${CMAKE_CURRENT_BINARY_DIR}/generic-constraints)
+    set_tests_properties(run_generic_constraints PROPERTIES DEPENDS compile_generic_constraints)
+
     add_test(NAME compile_box_content_borrow COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/box_content_borrow.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/box-content-borrow)
@@ -621,7 +627,11 @@ if(BUILD_TESTING)
             generic_call_without_instantiation
             generic_type_arity
             generic_arguments_on_regular_function
-            generic_conflicting_inference)
+            generic_conflicting_inference
+            generic_copy_box
+            generic_numeric_string
+            generic_unknown_constraint
+            generic_unconstrained_operator)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

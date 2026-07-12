@@ -62,6 +62,25 @@ bool inferTypeArguments(
         return inferTypeArguments(*pattern.element, *actual.element, substitutions);
     return pattern == actual;
 }
+bool isCopyType(const ValueType& type) {
+    if (type.kind == ValueType::Kind::Box) return false;
+    if (type.kind == ValueType::Kind::Array) return isCopyType(*type.element);
+    if (type.kind == ValueType::Kind::Reference || type.kind == ValueType::Kind::Slice)
+        return !type.mutableReference;
+    return type.kind != ValueType::Kind::TypeParameter;
+}
+bool satisfiesConstraint(const ValueType& type, const std::string& constraint) {
+    if (constraint.empty()) return true;
+    if (constraint == "Copy") return isCopyType(type);
+    if (constraint == "Numeric") return TypeRules::isNumeric(type);
+    if (constraint == "Ordered")
+        return TypeRules::isNumeric(type) || type == ValueType::Char;
+    if (constraint == "Equatable")
+        return type == ValueType::Int || type == ValueType::Byte ||
+            type == ValueType::Double || type == ValueType::Bool ||
+            type == ValueType::Char || type == ValueType::String;
+    return false;
+}
 
 void collectExpressionNames(const Expression& expression,
                             std::unordered_map<std::string, std::size_t>& uses);
@@ -195,6 +214,13 @@ void SemanticAnalyzer::checkStatement(Statement& statement, bool global) {
 }
 
 void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecursion) {
+    static const std::unordered_set<std::string> knownConstraints{
+        "", "Copy", "Numeric", "Ordered", "Equatable"};
+    for (std::size_t i = 0; i < declaration.typeConstraints.size(); ++i)
+        if (!knownConstraints.contains(declaration.typeConstraints[i]))
+            throw CompileError(declaration.location,
+                               "contrainte générique inconnue '" +
+                               declaration.typeConstraints[i] + "'");
     if (!declaration.typeParameters.empty() && declaration.publicSymbol)
         throw CompileError(declaration.location,
                            "l'export des fonctions génériques attend la monomorphisation");
@@ -326,7 +352,12 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
     }
     const auto previousReturnType = returnType_;
     const bool previousGenericDeclaration = insideGenericDeclaration_;
+    const auto previousTypeConstraints = activeTypeConstraints_;
     insideGenericDeclaration_ = !declaration.typeParameters.empty();
+    activeTypeConstraints_.clear();
+    for (std::size_t i = 0; i < declaration.typeParameters.size(); ++i)
+        activeTypeConstraints_.emplace(declaration.typeParameters[i],
+                                       declaration.typeConstraints[i]);
     const auto previousMovedBoxes = movedBoxes_;
     if (declaration.callable)
         for (const Parameter& parameter : declaration.parameters)
@@ -340,6 +371,7 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
     }
     returnType_ = previousReturnType;
     insideGenericDeclaration_ = previousGenericDeclaration;
+    activeTypeConstraints_ = previousTypeConstraints;
     if (declaration.callable) movedBoxes_ = previousMovedBoxes;
     symbols_.popScope();
 
@@ -710,6 +742,14 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 if (substitutions.empty())
                     for (std::size_t i = 0; i < node.typeArguments.size(); ++i)
                         substitutions.emplace(generic->typeParameters[i], node.typeArguments[i]);
+                for (std::size_t i = 0; i < generic->typeParameters.size(); ++i) {
+                    const ValueType& type = substitutions.at(generic->typeParameters[i]);
+                    const std::string& constraint = generic->typeConstraints[i];
+                    if (!satisfiesConstraint(type, constraint))
+                        throw CompileError(expression.location,
+                                           "le type " + typeName(type) +
+                                           " ne satisfait pas la contrainte " + constraint);
+                }
             }
             std::unordered_map<std::string, BorrowState> callBorrows;
             for (const ExprPtr& argument : node.arguments) {
@@ -771,7 +811,9 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 checkExpression(*node.operand, ValueType::Bool);
                 return ValueType::Bool;
             }
-            if (!TypeRules::isNumeric(expected))
+            const bool genericNumeric = expected.kind == ValueType::Kind::TypeParameter &&
+                activeTypeConstraints_[expected.typeParameter] == "Numeric";
+            if (!TypeRules::isNumeric(expected) && !genericNumeric)
                 throw CompileError(expression.location,
                                    "les opérateurs arithmétiques ne s'appliquent pas à Bool");
             checkExpression(*node.operand, expected);
@@ -785,6 +827,17 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (TypeRules::isComparison(node.op)) {
                 const ValueType operands = TypeRules::commonOperandType(
                     inferType(*node.left), inferType(*node.right));
+                if (operands.kind == ValueType::Kind::TypeParameter) {
+                    const std::string& constraint = activeTypeConstraints_[operands.typeParameter];
+                    const bool allowed = TypeRules::isOrdering(node.op)
+                        ? constraint == "Ordered"
+                        : constraint == "Equatable" || constraint == "Ordered" ||
+                          constraint == "Numeric";
+                    if (!allowed)
+                        throw CompileError(expression.location,
+                                           "l'opérateur '" + node.op +
+                                           "' exige une contrainte générique adaptée");
+                }
                 if (operands.kind == ValueType::Kind::Array ||
                     operands.kind == ValueType::Kind::Slice)
                     throw CompileError(expression.location,
@@ -802,7 +855,9 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 checkExpression(*node.right, operands);
                 return ValueType::Bool;
             }
-            if (!TypeRules::isNumeric(expected))
+            const bool genericNumeric = expected.kind == ValueType::Kind::TypeParameter &&
+                activeTypeConstraints_[expected.typeParameter] == "Numeric";
+            if (!TypeRules::isNumeric(expected) && !genericNumeric)
                 throw CompileError(expression.location,
                                    "les opérateurs arithmétiques ne s'appliquent pas à Bool");
             checkExpression(*node.left, expected);

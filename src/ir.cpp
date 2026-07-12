@@ -700,7 +700,7 @@ ValueId IrGenerator::expression(
             const ValueId operand = expression(*node.operand, parameters);
             const ValueId output = nextValue(expressionNode.inferredType);
             ir_.instructions.push_back(IrUnary{output, node.op, operand,
-                                               expressionNode.inferredType});
+                                               resolveType(expressionNode.inferredType)});
             return output;
         } else if constexpr (std::is_same_v<T, BinaryExpr>) {
             if (node.op == "&&" || node.op == "||") {
@@ -718,8 +718,8 @@ ValueId IrGenerator::expression(
             const ValueId right = expression(*node.right, parameters);
             const ValueId output = nextValue(expressionNode.inferredType);
             ir_.instructions.push_back(IrBinary{output, node.op, left, right,
-                                                expressionNode.inferredType,
-                                                node.left->inferredType});
+                                                resolveType(expressionNode.inferredType),
+                                                resolveType(node.left->inferredType)});
             return output;
         } else if constexpr (std::is_same_v<T, BlockExpr>) {
             std::vector<std::string> localNames;

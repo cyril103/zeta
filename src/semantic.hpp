@@ -54,4 +54,5 @@ private:
     std::vector<std::vector<std::string>> borrowScopes_;
     std::unordered_set<std::string> movedBoxes_;
     bool insideGenericDeclaration_{false};
+    std::unordered_map<std::string, std::string> activeTypeConstraints_;
 };

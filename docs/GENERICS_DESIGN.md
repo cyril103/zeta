@@ -12,7 +12,7 @@ Plan d'implémentation :
 2. instanciation explicite `identity[Int](42)` — syntaxe et validation disponibles ;
 3. monomorphisation avec noms manglés et cache des instances — terminé ;
 4. inférence récursive des types depuis les arguments — terminé ;
-5. contraintes intégrées `Copy`, `Numeric`, `Ordered` et `Equatable` ;
+5. contraintes intégrées `Copy`, `Numeric`, `Ordered` et `Equatable` — terminé ;
 6. structures génériques puis traits définissables par l'utilisateur.
 
 La première étape est disponible. Les fonctions génériques sont analysées mais ne

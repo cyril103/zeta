@@ -1,0 +1,13 @@
+def add[T : Numeric] (left : T, right : T) : T = left + right
+def maximum[T : Ordered] (left : T, right : T) : T = if (left > right) left else right
+def equal[T : Equatable] (left : T, right : T) : Bool = left == right
+def copyValue[T : Copy] (value : T) : T = value
+
+def main () : Int = {
+    val integer : Int = add(20, 22)
+    val floating : Double = add(1.5, 2.5)
+    val character : Char = maximum('A', 'Z')
+    val same : Bool = equal("Zeta", "Zeta")
+    val copied : Int = copyValue(integer)
+    if (integer == 42 && floating == 4.0 && character == 'Z' && same && copied == 42) 0 else 1
+}

@@ -455,6 +455,18 @@ Lorsque tous les paramètres de type apparaissent dans les arguments, ils sont
 inférés : `identity(42)` devient `identity[Int](42)` et `first(slice)` déduit le
 type d'élément de `Slice[T]`. Une déduction absente ou contradictoire est rejetée.
 
+Les contraintes intégrées autorisent les opérations garanties par un paramètre :
+
+```text
+def add[T : Numeric] (left : T, right : T) : T = left + right
+def maximum[T : Ordered] (left : T, right : T) : T = if (left > right) left else right
+def equal[T : Equatable] (left : T, right : T) : Bool = left == right
+def copyValue[T : Copy] (value : T) : T = value
+```
+
+`Copy` exclut notamment `Box[T]`, `Numeric` couvre `Byte`, `Int` et `Double`,
+`Ordered` ajoute `Char`, et `Equatable` couvre les types primitifs comparables.
+
 ## Expressions sur plusieurs lignes
 
 Une expression sur plusieurs lignes doit être placée entre accolades. Le bloc
