@@ -320,6 +320,14 @@ if(BUILD_TESTING)
         -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_box_early_drop.cmake)
     set_tests_properties(check_box_early_drop PROPERTIES DEPENDS compile_box_early_drop)
 
+    foreach(box_case IN ITEMS allocator_stress aggregate_content)
+        add_test(NAME compile_box_${box_case} COMMAND zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/box_${box_case}.zeta
+            -o ${CMAKE_CURRENT_BINARY_DIR}/box-${box_case})
+        add_test(NAME run_box_${box_case} COMMAND ${CMAKE_CURRENT_BINARY_DIR}/box-${box_case})
+        set_tests_properties(run_box_${box_case} PROPERTIES DEPENDS compile_box_${box_case})
+    endforeach()
+
     add_test(NAME compile_box_content_borrow COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/box_content_borrow.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/box-content-borrow)

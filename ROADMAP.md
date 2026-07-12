@@ -292,6 +292,7 @@ déterministe) avant d'introduire un allocateur fondé sur `mmap`. En parallèle
 compilation séparée pourra évoluer de l'IR fusionnée vers du code réellement
 réparti dans les objets propres à chaque module.
 
-La première étape de ce modèle est disponible : `Box[T]` est reconnu comme type
-récursif d'un mot machine. La prochaine étape introduira l'état sémantique des
-valeurs déplacées avant d'autoriser toute allocation.
+Le premier modèle de propriété dynamique est disponible : `Box[T]` est un type
+récursif d'un mot machine, alloué par `mmap`, déplacé sans copie et détruit
+déterministement par `munmap` sur toutes les sorties de portée. Les emprunts de
+son contenu utilisent `&*box` et `&mut *box`.

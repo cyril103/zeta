@@ -432,7 +432,8 @@ le lire. La mutation `*box = valeur` exige que le propriétaire soit une variabl
 depuis un propriétaire `var`. Une affectation ou un appel par valeur déplace la propriété sans la copier.
 Les sorties lexicales normales, `return`, `break`, `continue` et chaque fin
 d'itération détruisent récursivement les propriétaires encore actifs avec
-`munmap`. La conception est détaillée dans `docs/BOX_DESIGN.md`.
+`munmap`. Un échec de `mmap` termine le programme avec le code `102`. La
+conception est détaillée dans `docs/BOX_DESIGN.md`.
 
 ## Expressions sur plusieurs lignes
 

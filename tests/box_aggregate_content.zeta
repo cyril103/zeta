@@ -1,0 +1,5 @@
+def main () : Int = {
+    val text : Box[String] = Box("Zeta 🚀")
+    val values : Box[[Int; 3]] = Box([10, 20, 12])
+    if (*text == "Zeta 🚀" && (*values)[0] + (*values)[1] + (*values)[2] == 42) 0 else 1
+}

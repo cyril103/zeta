@@ -1,0 +1,10 @@
+def main () : Int = {
+    var index : Int = 0
+    var total : Int = 0
+    while (index < 20000) do {
+        val value : Box[Int] = Box(index)
+        total = total + *value
+        index = index + 1
+    }
+    if (total == 199990000) 0 else 1
+}

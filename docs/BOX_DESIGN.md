@@ -13,7 +13,12 @@ La mise en œuvre est volontairement découpée en étapes indépendantes :
    `&mut *box` — terminé ;
 5. instruction IR `drop` et destruction — disponible sur les sorties lexicales,
    `return`, `break`, `continue` et les fins d'itération ;
-6. allocation par `mmap` et libération par `munmap`.
+6. allocation par `mmap` et libération récursive par `munmap` — terminé.
+
+Cette première version du modèle propriétaire est complète. Chaque construction
+réalise une allocation de la taille exacte de `T`. Un échec d'allocation termine
+le processus avec le code `102`. Tous les chemins de sortie détruisent les
+propriétaires encore actifs, tandis qu'un déplacement transfère cette obligation.
 
 Une `Box[T]` ne sera jamais implicitement copiable. Une opération par valeur
 transférera son propriétaire et rendra l'ancien nom inutilisable. Les emprunts ne
