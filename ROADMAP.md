@@ -291,3 +291,7 @@ propriété dynamique (`Box[T]`, déplacement sans copie et destruction
 déterministe) avant d'introduire un allocateur fondé sur `mmap`. En parallèle, la
 compilation séparée pourra évoluer de l'IR fusionnée vers du code réellement
 réparti dans les objets propres à chaque module.
+
+La première étape de ce modèle est disponible : `Box[T]` est reconnu comme type
+récursif d'un mot machine. La prochaine étape introduira l'état sémantique des
+valeurs déplacées avant d'autoriser toute allocation.

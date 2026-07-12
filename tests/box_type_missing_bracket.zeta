@@ -1,0 +1,2 @@
+native def inspect (value : Box[Int) : Int
+def main () : Int = 0

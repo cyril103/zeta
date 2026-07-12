@@ -189,6 +189,12 @@ ValueType Parser::consumeType(const std::string& message) {
         return ValueType(ValueType::Kind::Slice,
                          std::make_shared<ValueType>(element), mutableView);
     }
+    if (match(TokenKind::BoxType)) {
+        consume(TokenKind::LeftBracket, "'[' attendu après 'Box'");
+        const ValueType element = consumeType("type contenu attendu dans 'Box'");
+        consume(TokenKind::RightBracket, "']' attendue après le type contenu");
+        return ValueType(ValueType::Kind::Box, std::make_shared<ValueType>(element));
+    }
     if (match(TokenKind::IntType)) return ValueType::Int;
     if (match(TokenKind::ByteType)) return ValueType::Byte;
     if (match(TokenKind::DoubleType)) return ValueType::Double;

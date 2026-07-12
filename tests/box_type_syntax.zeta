@@ -1,0 +1,4 @@
+native def inspect (value : Box[Int]) : Int
+native def inspectNested (value : Box[Box[String]]) : Int
+
+def main () : Int = 0

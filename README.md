@@ -154,7 +154,7 @@ ne retourne aucune valeur.
 
 Un identifiant commence par une lettre ou `_`, puis contient des lettres, chiffres
 ou `_`. Les mots `val`, `var`, `def`, `if`, `else`, `while`, `do`, `Int`, `Byte`, `Double`,
-`Bool`, `Char`, `String`, `Slice`, `SliceMut`, `true` et `false` sont réservés. Un identifiant
+`Bool`, `Char`, `String`, `Slice`, `SliceMut`, `Box`, `true` et `false` sont réservés. Un identifiant
 ne peut jamais être redéclaré. Une déclaration `val` est
 immuable, tandis qu'une déclaration `var` peut être réaffectée sans créer un
 nouveau slot sur la stack :
@@ -421,6 +421,15 @@ def remplace (values : SliceMut[Int], index : Int, value : Int) : Int = {
 Chaque accès vérifie dynamiquement `0 <= index < longueur` et termine avec le code
 `101` en cas d'échec. Les slices d'éléments tableaux acceptent aussi l'indexation
 imbriquée. Les invariants sont détaillés dans `docs/SLICE_DESIGN.md`.
+
+## Type propriétaire Box
+
+`Box[T]` est réservé comme premier type propriétaire dynamique. Sa représentation
+est un mot machine pointant vers une valeur `T`, et les types sont récursifs comme
+`Box[Box[Int]]`. La construction et l'allocation ne sont pas encore activées : le
+compilateur introduira d'abord le déplacement sans copie afin qu'une valeur ne
+puisse jamais avoir deux propriétaires. La conception est détaillée dans
+`docs/BOX_DESIGN.md`.
 
 ## Expressions sur plusieurs lignes
 

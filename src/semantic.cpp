@@ -642,9 +642,10 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                     operands.kind == ValueType::Kind::Slice)
                     throw CompileError(expression.location,
                                        "les comparaisons de tableaux et slices ne sont pas encore disponibles");
-                if (operands.kind == ValueType::Kind::Reference)
+                if (operands.kind == ValueType::Kind::Reference ||
+                    operands.kind == ValueType::Kind::Box)
                     throw CompileError(expression.location,
-                                       "les comparaisons de références ne sont pas disponibles");
+                                       "les comparaisons de références et Box ne sont pas disponibles");
                 if (TypeRules::isOrdering(node.op) &&
                     (operands == ValueType::Bool || operands == ValueType::String))
                     throw CompileError(expression.location,
