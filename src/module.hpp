@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 struct ExportedSymbol {
@@ -44,6 +45,8 @@ struct ModuleGraph {
 
 class ModuleLoader {
 public:
+    explicit ModuleLoader(std::filesystem::path standardLibraryDirectory = {})
+        : standardLibraryDirectory_(std::move(standardLibraryDirectory)) {}
     ModuleGraph load(const std::filesystem::path& rootPath);
 
 private:

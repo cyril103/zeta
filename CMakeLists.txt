@@ -262,7 +262,8 @@ if(BUILD_TESTING)
 
     add_test(NAME compile_stdlib_lookup COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/stdlib_lookup.zeta
-        -o ${CMAKE_CURRENT_BINARY_DIR}/stdlib-lookup)
+        -o ${CMAKE_CURRENT_BINARY_DIR}/stdlib-lookup
+        --stdlib ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/stdlib)
     add_test(NAME run_stdlib_lookup COMMAND ${CMAKE_CURRENT_BINARY_DIR}/stdlib-lookup)
     set_tests_properties(run_stdlib_lookup PROPERTIES DEPENDS compile_stdlib_lookup)
 

@@ -63,7 +63,7 @@ void runLinker(const std::vector<fs::path>& objects, const fs::path& executable)
 }
 
 void usage() {
-    std::cerr << "Usage: zeta <source.zeta> [-o executable]\n";
+    std::cerr << "Usage: zeta <source.zeta> [-o executable] [--stdlib dossier]\n";
 }
 
 std::string startAssembly(const ModuleGraph& modules) {
@@ -89,6 +89,7 @@ int main(int argc, char** argv) {
 
     fs::path sourcePath;
     fs::path outputPath;
+    fs::path standardLibraryPath;
     for (int i = 1; i < argc; ++i) {
         const std::string argument = argv[i];
         if (argument == "-o") {
@@ -97,6 +98,12 @@ int main(int argc, char** argv) {
                 return 2;
             }
             outputPath = argv[i];
+        } else if (argument == "--stdlib") {
+            if (++i >= argc) {
+                usage();
+                return 2;
+            }
+            standardLibraryPath = argv[i];
         } else if (sourcePath.empty()) {
             sourcePath = argument;
         } else {
@@ -114,7 +121,7 @@ int main(int argc, char** argv) {
     }
 
     try {
-        ModuleLoader loader;
+        ModuleLoader loader(standardLibraryPath);
         ModuleGraph modules = loader.load(sourcePath);
         for (const std::string& moduleName : modules.compilationOrder) {
             if (modules.modules.at(moduleName).precompiled &&

@@ -47,7 +47,7 @@ ModuleGraph ModuleLoader::load(const std::filesystem::path& rootPath) {
     const std::filesystem::path absolute = std::filesystem::absolute(rootPath);
     sourceDirectory_ = absolute.parent_path();
 #ifdef ZETA_STDLIB_DIR
-    standardLibraryDirectory_ = ZETA_STDLIB_DIR;
+    if (standardLibraryDirectory_.empty()) standardLibraryDirectory_ = ZETA_STDLIB_DIR;
 #endif
     graph_.root = absolute.stem().string();
     if (!validModuleName(graph_.root))
