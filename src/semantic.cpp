@@ -316,6 +316,9 @@ void SemanticAnalyzer::checkAssignment(Assignment& assignment) {
         const std::string subject = target->kind == BindingKind::Def ? "la définition '" : "la val '";
         throw CompileError(assignment.location, subject + assignment.name + "' est immuable");
     }
+    if (target->type.kind == ValueType::Kind::Box)
+        throw CompileError(assignment.location,
+                           "la réaffectation d'un propriétaire Box n'est pas encore autorisée ; modifiez son contenu avec '*box = valeur'");
     if (const auto borrowed = borrows_.find(assignment.name);
         borrowed != borrows_.end() &&
         (borrowed->second.mutableBorrow || borrowed->second.shared != 0))
@@ -738,6 +741,10 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             const auto afterThen = movedBoxes_;
             movedBoxes_ = beforeBranches;
             checkExpression(*node.elseBranch, expected);
+            const auto afterElse = movedBoxes_;
+            if (afterThen != afterElse)
+                throw CompileError(expression.location,
+                                   "un déplacement de Box conditionnel doit avoir lieu dans toutes les branches");
             movedBoxes_.insert(afterThen.begin(), afterThen.end());
             return expected;
         }

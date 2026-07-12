@@ -577,7 +577,9 @@ if(BUILD_TESTING)
             box_content_immutable
             box_constructor_mismatch
             box_content_borrow_conflict
-            box_content_mut_borrow_val)
+            box_content_mut_borrow_val
+            box_owner_reassignment
+            box_asymmetric_move)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

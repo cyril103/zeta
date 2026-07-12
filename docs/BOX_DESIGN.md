@@ -20,6 +20,10 @@ réalise une allocation de la taille exacte de `T`. Un échec d'allocation termi
 le processus avec le code `102`. Tous les chemins de sortie détruisent les
 propriétaires encore actifs, tandis qu'un déplacement transfère cette obligation.
 
+Une réaffectation du propriétaire lui-même reste interdite ; le contenu d'une
+`var Box[T]` se modifie avec `*box = valeur`. Un déplacement conditionnel doit se
+produire dans toutes les branches afin que la destruction reste déterministe.
+
 Une `Box[T]` ne sera jamais implicitement copiable. Une opération par valeur
 transférera son propriétaire et rendra l'ancien nom inutilisable. Les emprunts ne
 transféreront pas la propriété.

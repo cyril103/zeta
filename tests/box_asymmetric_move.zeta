@@ -1,0 +1,6 @@
+def consume (value : Box[Int]) : Int = 0
+
+def invalid (value : Box[Int], condition : Bool) : Int =
+    if (condition) consume(value) else 0
+
+def main () : Int = 0
