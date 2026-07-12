@@ -1,0 +1,13 @@
+def identity[T] (value : T) : T = value
+def first[T] (values : Slice[T]) : T = values[0]
+
+def main () : Int = {
+    val number : Int = identity(42)
+    val text : String = identity("Zeta")
+    val values : [Int; 3] = [10, 20, 12]
+    val view : Slice[Int] = Slice(&values)
+    val item : Int = first(view)
+    var boxed : Box[Int] = Box(42)
+    val moved : Box[Int] = identity(boxed)
+    if (number == 42 && text == "Zeta" && item == 10 && *moved == 42) 0 else 1
+}

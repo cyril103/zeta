@@ -11,7 +11,7 @@ Plan d'implémentation :
 1. paramètres de type dans les fonctions et substitution dans les signatures ;
 2. instanciation explicite `identity[Int](42)` — syntaxe et validation disponibles ;
 3. monomorphisation avec noms manglés et cache des instances — terminé ;
-4. inférence des types depuis les arguments ;
+4. inférence récursive des types depuis les arguments — terminé ;
 5. contraintes intégrées `Copy`, `Numeric`, `Ordered` et `Equatable` ;
 6. structures génériques puis traits définissables par l'utilisateur.
 

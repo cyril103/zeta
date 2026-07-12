@@ -1,2 +1,2 @@
-def identity[T] (value : T) : T = value
-def main () : Int = identity(42)
+def cannotInfer[T, U] (value : T) : T = value
+def main () : Int = cannotInfer(42)

@@ -589,8 +589,9 @@ ValueId IrGenerator::expression(
                 node.array->inferredType.kind == ValueType::Kind::Reference;
             const bool arrayIsSlice =
                 node.array->inferredType.kind == ValueType::Kind::Slice;
+            const ValueType resolvedOperandType = resolveType(node.array->inferredType);
             const ValueType arrayType = arrayIsReference
-                ? *node.array->inferredType.element : node.array->inferredType;
+                ? *resolvedOperandType.element : resolvedOperandType;
             ir_.instructions.push_back(IrIndexLoad{output, array, index, arrayType,
                                                    arrayIsReference, arrayIsSlice});
             return output;

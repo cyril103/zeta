@@ -39,6 +39,29 @@ ValueType substituteType(
             std::make_shared<ValueType>(substituteType(*type.element, substitutions)));
     return type;
 }
+bool inferTypeArguments(
+    const ValueType& pattern, const ValueType& actual,
+    std::unordered_map<std::string, ValueType>& substitutions) {
+    if (pattern.kind == ValueType::Kind::TypeParameter) {
+        const auto found = substitutions.find(pattern.typeParameter);
+        if (found == substitutions.end()) {
+            substitutions.emplace(pattern.typeParameter, actual);
+            return true;
+        }
+        return found->second == actual;
+    }
+    if (pattern.kind != actual.kind) return false;
+    if (pattern.kind == ValueType::Kind::Array && pattern.length != actual.length) return false;
+    if ((pattern.kind == ValueType::Kind::Reference ||
+         pattern.kind == ValueType::Kind::Slice) &&
+        pattern.mutableReference != actual.mutableReference) return false;
+    if (pattern.kind == ValueType::Kind::Array ||
+        pattern.kind == ValueType::Kind::Reference ||
+        pattern.kind == ValueType::Kind::Slice ||
+        pattern.kind == ValueType::Kind::Box)
+        return inferTypeArguments(*pattern.element, *actual.element, substitutions);
+    return pattern == actual;
+}
 
 void collectExpressionNames(const Expression& expression,
                             std::unordered_map<std::string, std::size_t>& uses);
@@ -656,24 +679,38 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (generic == nullptr && !node.typeArguments.empty())
                 throw CompileError(expression.location,
                                    "la fonction '" + node.name + "' n'est pas générique");
-            if (generic != nullptr && node.typeArguments.empty())
-                throw CompileError(expression.location,
-                                   "l'appel d'une fonction générique exige une instanciation explicite");
-            std::unordered_map<std::string, ValueType> substitutions;
-            if (generic != nullptr) {
-                if (node.typeArguments.size() != generic->typeParameters.size())
-                    throw CompileError(expression.location, "la fonction générique '" + node.name +
-                        "' attend " + std::to_string(generic->typeParameters.size()) +
-                        " argument(s) de type, reçu " + std::to_string(node.typeArguments.size()));
-                for (std::size_t i = 0; i < node.typeArguments.size(); ++i)
-                    substitutions.emplace(generic->typeParameters[i], node.typeArguments[i]);
-            }
             const std::size_t parameterCount = symbol->declaration != nullptr
                 ? symbol->declaration->parameters.size() : symbol->parameterTypes.size();
             if (node.arguments.size() != parameterCount)
                 throw CompileError(expression.location, "la fonction '" + node.name + "' attend " +
                     std::to_string(parameterCount) + " argument(s), reçu " +
                     std::to_string(node.arguments.size()));
+            std::unordered_map<std::string, ValueType> substitutions;
+            if (generic != nullptr) {
+                if (node.typeArguments.empty()) {
+                    for (std::size_t i = 0; i < node.arguments.size(); ++i) {
+                        if (!inferTypeArguments(generic->parameters[i].type,
+                                                inferType(*node.arguments[i]), substitutions))
+                            throw CompileError(node.arguments[i]->location,
+                                               "arguments incompatibles pour l'inférence générique de '" +
+                                               node.name + "'");
+                    }
+                    for (const std::string& parameter : generic->typeParameters) {
+                        const auto inferred = substitutions.find(parameter);
+                        if (inferred == substitutions.end())
+                            throw CompileError(expression.location,
+                                               "impossible de déduire le paramètre de type '" +
+                                               parameter + "'");
+                        node.typeArguments.push_back(inferred->second);
+                    }
+                } else if (node.typeArguments.size() != generic->typeParameters.size())
+                    throw CompileError(expression.location, "la fonction générique '" + node.name +
+                        "' attend " + std::to_string(generic->typeParameters.size()) +
+                        " argument(s) de type, reçu " + std::to_string(node.typeArguments.size()));
+                if (substitutions.empty())
+                    for (std::size_t i = 0; i < node.typeArguments.size(); ++i)
+                        substitutions.emplace(generic->typeParameters[i], node.typeArguments[i]);
+            }
             std::unordered_map<std::string, BorrowState> callBorrows;
             for (const ExprPtr& argument : node.arguments) {
                 const auto* address = std::get_if<AddressExpr>(&argument->value);

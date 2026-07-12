@@ -1,0 +1,2 @@
+def same[T] (first : T, second : T) : T = first
+def main () : Int = same(1, true)

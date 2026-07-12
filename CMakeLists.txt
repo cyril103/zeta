@@ -357,6 +357,14 @@ if(BUILD_TESTING)
     set_tests_properties(check_generic_instances PROPERTIES
         DEPENDS compile_generic_monomorphization)
 
+    add_test(NAME compile_generic_type_inference COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_type_inference.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/generic-type-inference)
+    add_test(NAME run_generic_type_inference
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/generic-type-inference)
+    set_tests_properties(run_generic_type_inference PROPERTIES
+        DEPENDS compile_generic_type_inference)
+
     add_test(NAME compile_box_content_borrow COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/box_content_borrow.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/box-content-borrow)
@@ -612,7 +620,8 @@ if(BUILD_TESTING)
             generic_duplicate_type_parameter
             generic_call_without_instantiation
             generic_type_arity
-            generic_arguments_on_regular_function)
+            generic_arguments_on_regular_function
+            generic_conflicting_inference)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

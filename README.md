@@ -451,6 +451,10 @@ types réutilisent la même instance. Une fonction générique non instanciée n
 produit aucun code machine. Le plan complet est décrit dans
 `docs/GENERICS_DESIGN.md`.
 
+Lorsque tous les paramètres de type apparaissent dans les arguments, ils sont
+inférés : `identity(42)` devient `identity[Int](42)` et `first(slice)` déduit le
+type d'élément de `Slice[T]`. Une déduction absente ou contradictoire est rejetée.
+
 ## Expressions sur plusieurs lignes
 
 Une expression sur plusieurs lignes doit être placée entre accolades. Le bloc
