@@ -181,6 +181,14 @@ ValueType Parser::consumeType(const std::string& message) {
         consume(TokenKind::RightBracket, "']' attendue après la taille du tableau");
         return ValueType(std::make_shared<ValueType>(element), length);
     }
+    if (match(TokenKind::SliceType) || match(TokenKind::SliceMutType)) {
+        const bool mutableView = previous().kind == TokenKind::SliceMutType;
+        consume(TokenKind::LeftBracket, "'[' attendu après le type de slice");
+        const ValueType element = consumeType("type d'élément attendu dans la slice");
+        consume(TokenKind::RightBracket, "']' attendue après le type d'élément");
+        return ValueType(ValueType::Kind::Slice,
+                         std::make_shared<ValueType>(element), mutableView);
+    }
     if (match(TokenKind::IntType)) return ValueType::Int;
     if (match(TokenKind::ByteType)) return ValueType::Byte;
     if (match(TokenKind::DoubleType)) return ValueType::Double;

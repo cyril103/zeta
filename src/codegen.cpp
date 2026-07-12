@@ -14,7 +14,7 @@ std::size_t typeSize(ValueType type) {
 std::size_t valueSize(ValueType type) {
     if (type.kind == ValueType::Kind::Array) return valueTypeSize(type);
     if (type.kind == ValueType::Kind::Reference) return 8U;
-    if (type == ValueType::String) return 16U;
+    if (type == ValueType::String || type.kind == ValueType::Kind::Slice) return 16U;
     return type == ValueType::Double ? 8U : 4U;
 }
 std::size_t slotBytes(const IrProgram& program) {

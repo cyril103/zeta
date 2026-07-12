@@ -154,7 +154,7 @@ ne retourne aucune valeur.
 
 Un identifiant commence par une lettre ou `_`, puis contient des lettres, chiffres
 ou `_`. Les mots `val`, `var`, `def`, `if`, `else`, `while`, `do`, `Int`, `Byte`, `Double`,
-`Bool`, `Char`, `String`, `true` et `false` sont réservés. Un identifiant
+`Bool`, `Char`, `String`, `Slice`, `SliceMut`, `true` et `false` sont réservés. Un identifiant
 ne peut jamais être redéclaré. Une déclaration `val` est
 immuable, tandis qu'une déclaration `var` peut être réaffectée sans créer un
 nouveau slot sur la stack :
@@ -371,6 +371,21 @@ seule.
 Le stockage global, les variables référence mutables et les retours de références
 sont encore interdits. Les slices, `Box[T]`, les pointeurs bruts, l'arithmétique
 d'adresse et l'allocation sur le tas ne font pas partie de cette étape.
+
+## Types slice
+
+`Slice[T]` décrit une vue partagée et `SliceMut[T]` une vue mutable sur des
+éléments contigus de type `T`. Les deux types sont reconnus dans les signatures et
+occupent 16 octets conceptuels `{adresse, longueur en éléments}` sans allocation.
+
+```text
+native def inspecte (values : Slice[Int]) : Int
+native def modifie (values : SliceMut[Byte]) : Int
+```
+
+La création depuis un tableau, l'indexation et le passage effectif dans l'ABI
+seront activés dans les prochaines étapes. Les invariants retenus sont détaillés
+dans `docs/SLICE_DESIGN.md`.
 
 ## Expressions sur plusieurs lignes
 

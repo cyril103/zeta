@@ -9,7 +9,7 @@
 #include <vector>
 
 struct ValueType {
-    enum class Kind { Int, Byte, Double, Bool, Char, String, Array, Reference };
+    enum class Kind { Int, Byte, Double, Bool, Char, String, Array, Reference, Slice };
 
     Kind kind;
     std::shared_ptr<const ValueType> element;
@@ -22,6 +22,10 @@ struct ValueType {
     ValueType(std::shared_ptr<const ValueType> referencedType, bool mutableBorrow)
         : kind(Kind::Reference), element(std::move(referencedType)),
           mutableReference(mutableBorrow) {}
+    ValueType(Kind viewKind, std::shared_ptr<const ValueType> elementType,
+              bool mutableView)
+        : kind(viewKind), element(std::move(elementType)),
+          mutableReference(mutableView) {}
 
     static const ValueType Int;
     static const ValueType Byte;
@@ -32,7 +36,8 @@ struct ValueType {
 
     friend bool operator==(const ValueType& left, const ValueType& right) {
         if (left.kind != right.kind) return false;
-        if (left.kind != Kind::Array && left.kind != Kind::Reference) return true;
+        if (left.kind != Kind::Array && left.kind != Kind::Reference &&
+            left.kind != Kind::Slice) return true;
         if (left.element == nullptr || right.element == nullptr || *left.element != *right.element)
             return false;
         return left.kind == Kind::Array ? left.length == right.length
@@ -56,6 +61,9 @@ inline std::string typeName(ValueType type) {
     if (type == ValueType::String) return "String";
     if (type.kind == ValueType::Kind::Array)
         return "[" + typeName(*type.element) + "; " + std::to_string(type.length) + "]";
+    if (type.kind == ValueType::Kind::Slice)
+        return std::string(type.mutableReference ? "SliceMut[" : "Slice[") +
+               typeName(*type.element) + "]";
     return type.mutableReference ? "&mut " + typeName(*type.element)
                                  : "&" + typeName(*type.element);
 }
@@ -64,7 +72,7 @@ inline std::size_t valueTypeSize(const ValueType& type) {
     if (type == ValueType::Byte || type == ValueType::Bool) return 1U;
     if (type == ValueType::Int || type == ValueType::Char) return 4U;
     if (type == ValueType::Double) return 8U;
-    if (type == ValueType::String) return 16U;
+    if (type == ValueType::String || type.kind == ValueType::Kind::Slice) return 16U;
     if (type.kind == ValueType::Kind::Reference) return 8U;
     return valueTypeSize(*type.element) * type.length;
 }
@@ -72,7 +80,8 @@ inline std::size_t valueTypeSize(const ValueType& type) {
 inline std::size_t valueTypeAlignment(const ValueType& type) {
     if (type == ValueType::Byte || type == ValueType::Bool) return 1U;
     if (type == ValueType::Int || type == ValueType::Char) return 4U;
-    if (type == ValueType::Double || type == ValueType::String) return 8U;
+    if (type == ValueType::Double || type == ValueType::String ||
+        type.kind == ValueType::Kind::Slice) return 8U;
     if (type.kind == ValueType::Kind::Reference) return 8U;
     return valueTypeAlignment(*type.element);
 }

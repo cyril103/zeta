@@ -1,0 +1,2 @@
+native def inspect (values : Slice[Int) : Int
+def main () : Int = 0

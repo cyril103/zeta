@@ -364,6 +364,14 @@ if(BUILD_TESTING)
     set_tests_properties(run_reference_shared_alias_last_use PROPERTIES
         DEPENDS compile_reference_shared_alias_last_use)
 
+    add_test(NAME compile_slice_type_syntax COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/slice_type_syntax.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/slice-type-syntax)
+    add_test(NAME run_slice_type_syntax
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/slice-type-syntax)
+    set_tests_properties(run_slice_type_syntax PROPERTIES
+        DEPENDS compile_slice_type_syntax)
+
     foreach(invalid_case IN ITEMS
             redefinition
             assignment
@@ -441,7 +449,9 @@ if(BUILD_TESTING)
             reference_call_alias
             reference_shared_array_mutation
             reference_mutable_alias
-            reference_mutable_direct_read)
+            reference_mutable_direct_read
+            slice_type_missing_element
+            slice_type_missing_bracket)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

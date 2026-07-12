@@ -1,0 +1,4 @@
+native def inspect (values : Slice[Int]) : Int
+native def update (values : SliceMut[Byte]) : Int
+
+def main () : Int = 0

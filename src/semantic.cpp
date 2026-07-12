@@ -570,9 +570,10 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (TypeRules::isComparison(node.op)) {
                 const ValueType operands = TypeRules::commonOperandType(
                     inferType(*node.left), inferType(*node.right));
-                if (operands.kind == ValueType::Kind::Array)
+                if (operands.kind == ValueType::Kind::Array ||
+                    operands.kind == ValueType::Kind::Slice)
                     throw CompileError(expression.location,
-                                       "les comparaisons de tableaux ne sont pas encore disponibles");
+                                       "les comparaisons de tableaux et slices ne sont pas encore disponibles");
                 if (operands.kind == ValueType::Kind::Reference)
                     throw CompileError(expression.location,
                                        "les comparaisons de références ne sont pas disponibles");
