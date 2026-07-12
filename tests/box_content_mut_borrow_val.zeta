@@ -1,0 +1,5 @@
+def main () : Int = {
+    val boxed : Box[Int] = Box(1)
+    val reference : &mut Int = &mut *boxed
+    *reference
+}

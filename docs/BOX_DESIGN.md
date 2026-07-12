@@ -9,8 +9,8 @@ La mise en œuvre est volontairement découpée en étapes indépendantes :
 2. état sémantique `disponible` ou `déplacé` — disponible pour les déclarations,
    avec fusion conservatrice des branches ;
 3. déplacement dans les déclarations et les appels — terminé ;
-4. construction `Box(valeur)` et déréférencement — terminé ; les emprunts du
-   contenu seront consolidés avec la destruction ;
+4. construction `Box(valeur)`, déréférencement et emprunts `&*box` /
+   `&mut *box` — terminé ;
 5. instruction IR `drop` et destruction sur toutes les sorties de portée ;
 6. allocation par `mmap` et libération par `munmap`.
 

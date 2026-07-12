@@ -166,6 +166,11 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
         if (const auto* address = std::get_if<AddressExpr>(&declaration.initializer->value)) {
             const auto* borrowedName = std::get_if<NameExpr>(&address->operand->value);
             if (borrowedName == nullptr) {
+                if (const auto* dereference =
+                        std::get_if<DereferenceExpr>(&address->operand->value))
+                    borrowedName = std::get_if<NameExpr>(&dereference->operand->value);
+            }
+            if (borrowedName == nullptr) {
                 throw CompileError(declaration.location,
                                    "une référence doit emprunter un identifiant");
             }
@@ -552,9 +557,31 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
         }
         else if constexpr (std::is_same_v<T, AddressExpr>) {
             const auto* name = std::get_if<NameExpr>(&node.operand->value);
-            if (name == nullptr)
+            const auto* dereference = std::get_if<DereferenceExpr>(&node.operand->value);
+            const auto* boxName = dereference == nullptr ? nullptr
+                : std::get_if<NameExpr>(&dereference->operand->value);
+            if (name == nullptr && boxName == nullptr)
                 throw CompileError(expression.location,
-                                   "seul un identifiant de donnée peut être emprunté");
+                                   "seul un identifiant ou le contenu d'une Box peut être emprunté");
+            if (boxName != nullptr) {
+                const SemanticSymbol* box = symbols_.lookup(boxName->name);
+                if (box == nullptr || box->type.kind != ValueType::Kind::Box)
+                    throw CompileError(expression.location,
+                                       "l'emprunt déréférencé exige une Box");
+                if (node.mutableBorrow && (box->kind != BindingKind::Var || box->parameter))
+                    throw CompileError(expression.location,
+                                       "'&mut *box' exige un propriétaire 'var'");
+                if (movedBoxes_.contains(boxName->name))
+                    throw CompileError(expression.location,
+                                       "utilisation de '" + boxName->name +
+                                       "' après son déplacement");
+                dereference->operand->inferredType = box->type;
+                dereference->operand->typed = true;
+                node.operand->inferredType = *box->type.element;
+                node.operand->typed = true;
+                return ValueType(std::make_shared<ValueType>(*box->type.element),
+                                 node.mutableBorrow);
+            }
             const SemanticSymbol* symbol = symbols_.lookup(name->name);
             if (symbol == nullptr || (symbol->kind == BindingKind::Def && symbol->callable))
                 throw CompileError(expression.location,

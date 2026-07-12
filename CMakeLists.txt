@@ -300,6 +300,12 @@ if(BUILD_TESTING)
         set_tests_properties(run_box_${box_case} PROPERTIES DEPENDS compile_box_${box_case})
     endforeach()
 
+    add_test(NAME compile_box_content_borrow COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/box_content_borrow.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/box-content-borrow)
+    add_test(NAME run_box_content_borrow COMMAND ${CMAKE_CURRENT_BINARY_DIR}/box-content-borrow)
+    set_tests_properties(run_box_content_borrow PROPERTIES DEPENDS compile_box_content_borrow)
+
     add_test(NAME compile_array_copy COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_copy.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/array-copy)
@@ -541,7 +547,9 @@ if(BUILD_TESTING)
             box_use_after_call
             box_duplicate_call_argument
             box_content_immutable
-            box_constructor_mismatch)
+            box_constructor_mismatch
+            box_content_borrow_conflict
+            box_content_mut_borrow_val)
         add_test(
             NAME reject_${invalid_case}
             COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/${invalid_case}.zeta

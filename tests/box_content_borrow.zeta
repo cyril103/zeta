@@ -1,0 +1,13 @@
+def read (value : &Int) : Int = *value
+
+def increment (value : &mut Int) : Int = {
+    *value = *value + 1
+    *value
+}
+
+def main () : Int = {
+    var boxed : Box[Int] = Box(41)
+    val observed : Int = read(&*boxed)
+    val changed : Int = increment(&mut *boxed)
+    if (observed == 41 && changed == 42 && *boxed == 42) 0 else 1
+}

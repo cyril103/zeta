@@ -1,0 +1,6 @@
+def main () : Int = {
+    var boxed : Box[Int] = Box(1)
+    val shared : &Int = &*boxed
+    val exclusive : &mut Int = &mut *boxed
+    *shared + *exclusive
+}

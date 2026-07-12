@@ -428,7 +428,8 @@ imbriquée. Les invariants sont détaillés dans `docs/SLICE_DESIGN.md`.
 machine pointant vers une valeur `T`, et les types sont récursifs comme
 `Box[Box[Int]]`. `Box(valeur)` alloue le contenu avec `mmap`, et `*box` permet de
 le lire. La mutation `*box = valeur` exige que le propriétaire soit une variable
-`var`. Une affectation ou un appel par valeur déplace la propriété sans la copier.
+`var`. `&*box` emprunte le contenu en lecture et `&mut *box` l'emprunte en écriture
+depuis un propriétaire `var`. Une affectation ou un appel par valeur déplace la propriété sans la copier.
 La destruction automatique sera ajoutée à l'étape suivante. La conception est
 détaillée dans `docs/BOX_DESIGN.md`.
 

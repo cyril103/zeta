@@ -415,6 +415,13 @@ ValueId IrGenerator::expression(
                                                    arrayIsReference, arrayIsSlice});
             return output;
         } else if constexpr (std::is_same_v<T, AddressExpr>) {
+            if (const auto* dereference = std::get_if<DereferenceExpr>(&node.operand->value)) {
+                const ValueId pointer = expression(*dereference->operand, parameters);
+                const ValueId output = nextValue(expressionNode.inferredType);
+                ir_.instructions.push_back(IrCopy{output, pointer,
+                                                  expressionNode.inferredType});
+                return output;
+            }
             const auto& name = std::get<NameExpr>(node.operand->value);
             const auto found = symbols_.find(name.name);
             if (found == symbols_.end())
