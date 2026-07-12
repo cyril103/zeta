@@ -7,8 +7,12 @@
 #include "version.hpp"
 
 #include <filesystem>
+#include <algorithm>
 #include <fstream>
 #include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <sys/wait.h>
@@ -63,8 +67,26 @@ void runLinker(const std::vector<fs::path>& objects, const fs::path& executable)
         throw std::runtime_error("ld n'a pas pu lier l'exécutable");
 }
 
+void runRelocatableLink(const std::vector<fs::path>& objects, const fs::path& output) {
+    const pid_t child = fork();
+    if (child < 0) throw std::runtime_error("impossible de lancer ld -r");
+    if (child == 0) {
+        std::vector<std::string> arguments{"ld", "-r", "-o", output.string()};
+        for (const fs::path& object : objects) arguments.push_back(object.string());
+        std::vector<char*> raw;
+        for (std::string& argument : arguments) raw.push_back(argument.data());
+        raw.push_back(nullptr);
+        execvp("ld", raw.data());
+        _exit(127);
+    }
+    int status{};
+    if (waitpid(child, &status, 0) < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0)
+        throw std::runtime_error("ld -r n'a pas pu produire l'objet stdlib");
+}
+
 void usage() {
-    std::cerr << "Usage: zeta <source.zeta> [-o executable] [--stdlib dossier]\n";
+    std::cerr << "Usage: zeta <source.zeta> [-o executable] [--stdlib dossier]\n"
+                 "       zeta --build-stdlib [--stdlib dossier]\n";
 }
 
 std::string startAssembly(const ModuleGraph& modules) {
@@ -91,9 +113,12 @@ int main(int argc, char** argv) {
     fs::path sourcePath;
     fs::path outputPath;
     fs::path standardLibraryPath;
+    bool buildStandardLibrary = false;
     for (int i = 1; i < argc; ++i) {
         const std::string argument = argv[i];
-        if (argument == "-o") {
+        if (argument == "--build-stdlib") {
+            buildStandardLibrary = true;
+        } else if (argument == "-o") {
             if (++i >= argc) {
                 usage();
                 return 2;
@@ -112,6 +137,28 @@ int main(int argc, char** argv) {
             return 2;
         }
     }
+    if (standardLibraryPath.empty()) {
+#ifdef ZETA_STDLIB_DIR
+        standardLibraryPath = ZETA_STDLIB_DIR;
+#endif
+    }
+    std::vector<std::string> standardModules;
+    if (buildStandardLibrary) {
+        if (standardLibraryPath.empty())
+            throw std::runtime_error("dossier de bibliothèque standard inconnu");
+        for (const fs::directory_entry& entry : fs::directory_iterator(standardLibraryPath))
+            if (entry.is_regular_file() && entry.path().extension() == ".zeta")
+                standardModules.push_back(entry.path().stem().string());
+        std::sort(standardModules.begin(), standardModules.end());
+        const fs::path precompiled = standardLibraryPath / "precompiled";
+        fs::create_directories(precompiled);
+        sourcePath = precompiled / "__stdlib_build.zeta";
+        std::string driver;
+        for (const std::string& module : standardModules) driver += "import " + module + "\n";
+        driver += "def main(): Int = 0\n";
+        writeFile(sourcePath, driver);
+        outputPath = precompiled / ".stdlib-build";
+    }
     if (sourcePath.empty()) {
         usage();
         return 2;
@@ -122,7 +169,7 @@ int main(int argc, char** argv) {
     }
 
     try {
-        ModuleLoader loader(standardLibraryPath);
+        ModuleLoader loader(standardLibraryPath, !buildStandardLibrary);
         ModuleGraph modules = loader.load(sourcePath);
         for (const std::string& moduleName : modules.compilationOrder) {
             if (modules.modules.at(moduleName).precompiled &&
@@ -242,6 +289,41 @@ int main(int argc, char** argv) {
         fs::permissions(outputPath,
                         fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
                         fs::perm_options::add);
+
+        if (buildStandardLibrary) {
+            const fs::path precompiled = standardLibraryPath / "precompiled";
+            for (const std::string& module : standardModules) {
+                fs::copy_file(moduleDirectory / (module + ".zti"),
+                              precompiled / (module + ".zti"),
+                              fs::copy_options::overwrite_existing);
+                const fs::path runtimeObject = moduleDirectory / (module + ".runtime.o");
+                if (fs::exists(runtimeObject))
+                    runRelocatableLink({moduleDirectory / (module + ".o"), runtimeObject},
+                                       precompiled / (module + ".o"));
+                else
+                    fs::copy_file(moduleDirectory / (module + ".o"),
+                                  precompiled / (module + ".o"),
+                                  fs::copy_options::overwrite_existing);
+            }
+            std::string manifest = "ZETA_STDLIB " + std::string(ZetaVersion::StdlibManifest) +
+                "\ncompiler " + std::string(ZetaVersion::Compiler) +
+                "\nabi " + std::string(ZetaVersion::Abi) +
+                "\ninterface " + std::to_string(ZetaVersion::InterfaceFormat) + "\n";
+            for (const std::string& module : standardModules) manifest += "module " + module + "\n";
+            for (const std::string& module : standardModules) {
+                std::uint64_t hash = 1469598103934665603ULL;
+                for (const unsigned char byte : readOptionalFile(standardLibraryPath / (module + ".zeta"))) {
+                    hash ^= byte;
+                    hash *= 1099511628211ULL;
+                }
+                std::ostringstream encoded;
+                encoded << std::hex << std::setfill('0') << std::setw(16) << hash;
+                manifest += "source " + module + " " + encoded.str() + "\n";
+            }
+            writeFile(precompiled / "manifest", manifest);
+            fs::remove(sourcePath);
+            std::cout << "Bibliothèque standard précompilée : " << precompiled << '\n';
+        }
 
         std::cout << "IR créé          : " << irPath << '\n'
                   << "Assembleur créé : " << assemblyPath << '\n'

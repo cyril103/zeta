@@ -45,17 +45,21 @@ struct ModuleGraph {
 
 class ModuleLoader {
 public:
-    explicit ModuleLoader(std::filesystem::path standardLibraryDirectory = {})
-        : standardLibraryDirectory_(std::move(standardLibraryDirectory)) {}
+    explicit ModuleLoader(std::filesystem::path standardLibraryDirectory = {},
+                          bool preferPrecompiled = true)
+        : standardLibraryDirectory_(std::move(standardLibraryDirectory)),
+          preferPrecompiled_(preferPrecompiled) {}
     ModuleGraph load(const std::filesystem::path& rootPath);
 
 private:
     void loadModule(const std::string& name, const std::filesystem::path& path);
     std::filesystem::path resolveImport(const std::string& name) const;
+    bool validPrecompiledModule(const std::string& name) const;
     void buildInterfaces();
     void buildDependencyGraph();
     void buildFingerprints();
     std::filesystem::path sourceDirectory_;
     std::filesystem::path standardLibraryDirectory_;
     ModuleGraph graph_;
+    bool preferPrecompiled_{true};
 };

@@ -160,12 +160,47 @@ std::filesystem::path ModuleLoader::resolveImport(const std::string& name) const
     if (std::filesystem::exists(local)) return local;
     const std::filesystem::path localInterface = sourceDirectory_ / (name + ".zti");
     if (std::filesystem::exists(localInterface)) return localInterface;
+    const std::filesystem::path precompiled = standardLibraryDirectory_ / "precompiled" /
+        (name + ".zti");
+    if (preferPrecompiled_ && validPrecompiledModule(name) && std::filesystem::exists(precompiled))
+        return precompiled;
     const std::filesystem::path standard = standardLibraryDirectory_ / (name + ".zeta");
     if (!standardLibraryDirectory_.empty() && std::filesystem::exists(standard)) return standard;
     const std::filesystem::path standardInterface = standardLibraryDirectory_ / (name + ".zti");
     if (!standardLibraryDirectory_.empty() && std::filesystem::exists(standardInterface))
         return standardInterface;
     throw std::runtime_error("module introuvable : " + name);
+}
+
+bool ModuleLoader::validPrecompiledModule(const std::string& name) const {
+    if (standardLibraryDirectory_.empty()) return false;
+    const std::filesystem::path directory = standardLibraryDirectory_ / "precompiled";
+    if (!std::filesystem::exists(directory / "manifest")) return false;
+    const std::string manifest = readSource(directory / "manifest");
+    std::istringstream input(manifest);
+    std::string key, value;
+    if (!(input >> key >> value) || key != "ZETA_STDLIB" ||
+        value != ZetaVersion::StdlibManifest) return false;
+    if (!(input >> key >> value) || key != "compiler" || value != ZetaVersion::Compiler)
+        return false;
+    if (!(input >> key >> value) || key != "abi" || value != ZetaVersion::Abi) return false;
+    if (!(input >> key >> value) || key != "interface" ||
+        value != std::to_string(ZetaVersion::InterfaceFormat)) return false;
+    std::string expectedSourceHash;
+    while (input >> key) {
+        if (key == "source") {
+            std::string module;
+            input >> module >> value;
+            if (module == name) expectedSourceHash = value;
+        } else {
+            std::getline(input, value);
+        }
+    }
+    if (expectedSourceHash.empty()) return false;
+    const std::filesystem::path source = standardLibraryDirectory_ / (name + ".zeta");
+    if (std::filesystem::exists(source) &&
+        hexHash(hashText(readSource(source))) != expectedSourceHash) return false;
+    return std::filesystem::exists(directory / (name + ".o"));
 }
 
 void ModuleLoader::buildFingerprints() {
