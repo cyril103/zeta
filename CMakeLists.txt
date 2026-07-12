@@ -264,6 +264,14 @@ if(BUILD_TESTING)
             DEPENDS compile_io_${io_case})
     endforeach()
 
+    add_test(NAME compile_io_bytes COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/io_bytes.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/io-bytes)
+    add_test(NAME run_io_bytes COMMAND ${CMAKE_COMMAND}
+        -DPROGRAM=${CMAKE_CURRENT_BINARY_DIR}/io-bytes
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_io_bytes.cmake)
+    set_tests_properties(run_io_bytes PROPERTIES DEPENDS compile_io_bytes)
+
     add_test(NAME compile_array_copy COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_copy.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/array-copy)

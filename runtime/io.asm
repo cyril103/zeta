@@ -13,8 +13,12 @@ public zeta_fn_io__printBool
 public zeta_fn_io__printlnBool
 public zeta_fn_io__printDouble
 public zeta_fn_io__printlnDouble
+public zeta_fn_io__printBytes
+public zeta_fn_io__printlnBytes
 
 ; ABI Zeta : une String est passée sur la pile sous la forme {adresse, longueur}.
+; Slice[Byte] possède la même représentation et peut donc partager ce chemin.
+zeta_fn_io__printBytes:
 zeta_fn_io__print:
     mov rsi, qword [rsp+8]
     mov rdx, qword [rsp+16]
@@ -35,6 +39,9 @@ zeta_fn_io__println:
     add rax, r9
 .return:
     ret
+
+zeta_fn_io__printlnBytes:
+    jmp zeta_fn_io__println
 
 zeta_fn_io__printChar:
     sub rsp, 8

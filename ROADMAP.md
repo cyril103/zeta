@@ -283,7 +283,8 @@ Consolider d'abord les références et préparer les vues dynamiques :
 6. passer et indexer les slices dans l'ABI avec les mêmes contrôles de limites —
    terminé ;
 7. utiliser ensuite les slices pour les buffers d'E/S et les futures chaînes
-   construites dynamiquement.
+   construites dynamiquement — buffers de sortie `Slice[Byte]` disponibles ;
+   entrées et chaînes possédées à poursuivre après le modèle de propriété.
 
 Après stabilisation des slices, choisir explicitement le premier modèle de
 propriété dynamique (`Box[T]`, déplacement sans copie et destruction

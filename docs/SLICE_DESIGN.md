@@ -46,4 +46,5 @@ comme l'indexation des tableaux fixes.
 2. création depuis `&[T; N]` et `&mut [T; N]` sans allocation — terminé,
    avec `Slice(&tableau)` et `SliceMut(&mut tableau)` ;
 3. passage et indexation dans l'IR et l'ABI — terminé ;
-4. sous-slices, puis utilisation par les buffers d'E/S.
+4. buffers de sortie `Slice[Byte]` — terminé ; sous-slices et buffers d'entrée à
+   poursuivre avec le runtime possédé.

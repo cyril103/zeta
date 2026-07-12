@@ -11,3 +11,5 @@ pub native def printBool (value : Bool) : Int
 pub native def printlnBool (value : Bool) : Int
 pub native def printDouble (value : Double) : Int
 pub native def printlnDouble (value : Double) : Int
+pub native def printBytes (value : Slice[Byte]) : Int
+pub native def printlnBytes (value : Slice[Byte]) : Int
