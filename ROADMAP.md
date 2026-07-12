@@ -232,18 +232,18 @@ Disponible :
 - résolution récursive de plusieurs fichiers source ;
 - symboles publics et privés et noms qualifiés ;
 - interfaces de modules et graphe de dépendances sans cycles ;
-- ordre topologique et IR fusionnée avec noms manglés ;
-- objets ELF64 relogeables assemblés par FASM ;
+- ordre topologique, IR par module et vue IR fusionnée de diagnostic ;
+- vrais objets ELF64 par module, avec fonctions et globales liées entre objets ;
+- objet de démarrage minimal et initialisation topologique des modules ;
 - liaison finale avec `ld` ;
-- cache invalidé par le source, l'interface et les dépendances.
+- cache incrémental invalidé par le source et les interfaces réellement importées.
 
 Le module standard `io` valide désormais cette chaîne avec des fonctions natives
 liées depuis un objet runtime : affichage de `String`, `Char` et `Int`, gestion des
 écritures partielles et reprise après `EINTR`.
 
-Une évolution future pourra déplacer davantage de code de l'unité IR fusionnée
-vers les objets propres à chaque module, puis sérialiser les interfaces pour ne
-plus reparcourir les sources inchangés.
+Une évolution future pourra sérialiser les interfaces dans des fichiers `.zti`
+pour ne plus reparcourir les sources inchangées.
 
 ## Phase 9 — Optimisations IR
 

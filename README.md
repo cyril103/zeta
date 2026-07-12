@@ -250,13 +250,16 @@ les cycles avec leur chemin et analyse les modules dans l'ordre topologique. Seu
 le fichier donné sur la ligne de commande doit fournir `def main () : Int`.
 
 Les noms de liaison sont préfixés par leur module afin que deux modules puissent
-déclarer le même identifiant. La compilation produit une IR fusionnée, des objets
-ELF64 relogeables assemblés par FASM, puis utilise `ld` pour créer l'exécutable
-statique. Les artefacts de module se trouvent dans `<sortie>.modules/`.
+déclarer le même identifiant. Chaque module produit sa propre IR et son propre
+objet ELF64 relogeable. Un petit `start.o` initialise les modules dans l'ordre
+topologique, appelle le `main` racine, puis `ld` crée l'exécutable statique. Les
+artefacts se trouvent dans `<sortie>.modules/`. L'IR fusionnée à la racine reste
+produite comme vue de diagnostic.
 
 Le dossier `<sortie>.cache/` conserve les objets et leurs empreintes. Une empreinte
-dépend du source, de l'interface publique, des interfaces importées et de la
-version du format de cache. Un objet inchangé est réutilisé automatiquement.
+dépend du source, des interfaces importées et de la version du format de cache.
+Une modification privée ne reconstruit que son module ; une modification
+d'interface invalide également ses consommateurs. Un objet inchangé est réutilisé.
 
 ## Entrées-sorties standard
 
