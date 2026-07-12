@@ -1,6 +1,7 @@
 #include "codegen.hpp"
 #include "diagnostic.hpp"
 #include "ir.hpp"
+#include "interface.hpp"
 #include "module.hpp"
 #include "semantic.hpp"
 
@@ -156,6 +157,7 @@ int main(int argc, char** argv) {
             IrGenerator moduleGenerator;
             const IrProgram moduleIr = moduleGenerator.generateModule(modules, moduleName);
             const fs::path moduleIrPath = moduleDirectory / (moduleName + ".ir");
+            const fs::path moduleInterfacePath = moduleDirectory / (moduleName + ".zti");
             const fs::path moduleAssembly = moduleDirectory / (moduleName + ".asm");
             const fs::path moduleObject = moduleDirectory / (moduleName + ".o");
             const fs::path cachedModuleObject = cacheDirectory / (moduleName + ".o");
@@ -163,6 +165,9 @@ int main(int argc, char** argv) {
             const std::string fingerprint = "zeta-module-object-v2:" +
                 modules.fingerprints.at(moduleName);
             writeFile(moduleIrPath, IrGenerator::print(moduleIr));
+            writeFile(moduleInterfacePath, InterfaceCodec::serialize(
+                modules.interfaces.at(moduleName),
+                modules.interfaceFingerprints.at(moduleName)));
             if (!fs::exists(cachedModuleObject) || readOptionalFile(moduleStamp) != fingerprint) {
                 writeFile(moduleAssembly,
                     FasmCodeGenerator::generateObject(moduleIr, false, moduleName));
