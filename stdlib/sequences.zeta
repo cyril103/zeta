@@ -111,6 +111,34 @@ pub def endsWith[T: Equatable](values: Slice[T], suffix: Slice[T]): Bool = {
     }
 }
 
+pub def isSorted[T: Ordered](values: Slice[T]): Bool = {
+    var index: Int = 1
+    var sorted: Bool = true
+    while (index < values.length && sorted) do {
+        sorted = values[index] >= values[index - 1]
+        index = index + 1
+    }
+    sorted
+}
+
+pub def binarySearch[T: Ordered](values: Slice[T], expected: T): Option[Int] = {
+    var low: Int = 0
+    var high: Int = values.length - 1
+    while (low <= high) do {
+        val middle: Int = low + (high - low) / 2
+        if (values[middle] == expected) {
+            return Option[Int].Some(value: middle)
+        } else if (values[middle] < expected) {
+            low = middle + 1
+            true
+        } else {
+            high = middle - 1
+            true
+        }
+    }
+    Option[Int].None
+}
+
 pub def reverse[T: Copy](values: SliceMut[T]): Int = {
     var left: Int = 0
     var right: Int = values.length - 1
@@ -142,4 +170,21 @@ pub def swap[T: Copy](values: SliceMut[T], left: Int, right: Int): Bool = {
         values[right] = temporary
         true
     }
+}
+
+pub def sort[T: Ordered](values: SliceMut[T]): Int = {
+    var index: Int = 1
+    var swaps: Int = 0
+    while (index < values.length) do {
+        var cursor: Int = index
+        while (cursor > 0 && values[cursor] < values[cursor - 1]) do {
+            val temporary: T = values[cursor]
+            values[cursor] = values[cursor - 1]
+            values[cursor - 1] = temporary
+            cursor = cursor - 1
+            swaps = swaps + 1
+        }
+        index = index + 1
+    }
+    swaps
 }
