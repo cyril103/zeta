@@ -64,17 +64,20 @@ hors intervalle ou une terminaison invalide est rejeté avant le parseur.
 
 ## Production et chargement
 
-Le chargeur source conserve les tokens produits lors de sa lecture initiale.
-L'écriture d'une interface les ajoute uniquement si un export possède des
-paramètres de type. Les commentaires et espaces ont déjà disparu à ce stade.
+Le chargeur source conserve d'abord les tokens produits lors de sa lecture
+initiale, calcule les exports génériques racines, puis remplace cette séquence par
+sa fermeture réduite. L'écriture d'une interface ajoute cette fermeture uniquement
+si elle n'est pas vide. Les commentaires, espaces et déclarations sans lien ont
+déjà disparu à ce stade.
 
 À la lecture, `InterfaceCodec` reconstruit directement les objets `Token`. Le
 `ModuleLoader` fournit cette suite au parseur avec les tables de types importés,
 sans reconstruire un fichier `.zeta` et sans appeler le lexer.
 
-L'empreinte publique d'un module générique dépend de la représentation canonique
-et non plus des octets du fichier source. Une modification de commentaire ne doit
-donc plus invalider ses consommateurs, contrairement à une modification de token.
+L'empreinte publique d'un module générique dépend de la fermeture canonique et
+non plus des octets du fichier source. Une modification de commentaire ou d'une
+déclaration exclue ne doit donc plus invalider ses consommateurs, contrairement à
+une modification d'une déclaration retenue.
 
 ## Migration
 

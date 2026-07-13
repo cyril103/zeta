@@ -176,14 +176,15 @@ Travail livré :
 8. remplacement de `generic_source` par `generic_tokens 1`, représentation
    canonique chargée directement par le parseur dans le format `.zti` 7 ;
 9. diagnostics stables `ZTI`, `MOD` et `ABI`, contextualisés par chemin, export,
-   type, variante et champ, avec validation précoce des objets ELF64 x86-64.
+   type, variante et champ, avec validation précoce des objets ELF64 x86-64 ;
+10. réduction conservative de `generic_tokens` à la fermeture transitive des
+    exports génériques et de leurs déclarations globales dépendantes.
 
 Travail restant :
 
-1. réduction des tokens génériques à la fermeture des déclarations nécessaires ;
-2. commande explicite de construction d'une bibliothèque ;
-3. installation dans un cache partagé indépendant d'un projet ;
-4. déduplication robuste des instances génériques entre consommateurs.
+1. commande explicite de construction d'une bibliothèque ;
+2. installation dans un cache partagé indépendant d'un projet ;
+3. déduplication robuste des instances génériques entre consommateurs.
 
 ## Priorité 5 — Optimisations IR
 
@@ -222,6 +223,6 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Réduire `generic_tokens` à la fermeture des déclarations nécessaires pour chaque
-module : exports génériques, types référencés et dépendances de corps, sans
-réintroduire de texte source ni modifier les résultats de monomorphisation.
+Ajouter une commande explicite de construction de bibliothèque qui produise un
+couple `.zti` + `.o` dans un dossier choisi, sans exiger de `main` et sans passer
+par les artefacts temporaires d'un exécutable factice.
