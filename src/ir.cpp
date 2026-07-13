@@ -503,7 +503,7 @@ void IrGenerator::emitIndexStore(
     const bool isParameter = parameter != parameters.end();
     const ValueType targetType = isParameter
         ? ir_.valueTypes[parameter->second]
-        : symbol->second.declaration->type;
+        : resolveType(symbol->second.declaration->type);
     const bool throughReference = targetType.kind == ValueType::Kind::Reference;
     const bool throughSlice = targetType.kind == ValueType::Kind::Slice;
 
@@ -533,7 +533,7 @@ void IrGenerator::emitFieldStore(
     const FieldAssignment& assignment,
     const std::unordered_map<std::string, ValueId>& parameters) {
     const auto symbol = symbols_.find(assignment.name);
-    const ValueType type = symbol->second.declaration->type;
+    const ValueType type = resolveType(symbol->second.declaration->type);
     const auto& fields = type.structure->fields;
     const auto field = std::find_if(fields.begin(), fields.end(), [&](const StructField& candidate) {
         return candidate.name == assignment.field;
@@ -547,10 +547,10 @@ void IrGenerator::emitBoxDrops(const std::vector<std::string>& names) {
     for (auto name = names.rbegin(); name != names.rend(); ++name) {
         const auto symbol = symbols_.find(*name);
         if (symbol == symbols_.end() ||
-            !valueTypeNeedsDrop(symbol->second.declaration->type) ||
+            !valueTypeNeedsDrop(resolveType(symbol->second.declaration->type)) ||
             movedBoxes_.contains(*name))
             continue;
-        const ValueType type = symbol->second.declaration->type;
+        const ValueType type = resolveType(symbol->second.declaration->type);
         const ValueId value = nextValue(type);
         ir_.instructions.push_back(IrLoad{value, symbol->second.slot, type});
         ir_.instructions.push_back(IrDrop{value, type});
@@ -581,29 +581,30 @@ void IrGenerator::emitTailExpression(
                 using T = std::decay_t<decltype(item)>;
                 if constexpr (std::is_same_v<T, Declaration>) {
                     localNames.push_back(item.name);
-                    if (valueTypeNeedsDrop(item.type))
+                    const ValueType localType = resolveType(item.type);
+                    if (valueTypeNeedsDrop(localType))
                         boxScopes_.back().push_back(item.name);
                     if (item.kind == BindingKind::Def) {
                         symbols_.emplace(item.name, Symbol{0, item.kind, &item, false, item.name});
                     } else {
                         const ValueId value = expression(*item.initializer, parameters);
-                        if (isMoveOnlyValueType(item.type))
+                        if (isMoveOnlyValueType(localType))
                             if (const auto* source =
                                     std::get_if<NameExpr>(&item.initializer->value))
                                 movedBoxes_.insert(source->name);
-                        if (valueTypeNeedsDrop(item.type) && isCopyValueType(item.type) &&
+                        if (valueTypeNeedsDrop(localType) && isCopyValueType(localType) &&
                             std::holds_alternative<NameExpr>(item.initializer->value))
-                            ir_.instructions.push_back(IrRetain{value, item.type});
+                            ir_.instructions.push_back(IrRetain{value, localType});
                         const SlotId slot = ir_.slots.size();
                         symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false, item.name});
-                        ir_.slots.push_back(IrSlot{item.name, item.type, false});
-                        ir_.instructions.push_back(IrStore{slot, value, item.type});
+                        ir_.slots.push_back(IrSlot{item.name, localType, false});
+                        ir_.instructions.push_back(IrStore{slot, value, localType});
                     }
                 } else if constexpr (std::is_same_v<T, Assignment>) {
                     const auto found = symbols_.find(item.name);
                     const ValueId value = expression(*item.value, parameters);
                     ir_.instructions.push_back(IrStore{found->second.slot, value,
-                                                       found->second.declaration->type});
+                        resolveType(found->second.declaration->type)});
                 } else if constexpr (std::is_same_v<T, IndexAssignment>) {
                     emitIndexStore(item, parameters);
                 } else if constexpr (std::is_same_v<T, FieldAssignment>) {
@@ -612,18 +613,19 @@ void IrGenerator::emitTailExpression(
                     const ValueId reference = expression(*item.reference, parameters);
                     const ValueId value = expression(*item.value, parameters);
                     ir_.instructions.push_back(IrDereferenceStore{
-                        reference, value, item.value->inferredType});
+                        reference, value, resolveType(item.value->inferredType)});
                 } else if constexpr (std::is_same_v<T, WhileStatement>) {
                     emitLoop(item, parameters);
                 } else if constexpr (std::is_same_v<T, ExpressionStatement>) {
                     expression(*item.expression, parameters);
                 } else if constexpr (std::is_same_v<T, ReturnStatement>) {
                     const ValueId value = expression(*item.value, parameters);
-                    if (isMoveOnlyValueType(item.value->inferredType))
+                    const ValueType returnType = resolveType(item.value->inferredType);
+                    if (isMoveOnlyValueType(returnType))
                         if (const auto* moved = std::get_if<NameExpr>(&item.value->value))
                             movedBoxes_.insert(moved->name);
                     emitAllBoxDrops();
-                    ir_.instructions.push_back(IrReturn{value, item.value->inferredType});
+                    ir_.instructions.push_back(IrReturn{value, returnType});
                 } else if constexpr (std::is_same_v<T, BreakStatement>) {
                     emitBoxDrops(boxScopes_.back());
                     ir_.instructions.push_back(IrJump{loopLabels_.back().second});
@@ -636,14 +638,14 @@ void IrGenerator::emitTailExpression(
         const bool ownsBox = std::any_of(localNames.begin(), localNames.end(), [&](const auto& name) {
             const auto symbol = symbols_.find(name);
             return symbol != symbols_.end() &&
-                valueTypeNeedsDrop(symbol->second.declaration->type) &&
+                valueTypeNeedsDrop(resolveType(symbol->second.declaration->type)) &&
                 !movedBoxes_.contains(name);
         });
         if (block->result && ownsBox) {
             const ValueId result = expression(*block->result, parameters);
             emitBoxDrops(localNames);
             emitBoxParameterDrops();
-            ir_.instructions.push_back(IrReturn{result, function.type});
+            ir_.instructions.push_back(IrReturn{result, resolveType(function.type)});
         } else if (block->result) {
             emitTailExpression(*block->result, parameters, function);
         }
@@ -658,7 +660,7 @@ void IrGenerator::emitTailExpression(
         std::vector<ValueType> argumentTypes;
         for (std::size_t i = 0; i < call->arguments.size(); ++i) {
             arguments.push_back(expression(*call->arguments[i], parameters));
-            argumentTypes.push_back(function.parameters[i].type);
+            argumentTypes.push_back(resolveType(function.parameters[i].type));
         }
         ir_.instructions.push_back(IrTailCall{symbols_.at(function.name).linkName, std::move(arguments),
                                               std::move(argumentTypes)});
@@ -700,29 +702,30 @@ void IrGenerator::emitLoop(
             using T = std::decay_t<decltype(item)>;
             if constexpr (std::is_same_v<T, Declaration>) {
                 localNames.push_back(item.name);
-                if (valueTypeNeedsDrop(item.type))
+                const ValueType localType = resolveType(item.type);
+                if (valueTypeNeedsDrop(localType))
                     boxScopes_.back().push_back(item.name);
                 if (item.kind == BindingKind::Def) {
                     symbols_.emplace(item.name, Symbol{0, item.kind, &item, false, item.name});
                 } else {
                     const ValueId value = expression(*item.initializer, parameters);
-                    if (isMoveOnlyValueType(item.type))
+                    if (isMoveOnlyValueType(localType))
                         if (const auto* source =
                                 std::get_if<NameExpr>(&item.initializer->value))
                             movedBoxes_.insert(source->name);
-                    if (valueTypeNeedsDrop(item.type) && isCopyValueType(item.type) &&
+                    if (valueTypeNeedsDrop(localType) && isCopyValueType(localType) &&
                         std::holds_alternative<NameExpr>(item.initializer->value))
-                        ir_.instructions.push_back(IrRetain{value, item.type});
+                        ir_.instructions.push_back(IrRetain{value, localType});
                     const SlotId slot = ir_.slots.size();
                     symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false, item.name});
-                    ir_.slots.push_back(IrSlot{item.name, item.type, false});
-                    ir_.instructions.push_back(IrStore{slot, value, item.type});
+                    ir_.slots.push_back(IrSlot{item.name, localType, false});
+                    ir_.instructions.push_back(IrStore{slot, value, localType});
                 }
             } else if constexpr (std::is_same_v<T, Assignment>) {
                 const auto found = symbols_.find(item.name);
                 const ValueId value = expression(*item.value, parameters);
                 ir_.instructions.push_back(IrStore{found->second.slot, value,
-                                                   found->second.declaration->type});
+                    resolveType(found->second.declaration->type)});
             } else if constexpr (std::is_same_v<T, IndexAssignment>) {
                 emitIndexStore(item, parameters);
             } else if constexpr (std::is_same_v<T, FieldAssignment>) {
@@ -731,18 +734,19 @@ void IrGenerator::emitLoop(
                 const ValueId reference = expression(*item.reference, parameters);
                 const ValueId value = expression(*item.value, parameters);
                 ir_.instructions.push_back(IrDereferenceStore{
-                    reference, value, item.value->inferredType});
+                    reference, value, resolveType(item.value->inferredType)});
             } else if constexpr (std::is_same_v<T, WhileStatement>) {
                 emitLoop(item, parameters);
             } else if constexpr (std::is_same_v<T, ExpressionStatement>) {
                 expression(*item.expression, parameters);
             } else if constexpr (std::is_same_v<T, ReturnStatement>) {
                 const ValueId value = expression(*item.value, parameters);
-                if (isMoveOnlyValueType(item.value->inferredType))
+                const ValueType returnType = resolveType(item.value->inferredType);
+                if (isMoveOnlyValueType(returnType))
                     if (const auto* moved = std::get_if<NameExpr>(&item.value->value))
                         movedBoxes_.insert(moved->name);
                 emitAllBoxDrops();
-                ir_.instructions.push_back(IrReturn{value, item.value->inferredType});
+                ir_.instructions.push_back(IrReturn{value, returnType});
             } else if constexpr (std::is_same_v<T, BreakStatement>) {
                 emitBoxDrops(boxScopes_.back());
                 ir_.instructions.push_back(IrJump{endLabel});
@@ -975,7 +979,7 @@ ValueId IrGenerator::expression(
             }
             const ValueId output = nextValue(expressionNode.inferredType);
             ir_.instructions.push_back(IrLoad{output, found->second.slot,
-                                              expressionNode.inferredType});
+                                              resolveType(expressionNode.inferredType)});
             return output;
         } else if constexpr (std::is_same_v<T, CallExpr>) {
             const auto found = symbols_.find(node.name);
@@ -1072,23 +1076,24 @@ ValueId IrGenerator::expression(
                     using S = std::decay_t<decltype(item)>;
                     if constexpr (std::is_same_v<S, Declaration>) {
                         localNames.push_back(item.name);
-                        if (valueTypeNeedsDrop(item.type))
+                        const ValueType localType = resolveType(item.type);
+                        if (valueTypeNeedsDrop(localType))
                             boxScopes_.back().push_back(item.name);
                         if (item.kind == BindingKind::Def) {
                             symbols_.emplace(item.name, Symbol{0, item.kind, &item, false, item.name});
                         } else {
                             const ValueId value = expression(*item.initializer, parameters);
-                            if (isMoveOnlyValueType(item.type))
+                            if (isMoveOnlyValueType(localType))
                                 if (const auto* source =
                                         std::get_if<NameExpr>(&item.initializer->value))
                                     movedBoxes_.insert(source->name);
-                            if (valueTypeNeedsDrop(item.type) && isCopyValueType(item.type) &&
+                            if (valueTypeNeedsDrop(localType) && isCopyValueType(localType) &&
                                 std::holds_alternative<NameExpr>(item.initializer->value))
-                                ir_.instructions.push_back(IrRetain{value, item.type});
+                                ir_.instructions.push_back(IrRetain{value, localType});
                             const SlotId slot = ir_.slots.size();
                             symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false, item.name});
-                            ir_.slots.push_back(IrSlot{item.name, item.type, false});
-                            ir_.instructions.push_back(IrStore{slot, value, item.type});
+                            ir_.slots.push_back(IrSlot{item.name, localType, false});
+                            ir_.instructions.push_back(IrStore{slot, value, localType});
                         }
                     } else if constexpr (std::is_same_v<S, Assignment>) {
                         if (parameters.contains(item.name)) {
@@ -1102,7 +1107,7 @@ ValueId IrGenerator::expression(
                         }
                         const ValueId value = expression(*item.value, parameters);
                         ir_.instructions.push_back(IrStore{found->second.slot, value,
-                                                           found->second.declaration->type});
+                            resolveType(found->second.declaration->type)});
                     } else if constexpr (std::is_same_v<S, IndexAssignment>) {
                         emitIndexStore(item, parameters);
                     } else if constexpr (std::is_same_v<S, FieldAssignment>) {
@@ -1111,18 +1116,19 @@ ValueId IrGenerator::expression(
                         const ValueId reference = expression(*item.reference, parameters);
                         const ValueId value = expression(*item.value, parameters);
                         ir_.instructions.push_back(IrDereferenceStore{
-                            reference, value, item.value->inferredType});
+                            reference, value, resolveType(item.value->inferredType)});
                     } else if constexpr (std::is_same_v<S, WhileStatement>) {
                         emitLoop(item, parameters);
                     } else if constexpr (std::is_same_v<S, ExpressionStatement>) {
                         expression(*item.expression, parameters);
                     } else if constexpr (std::is_same_v<S, ReturnStatement>) {
                         const ValueId value = expression(*item.value, parameters);
-                        if (isMoveOnlyValueType(item.value->inferredType))
+                        const ValueType returnType = resolveType(item.value->inferredType);
+                        if (isMoveOnlyValueType(returnType))
                             if (const auto* moved = std::get_if<NameExpr>(&item.value->value))
                                 movedBoxes_.insert(moved->name);
                         emitAllBoxDrops();
-                        ir_.instructions.push_back(IrReturn{value, item.value->inferredType});
+                        ir_.instructions.push_back(IrReturn{value, returnType});
                     } else if constexpr (std::is_same_v<S, BreakStatement>) {
                         emitBoxDrops(boxScopes_.back());
                         ir_.instructions.push_back(IrJump{loopLabels_.back().second});
@@ -1342,7 +1348,7 @@ std::string IrGenerator::print(const IrProgram& program) {
                     << "[$" << item.index << "]\n";
             else if constexpr (std::is_same_v<T, IrIndexStore>)
             {
-                if (item.arrayIsReference)
+                if (item.arrayIsReference || item.arrayIsSlice)
                     out << "  index_store $" << item.array;
                 else
                     out << "  index_store %" << program.slots[item.slot].name;
