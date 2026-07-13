@@ -1,18 +1,23 @@
-# Roadmap de Zeta — reprise de session
+# Roadmap de Zeta — prochaine session
 
-Ce document est le point d'entrée de la prochaine session. Il remplace l'ancien
-journal cumulatif par un état vérifié, les invariants à préserver et un ordre de
-travail directement exécutable. Le détail historique des fonctionnalités livrées
-reste dans le `README.md`, les documents de `docs/` et l'historique Git.
+Ce document est le point de reprise opérationnel du projet. Il intègre les
+enseignements tirés de l'écriture de `examples/stdlib_showcase.zeta`, qui utilise
+ensemble toute la bibliothèque standard publique.
 
-## Reprise rapide
+L'objectif n'est plus seulement d'ajouter des fonctionnalités : Zeta possède déjà
+un socle conséquent. Les prochains chantiers doivent surtout renforcer le
+compilateur, réduire la cérémonie du code utilisateur et permettre de composer
+les primitives existantes sans ajouter un builtin pour chaque nouveau type.
 
-État vérifié le 14 juillet 2026 sur la branche `master` :
+## Snapshot vérifié
+
+État validé le 14 juillet 2026 sur la branche `master` :
 
 - construction CMake réussie ;
 - stdlib locale régénérée ;
 - 384 tests CTest réussis sur 384 ;
-- aucun changement suivi en attente après les commits de la session ;
+- exemple complet compilé, exécuté et couvert par CTest ;
+- aucun changement suivi en attente à la fin de la session ;
 - `build/`, `stdlib/precompiled/` et certains artefacts de tests sont ignorés.
 
 Commandes de reprise :
@@ -23,16 +28,17 @@ cmake -S . -B build
 cmake --build build -j2
 ctest --test-dir build --output-on-failure
 build/zeta --build-stdlib
+build/zeta examples/stdlib_showcase.zeta -o build/stdlib-showcase
+build/stdlib-showcase
 ```
 
-Après une modification du compilateur, reconstruire `zeta` avant de régénérer la
-stdlib. Après une modification de la génération de code ou du format de cache,
-incrémenter la version concernée dans `src/version.hpp` afin de ne pas réutiliser
-un ancien objet valide en apparence.
+Le programme de référence utilisateur est
+`examples/stdlib_showcase.zeta`. Toute évolution ergonomique importante devrait
+chercher à le simplifier sans réduire sa sûreté.
 
-## Versions et formats actuels
+## Versions actuelles
 
-| Élément | Version |
+| Contrat | Version |
 | --- | ---: |
 | Compilateur | `0.1.0` |
 | ABI | `4` |
@@ -42,96 +48,134 @@ un ancien objet valide en apparence.
 | Cache de démarrage | `2` |
 | Manifeste de stdlib | `1` |
 
-Une modification de représentation mémoire ou de convention d'appel exige une
-révision ABI. Une modification de sérialisation exige une révision `.zti`. Une
-modification susceptible de changer un objet généré exige au minimum une révision
-du cache de modules.
+Règles de versionnement :
 
-## Vision et pipeline
+- représentation mémoire ou convention d'appel : réviser l'ABI ;
+- sérialisation publique : réviser le format `.zti` ;
+- représentation des génériques : réviser les tokens génériques et `.zti` ;
+- modification pouvant changer un objet généré : réviser le cache de modules ;
+- modification du démarrage : réviser le cache de démarrage.
+
+Un changement de codegen sans révision du cache peut réutiliser un objet ancien et
+masquer une correction. Ce cas a déjà été rencontré avec les locaux génériques.
+
+## Vision
 
 Zeta est un langage statiquement typé produisant des exécutables Linux x86-64
-autonomes. Il privilégie la monomorphisation, une propriété déterministe, des
-emprunts explicites et une compilation séparée distribuable sans sources.
+autonomes. Il privilégie :
+
+- la propriété déterministe et l'absence de copies implicites dangereuses ;
+- les emprunts explicites ;
+- la monomorphisation des génériques ;
+- des interfaces binaires distribuables sans sources ;
+- une stdlib majoritairement écrite en Zeta ;
+- des diagnostics précoces plutôt que des comportements indéfinis.
+
+Pipeline actuel :
 
 ```text
 source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
        -> IR par module -> assembleur FASM -> objets ELF64 -> ld -> exécutable
 ```
 
-Le compilateur est organisé ainsi :
+## Évaluation issue de l'exemple complet
 
-- `lexer.*`, `parser.*`, `ast.*` : syntaxe et représentation du programme ;
-- `semantic.*`, `type_rules.hpp`, `symbol_table.hpp` : typage, propriété et
-  emprunts ;
-- `module.*`, `interface.*`, `generic_tokens.*` : graphe de modules, `.zti` et
-  génériques distribués ;
-- `ir.*` : abaissement, instances génériques et IR textuelle ;
-- `codegen.*` : émission FASM x86-64 ;
-- `main.cpp` : CLI, construction, cache, assemblage et édition de liens ;
-- `version.hpp` : contrats de compatibilité à mettre à jour explicitement.
+### Points forts à préserver
 
-## Socle terminé
+La chaîne `Vec[T] -> Slice[T]/SliceMut[T] -> sequences` est la meilleure base
+architecturale actuelle. Elle sépare correctement propriété, lecture, mutation et
+algorithmes, tout en réutilisant les mêmes fonctions pour les tableaux.
+
+Les autres acquis particulièrement utiles sont :
+
+- `Option[T]` pour les accès sûrs ;
+- les contraintes `Copy`, `Numeric`, `Ordered` et `Equatable` ;
+- les imports et noms qualifiés explicites ;
+- les conversions `String(value)` et la concaténation ;
+- les règles de déplacement et d'emprunt déjà actives sur `Box`, `Vec` et slices ;
+- les modules `.zti` + `.o` consommables sans source ;
+- une stdlib générique réellement écrite dans le langage ;
+- des diagnostics avec positions et familles de codes stables.
+
+### Frictions observées
+
+L'exemple est compréhensible, mais trop cérémonieux :
+
+- chaque variable locale exige une annotation de type ;
+- l'absence de `Unit` force les mutations à retourner un compteur ou un booléen ;
+- `sequences.sort(values.asSliceMut())` expose trop de mécanique pour un usage
+  courant ;
+- `collections.unwrapOr` et `strings.unwrapOr` dupliquent une API qui appartient
+  conceptuellement à `Option[T]` ;
+- `if` est toujours une expression, ce qui rend certaines gardes suivies de
+  déclarations locales maladroites ;
+- tous les parcours utilisent une boucle `while` et un indice manuel ;
+- les offsets UTF-8 en octets sont corrects mais trop bas niveau pour l'usage
+  quotidien ;
+- un `Vec[T]` placé dans une structure ne permet pas encore de construire
+  naturellement une nouvelle collection ;
+- une seule contrainte générique peut être exprimée par paramètre ;
+- l'absence de fonctions de première classe bloque `map`, `filter`, `fold` et les
+  comparateurs personnalisés.
+
+### Positionnement actuel
+
+Zeta est déjà un langage expérimental solide pour la propriété, les emprunts, les
+génériques et la compilation séparée. Il n'est pas encore assez ergonomique ni
+composable pour une application générale. L'architecture interne est aujourd'hui
+plus avancée que la surface utilisateur.
+
+## Socle livré
 
 ### Langage
 
-- `val`, `var`, `def`, fonctions globales, récursion et appels terminaux ;
-- blocs expressions, `if/else`, `while ... do`, `break`, `continue`, `return` ;
-- `Int`, `Byte`, `Double`, `Bool`, `Char`, `String` et conversions explicites ;
-- tableaux fixes et imbriqués avec vérification de bornes ;
-- références `&T` et `&mut T`, `Slice[T]` et `SliceMut[T]` ;
-- `Box[T]` et `Vec[T]` possédés avec déplacement et destruction déterministe ;
-- structures et énumérations ordinaires ou génériques ;
-- `match` exhaustif et type builtin partagé `Option[T]` ;
-- fonctions génériques monomorphisées, inférence et contraintes `Copy`,
-  `Numeric`, `Ordered`, `Equatable` ;
-- variables locales utilisant un paramètre de type et substitution correcte de
-  leur type pendant la génération IR.
+- `val`, `var`, `def`, fonctions globales et récursives, retours et appels
+  terminaux ;
+- blocs expressions, `if/else`, `while ... do`, `break`, `continue` ;
+- types primitifs, conversions explicites et opérations typées ;
+- tableaux fixes et imbriqués avec bornes contrôlées ;
+- références, emprunts mutables, `Slice[T]` et `SliceMut[T]` ;
+- `Box[T]` et `Vec[T]` possédés ;
+- structures et enums ordinaires ou génériques ;
+- `match` exhaustif et `Option[T]` builtin ;
+- fonctions génériques monomorphisées, inférence des appels et contraintes ;
+- locaux typés par un paramètre générique correctement substitué dans l'IR.
 
 ### Chaînes
 
-- UTF-8 validé, échappements Unicode et égalité exacte ;
-- représentation possédée `{données, longueur}` avec comptage de références ;
-- concaténation et conversions depuis les types primitifs ;
+- UTF-8 validé et échappements Unicode ;
+- `String` possédée avec comptage de références ;
+- concaténation, égalité et conversions depuis les types primitifs ;
 - propriétés `lengthBytes` et `isEmpty` ;
-- décodage contrôlé, parcours par offset d'octet et `StringView` empruntée ;
-- recherche de sous-vues dans le module `strings`.
+- décodage contrôlé et `StringView` empruntée ;
+- recherche de sous-vues via `strings`.
 
 ### Modules et distribution
 
-- imports récursifs, visibilité `pub`, noms qualifiés et cycles diagnostiqués ;
-- IR et objet ELF64 séparés par module ;
-- cache incrémental dépendant des sources et interfaces ;
-- interfaces `.zti` consommables avec un `.o` sans source ;
-- types publics ordinaires et génériques avec disposition ABI sérialisée ;
-- génériques publics stockés sous forme de tokens canoniques réduits à leur
-  fermeture sémantique ;
-- identité canonique et déduplication `link-once` des instances génériques ;
-- diagnostics `ZTI`, `MOD`, `ABI`, `GEN` et `LIB` contextualisés ;
-- `--build-stdlib`, `--build-library` et `--install-library` ;
-- cache partagé de bibliothèques isolé par ABI et installation atomique.
+- imports récursifs, visibilité publique, noms qualifiés et cycles diagnostiqués ;
+- objets ELF64 séparés par module et initialisation topologique ;
+- cache incrémental ;
+- interfaces `.zti` versionnées ;
+- types publics avec disposition ABI sérialisée ;
+- tokens génériques canoniques réduits à leur fermeture sémantique ;
+- déduplication `link-once` des instances génériques ;
+- diagnostics `ZTI`, `MOD`, `ABI`, `GEN` et `LIB` ;
+- construction et installation de bibliothèques sans sources ;
+- stdlib précompilée avec manifeste et fallback source.
 
-Les contrats détaillés sont dans :
+### Bibliothèque standard
 
-- `docs/PUBLIC_TYPES_DESIGN.md` et `docs/PUBLIC_ENUMS_DESIGN.md` ;
-- `docs/GENERIC_INTERFACE_DESIGN.md` ;
-- `docs/GENERIC_INSTANCE_DEDUP_DESIGN.md` ;
-- `docs/INTERFACE_DIAGNOSTICS.md` ;
-- `docs/LIBRARY_BUILD_DESIGN.md` et `docs/SHARED_LIBRARY_CACHE_DESIGN.md`.
+La stdlib publique contient exactement :
 
-## Bibliothèque standard actuelle
+- `io` ;
+- `collections` ;
+- `strings` ;
+- `sequences`.
 
-La stdlib publique contient exactement quatre modules source :
+`Vec[T]` est builtin et ne nécessite aucun import. L'ancien module `vectors` a été
+retiré ; sa frontière générique subsiste uniquement comme fixture de test privée.
 
-- `io` : affichage des types primitifs, `String` et `Slice[Byte]` ;
-- `collections` : accès sûrs à une slice et helpers `Option[T]` ;
-- `strings` : décodage UTF-8, vues et recherche ;
-- `sequences` : algorithmes génériques sur `Slice[T]` et `SliceMut[T]`.
-
-`Vec[T]` est builtin et s'utilise sans import. L'ancien module artificiel
-`vectors` a été retiré ; sa frontière générique est désormais une fixture privée
-dans `tests/fixtures/stdlib/`.
-
-API actuelle de `sequences` :
+`sequences` fournit actuellement :
 
 - recherche : `contains`, `indexOf`, `lastIndexOf`, `binarySearch`, `lowerBound`,
   `upperBound` ;
@@ -140,154 +184,237 @@ API actuelle de `sequences` :
 - mutation : `reverse`, `fill`, `swap`, `sort` ;
 - validation : `isSorted`.
 
-Les fonctions prennent des slices pour ne pas déplacer le `Vec` et pour rester
-utilisables avec les tableaux. `sum` et `product` retournent `Option[T]` sur une
-séquence potentiellement vide. Le tri actuel est un tri par insertion stable en
-`O(n²)`, adapté comme première implémentation et non comme objectif final de
-performance.
+Le tri actuel est un tri par insertion stable en `O(n²)`. Il constitue une
+implémentation correcte de référence, pas la cible finale de performance.
 
-La distribution sans sources de toutes ces familles est couverte par
-`tests/precompiled_stdlib.sh`.
+## Invariants non négociables
 
-## Invariants à préserver
-
-- une valeur possédée non `Copy` ne doit jamais être dupliquée silencieusement ;
+- aucune valeur possédée non `Copy` ne doit être dupliquée silencieusement ;
 - une `SliceMut[T]` reste exclusive et non copiable ;
-- aucun accès indexé ne contourne les contrôles de bornes ;
-- une interface publique ne peut exposer un type privé ;
-- un module précompilé n'est accepté que si manifeste, empreinte, formats et objet
-  ELF sont cohérents ;
+- tous les accès indexés restent contrôlés ;
+- une interface publique ne peut pas exposer un type privé ;
+- une interface précompilée n'est chargée que si manifeste, empreintes, formats et
+  objet ELF sont cohérents ;
 - deux instances génériques identiques se dédupliquent, deux identités différentes
   restent distinctes ;
-- `Option[T]` conserve une identité builtin unique entre sources et interfaces ;
-- `--build-stdlib` doit lire les sources même si des `.zti` sont déjà présents ;
-- tout changement de code généré invalide les objets mis en cache.
+- `Option[T]` conserve une identité builtin unique entre parseurs et interfaces ;
+- `--build-stdlib` lit toujours les sources pendant la reconstruction ;
+- tout changement de code généré invalide les objets mis en cache ;
+- une amélioration ergonomique ne doit pas introduire de copie ou d'emprunt
+  implicite ambigu.
 
-## Limites et dettes connues
+## Priorité 0 — vérificateur structurel d'IR
 
-### Langage et ergonomie
+La prochaine session doit commencer ici. Une variable locale générique non
+substituée a déjà atteint le backend et corrompu la pile. Un vérificateur doit
+intercepter ce type d'erreur avant FASM.
 
-- une seule contrainte est exprimable par paramètre générique ;
-- pas encore de traits définis par l'utilisateur ;
-- pas de fonctions de première classe, lambdas, `map`, `filter` ou `fold` ;
-- pas de type `Unit`, plusieurs fonctions mutantes retournent donc un compteur ou
-  un booléen utile ;
-- pas de boucle `for` ni de protocole d'itération ;
-- les méthodes utilisateur et receveurs mutables ne sont pas disponibles ;
-- la mutation d'un `Vec[T]` stocké dans un champ reste peu composable ;
-- références, slices et `StringView` ne peuvent pas être retournées ni stockées
-  globalement ;
-- les durées de vie sont lexicales, réduites à la dernière utilisation connue,
-  sans analyse interprocédurale générale ;
-- les fonctions locales capturantes ne sont pas de véritables fermetures.
+### Étapes committables
 
-### Backend et performances
-
-- aucune vérification structurelle autonome de l'IR avant le backend ;
-- pas de propagation de constantes ni élimination de code mort ;
-- nombreuses valeurs temporaires matérialisées sur la pile ;
-- copies d'agrégats encore conservatrices ;
-- cible unique Linux x86-64, FASM et `ld` ;
-- pas d'informations de débogage source.
-
-### Outillage et stdlib
-
-- `--build-stdlib` réécrit le manifeste courant mais ne supprime pas les anciens
-  `.o`/`.zti` qui ne correspondent plus à un module source ; le manifeste empêche
-  leur chargement, mais un nettoyage manuel peut être nécessaire ;
-- pas d'entrée standard, fichiers, réseau, dictionnaire ni ensemble ;
-- pas de gestionnaire de paquets ;
-- les artefacts de `stdlib/precompiled/` sont locaux et ignorés par Git.
-
-## Prochaine priorité — vérificateur structurel d'IR
-
-La prochaine session doit commencer ici. Les corrections récentes sur les locaux
-génériques ont montré qu'une IR textuellement plausible pouvait conserver un type
-symbolique et produire une corruption de pile. Un vérificateur entre abaissement
-et codegen doit transformer ce genre d'erreur en diagnostic interne déterministe.
-
-### Plan committable
-
-1. Écrire `docs/IR_VERIFIER_DESIGN.md` : modèle des fonctions, valeurs, slots,
-   labels, terminaisons et catégories d'erreurs.
-2. Introduire un composant `IrVerifier` sans modifier le codegen ; vérifier les
-   identifiants de valeurs, slots et labels ainsi que leurs bornes.
-3. Vérifier qu'une valeur est définie avant usage dans sa fonction et une seule
-   fois, avec traitement explicite des paramètres.
-4. Vérifier les types de chaque instruction : charges, stores, indexation,
-   conversions, appels, retours, slices, structures, enums, `Box` et `Vec`.
-5. Vérifier les frontières de fonctions, branches, labels uniques et chemins
-   terminés par retour ou appel terminal.
-6. Appeler le vérificateur avant toute écriture d'IR/codegen et produire des
-   diagnostics internes stables préfixés `IRV`.
-7. Ajouter des tests unitaires construisant volontairement des `IrProgram`
-   invalides, plus un test d'intégration confirmant une IR valide par module.
-8. Exécuter la suite complète, mesurer le coût et documenter le contrat dans le
-   README. Incrémenter le cache de modules si l'intégration change les objets.
+1. Écrire `docs/IR_VERIFIER_DESIGN.md` et définir les diagnostics `IRV`.
+2. Ajouter un composant `IrVerifier` indépendant du codegen.
+3. Vérifier les frontières de fonctions, identifiants de valeurs, slots et labels.
+4. Vérifier définition unique, usage après définition et portée des paramètres.
+5. Vérifier les types de toutes les instructions, appels et retours.
+6. Vérifier branches, labels uniques et terminaisons de fonctions.
+7. Intégrer la vérification avant toute émission textuelle ou assembleur.
+8. Ajouter des tests unitaires construisant des `IrProgram` volontairement
+   invalides et un test d'intégration par module.
+9. Exécuter toute la suite et mesurer le coût de la vérification.
 
 ### Critère de sortie
 
-Chaque instruction envoyée au backend appartient à une fonction valide, ne
-référence que des valeurs et slots définis, respecte les types attendus et mène à
-une terminaison cohérente. Les erreurs du compilateur sont interceptées avant
-l'émission assembleur avec un diagnostic `IRV` reproductible.
+Toute IR envoyée au backend possède des fonctions correctement délimitées, des
+valeurs et slots définis, des types cohérents et des chemins terminés. Une erreur
+interne produit un diagnostic `IRV` reproductible avant l'assembleur.
 
-## Priorités suivantes
+## Priorité 1 — ergonomie fondamentale
 
-### 2. Optimisations IR mesurées
+Objectif : réduire fortement le bruit de `stdlib_showcase.zeta` sans modifier son
+comportement ni affaiblir le typage.
 
-À entreprendre seulement après le vérificateur :
+### 1A. Inférence des variables locales
 
-1. propagation et pliage des constantes ;
-2. simplification algébrique ;
-3. suppression des valeurs, branches et fonctions mortes ;
-4. réduction ou réutilisation des temporaires de pile ;
-5. élimination des copies d'agrégats inutiles ;
-6. inlining contrôlé et maintien des appels terminaux ;
-7. mesures reproductibles de taille, temps de compilation et temps d'exécution.
+Syntaxe cible :
 
-Chaque passe doit préserver une IR vérifiable avant et après transformation.
+```zeta
+val total = sequences.sum(values.asSlice())
+var index = 0
+```
 
-### 3. Composition des types possédés
+Étapes :
 
-Objectif : permettre d'écrire une vraie collection en Zeta au-dessus de `Vec[T]`
-sans ajout builtin.
+1. rendre l'annotation locale optionnelle tout en la conservant aux signatures et
+   déclarations publiques ;
+2. inférer depuis l'initialiseur après résolution générique ;
+3. refuser une inférence ambiguë ou sans type concret ;
+4. couvrir `Option`, structures, enums, slices et types possédés ;
+5. vérifier que l'inférence ne change pas les règles de déplacement.
 
-1. mutation sûre d'un champ `Vec[T]` ;
-2. passage et utilisation de `&mut Vec[T]` ;
-3. méthodes utilisateur avec receveur partagé ou mutable ;
-4. combinaisons de contraintes génériques ;
-5. implémentation d'une `Queue[T]` de stdlib comme test de sortie.
+### 1B. Type `Unit`
 
-### 4. Itération et fonctions de première classe
+Objectif : permettre des fonctions et expressions sans résultat métier :
 
-1. protocole d'itération et boucle `for` ;
-2. fonctions comme valeurs sans capture ;
-3. fermetures avec environnement explicite ;
-4. `map`, `filter`, `fold`, prédicats et comparateurs dans `sequences` ;
-5. règles de propriété pour arguments et résultats des callbacks.
+```zeta
+def log(value: String): Unit = io.println(value)
+```
 
-### 5. Runtime et écosystème
+Définir représentation ABI, compatibilité des branches, appels utilisés comme
+instructions et convention de retour. Les API mutantes pourront ensuite choisir
+`Unit` lorsque leur compteur actuel n'est pas contractuel.
 
-- erreurs structurées et propagation ;
-- entrée standard et fichiers ;
-- dictionnaires et ensembles ;
-- informations de débogage ;
-- autres architectures et formats objets ;
-- gestionnaire de paquets.
+### 1C. Contrôle de flux
+
+Clarifier les gardes et branches qui ne reviennent pas :
+
+- soit autoriser un `if` instruction sans `else` ;
+- soit introduire un type interne `Never` pour `return`, `break` et `continue` ;
+- conserver `if/else` comme expression typée lorsque sa valeur est utilisée.
+
+### Critère de sortie
+
+Réécrire l'exemple complet avec moins d'annotations et sans valeurs factices,
+tout en conservant les mêmes sorties et les 384 tests existants.
+
+## Priorité 2 — composabilité de `Vec` et méthodes
+
+Objectif : permettre d'écrire une collection possédée entièrement en Zeta.
+
+1. autoriser la mutation sûre d'un `Vec[T]` stocké dans un champ ;
+2. permettre le passage et l'utilisation de `&mut Vec[T]` ;
+3. définir des méthodes utilisateur avec receveur partagé ou mutable ;
+4. définir éventuellement des méthodes d'extension pour les modules ;
+5. rendre possibles des appels ergonomiques comme `values.sort()` tout en
+   conservant `SliceMut` comme mécanisme interne ;
+6. écrire `Stack[T]` comme validation minimale ;
+7. écrire `Queue[T]` comme critère de sortie réel.
+
+Le compilateur ne doit pas recevoir un nouveau builtin `Stack` ou `Queue`. Le but
+est précisément de prouver que `Vec` est une brique de fondation suffisante.
+
+## Priorité 3 — généricité composable
+
+### Contraintes multiples
+
+Syntaxe cible indicative :
+
+```zeta
+def replaceAll[T: Equatable + Copy](values: SliceMut[T], old: T, next: T): Int
+```
+
+Étapes : parser une liste canonique, diagnostiquer doublons et contraintes
+incompatibles, sérialiser dans `.zti`, intégrer à l'identité générique et tester la
+compilation sans sources.
+
+### API commune d'Option
+
+Éliminer la duplication de `collections.unwrapOr`, `strings.unwrapOr` et
+`isNone`. Deux directions sont acceptables :
+
+- module standard `option` ;
+- méthodes génériques sur `Option[T]` après livraison des méthodes utilisateur.
+
+Ne pas dupliquer une troisième fois les helpers entre modules.
+
+### Traits utilisateur
+
+À entreprendre après les contraintes multiples. Commencer par des contrats sans
+état et monomorphisés ; reporter les objets de traits dynamiques.
+
+## Priorité 4 — itération
+
+Objectif : remplacer les boucles indexées répétitives de la stdlib par une
+abstraction sûre.
+
+1. concevoir un protocole d'itération sans allocation ;
+2. ajouter `for` sur tableaux, slices et `Vec` ;
+3. distinguer itération partagée, mutable et consommatrice ;
+4. fournir un parcours de `String` par `Char` masquant les offsets UTF-8 ;
+5. migrer progressivement `sequences` vers ce protocole ;
+6. vérifier les emprunts jusqu'à la dernière utilisation.
+
+Exemple cible :
+
+```zeta
+for (value in values.asSlice()) do {
+    io.printlnInt(value)
+}
+
+for (character in text.chars()) do {
+    io.printChar(character)
+}
+```
+
+## Priorité 5 — fonctions de première classe
+
+1. fonctions sans capture comme valeurs ;
+2. convention d'appel et types de fonctions ;
+3. callbacks génériques monomorphisés ;
+4. fermetures avec environnement explicite ;
+5. règles de propriété des captures ;
+6. `map`, `filter`, `fold`, prédicats et comparateurs dans `sequences`.
+
+Ce chantier vient après l'itération : les deux modèles doivent être conçus
+ensemble, mais livrés séparément.
+
+## Priorité 6 — texte, erreurs et entrées-sorties
+
+- permettre des vues retournées avec un modèle de durée de vie explicite ;
+- ajouter une API Unicode de haut niveau au-dessus des offsets d'octets ;
+- introduire une gestion d'erreurs structurée, probablement fondée sur un enum
+  générique ;
+- ajouter entrée standard et fichiers ;
+- remplacer progressivement les codes négatifs et arrêts de processus par des
+  résultats typés lorsque la récupération est raisonnable.
+
+## Priorité 7 — performances et backend
+
+À commencer après le vérificateur d'IR, mais sans bloquer les améliorations
+d'ergonomie indépendantes :
+
+1. mesures reproductibles de taille et de temps ;
+2. propagation et pliage des constantes ;
+3. simplification algébrique ;
+4. suppression de code mort ;
+5. réduction des temporaires de pile ;
+6. élimination des copies d'agrégats inutiles ;
+7. meilleur tri générique pour les grandes séquences ;
+8. informations de débogage source ;
+9. autres architectures et formats objets.
+
+Chaque passe doit produire une IR valide avant et après transformation.
+
+## Limites opérationnelles à garder visibles
+
+- `--build-stdlib` ne purge pas les anciens `.o`/`.zti` sans source correspondante ;
+  le manifeste empêche leur chargement, mais un nettoyage manuel peut être requis ;
+- `stdlib/precompiled/` est local et ignoré par Git ;
+- cible unique Linux x86-64 avec FASM et `ld` ;
+- pas encore de gestionnaire de paquets ;
+- pas de dictionnaire, ensemble, fichiers ou réseau ;
+- références, slices et `StringView` ne peuvent pas encore être retournées ou
+  stockées globalement ;
+- les durées de vie restent lexicales sans analyse interprocédurale générale.
 
 ## Discipline de livraison
 
 Chaque étape doit :
 
 - former un commit cohérent et réversible ;
-- ajouter des tests positifs, d'exécution et de rejet quand ils sont pertinents ;
-- couvrir les frontières `.zti`/`.o` lorsqu'une API générique publique change ;
-- préserver le fallback source et l'invalidation des caches ;
-- exécuter `git diff --check`, la construction CMake et les tests ciblés ;
-- terminer par `ctest --test-dir build --output-on-failure` ;
-- régénérer la stdlib avec `build/zeta --build-stdlib` si ses sources changent ;
-- mettre à jour le README, la roadmap et le document de conception concerné.
+- ajouter des tests de compilation, d'exécution et de rejet pertinents ;
+- couvrir `.zti` + `.o` sans sources lorsqu'une API générique publique change ;
+- préserver fallback source, propriété, emprunts et invalidation des caches ;
+- exécuter `git diff --check`, les tests ciblés puis toute la suite CTest ;
+- régénérer la stdlib après toute modification de ses sources ;
+- mettre à jour README, roadmap et document de conception associé ;
+- ne jamais committer `build/` ou `stdlib/precompiled/` ;
+- ne jamais effacer les changements locaux d'un utilisateur pour nettoyer le
+  dépôt.
 
-Ne jamais committer `build/` ni `stdlib/precompiled/`. Ne pas supprimer les
-changements locaux d'un utilisateur pour nettoyer le dépôt.
+## Première action de la prochaine session
+
+Créer `docs/IR_VERIFIER_DESIGN.md`, inventorier chaque variante de
+`IrInstruction`, puis définir pour chacune : valeurs lues, valeur produite, slots,
+types attendus, effet de contrôle et diagnostic `IRV` associé. Aucun changement de
+codegen ne doit être réalisé avant que ce contrat soit relu et testé sur l'IR
+actuelle de `stdlib_showcase.zeta`.
