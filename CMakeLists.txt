@@ -420,6 +420,16 @@ if(BUILD_TESTING)
     set_tests_properties(run_example PROPERTIES DEPENDS compile_example)
 
     add_test(
+        NAME compile_stdlib_showcase
+        COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/examples/stdlib_showcase.zeta
+                -o ${CMAKE_CURRENT_BINARY_DIR}/stdlib-showcase
+    )
+    add_test(NAME run_stdlib_showcase COMMAND ${CMAKE_CURRENT_BINARY_DIR}/stdlib-showcase)
+    set_tests_properties(run_stdlib_showcase PROPERTIES
+        DEPENDS compile_stdlib_showcase
+        PASS_REGULAR_EXPRESSION "Démonstration terminée")
+
+    add_test(
         NAME compile_mutable_assignment
         COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/mutable_assignment.zeta
                 -o ${CMAKE_CURRENT_BINARY_DIR}/mutable-assignment

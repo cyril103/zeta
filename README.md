@@ -747,11 +747,14 @@ cmake -S . -B build
 cmake --build build
 ./build/zeta examples/basic.zeta -o build/basic
 ./build/basic
+./build/zeta examples/stdlib_showcase.zeta -o build/stdlib-showcase
+./build/stdlib-showcase
 ```
 
 La compilation produit `build/basic.ir`, `build/basic.asm` et l'exécutable
 `build/basic`. La cible actuelle est Linux x86-64 et nécessite `fasm` dans le
-`PATH`.
+`PATH`. `stdlib_showcase.zeta` présente ensemble les modules `io`, `collections`,
+`strings` et `sequences`, ainsi que `Vec`, `Option` et les slices.
 
 ## Architecture du compilateur
 

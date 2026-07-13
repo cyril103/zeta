@@ -1,0 +1,75 @@
+import collections
+import io
+import sequences
+import strings
+
+def main(): Int = {
+    io.println("=== Démonstration de la bibliothèque standard Zeta ===")
+
+    var scores: Vec[Int] = Vec[Int]()
+    scores.push(5)
+    scores.push(2)
+    scores.push(8)
+    scores.push(2)
+
+    val original: Slice[Int] = scores.asSlice()
+    val first: Int = collections.unwrapOr(collections.first(original), -1)
+    val second: Int = collections.unwrapOr(collections.second(original), -1)
+    val missing: Bool = collections.isNone(collections.at(original, 99))
+    val total: Int = collections.unwrapOr(sequences.sum(original), 0)
+    val product: Int = collections.unwrapOr(sequences.product(original), 0)
+    val minimum: Int = collections.unwrapOr(sequences.minimum(original), 0)
+    val maximum: Int = collections.unwrapOr(sequences.maximum(original), 0)
+    val occurrences: Int = sequences.count(original, 2)
+
+    io.println("Vec initial : [5, 2, 8, 2]")
+    io.println("Premier élément : " + String(first))
+    io.println("Deuxième élément : " + String(second))
+    io.println("Somme : " + String(total) + ", produit : " + String(product))
+    io.println("Minimum : " + String(minimum) + ", maximum : " + String(maximum))
+    io.println("Nombre de 2 : " + String(occurrences))
+    io.println("Indice absent détecté : " + String(missing))
+
+    val swaps: Int = sequences.sort(scores.asSliceMut())
+    val sorted: Slice[Int] = scores.asSlice()
+    val sortedOk: Bool = sequences.isSorted(sorted)
+    val positionEight: Int = collections.unwrapOr(
+        sequences.binarySearch(sorted, 8), -1)
+    val twosBegin: Int = sequences.lowerBound(sorted, 2)
+    val twosEnd: Int = sequences.upperBound(sorted, 2)
+
+    io.println("Vec trié : [2, 2, 5, 8]")
+    io.println("Échanges effectués : " + String(swaps))
+    io.println("Position de 8 : " + String(positionEight))
+    io.println("Intervalle des 2 : [" + String(twosBegin) + ", " +
+        String(twosEnd) + ")")
+
+    val unicode: String = "éclair"
+    val firstChar: Char = strings.unwrapOr(strings.charAtByte(unicode, 0), '?')
+    val nextOffset: Int = strings.nextByteOffset(unicode, 0)
+
+    val message: String = "Bonjour Zeta"
+    val whole: StringView = strings.view(message, 0, message.lengthBytes)
+    val zeta: StringView = strings.view(message, 8, 12)
+    val viewValid: Bool = strings.viewIsValid(zeta)
+    val viewFound: Bool = strings.contains(whole, zeta)
+
+    io.println("Premier caractère UTF-8 : " + String(firstChar))
+    io.println("Offset du caractère suivant : " + String(nextOffset))
+    io.println("Vue 'Zeta' valide et trouvée : " + String(viewValid && viewFound))
+
+    val bytes: [Byte; 4] = [90, 101, 116, 97]
+    val byteView: Slice[Byte] = Slice(&bytes)
+    io.print("Octets directs : ")
+    io.printlnBytes(byteView)
+
+    val valuesOk: Bool = sorted[0] == 2 && sorted[1] == 2 &&
+        sorted[2] == 5 && sorted[3] == 8
+    val success: Bool = first == 5 && second == 2 && missing && total == 17 &&
+        product == 160 && minimum == 2 && maximum == 8 && occurrences == 2 &&
+        sortedOk && valuesOk && positionEight == 3 && twosBegin == 0 &&
+        twosEnd == 2 && firstChar == 'é' && nextOffset == 2 && viewValid && viewFound
+
+    io.println("Démonstration terminée.")
+    if (success) 0 else 1
+}

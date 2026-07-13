@@ -11,7 +11,7 @@ reste dans le `README.md`, les documents de `docs/` et l'historique Git.
 
 - construction CMake réussie ;
 - stdlib locale régénérée ;
-- 382 tests CTest réussis sur 382 ;
+- 384 tests CTest réussis sur 384 ;
 - aucun changement suivi en attente après les commits de la session ;
 - `build/`, `stdlib/precompiled/` et certains artefacts de tests sont ignorés.
 
