@@ -180,9 +180,9 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
         for (const Program::Import& import : imports)
             loadModule(import.module, resolveImport(import.module));
         Program program;
-        if (!persisted.genericSource.empty()) {
-            Lexer lexer(persisted.genericSource);
-            Parser parser(lexer.scan(), importedStructures(imports, graph_.interfaces),
+        if (!persisted.genericTokens.empty()) {
+            Parser parser(persisted.genericTokens,
+                          importedStructures(imports, graph_.interfaces),
                           importedEnumerations(imports, graph_.interfaces));
             program = parser.parse();
         }
@@ -205,7 +205,7 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
                 std::move(parameters), {}, {}, nullptr});
         }
         graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source),
-                                            true, objectPath, persisted.genericSource, {}});
+                                            true, objectPath, persisted.genericTokens});
         Module& storedModule = graph_.modules.at(name);
         for (Statement& statement : storedModule.program.statements) {
             auto* declaration = std::get_if<Declaration>(&statement.value);
@@ -232,7 +232,7 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
                   importedEnumerations(imports, graph_.interfaces));
     Program program = parser.parse();
     graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source),
-                                        false, {}, source, syntaxTokens});
+                                        false, {}, syntaxTokens});
     buildInterface(name);
     loading_.erase(name);
 }

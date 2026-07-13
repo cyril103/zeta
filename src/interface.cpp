@@ -168,42 +168,26 @@ ValueType decodeType(const std::string& encoded, const StructRegistry& structure
     return type;
 }
 
-std::string hexEncode(std::string_view value) {
-    static constexpr char digits[] = "0123456789abcdef";
-    std::string encoded;
-    encoded.reserve(value.size() * 2U);
-    for (const unsigned char byte : value) {
-        encoded.push_back(digits[byte >> 4U]);
-        encoded.push_back(digits[byte & 0x0FU]);
-    }
-    return encoded;
-}
-
-std::string hexDecode(const std::string& encoded) {
-    if (encoded.size() % 2U != 0) throw std::runtime_error("source générique .zti invalide");
-    const auto nibble = [](char value) -> unsigned {
-        if (value >= '0' && value <= '9') return static_cast<unsigned>(value - '0');
-        if (value >= 'a' && value <= 'f') return static_cast<unsigned>(value - 'a' + 10);
-        throw std::runtime_error("source générique .zti invalide");
-    };
-    std::string decoded;
-    decoded.reserve(encoded.size() / 2U);
-    for (std::size_t i = 0; i < encoded.size(); i += 2U)
-        decoded.push_back(static_cast<char>((nibble(encoded[i]) << 4U) | nibble(encoded[i + 1U])));
-    return decoded;
-}
 }
 
 std::string InterfaceCodec::serialize(
     const ModuleInterface& interface, const std::string& fingerprint,
-    const std::vector<std::string>& imports, const std::string& genericSource) {
+    const std::vector<std::string>& imports,
+    const std::vector<Token>& genericTokens) {
     std::ostringstream output;
     output << "ZTI " << ZetaVersion::InterfaceFormat << "\nmodule "
            << std::quoted(interface.name) << '\n'
            << "fingerprint " << fingerprint << '\n';
     for (const std::string& import : imports)
         output << "import " << std::quoted(import) << '\n';
-    if (!genericSource.empty()) output << "generic_source " << hexEncode(genericSource) << '\n';
+    if (!genericTokens.empty()) {
+        output << "generic_tokens " << ZetaVersion::GenericTokens << ' '
+               << genericTokens.size() << '\n';
+        for (const Token& token : genericTokens)
+            output << "token " << static_cast<int>(token.kind) << ' '
+                   << token.location.line << ' ' << token.location.column << ' '
+                   << std::quoted(token.text) << '\n';
+    }
     for (const std::shared_ptr<const StructType>& structure : interface.structures) {
         output << "structure " << std::quoted(structure->name) << ' '
                << structure->size << ' ' << structure->alignment << ' '
@@ -292,10 +276,29 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
             result.imports.push_back(std::move(name));
             continue;
         }
-        if (word == "generic_source") {
-            std::string encoded;
-            if (!(input >> encoded)) throw std::runtime_error("source générique .zti absente");
-            result.genericSource = hexDecode(encoded);
+        if (word == "generic_tokens") {
+            int tokenVersion = 0;
+            std::size_t count = 0;
+            if (!(input >> tokenVersion >> count) ||
+                tokenVersion != ZetaVersion::GenericTokens || count == 0U ||
+                !result.genericTokens.empty())
+                throw std::runtime_error("représentation générique .zti invalide");
+            for (std::size_t i = 0; i < count; ++i) {
+                std::string tokenWord, text;
+                int kind = 0;
+                std::size_t line = 0, column = 0;
+                if (!(input >> tokenWord >> kind >> line >> column >> std::quoted(text)) ||
+                    tokenWord != "token" || kind < 0 ||
+                    kind > static_cast<int>(TokenKind::End) || line == 0U || column == 0U)
+                    throw std::runtime_error("token générique .zti invalide");
+                const TokenKind tokenKind = static_cast<TokenKind>(kind);
+                if (tokenKind == TokenKind::End && i + 1U != count)
+                    throw std::runtime_error("fin prématurée des tokens génériques .zti");
+                result.genericTokens.push_back(Token{
+                    tokenKind, std::move(text), SourceLocation{line, column}});
+            }
+            if (result.genericTokens.back().kind != TokenKind::End)
+                throw std::runtime_error("fin des tokens génériques .zti absente");
             continue;
         }
         if (word == "structure") {

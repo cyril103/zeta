@@ -26,6 +26,35 @@ cp "$work/generic-published.modules/collections.zti" "$work/generic/collections.
 cp "$work/generic-published.modules/collections.o" "$work/generic/collections.o"
 "$compiler" "$work/generic/collections_module.zeta" -o "$work/generic/app" >/dev/null
 "$work/generic/app"
+grep -q '^generic_tokens 1 ' "$work/generic/collections.zti"
+if grep -q '^generic_source ' "$work/generic/collections.zti"; then
+    exit 1
+fi
+
+# Une version inconnue ou une suite sans token End doit être rejetée.
+mkdir "$work/invalid-generic-version"
+cp "$generic_root" "$work/invalid-generic-version/collections_module.zeta"
+cp "$work/generic-published.modules/collections.o" \
+   "$work/invalid-generic-version/collections.o"
+printf 'ZTI 7\nmodule "collections"\nfingerprint invalid\ngeneric_tokens 999 1\ntoken 0 1 1 ""\nend\n' \
+    > "$work/invalid-generic-version/collections.zti"
+if "$compiler" "$work/invalid-generic-version/collections_module.zeta" \
+    -o "$work/invalid-generic-version/app" >"$work/generic-version-error" 2>&1; then
+    exit 1
+fi
+grep -q 'représentation générique .zti invalide' "$work/generic-version-error"
+
+mkdir "$work/invalid-generic-end"
+cp "$generic_root" "$work/invalid-generic-end/collections_module.zeta"
+cp "$work/generic-published.modules/collections.o" \
+   "$work/invalid-generic-end/collections.o"
+printf 'ZTI 7\nmodule "collections"\nfingerprint invalid\ngeneric_tokens 1 1\ntoken 0 1 1 ""\nend\n' \
+    > "$work/invalid-generic-end/collections.zti"
+if "$compiler" "$work/invalid-generic-end/collections_module.zeta" \
+    -o "$work/invalid-generic-end/app" >"$work/generic-end-error" 2>&1; then
+    exit 1
+fi
+grep -q 'fin des tokens génériques .zti absente' "$work/generic-end-error"
 
 # Une version inconnue doit être diagnostiquée avant l'édition de liens.
 mkdir "$work/invalid"

@@ -34,7 +34,6 @@ struct Module {
     std::uint64_t sourceHash;
     bool precompiled{false};
     std::filesystem::path objectPath;
-    std::string sourceText;
     std::vector<Token> syntaxTokens;
 };
 

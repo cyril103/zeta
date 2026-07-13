@@ -173,7 +173,7 @@ int main(int argc, char** argv) {
         ModuleGraph modules = loader.load(sourcePath);
         for (const std::string& moduleName : modules.compilationOrder) {
             if (modules.modules.at(moduleName).precompiled &&
-                modules.modules.at(moduleName).sourceText.empty()) continue;
+                modules.modules.at(moduleName).syntaxTokens.empty()) continue;
             SemanticAnalyzer semanticAnalyzer;
             semanticAnalyzer.analyze(modules.modules.at(moduleName).program, &modules.interfaces,
                                      moduleName == modules.root);
@@ -240,12 +240,12 @@ int main(int argc, char** argv) {
                 modules.interfaces.at(moduleName),
                 modules.interfaceFingerprints.at(moduleName),
                 modules.dependencies.at(moduleName),
-                [&]() -> std::string {
+                [&]() -> std::vector<Token> {
                     for (const auto& [name, symbol] : modules.interfaces.at(moduleName).exports) {
                         static_cast<void>(name);
                         if (symbol.declaration != nullptr &&
                             !symbol.declaration->typeParameters.empty())
-                            return modules.modules.at(moduleName).sourceText;
+                            return modules.modules.at(moduleName).syntaxTokens;
                     }
                     return {};
                 }()));

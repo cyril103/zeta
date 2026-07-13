@@ -63,6 +63,5 @@ Les tests vérifient notamment :
 
 - la disparition de `generic_source` et du texte hexadécimal ;
 - la compilation de `collections` et `vectors` sans leurs sources ;
-- les dépendances privées utilisées par un générique public ;
 - le rejet d'une version de tokens inconnue ou d'une suite sans `End` ;
 - la stabilité de l'interface lors d'un changement limité aux commentaires.
