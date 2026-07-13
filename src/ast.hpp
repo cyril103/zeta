@@ -9,9 +9,10 @@
 #include <vector>
 
 struct StructType;
+struct EnumType;
 
 struct ValueType {
-    enum class Kind { Int, Byte, Double, Bool, Char, String, Array, Reference, Slice, Box, TypeParameter, Struct };
+    enum class Kind { Int, Byte, Double, Bool, Char, String, Array, Reference, Slice, Box, TypeParameter, Struct, Enum };
 
     Kind kind;
     std::shared_ptr<const ValueType> element;
@@ -19,6 +20,7 @@ struct ValueType {
     bool mutableReference{false};
     std::string typeParameter;
     std::shared_ptr<const StructType> structure;
+    std::shared_ptr<const EnumType> enumeration;
 
     explicit ValueType(Kind primitive) : kind(primitive) {}
     ValueType(std::shared_ptr<const ValueType> elementType, std::size_t arrayLength)
@@ -36,6 +38,8 @@ struct ValueType {
         : kind(parameterKind), typeParameter(std::move(parameterName)) {}
     explicit ValueType(std::shared_ptr<const StructType> structType)
         : kind(Kind::Struct), structure(std::move(structType)) {}
+    explicit ValueType(std::shared_ptr<const EnumType> enumType)
+        : kind(Kind::Enum), enumeration(std::move(enumType)) {}
 
     static const ValueType Int;
     static const ValueType Byte;
@@ -48,8 +52,10 @@ struct ValueType {
         if (left.kind != right.kind) return false;
         if (left.kind != Kind::Array && left.kind != Kind::Reference &&
             left.kind != Kind::Slice && left.kind != Kind::Box &&
-            left.kind != Kind::TypeParameter && left.kind != Kind::Struct) return true;
+            left.kind != Kind::TypeParameter && left.kind != Kind::Struct &&
+            left.kind != Kind::Enum) return true;
         if (left.kind == Kind::Struct) return left.structure == right.structure;
+        if (left.kind == Kind::Enum) return left.enumeration == right.enumeration;
         if (left.kind == Kind::TypeParameter)
             return left.typeParameter == right.typeParameter;
         if (left.element == nullptr || right.element == nullptr || *left.element != *right.element)
@@ -74,6 +80,25 @@ struct StructType {
     std::vector<StructField> fields;
     std::size_t size{0};
     std::size_t alignment{1};
+};
+
+struct EnumVariant {
+    SourceLocation location;
+    std::string name;
+    std::vector<StructField> fields;
+    std::size_t payloadSize{0};
+    std::size_t payloadAlignment{1};
+};
+
+struct EnumType {
+    SourceLocation location;
+    std::string name;
+    std::vector<std::string> typeParameters;
+    std::vector<ValueType> typeArguments;
+    std::vector<EnumVariant> variants;
+    std::size_t payloadOffset{4};
+    std::size_t size{4};
+    std::size_t alignment{4};
 };
 
 inline const ValueType ValueType::Int{ValueType::Kind::Int};
@@ -110,6 +135,18 @@ inline std::string typeName(ValueType type) {
         }
         return name;
     }
+    if (type.kind == ValueType::Kind::Enum) {
+        std::string name = type.enumeration->name;
+        if (!type.enumeration->typeArguments.empty()) {
+            name += '[';
+            for (std::size_t i = 0; i < type.enumeration->typeArguments.size(); ++i) {
+                if (i != 0) name += ", ";
+                name += typeName(type.enumeration->typeArguments[i]);
+            }
+            name += ']';
+        }
+        return name;
+    }
     return type.mutableReference ? "&mut " + typeName(*type.element)
                                  : "&" + typeName(*type.element);
 }
@@ -121,6 +158,7 @@ inline std::size_t valueTypeSize(const ValueType& type) {
     if (type == ValueType::String || type.kind == ValueType::Kind::Slice) return 16U;
     if (type.kind == ValueType::Kind::Reference || type.kind == ValueType::Kind::Box) return 8U;
     if (type.kind == ValueType::Kind::Struct) return type.structure->size;
+    if (type.kind == ValueType::Kind::Enum) return type.enumeration->size;
     return valueTypeSize(*type.element) * type.length;
 }
 
@@ -131,6 +169,7 @@ inline std::size_t valueTypeAlignment(const ValueType& type) {
         type.kind == ValueType::Kind::Slice) return 8U;
     if (type.kind == ValueType::Kind::Reference || type.kind == ValueType::Kind::Box) return 8U;
     if (type.kind == ValueType::Kind::Struct) return type.structure->alignment;
+    if (type.kind == ValueType::Kind::Enum) return type.enumeration->alignment;
     return valueTypeAlignment(*type.element);
 }
 
@@ -247,5 +286,6 @@ struct Program {
     };
     std::vector<Import> imports;
     std::vector<std::shared_ptr<const StructType>> structures;
+    std::vector<std::shared_ptr<const EnumType>> enumerations;
     std::vector<Statement> statements;
 };

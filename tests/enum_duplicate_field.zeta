@@ -1,0 +1,5 @@
+enum Resultat {
+    Valeur(value: Int, value: Byte)
+}
+
+def main(): Int = 0

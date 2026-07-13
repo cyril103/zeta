@@ -26,6 +26,8 @@ std::string encodeType(const ValueType& type) {
     case ValueType::Kind::TypeParameter: return "T(" + type.typeParameter + ")";
     case ValueType::Kind::Struct:
         throw std::runtime_error("les structures publiques ne sont pas encore sérialisables");
+    case ValueType::Kind::Enum:
+        throw std::runtime_error("les énumérations publiques ne sont pas encore sérialisables");
     }
     throw std::runtime_error("type Zeta inconnu dans l'interface");
 }

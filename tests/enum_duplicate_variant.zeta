@@ -1,0 +1,6 @@
+enum Etat {
+    Present
+    Present(value: Int)
+}
+
+def main(): Int = 0

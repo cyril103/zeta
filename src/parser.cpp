@@ -224,8 +224,94 @@ ValueType Parser::consumeType(const std::string& message) {
             }
             return ValueType(instantiateStructure(found->second, std::move(arguments), token.location));
         }
+        const auto enumFound = enumerations_.find(peek().text);
+        if (enumFound != enumerations_.end()) {
+            const Token token = tokens_[current_++];
+            if (check(TokenKind::LeftBracket))
+                throw CompileError(token.location,
+                                   "les énumérations génériques ne sont pas encore disponibles");
+            return ValueType(std::shared_ptr<const EnumType>(enumFound->second));
+        }
     }
     throw CompileError(peek().location, message + ", reçu " + tokenName(peek().kind));
+}
+
+std::shared_ptr<EnumType> Parser::enumeration() {
+    const Token start = previous();
+    const Token& name = consume(TokenKind::Identifier, "nom d'énumération attendu");
+    if (structures_.contains(name.text) || enumerations_.contains(name.text))
+        throw CompileError(name.location, "type '" + name.text + "' déclaré plusieurs fois");
+
+    auto result = std::make_shared<EnumType>();
+    result->location = start.location;
+    result->name = name.text;
+    enumerations_.emplace(name.text, result);
+
+    if (check(TokenKind::LeftBracket))
+        throw CompileError(peek().location,
+                           "les énumérations génériques ne sont pas encore disponibles");
+    consume(TokenKind::LeftBrace, "'{' attendue après le nom d'énumération");
+    skipSeparators();
+
+    std::unordered_set<std::string> variantNames;
+    std::size_t maximumPayloadSize = 0;
+    std::size_t maximumPayloadAlignment = 1;
+    while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
+        const Token& variantName = consume(TokenKind::Identifier, "nom de variante attendu");
+        if (!variantNames.insert(variantName.text).second)
+            throw CompileError(variantName.location,
+                               "variante '" + variantName.text + "' déclarée plusieurs fois");
+
+        EnumVariant variant{variantName.location, variantName.text, {}};
+        if (match(TokenKind::LeftParen)) {
+            std::unordered_set<std::string> fieldNames;
+            if (check(TokenKind::RightParen))
+                throw CompileError(peek().location,
+                                   "une variante vide ne doit pas utiliser de parenthèses");
+            do {
+                const Token& field = consume(TokenKind::Identifier, "nom de champ attendu");
+                if (!fieldNames.insert(field.text).second)
+                    throw CompileError(field.location,
+                                       "champ '" + field.text + "' déclaré plusieurs fois dans la variante '" +
+                                       variant.name + "'");
+                consume(TokenKind::Colon, "':' attendu après le nom du champ");
+                ValueType type = consumeType("type de champ attendu");
+                if (type.kind == ValueType::Kind::Enum && type.enumeration.get() == result.get())
+                    throw CompileError(field.location,
+                                       "l'énumération '" + name.text +
+                                       "' ne peut pas se contenir directement");
+                const std::size_t alignment = valueTypeAlignment(type);
+                const std::size_t offset =
+                    (variant.payloadSize + alignment - 1U) / alignment * alignment;
+                variant.fields.push_back(StructField{field.location, field.text, type, offset});
+                variant.payloadSize = offset + valueTypeSize(type);
+                variant.payloadAlignment = std::max(variant.payloadAlignment, alignment);
+            } while (match(TokenKind::Comma));
+            consume(TokenKind::RightParen, "')' attendue après les champs de variante");
+        }
+        variant.payloadSize =
+            (variant.payloadSize + variant.payloadAlignment - 1U) /
+            variant.payloadAlignment * variant.payloadAlignment;
+        maximumPayloadSize = std::max(maximumPayloadSize, variant.payloadSize);
+        maximumPayloadAlignment = std::max(maximumPayloadAlignment, variant.payloadAlignment);
+        result->variants.push_back(std::move(variant));
+
+        if (!check(TokenKind::RightBrace) && !match(TokenKind::Comma) && !matchSeparator())
+            throw CompileError(peek().location,
+                               "fin de ligne, ',' ou '}' attendue après la variante");
+        skipSeparators();
+    }
+    consume(TokenKind::RightBrace, "'}' attendue après les variantes");
+    if (result->variants.empty())
+        throw CompileError(name.location,
+                           "l'énumération '" + name.text + "' doit contenir une variante");
+
+    result->alignment = std::max<std::size_t>(4U, maximumPayloadAlignment);
+    result->payloadOffset =
+        (4U + maximumPayloadAlignment - 1U) / maximumPayloadAlignment * maximumPayloadAlignment;
+    result->size = (result->payloadOffset + maximumPayloadSize + result->alignment - 1U) /
+                   result->alignment * result->alignment;
+    return result;
 }
 
 std::shared_ptr<StructType> Parser::structure() {
@@ -334,6 +420,7 @@ Program Parser::parse() {
     }
     while (!check(TokenKind::End)) {
         if (match(TokenKind::Struct)) program.structures.push_back(structure());
+        else if (match(TokenKind::Enum)) program.enumerations.push_back(enumeration());
         else program.statements.push_back(statement());
         if (!check(TokenKind::End) && !matchSeparator()) {
             throw CompileError(peek().location, "fin d'instruction attendue");

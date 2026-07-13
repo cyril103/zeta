@@ -23,6 +23,7 @@ private:
     const Token& consume(TokenKind kind, const std::string& message);
     ValueType consumeType(const std::string& message);
     std::shared_ptr<StructType> structure();
+    std::shared_ptr<EnumType> enumeration();
     std::shared_ptr<StructType> instantiateStructure(
         const std::shared_ptr<StructType>& structure, std::vector<ValueType> arguments,
         SourceLocation location);
@@ -55,6 +56,7 @@ private:
     bool nativeDeclaration_{false};
     std::unordered_set<std::string> activeTypeParameters_;
     std::unordered_map<std::string, std::shared_ptr<StructType>> structures_;
+    std::unordered_map<std::string, std::shared_ptr<EnumType>> enumerations_;
     std::unordered_map<std::string, std::shared_ptr<StructType>> structureInstances_;
     std::unordered_set<std::string> importedModules_;
 };

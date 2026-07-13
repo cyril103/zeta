@@ -1,0 +1,6 @@
+enum Liste {
+    Cons(tail: Liste)
+    Nil
+}
+
+def main(): Int = 0

@@ -1,0 +1,13 @@
+enum Etat {
+    Vide
+    Octet(value: Byte)
+    Mesure(code: Int, value: Double)
+    Texte(value: String)
+}
+
+enum Liste {
+    Cons(value: Int, tail: Box[Liste])
+    Nil
+}
+
+def main(): Int = 0

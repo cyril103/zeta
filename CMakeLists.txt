@@ -23,6 +23,23 @@ target_compile_options(zeta PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
 include(CTest)
 if(BUILD_TESTING)
+    add_test(NAME compile_enum_declaration COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_declaration.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/enum-declaration)
+    add_test(NAME run_enum_declaration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/enum-declaration)
+    set_tests_properties(run_enum_declaration PROPERTIES DEPENDS compile_enum_declaration)
+    add_test(NAME reject_enum_duplicate_variant COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_duplicate_variant.zeta)
+    set_tests_properties(reject_enum_duplicate_variant PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_enum_duplicate_field COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_duplicate_field.zeta)
+    set_tests_properties(reject_enum_duplicate_field PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_enum_direct_recursion COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_direct_recursion.zeta)
+    set_tests_properties(reject_enum_direct_recursion PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_enum_empty COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_empty.zeta)
+    set_tests_properties(reject_enum_empty PROPERTIES WILL_FAIL TRUE)
     add_test(NAME precompiled_standard_library
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/precompiled_stdlib.sh
             $<TARGET_FILE:zeta>
