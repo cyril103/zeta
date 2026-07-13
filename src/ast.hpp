@@ -147,6 +147,27 @@ inline bool isMoveOnlyValueType(const ValueType& type) {
     return false;
 }
 
+inline bool isEquatableValueType(const ValueType& type) {
+    if (type == ValueType::Int || type == ValueType::Byte ||
+        type == ValueType::Double || type == ValueType::Bool ||
+        type == ValueType::Char || type == ValueType::String)
+        return true;
+    if (type.kind == ValueType::Kind::Array)
+        return isEquatableValueType(*type.element);
+    if (type.kind == ValueType::Kind::Struct) {
+        for (const StructField& field : type.structure->fields)
+            if (!isEquatableValueType(field.type)) return false;
+        return true;
+    }
+    if (type.kind == ValueType::Kind::Enum) {
+        for (const EnumVariant& variant : type.enumeration->variants)
+            for (const StructField& field : variant.fields)
+                if (!isEquatableValueType(field.type)) return false;
+        return true;
+    }
+    return false;
+}
+
 inline const ValueType ValueType::Int{ValueType::Kind::Int};
 inline const ValueType ValueType::Byte{ValueType::Kind::Byte};
 inline const ValueType ValueType::Double{ValueType::Kind::Double};

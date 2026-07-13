@@ -1,0 +1,9 @@
+enum Owned { Value(value: Box[Int]), None }
+
+def copyValue[T : Copy](value: T): T = value
+
+def main(): Int = {
+    val owned: Owned = Owned.Value(value: Box(1))
+    val invalid: Owned = copyValue(owned)
+    0
+}

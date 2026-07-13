@@ -1,0 +1,3 @@
+enum Level { Low, High }
+
+def main(): Int = if (Level.Low < Level.High) 0 else 1

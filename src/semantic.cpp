@@ -72,9 +72,7 @@ bool satisfiesConstraint(const ValueType& type, const std::string& constraint) {
     if (constraint == "Ordered")
         return TypeRules::isNumeric(type) || type == ValueType::Char;
     if (constraint == "Equatable")
-        return type == ValueType::Int || type == ValueType::Byte ||
-            type == ValueType::Double || type == ValueType::Bool ||
-            type == ValueType::Char || type == ValueType::String;
+        return isEquatableValueType(type);
     return false;
 }
 
@@ -931,8 +929,15 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                     operands.kind == ValueType::Kind::Box)
                     throw CompileError(expression.location,
                                        "les comparaisons de références et Box ne sont pas disponibles");
+                if (TypeRules::isEquality(node.op) &&
+                    !isEquatableValueType(operands) &&
+                    operands.kind != ValueType::Kind::TypeParameter)
+                    throw CompileError(expression.location,
+                                       "le type " + typeName(operands) +
+                                       " ne satisfait pas Equatable");
                 if (TypeRules::isOrdering(node.op) &&
-                    (operands == ValueType::Bool || operands == ValueType::String))
+                    !TypeRules::isNumeric(operands) && operands != ValueType::Char &&
+                    operands.kind != ValueType::Kind::TypeParameter)
                     throw CompileError(expression.location,
                                        "seuls '==' et '!=' sont autorisés sur " +
                                            typeName(operands));

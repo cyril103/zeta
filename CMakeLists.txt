@@ -82,6 +82,20 @@ if(BUILD_TESTING)
     add_test(NAME reject_enum_payload_use_after_move COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_payload_use_after_move.zeta)
     set_tests_properties(reject_enum_payload_use_after_move PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_enum_equality COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_equality.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/enum-equality)
+    add_test(NAME run_enum_equality COMMAND ${CMAKE_CURRENT_BINARY_DIR}/enum-equality)
+    set_tests_properties(run_enum_equality PROPERTIES DEPENDS compile_enum_equality)
+    add_test(NAME reject_enum_not_equatable COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_not_equatable.zeta)
+    set_tests_properties(reject_enum_not_equatable PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_enum_not_copy COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_not_copy.zeta)
+    set_tests_properties(reject_enum_not_copy PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_enum_ordering COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_ordering.zeta)
+    set_tests_properties(reject_enum_ordering PROPERTIES WILL_FAIL TRUE)
     add_test(NAME precompiled_standard_library
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/precompiled_stdlib.sh
             $<TARGET_FILE:zeta>

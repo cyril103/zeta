@@ -1,0 +1,23 @@
+enum Value {
+    None
+    Integer(value: Int)
+    Text(label: String, score: Double)
+}
+
+def equal[T : Equatable](left: T, right: T): Bool = left == right
+def copyValue[T : Copy](value: T): T = value
+
+def main(): Int = {
+    val noneEqual: Bool = Value.None == Value.None
+    val tagsDiffer: Bool = Value.None != Value.Integer(value: 0)
+    val integersEqual: Bool = Value.Integer(value: 42) == Value.Integer(value: 42)
+    val integersDiffer: Bool = Value.Integer(value: 41) != Value.Integer(value: 42)
+    val textEqual: Bool = equal(
+        Value.Text(label: "ze" + "ta", score: 1.5),
+        Value.Text(label: "zeta", score: 1.5))
+    val textDiffer: Bool = Value.Text(label: "zeta", score: 1.5) !=
+        Value.Text(label: "zeta", score: 2.5)
+    val copied: Value = copyValue(Value.Integer(value: 7))
+    if (noneEqual && tagsDiffer && integersEqual && integersDiffer &&
+        textEqual && textDiffer && copied == Value.Integer(value: 7)) 0 else 1
+}

@@ -196,6 +196,88 @@ void emitValueRetain(std::ostringstream& out, const std::string& address,
         out << done << ":\n";
     }
 }
+
+void emitEqualityChecks(std::ostringstream& out, const std::string& left,
+                        const std::string& right, const ValueType& type,
+                        const std::string& different, const std::string& label) {
+    if (type == ValueType::String) {
+        out << "    mov rcx, qword " << displacedAddress(left, 8U) << "\n"
+            << "    cmp rcx, qword " << displacedAddress(right, 8U) << "\n"
+            << "    jne " << different << "\n"
+            << "    mov rsi, qword " << left << "\n"
+            << "    mov rdi, qword " << right << "\n"
+            << "    test rcx, rcx\n"
+            << "    je " << label << "_equal\n"
+            << label << "_loop:\n"
+            << "    mov al, byte [rsi]\n"
+            << "    cmp al, byte [rdi]\n"
+            << "    jne " << different << "\n"
+            << "    inc rsi\n    inc rdi\n    dec rcx\n"
+            << "    jne " << label << "_loop\n"
+            << label << "_equal:\n";
+        return;
+    }
+    if (type == ValueType::Double) {
+        out << "    movsd xmm0, qword " << left << "\n"
+            << "    ucomisd xmm0, qword " << right << "\n"
+            << "    jne " << different << "\n"
+            << "    jp " << different << "\n";
+        return;
+    }
+    if (type == ValueType::Byte || type == ValueType::Bool) {
+        out << "    mov al, byte " << left << "\n"
+            << "    cmp al, byte " << right << "\n"
+            << "    jne " << different << "\n";
+        return;
+    }
+    if (type == ValueType::Int || type == ValueType::Char) {
+        out << "    mov eax, dword " << left << "\n"
+            << "    cmp eax, dword " << right << "\n"
+            << "    jne " << different << "\n";
+        return;
+    }
+    if (type.kind == ValueType::Kind::Array) {
+        const std::size_t elementSize = valueTypeSize(*type.element);
+        for (std::size_t i = 0; i < type.length; ++i)
+            emitEqualityChecks(out, displacedAddress(left, i * elementSize),
+                displacedAddress(right, i * elementSize), *type.element, different,
+                label + "_element_" + std::to_string(i));
+        return;
+    }
+    if (type.kind == ValueType::Kind::Struct) {
+        for (std::size_t i = 0; i < type.structure->fields.size(); ++i) {
+            const StructField& field = type.structure->fields[i];
+            emitEqualityChecks(out, displacedAddress(left, field.offset),
+                displacedAddress(right, field.offset), field.type, different,
+                label + "_field_" + std::to_string(i));
+        }
+        return;
+    }
+    if (type.kind == ValueType::Kind::Enum) {
+        out << "    mov eax, dword " << left << "\n"
+            << "    cmp eax, dword " << right << "\n"
+            << "    jne " << different << "\n";
+        const std::string done = label + "_done";
+        for (std::size_t i = 0; i < type.enumeration->variants.size(); ++i)
+            out << "    cmp eax, " << i << "\n"
+                << "    je " << label << "_variant_" << i << "\n";
+        out << "    jmp " << done << "\n";
+        for (std::size_t i = 0; i < type.enumeration->variants.size(); ++i) {
+            out << label << "_variant_" << i << ":\n";
+            const EnumVariant& variant = type.enumeration->variants[i];
+            for (std::size_t fieldIndex = 0; fieldIndex < variant.fields.size(); ++fieldIndex) {
+                const StructField& field = variant.fields[fieldIndex];
+                const std::size_t offset = type.enumeration->payloadOffset + field.offset;
+                emitEqualityChecks(out, displacedAddress(left, offset),
+                    displacedAddress(right, offset), field.type, different,
+                    label + "_variant_" + std::to_string(i) + "_field_" +
+                        std::to_string(fieldIndex));
+            }
+            out << "    jmp " << done << "\n";
+        }
+        out << done << ":\n";
+    }
+}
 }
 
 std::string FasmCodeGenerator::generate(const IrProgram& program) {
@@ -608,6 +690,26 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         << "    " << (item.op == "&&" ? "and" : "or")
                         << " eax, dword [rbp-" << valueOffset(program, item.right) << "]\n"
                         << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
+                    return;
+                }
+                if ((item.op == "==" || item.op == "!=") &&
+                    (item.operandType.kind == ValueType::Kind::Enum ||
+                     item.operandType.kind == ValueType::Kind::Struct)) {
+                    const std::string label = "ir_aggregate_equal_" +
+                                              std::to_string(item.output);
+                    const std::string different = label + "_different";
+                    const std::string done = label + "_result_done";
+                    emitEqualityChecks(out,
+                        "[rbp-" + std::to_string(valueOffset(program, item.left)) + "]",
+                        "[rbp-" + std::to_string(valueOffset(program, item.right)) + "]",
+                        item.operandType, different, label);
+                    out << "    mov eax, " << (item.op == "==" ? 1 : 0) << "\n"
+                        << "    jmp " << done << "\n"
+                        << different << ":\n"
+                        << "    mov eax, " << (item.op == "==" ? 0 : 1) << "\n"
+                        << done << ":\n"
+                        << "    mov dword [rbp-" << valueOffset(program, item.output)
+                        << "], eax\n";
                     return;
                 }
                 if (comparison && item.operandType == ValueType::String) {

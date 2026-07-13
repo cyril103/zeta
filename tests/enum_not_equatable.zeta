@@ -1,0 +1,3 @@
+enum Owned { Value(value: Box[Int]), None }
+
+def main(): Int = if (Owned.None == Owned.None) 0 else 1
