@@ -1,0 +1,7 @@
+def main(): Int = {
+    var values: Vec[Int] = Vec[Int]()
+    values.push(1)
+    val view: Slice[Int] = values.asSlice()
+    values.push(2)
+    view.length
+}

@@ -1,0 +1,16 @@
+def main(): Int = {
+    var values: Vec[Int] = Vec[Int]()
+    values.push(10)
+    values.push(20)
+
+    val shared: Slice[Int] = values.asSlice()
+    val first: Int = shared[0] + shared[1]
+    values.push(12)
+
+    val mutable: SliceMut[Int] = values.asSliceMut()
+    mutable[1] = 30
+    val second: Int = mutable[1]
+    values.push(1)
+
+    if (first == 30 && second == 30 && values.length == 4) 0 else 1
+}

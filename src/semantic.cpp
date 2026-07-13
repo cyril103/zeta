@@ -333,28 +333,37 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
             : std::get_if<AddressExpr>(&conversion->operand->value);
         const auto* borrowedName = address == nullptr ? nullptr
             : std::get_if<NameExpr>(&address->operand->value);
+        const auto* method = std::get_if<MethodCallExpr>(&declaration.initializer->value);
+        const auto* vectorName = method == nullptr ? nullptr
+            : std::get_if<NameExpr>(&method->object->value);
+        const bool vectorView = method != nullptr && vectorName != nullptr &&
+            (method->method == "asSlice" || method->method == "asSliceMut");
         if (source == nullptr &&
             (conversion == nullptr || conversion->target.kind != ValueType::Kind::Slice ||
-             borrowedName == nullptr))
+             borrowedName == nullptr) && !vectorView)
             throw CompileError(declaration.location,
-                               "une slice doit être créée depuis un tableau emprunté");
-        if (borrowedName != nullptr) {
-            BorrowState& state = borrows_[borrowedName->name];
-            if (conversion->target.mutableReference) {
+                               "une slice doit être créée depuis une collection empruntée");
+        const std::string* borrowedOwner = borrowedName != nullptr ? &borrowedName->name
+            : vectorView ? &vectorName->name : nullptr;
+        if (borrowedOwner != nullptr) {
+            const bool mutableView = borrowedName != nullptr
+                ? conversion->target.mutableReference : method->method == "asSliceMut";
+            BorrowState& state = borrows_[*borrowedOwner];
+            if (mutableView) {
                 if (state.mutableBorrow || state.shared != 0)
                     throw CompileError(declaration.location,
                                        "emprunt mutable exclusif impossible pour '" +
-                                       borrowedName->name + "'");
+                                       *borrowedOwner + "'");
                 state.mutableBorrow = true;
             } else {
                 if (state.mutableBorrow)
                     throw CompileError(declaration.location,
-                                       "'" + borrowedName->name +
+                                       "'" + *borrowedOwner +
                                        "' possède déjà un emprunt mutable");
                 ++state.shared;
             }
             referenceBorrows_.insert_or_assign(declaration.name,
-                ReferenceBorrow{borrowedName->name, conversion->target.mutableReference});
+                ReferenceBorrow{*borrowedOwner, mutableView});
             borrowScopes_.back().push_back(declaration.name);
         }
     }
@@ -636,7 +645,15 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
                 if (field.name == node.field) return field.type;
             return ValueType::Int;
         }
-        else if constexpr (std::is_same_v<T, MethodCallExpr>) return ValueType::Int;
+        else if constexpr (std::is_same_v<T, MethodCallExpr>) {
+            const ValueType object = inferType(*node.object);
+            if (object.kind == ValueType::Kind::Vec &&
+                (node.method == "asSlice" || node.method == "asSliceMut"))
+                return ValueType(ValueType::Kind::Slice,
+                    std::make_shared<ValueType>(*object.element),
+                    node.method == "asSliceMut");
+            return ValueType::Int;
+        }
         else if constexpr (std::is_same_v<T, IndexExpr>) {
             ValueType arrayType = inferType(*node.array);
             if (arrayType.kind == ValueType::Kind::Reference) arrayType = *arrayType.element;
@@ -792,6 +809,24 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (symbol == nullptr || symbol->type.kind != ValueType::Kind::Vec)
                 throw CompileError(node.object->location,
                                    "la méthode '" + node.method + "' exige un Vec");
+            if (node.method == "asSlice" || node.method == "asSliceMut") {
+                if (!node.arguments.empty())
+                    throw CompileError(expression.location, "'" + node.method +
+                        "' n'attend aucun argument");
+                if (node.method == "asSliceMut" &&
+                    (symbol->parameter || symbol->kind != BindingKind::Var))
+                    throw CompileError(node.object->location,
+                                       "'asSliceMut' exige un Vec déclaré avec 'var'");
+                if (movedBoxes_.contains(name->name))
+                    throw CompileError(node.object->location,
+                                       "utilisation de '" + name->name +
+                                       "' après son déplacement");
+                node.object->inferredType = symbol->type;
+                node.object->typed = true;
+                return ValueType(ValueType::Kind::Slice,
+                    std::make_shared<ValueType>(*symbol->type.element),
+                    node.method == "asSliceMut");
+            }
             if (node.method != "reserve" && node.method != "push" &&
                 node.method != "clear")
                 throw CompileError(expression.location,

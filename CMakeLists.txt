@@ -67,6 +67,20 @@ if(BUILD_TESTING)
     add_test(NAME reject_vec_push_wrong_type COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_push_wrong_type.zeta)
     set_tests_properties(reject_vec_push_wrong_type PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_vec_slices COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_slices.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/vec-slices)
+    add_test(NAME run_vec_slices COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vec-slices)
+    set_tests_properties(run_vec_slices PROPERTIES DEPENDS compile_vec_slices)
+    add_test(NAME reject_vec_slice_blocks_growth COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_slice_blocks_growth.zeta)
+    set_tests_properties(reject_vec_slice_blocks_growth PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_vec_slice_mut_blocks_access COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_slice_mut_blocks_access.zeta)
+    set_tests_properties(reject_vec_slice_mut_blocks_access PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_vec_slice_mut_immutable COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_slice_mut_immutable.zeta)
+    set_tests_properties(reject_vec_slice_mut_immutable PROPERTIES WILL_FAIL TRUE)
     add_test(NAME compile_enum_declaration COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_declaration.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/enum-declaration)

@@ -88,3 +88,8 @@ Le cycle propriétaire des éléments est désormais disponible : `push` transf�
 ou retient la valeur selon son type, la croissance déplace les emplacements sans
 les détruire, et `clear` comme la destruction finale parcourent les éléments en
 ordre inverse. `clear` conserve le bloc alloué pour sa réutilisation.
+
+Les méthodes `asSlice` et `asSliceMut` produisent maintenant les deux mots
+`{adresse, longueur}` directement depuis le propriétaire. Elles participent au
+suivi lexical des emprunts : toute opération susceptible de modifier ou déplacer
+le vecteur est refusée jusqu'à la dernière utilisation de la vue.

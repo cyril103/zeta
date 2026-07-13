@@ -533,6 +533,16 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 }
                 out << "    mov qword " << displacedAddress(address, 8U) << ", 0\n"
                     << "    mov dword [rbp-" << valueOffset(program, item.output) << "], 0\n";
+            } else if constexpr (std::is_same_v<T, IrVecView>) {
+                const IrSlot& slot = program.slots[item.slot];
+                const std::string address = slot.global
+                    ? "[" + globalLabel(slot) + "]"
+                    : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
+                const std::size_t output = valueOffset(program, item.output);
+                out << "    mov rax, qword " << address << "\n"
+                    << "    mov qword [rbp-" << output << "], rax\n"
+                    << "    mov rax, qword " << displacedAddress(address, 8U) << "\n"
+                    << "    mov qword [rbp-" << output - 8U << "], rax\n";
             } else if constexpr (std::is_same_v<T, IrStructConstruct>) {
                 const std::size_t output = valueOffset(program, item.output);
                 for (std::size_t i = 0; i < item.fields.size(); ++i) {

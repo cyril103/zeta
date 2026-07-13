@@ -722,8 +722,14 @@ ValueId IrGenerator::expression(
             const auto found = symbols_.find(name.name);
             if (found == symbols_.end())
                 throw CompileError(expressionNode.location, "Vec inconnu '" + name.name + "'");
-            const ValueId output = nextValue(ValueType::Int);
             const ValueType vectorType = resolveType(node.object->inferredType);
+            if (node.method == "asSlice" || node.method == "asSliceMut") {
+                const ValueId output = nextValue(resolveType(expressionNode.inferredType));
+                ir_.instructions.push_back(IrVecView{
+                    output, found->second.slot, resolveType(expressionNode.inferredType)});
+                return output;
+            }
+            const ValueId output = nextValue(ValueType::Int);
             if (node.method == "clear") {
                 ir_.instructions.push_back(IrVecClear{output, found->second.slot, vectorType});
                 return output;
@@ -1114,6 +1120,9 @@ std::string IrGenerator::print(const IrProgram& program) {
             else if constexpr (std::is_same_v<T, IrVecClear>)
                 out << "  $" << item.output << " = vec_clear %"
                     << program.slots[item.slot].name << '\n';
+            else if constexpr (std::is_same_v<T, IrVecView>)
+                out << "  $" << item.output << " = vec_view %"
+                    << program.slots[item.slot].name << " as " << typeName(item.type) << '\n';
             else if constexpr (std::is_same_v<T, IrStructConstruct>) {
                 out << "  $" << item.output << " = struct " << typeName(item.type) << " [";
                 for (std::size_t i = 0; i < item.fields.size(); ++i) {
