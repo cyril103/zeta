@@ -131,9 +131,13 @@ avance avec `nextByteOffset`, sans confondre octets et points de code.
 
 Objectif : ajouter un premier conteneur possédé, probablement `Vec[T]`.
 
+Conception arrêtée dans `docs/VEC_DESIGN.md` : représentation ABI sur trois mots,
+capacité exprimée en éléments, croissance géométrique et arrêt avec le code `105`
+en cas d'échec d'allocation ou de dépassement de taille.
+
 Étapes :
 
-1. définir la représentation `{adresse, longueur, capacité}` ;
+1. définir la représentation `{adresse, longueur, capacité}` — conception terminée ;
 2. introduire allocation, croissance et libération déterministes ;
 3. appliquer les règles de déplacement aux éléments non `Copy` ;
 4. exposer des vues `Slice[T]` et `SliceMut[T]` sans copie ;
@@ -141,7 +145,7 @@ Objectif : ajouter un premier conteneur possédé, probablement `Vec[T]`.
 6. tester les types primitifs, structures, `String` et `Box[T]` ;
 7. intégrer le module à la stdlib précompilée.
 
-Le comportement en cas d'échec d'allocation doit être défini avant l'ajout de
+Le comportement en cas d'échec d'allocation est désormais défini avant l'ajout de
 plusieurs conteneurs.
 
 ## Priorité 4 — Interfaces publiques complètes
@@ -195,5 +199,5 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Concevoir la représentation et les invariants de `Vec[T]`, première étape de la
-priorité 3 sur les collections dynamiques possédées.
+Implémenter le type `Vec[T]` et sa représentation ABI, première étape technique de
+la priorité 3 sur les collections dynamiques possédées.
