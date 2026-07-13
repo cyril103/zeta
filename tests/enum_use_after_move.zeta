@@ -1,0 +1,11 @@
+enum Owned { Some(value: Box[Int]), None }
+
+def main(): Int = {
+    val owned: Owned = Owned.Some(value: Box(42))
+    val value: Int = match (owned) {
+        Owned.Some(box) => *box
+        Owned.None => 0
+    }
+    val reused: Owned = owned
+    value
+}

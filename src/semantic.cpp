@@ -63,11 +63,7 @@ bool inferTypeArguments(
     return pattern == actual;
 }
 bool isCopyType(const ValueType& type) {
-    if (type.kind == ValueType::Kind::Box) return false;
-    if (type.kind == ValueType::Kind::Array) return isCopyType(*type.element);
-    if (type.kind == ValueType::Kind::Reference || type.kind == ValueType::Kind::Slice)
-        return !type.mutableReference;
-    return type.kind != ValueType::Kind::TypeParameter;
+    return isCopyValueType(type);
 }
 bool satisfiesConstraint(const ValueType& type, const std::string& constraint) {
     if (constraint.empty()) return true;
@@ -379,11 +375,11 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
     const auto previousMovedBoxes = movedBoxes_;
     if (declaration.callable)
         for (const Parameter& parameter : declaration.parameters)
-            if (parameter.type.kind == ValueType::Kind::Box)
+            if (isMoveOnlyValueType(parameter.type))
                 movedBoxes_.erase(parameter.name);
     if (declaration.callable) returnType_ = declaration.type;
     checkExpression(*declaration.initializer, declaration.type);
-    if (!declaration.callable && declaration.type.kind == ValueType::Kind::Box) {
+    if (!declaration.callable && isMoveOnlyValueType(declaration.type)) {
         if (const auto* source = std::get_if<NameExpr>(&declaration.initializer->value))
             movedBoxes_.insert(source->name);
     }
@@ -414,9 +410,9 @@ void SemanticAnalyzer::checkAssignment(Assignment& assignment) {
         const std::string subject = target->kind == BindingKind::Def ? "la définition '" : "la val '";
         throw CompileError(assignment.location, subject + assignment.name + "' est immuable");
     }
-    if (target->type.kind == ValueType::Kind::Box)
+    if (isMoveOnlyValueType(target->type))
         throw CompileError(assignment.location,
-                           "la réaffectation d'un propriétaire Box n'est pas encore autorisée ; modifiez son contenu avec '*box = valeur'");
+                           "la réaffectation d'un propriétaire non Copy n'est pas encore autorisée");
     if (const auto borrowed = borrows_.find(assignment.name);
         borrowed != borrows_.end() &&
         (borrowed->second.mutableBorrow || borrowed->second.shared != 0))
@@ -691,8 +687,12 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
         else if constexpr (std::is_same_v<T, EnumExpr>) {
             const ValueType type(node.type);
             const EnumVariant& variant = node.type->variants[node.variant];
-            for (std::size_t i = 0; i < node.fields.size(); ++i)
+            for (std::size_t i = 0; i < node.fields.size(); ++i) {
                 checkExpression(*node.fields[i], variant.fields[i].type);
+                if (isMoveOnlyValueType(variant.fields[i].type))
+                    if (const auto* moved = std::get_if<NameExpr>(&node.fields[i]->value))
+                        movedBoxes_.insert(moved->name);
+            }
             return type;
         }
         else if constexpr (std::is_same_v<T, FieldExpr>) {
@@ -777,7 +777,7 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (symbol->kind == BindingKind::Def && symbol->callable)
                 throw CompileError(expression.location,
                                    "la fonction '" + node.name + "' doit être appelée");
-            if (symbol->type.kind == ValueType::Kind::Box && movedBoxes_.contains(node.name))
+            if (isMoveOnlyValueType(symbol->type) && movedBoxes_.contains(node.name))
                 throw CompileError(expression.location,
                                    "utilisation de '" + node.name + "' après son déplacement");
             if (const auto borrowed = borrows_.find(node.name);
@@ -865,7 +865,7 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 const ValueType parameterType = generic == nullptr ? declaredParameterType
                     : substituteType(declaredParameterType, substitutions);
                 checkExpression(*node.arguments[i], parameterType);
-                if (parameterType.kind == ValueType::Kind::Box) {
+                if (isMoveOnlyValueType(parameterType)) {
                     if (const auto* moved = std::get_if<NameExpr>(&node.arguments[i]->value))
                         movedBoxes_.insert(moved->name);
                 }
@@ -976,6 +976,9 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             return expected;
         } else {
             checkExpression(*node.operand, ValueType(node.type));
+            if (isMoveOnlyValueType(ValueType(node.type)))
+                if (const auto* moved = std::get_if<NameExpr>(&node.operand->value))
+                    movedBoxes_.insert(moved->name);
             const auto beforeBranches = movedBoxes_;
             std::optional<std::unordered_set<std::string>> mergedMoves;
             for (MatchBranch& branch : node.branches) {
@@ -994,7 +997,7 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 if (!mergedMoves) mergedMoves = movedBoxes_;
                 else if (*mergedMoves != movedBoxes_)
                     throw CompileError(expression.location,
-                        "un déplacement de Box dans un match doit avoir lieu dans toutes les branches");
+                        "un déplacement non Copy dans un match doit avoir lieu dans toutes les branches");
             }
             movedBoxes_ = mergedMoves.value_or(beforeBranches);
             return expected;

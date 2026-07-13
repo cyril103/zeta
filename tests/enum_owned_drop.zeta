@@ -1,0 +1,41 @@
+enum Owned {
+    Some(value: Box[Int])
+    None
+}
+
+enum TextValue {
+    Text(value: String)
+    Empty
+}
+
+def unwrap(owned: Owned): Int = match (owned) {
+    Owned.Some(value) => *value
+    Owned.None => 0
+}
+
+def ignore(owned: Owned): Int = match (owned) {
+    Owned.Some(_) => 1
+    Owned.None => 0
+}
+
+def early(owned: Owned): Int = match (owned) {
+    Owned.Some(value) => { return *value
+        0
+    }
+    Owned.None => 0
+}
+
+def read(text: TextValue): Int = match (text) {
+    TextValue.Text(value) => if (value == "zeta") 1 else 0
+    TextValue.Empty => 0
+}
+
+def main(): Int = {
+    val first: Int = unwrap(Owned.Some(value: Box(40)))
+    val ignored: Int = ignore(Owned.Some(value: Box(1)))
+    val returned: Int = early(Owned.Some(value: Box(2)))
+    val text: TextValue = TextValue.Text(value: "ze" + "ta")
+    val textCopy: TextValue = text
+    val textResult: Int = read(textCopy)
+    if (first == 40 && ignored == 1 && returned == 2 && textResult == 1) 0 else 1
+}

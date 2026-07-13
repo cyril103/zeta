@@ -102,6 +102,51 @@ struct EnumType {
     std::size_t alignment{4};
 };
 
+inline bool isCopyValueType(const ValueType& type) {
+    if (type.kind == ValueType::Kind::Box ||
+        type.kind == ValueType::Kind::TypeParameter)
+        return false;
+    if (type.kind == ValueType::Kind::Reference || type.kind == ValueType::Kind::Slice)
+        return !type.mutableReference;
+    if (type.kind == ValueType::Kind::Array)
+        return isCopyValueType(*type.element);
+    if (type.kind == ValueType::Kind::Struct) {
+        for (const StructField& field : type.structure->fields)
+            if (!isCopyValueType(field.type)) return false;
+    }
+    if (type.kind == ValueType::Kind::Enum) {
+        for (const EnumVariant& variant : type.enumeration->variants)
+            for (const StructField& field : variant.fields)
+                if (!isCopyValueType(field.type)) return false;
+    }
+    return true;
+}
+
+inline bool valueTypeNeedsDrop(const ValueType& type) {
+    if (type == ValueType::String || type.kind == ValueType::Kind::Box) return true;
+    if (type.kind == ValueType::Kind::Array)
+        return valueTypeNeedsDrop(*type.element);
+    if (type.kind == ValueType::Kind::Struct) {
+        for (const StructField& field : type.structure->fields)
+            if (valueTypeNeedsDrop(field.type)) return true;
+    }
+    if (type.kind == ValueType::Kind::Enum) {
+        for (const EnumVariant& variant : type.enumeration->variants)
+            for (const StructField& field : variant.fields)
+                if (valueTypeNeedsDrop(field.type)) return true;
+    }
+    return false;
+}
+
+inline bool isMoveOnlyValueType(const ValueType& type) {
+    if (type.kind == ValueType::Kind::Box) return true;
+    if (type.kind == ValueType::Kind::Array)
+        return !isCopyValueType(*type.element);
+    if (type.kind == ValueType::Kind::Struct || type.kind == ValueType::Kind::Enum)
+        return !isCopyValueType(type);
+    return false;
+}
+
 inline const ValueType ValueType::Int{ValueType::Kind::Int};
 inline const ValueType ValueType::Byte{ValueType::Kind::Byte};
 inline const ValueType ValueType::Double{ValueType::Kind::Double};

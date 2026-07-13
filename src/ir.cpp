@@ -119,7 +119,7 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
             const Parameter& parameter = function->parameters[i];
             const ValueId value = nextValue(parameter.type);
             parameters.emplace(parameter.name, value);
-            if (parameter.type.kind == ValueType::Kind::Box)
+            if (isMoveOnlyValueType(parameter.type))
                 boxParameters_.insert_or_assign(parameter.name,
                                                  std::pair{value, parameter.type});
             ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameter.type});
@@ -146,7 +146,7 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
             const ValueType parameterType = resolveType(parameter.type);
             const ValueId value = nextValue(parameterType);
             parameters.emplace(parameter.name, value);
-            if (parameterType.kind == ValueType::Kind::Box)
+            if (isMoveOnlyValueType(parameterType))
                 boxParameters_.insert_or_assign(parameter.name,
                                                  std::pair{value, parameterType});
             ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameterType});
@@ -299,7 +299,7 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
             const Parameter& parameter = function->parameters[i];
             const ValueId value = nextValue(parameter.type);
             parameters.emplace(parameter.name, value);
-            if (parameter.type.kind == ValueType::Kind::Box)
+            if (isMoveOnlyValueType(parameter.type))
                 boxParameters_.insert_or_assign(parameter.name,
                                                  std::pair{value, parameter.type});
             ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameter.type});
@@ -326,7 +326,7 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
             const ValueType parameterType = resolveType(function.parameters[i].type);
             const ValueId value = nextValue(parameterType);
             parameters.emplace(function.parameters[i].name, value);
-            if (parameterType.kind == ValueType::Kind::Box)
+            if (isMoveOnlyValueType(parameterType))
                 boxParameters_.insert_or_assign(function.parameters[i].name,
                                                  std::pair{value, parameterType});
             ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameterType});
@@ -393,8 +393,7 @@ void IrGenerator::emitBoxDrops(const std::vector<std::string>& names) {
     for (auto name = names.rbegin(); name != names.rend(); ++name) {
         const auto symbol = symbols_.find(*name);
         if (symbol == symbols_.end() ||
-            (symbol->second.declaration->type.kind != ValueType::Kind::Box &&
-             symbol->second.declaration->type != ValueType::String) ||
+            !valueTypeNeedsDrop(symbol->second.declaration->type) ||
             movedBoxes_.contains(*name))
             continue;
         const ValueType type = symbol->second.declaration->type;
@@ -428,17 +427,17 @@ void IrGenerator::emitTailExpression(
                 using T = std::decay_t<decltype(item)>;
                 if constexpr (std::is_same_v<T, Declaration>) {
                     localNames.push_back(item.name);
-                    if (item.type.kind == ValueType::Kind::Box || item.type == ValueType::String)
+                    if (valueTypeNeedsDrop(item.type))
                         boxScopes_.back().push_back(item.name);
                     if (item.kind == BindingKind::Def) {
                         symbols_.emplace(item.name, Symbol{0, item.kind, &item, false, item.name});
                     } else {
                         const ValueId value = expression(*item.initializer, parameters);
-                        if (item.type.kind == ValueType::Kind::Box)
+                        if (isMoveOnlyValueType(item.type))
                             if (const auto* source =
                                     std::get_if<NameExpr>(&item.initializer->value))
                                 movedBoxes_.insert(source->name);
-                        if (item.type == ValueType::String &&
+                        if (valueTypeNeedsDrop(item.type) && isCopyValueType(item.type) &&
                             std::holds_alternative<NameExpr>(item.initializer->value))
                             ir_.instructions.push_back(IrRetain{value, item.type});
                         const SlotId slot = ir_.slots.size();
@@ -466,7 +465,7 @@ void IrGenerator::emitTailExpression(
                     expression(*item.expression, parameters);
                 } else if constexpr (std::is_same_v<T, ReturnStatement>) {
                     const ValueId value = expression(*item.value, parameters);
-                    if (item.value->inferredType.kind == ValueType::Kind::Box)
+                    if (isMoveOnlyValueType(item.value->inferredType))
                         if (const auto* moved = std::get_if<NameExpr>(&item.value->value))
                             movedBoxes_.insert(moved->name);
                     emitAllBoxDrops();
@@ -483,7 +482,7 @@ void IrGenerator::emitTailExpression(
         const bool ownsBox = std::any_of(localNames.begin(), localNames.end(), [&](const auto& name) {
             const auto symbol = symbols_.find(name);
             return symbol != symbols_.end() &&
-                symbol->second.declaration->type.kind == ValueType::Kind::Box &&
+                valueTypeNeedsDrop(symbol->second.declaration->type) &&
                 !movedBoxes_.contains(name);
         });
         if (block->result && ownsBox) {
@@ -522,7 +521,7 @@ void IrGenerator::emitTailExpression(
     }
     const ValueId result = expression(expressionNode, parameters);
     const ValueType resolvedFunctionType = resolveType(function.type);
-    if (resolvedFunctionType.kind == ValueType::Kind::Box)
+    if (isMoveOnlyValueType(resolvedFunctionType))
         if (const auto* moved = std::get_if<NameExpr>(&expressionNode.value))
             movedBoxes_.insert(moved->name);
     emitBoxParameterDrops();
@@ -547,13 +546,17 @@ void IrGenerator::emitLoop(
             using T = std::decay_t<decltype(item)>;
             if constexpr (std::is_same_v<T, Declaration>) {
                 localNames.push_back(item.name);
-                if (item.type.kind == ValueType::Kind::Box || item.type == ValueType::String)
+                if (valueTypeNeedsDrop(item.type))
                     boxScopes_.back().push_back(item.name);
                 if (item.kind == BindingKind::Def) {
                     symbols_.emplace(item.name, Symbol{0, item.kind, &item, false, item.name});
                 } else {
                     const ValueId value = expression(*item.initializer, parameters);
-                    if (item.type == ValueType::String &&
+                    if (isMoveOnlyValueType(item.type))
+                        if (const auto* source =
+                                std::get_if<NameExpr>(&item.initializer->value))
+                            movedBoxes_.insert(source->name);
+                    if (valueTypeNeedsDrop(item.type) && isCopyValueType(item.type) &&
                         std::holds_alternative<NameExpr>(item.initializer->value))
                         ir_.instructions.push_back(IrRetain{value, item.type});
                     const SlotId slot = ir_.slots.size();
@@ -581,7 +584,7 @@ void IrGenerator::emitLoop(
                 expression(*item.expression, parameters);
             } else if constexpr (std::is_same_v<T, ReturnStatement>) {
                 const ValueId value = expression(*item.value, parameters);
-                if (item.value->inferredType.kind == ValueType::Kind::Box)
+                if (isMoveOnlyValueType(item.value->inferredType))
                     if (const auto* moved = std::get_if<NameExpr>(&item.value->value))
                         movedBoxes_.insert(moved->name);
                 emitAllBoxDrops();
@@ -655,8 +658,14 @@ ValueId IrGenerator::expression(
             return output;
         } else if constexpr (std::is_same_v<T, EnumExpr>) {
             std::vector<ValueId> fields;
-            for (const ExprPtr& field : node.fields)
+            const EnumVariant& variant = node.type->variants[node.variant];
+            for (std::size_t i = 0; i < node.fields.size(); ++i) {
+                const ExprPtr& field = node.fields[i];
                 fields.push_back(expression(*field, parameters));
+                if (isMoveOnlyValueType(variant.fields[i].type))
+                    if (const auto* source = std::get_if<NameExpr>(&field->value))
+                        movedBoxes_.insert(source->name);
+            }
             const ValueId output = nextValue(expressionNode.inferredType);
             ir_.instructions.push_back(IrEnumConstruct{
                 output, node.variant, std::move(fields), expressionNode.inferredType});
@@ -761,7 +770,7 @@ ValueId IrGenerator::expression(
                 arguments.push_back(expression(*node.arguments[i], parameters));
                 const ValueType argumentType = resolveType(function.parameters[i].type);
                 argumentTypes.push_back(argumentType);
-                if (argumentType.kind == ValueType::Kind::Box)
+                if (isMoveOnlyValueType(argumentType))
                     if (const auto* moved = std::get_if<NameExpr>(&node.arguments[i]->value))
                         movedBoxes_.insert(moved->name);
             }
@@ -820,17 +829,17 @@ ValueId IrGenerator::expression(
                     using S = std::decay_t<decltype(item)>;
                     if constexpr (std::is_same_v<S, Declaration>) {
                         localNames.push_back(item.name);
-                        if (item.type.kind == ValueType::Kind::Box || item.type == ValueType::String)
+                        if (valueTypeNeedsDrop(item.type))
                             boxScopes_.back().push_back(item.name);
                         if (item.kind == BindingKind::Def) {
                             symbols_.emplace(item.name, Symbol{0, item.kind, &item, false, item.name});
                         } else {
                             const ValueId value = expression(*item.initializer, parameters);
-                            if (item.type.kind == ValueType::Kind::Box)
+                            if (isMoveOnlyValueType(item.type))
                                 if (const auto* source =
                                         std::get_if<NameExpr>(&item.initializer->value))
                                     movedBoxes_.insert(source->name);
-                            if (item.type == ValueType::String &&
+                            if (valueTypeNeedsDrop(item.type) && isCopyValueType(item.type) &&
                                 std::holds_alternative<NameExpr>(item.initializer->value))
                                 ir_.instructions.push_back(IrRetain{value, item.type});
                             const SlotId slot = ir_.slots.size();
@@ -866,7 +875,7 @@ ValueId IrGenerator::expression(
                         expression(*item.expression, parameters);
                     } else if constexpr (std::is_same_v<S, ReturnStatement>) {
                         const ValueId value = expression(*item.value, parameters);
-                        if (item.value->inferredType.kind == ValueType::Kind::Box)
+                        if (isMoveOnlyValueType(item.value->inferredType))
                             if (const auto* moved = std::get_if<NameExpr>(&item.value->value))
                                 movedBoxes_.insert(moved->name);
                         emitAllBoxDrops();
@@ -904,6 +913,10 @@ ValueId IrGenerator::expression(
             return output;
         } else {
             const ValueId input = expression(*node.operand, parameters);
+            const bool copiesInput = isCopyValueType(ValueType(node.type));
+            if (!copiesInput)
+                if (const auto* moved = std::get_if<NameExpr>(&node.operand->value))
+                    movedBoxes_.insert(moved->name);
             const ValueId tag = nextValue(ValueType::Int);
             ir_.instructions.push_back(IrEnumTag{tag, input});
             const ValueId output = nextValue(expressionNode.inferredType);
@@ -926,16 +939,41 @@ ValueId IrGenerator::expression(
 
                 auto branchParameters = parameters;
                 const EnumVariant& variant = node.type->variants[branch.variant];
+                std::vector<std::string> branchOwners;
                 for (std::size_t i = 0; i < branch.bindings.size(); ++i) {
-                    if (!branch.bindings[i]) continue;
+                    if (!branch.bindings[i] && !valueTypeNeedsDrop(variant.fields[i].type))
+                        continue;
                     const ValueId field = nextValue(variant.fields[i].type);
                     ir_.instructions.push_back(IrEnumFieldLoad{
                         field, input, ValueType(node.type), branch.variant, i});
-                    branchParameters.insert_or_assign(*branch.bindings[i], field);
+                    if (copiesInput && valueTypeNeedsDrop(variant.fields[i].type))
+                        ir_.instructions.push_back(IrRetain{field, variant.fields[i].type});
+                    if (branch.bindings[i])
+                        branchParameters.insert_or_assign(*branch.bindings[i], field);
+                    if (valueTypeNeedsDrop(variant.fields[i].type)) {
+                        const std::string ownerName = branch.bindings[i]
+                            ? *branch.bindings[i]
+                            : "__match_ignored_" + std::to_string(endLabel) + "_" +
+                              std::to_string(branchIndex) + "_" + std::to_string(i);
+                        branchOwners.push_back(ownerName);
+                        boxParameters_.insert_or_assign(
+                            ownerName, std::pair{field, variant.fields[i].type});
+                    }
                 }
                 const ValueId branchValue = expression(*branch.result, branchParameters);
+                if (const auto* returned = std::get_if<NameExpr>(&branch.result->value))
+                    if (std::find(branchOwners.begin(), branchOwners.end(), returned->name) !=
+                        branchOwners.end())
+                        movedBoxes_.insert(returned->name);
                 ir_.instructions.push_back(IrCopy{
                     output, branchValue, expressionNode.inferredType});
+                for (const std::string& ownerName : branchOwners) {
+                    const auto owner = boxParameters_.find(ownerName);
+                    if (owner != boxParameters_.end() && !movedBoxes_.contains(ownerName))
+                        ir_.instructions.push_back(IrDrop{owner->second.first, owner->second.second});
+                    boxParameters_.erase(ownerName);
+                    movedBoxes_.erase(ownerName);
+                }
                 ir_.instructions.push_back(IrJump{endLabel});
                 if (!last) ir_.instructions.push_back(IrLabel{nextBranchLabel});
             }

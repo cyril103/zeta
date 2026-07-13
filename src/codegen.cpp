@@ -78,18 +78,123 @@ void emitBlockCopy(std::ostringstream& out, const std::string& source,
         ++offset;
     }
 }
-void emitBoxDrop(std::ostringstream& out, const std::string& source,
-                 const ValueType& boxType) {
-    out << "    mov rdi, " << source << "\n";
-    if (boxType.element->kind == ValueType::Kind::Box) {
-        out << "    push rdi\n"
-            << "    mov rax, qword [rdi]\n";
-        emitBoxDrop(out, "rax", *boxType.element);
-        out << "    pop rdi\n";
+void emitValueDrop(std::ostringstream& out, const std::string& address,
+                   const ValueType& type, const std::string& label) {
+    if (type == ValueType::String) {
+        out << "    mov rdi, qword " << address << "\n"
+            << "    cmp qword [rdi-16], -1\n"
+            << "    je " << label << "_done\n"
+            << "    dec qword [rdi-16]\n"
+            << "    jnz " << label << "_done\n"
+            << "    mov rsi, qword [rdi-8]\n"
+            << "    add rsi, 16\n"
+            << "    sub rdi, 16\n"
+            << "    mov eax, 11\n"
+            << "    syscall\n"
+            << label << "_done:\n";
+        return;
     }
-    out << "    mov rsi, " << valueTypeSize(*boxType.element) << "\n"
-        << "    mov eax, 11\n"
-        << "    syscall\n";
+    if (type.kind == ValueType::Kind::Box) {
+        out << "    mov rdi, qword " << address << "\n"
+            << "    push rdi\n";
+        if (valueTypeNeedsDrop(*type.element))
+            emitValueDrop(out, "[rdi]", *type.element, label + "_content");
+        out << "    pop rdi\n"
+            << "    mov rsi, " << valueTypeSize(*type.element) << "\n"
+            << "    mov eax, 11\n"
+            << "    syscall\n";
+        return;
+    }
+    if (type.kind == ValueType::Kind::Array) {
+        const std::size_t elementSize = valueTypeSize(*type.element);
+        for (std::size_t i = 0; i < type.length; ++i)
+            if (valueTypeNeedsDrop(*type.element))
+                emitValueDrop(out, displacedAddress(address, i * elementSize), *type.element,
+                              label + "_element_" + std::to_string(i));
+        return;
+    }
+    if (type.kind == ValueType::Kind::Struct) {
+        for (std::size_t i = 0; i < type.structure->fields.size(); ++i) {
+            const StructField& field = type.structure->fields[i];
+            if (valueTypeNeedsDrop(field.type))
+                emitValueDrop(out, displacedAddress(address, field.offset), field.type,
+                              label + "_field_" + std::to_string(i));
+        }
+        return;
+    }
+    if (type.kind == ValueType::Kind::Enum) {
+        const std::string done = label + "_done";
+        out << "    mov eax, dword " << address << "\n";
+        for (std::size_t i = 0; i < type.enumeration->variants.size(); ++i)
+            out << "    cmp eax, " << i << "\n"
+                << "    je " << label << "_variant_" << i << "\n";
+        out << "    jmp " << done << "\n";
+        for (std::size_t i = 0; i < type.enumeration->variants.size(); ++i) {
+            out << label << "_variant_" << i << ":\n";
+            const EnumVariant& variant = type.enumeration->variants[i];
+            for (std::size_t fieldIndex = 0; fieldIndex < variant.fields.size(); ++fieldIndex) {
+                const StructField& field = variant.fields[fieldIndex];
+                if (valueTypeNeedsDrop(field.type))
+                    emitValueDrop(out, displacedAddress(address,
+                        type.enumeration->payloadOffset + field.offset), field.type,
+                        label + "_variant_" + std::to_string(i) + "_field_" +
+                            std::to_string(fieldIndex));
+            }
+            out << "    jmp " << done << "\n";
+        }
+        out << done << ":\n";
+    }
+}
+
+void emitValueRetain(std::ostringstream& out, const std::string& address,
+                     const ValueType& type, const std::string& label) {
+    if (type == ValueType::String) {
+        out << "    mov rax, qword " << address << "\n"
+            << "    cmp qword [rax-16], -1\n"
+            << "    je " << label << "_done\n"
+            << "    inc qword [rax-16]\n"
+            << label << "_done:\n";
+        return;
+    }
+    if (type.kind == ValueType::Kind::Array) {
+        const std::size_t elementSize = valueTypeSize(*type.element);
+        for (std::size_t i = 0; i < type.length; ++i)
+            if (valueTypeNeedsDrop(*type.element))
+                emitValueRetain(out, displacedAddress(address, i * elementSize), *type.element,
+                                label + "_element_" + std::to_string(i));
+        return;
+    }
+    if (type.kind == ValueType::Kind::Struct) {
+        for (std::size_t i = 0; i < type.structure->fields.size(); ++i) {
+            const StructField& field = type.structure->fields[i];
+            if (valueTypeNeedsDrop(field.type))
+                emitValueRetain(out, displacedAddress(address, field.offset), field.type,
+                                label + "_field_" + std::to_string(i));
+        }
+        return;
+    }
+    if (type.kind == ValueType::Kind::Enum) {
+        const std::string done = label + "_done";
+        out << "    mov eax, dword " << address << "\n";
+        for (std::size_t i = 0; i < type.enumeration->variants.size(); ++i)
+            out << "    cmp eax, " << i << "\n"
+                << "    je " << label << "_variant_" << i << "\n";
+        out << "    jmp " << done << "\n";
+        for (std::size_t i = 0; i < type.enumeration->variants.size(); ++i) {
+            out << label << "_variant_" << i << ":\n";
+            const EnumVariant& variant = type.enumeration->variants[i];
+            for (std::size_t fieldIndex = 0; fieldIndex < variant.fields.size(); ++fieldIndex) {
+                const StructField& field = variant.fields[fieldIndex];
+                if (valueTypeNeedsDrop(field.type))
+                    emitValueRetain(out, displacedAddress(address,
+                        type.enumeration->payloadOffset + field.offset), field.type,
+                        label + "_variant_" + std::to_string(i) + "_field_" +
+                            std::to_string(fieldIndex));
+            }
+            out << "    jmp " << done << "\n";
+        }
+        out << done << ":\n";
+    }
 }
 }
 
@@ -104,6 +209,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
            "    mov rbp, rsp\n";
     if (frameSize != 0) out << "    sub rsp, " << frameSize << '\n';
 
+    std::size_t resourceSequence = 0;
     for (const IrInstruction& instruction : program.instructions) {
         std::visit([&](const auto& item) {
             using T = std::decay_t<decltype(item)>;
@@ -757,29 +863,13 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     out << "    mov eax, dword [rbp-" << valueOffset(program, item.value) << "]\n";
                 out << "    leave\n    ret\n";
             } else if constexpr (std::is_same_v<T, IrDrop>) {
-                if (item.type == ValueType::String) {
-                    out << "    mov rdi, qword [rbp-" << valueOffset(program, item.value) << "]\n"
-                        << "    cmp qword [rdi-16], -1\n"
-                        << "    je ir_string_drop_done_" << item.value << "\n"
-                        << "    dec qword [rdi-16]\n"
-                        << "    jnz ir_string_drop_done_" << item.value << "\n"
-                        << "    mov rsi, qword [rdi-8]\n"
-                        << "    add rsi, 16\n"
-                        << "    sub rdi, 16\n"
-                        << "    mov eax, 11\n"
-                        << "    syscall\n"
-                        << "ir_string_drop_done_" << item.value << ":\n";
-                } else {
-                    emitBoxDrop(out,
-                        "qword [rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
-                        item.type);
-                }
+                emitValueDrop(out,
+                    "[rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
+                    item.type, "ir_drop_" + std::to_string(resourceSequence++));
             } else if constexpr (std::is_same_v<T, IrRetain>) {
-                out << "    mov rax, qword [rbp-" << valueOffset(program, item.value) << "]\n"
-                    << "    cmp qword [rax-16], -1\n"
-                    << "    je ir_string_retain_done_" << item.value << "\n"
-                    << "    inc qword [rax-16]\n"
-                    << "ir_string_retain_done_" << item.value << ":\n";
+                emitValueRetain(out,
+                    "[rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
+                    item.type, "ir_retain_" + std::to_string(resourceSequence++));
             } else if constexpr (std::is_same_v<T, IrExit>) {
                 out << "    mov edi, dword [rbp-" << valueOffset(program, item.value) << "]\n"
                        "    mov eax, 60\n"

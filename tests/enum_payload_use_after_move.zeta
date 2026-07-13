@@ -1,0 +1,8 @@
+enum Owned { Some(value: Box[Int]), None }
+
+def consume(value: Box[Int]): Int = *value
+
+def main(): Int = match (Owned.Some(value: Box(42))) {
+    Owned.Some(box) => consume(box) + *box
+    Owned.None => 0
+}
