@@ -302,6 +302,29 @@ Les structures génériques suivent la même syntaxe, par exemple
 `geometry.Pair[Int]`. Une structure privée ne peut pas apparaître dans les champs
 d'une structure publique ni dans la signature d'un symbole public.
 
+Une énumération exportée utilise `pub enum`. L'interface conserve l'ordre des
+variantes, leurs charges utiles et leur disposition. Le module qualifie le type,
+le constructeur et les motifs :
+
+```text
+// protocol.zeta
+pub enum Result[T] {
+    Ok(value: T)
+    Error(code: Int)
+}
+
+// main.zeta
+import protocol
+
+def unwrap(result: protocol.Result[Int]): Int = match (result) {
+    protocol.Result[Int].Ok(value) => value
+    protocol.Result[Int].Error(code) => -code
+}
+```
+
+La même syntaxe fonctionne lorsque `protocol.zeta` est absent et que seuls
+`protocol.zti` et `protocol.o` sont distribués.
+
 La bibliothèque standard peut être précompilée une fois avec :
 
 ```sh

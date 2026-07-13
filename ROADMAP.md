@@ -84,8 +84,6 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
 - les durées de vie restent lexicales avec réduction à la dernière utilisation,
   sans inférence générale interprocédurale ;
 - les fonctions locales capturantes ne sont pas encore de véritables fermetures ;
-- les énumérations publiques ne sont pas encore exportées avec leurs variantes
-  dans les `.zti` ;
 - les corps génériques sont conservés textuellement dans les interfaces, pas sous
   forme d'AST sérialisée compacte ;
 - l'IR ne possède pas encore de pipeline d'optimisation ;
@@ -169,16 +167,21 @@ Travail livré :
    génériques des structures ;
 3. résolution qualifiée `module.Type` après chargement en deux phases ;
 4. construction, annotation et passage par fonction de structures ordinaires et
-   génériques avec uniquement le couple `.zti` + `.o` du producteur.
+   génériques avec uniquement le couple `.zti` + `.o` du producteur ;
+5. syntaxe `pub enum`, validation des charges publiques et empreinte ABI des
+   variantes ;
+6. sérialisation des discriminants, charges, champs et paramètres génériques des
+   enums dans le format `.zti` 6 ;
+7. annotations, constructions et motifs `match` qualifiés pour les enums
+   ordinaires et génériques distribuées sans source.
 
 Travail restant :
 
-1. visibilité et export complets des énumérations et de leurs variantes ;
-2. remplacement des sources génériques incorporées par une AST versionnée ;
-3. diagnostics plus détaillés pour toutes les incompatibilités ABI ;
-4. commande explicite de construction d'une bibliothèque ;
-5. installation dans un cache partagé indépendant d'un projet ;
-6. déduplication robuste des instances génériques entre consommateurs.
+1. remplacement des sources génériques incorporées par une AST versionnée ;
+2. diagnostics plus détaillés pour toutes les incompatibilités ABI ;
+3. commande explicite de construction d'une bibliothèque ;
+4. installation dans un cache partagé indépendant d'un projet ;
+5. déduplication robuste des instances génériques entre consommateurs.
 
 ## Priorité 5 — Optimisations IR
 
@@ -217,5 +220,6 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Étendre le même contrat public aux énumérations : `pub enum`, sérialisation des
-variantes et charges utiles, puis consommation qualifiée sans fichier source.
+Remplacer le texte source des fonctions génériques publiques incorporé aux
+interfaces par une représentation versionnée, structurée et indépendante du
+parseur de sources complet.

@@ -212,9 +212,11 @@ Les signatures `.zti` sérialisent désormais le nom et les arguments d'une enum
 Les corps génériques incorporés permettent notamment de reconstruire `Option[T]`
 et de monomorphiser les fonctions de `collections` côté consommateur.
 
-L'export autonome de définitions publiques complètes — variantes, champs et
-disposition sans source générique incorporée — reste prévu avec les interfaces
-publiques complètes.
+Les déclarations `pub enum` exportent désormais leurs variantes, champs,
+discriminants et disposition complète dans le format `.zti` 6. Un consommateur
+peut annoter, construire et filtrer `module.Enum[T]` avec uniquement l'interface
+et l'objet du producteur. Le contrat détaillé se trouve dans
+`docs/PUBLIC_ENUMS_DESIGN.md`.
 
 ## Découpage d'implémentation — terminé
 
