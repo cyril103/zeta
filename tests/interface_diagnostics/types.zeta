@@ -1,0 +1,12 @@
+pub struct Point {
+    x: Int
+}
+
+pub enum Result {
+    Ok(value: Int)
+    Error
+}
+
+pub def identity[T](value: T): T = value
+
+pub def zero(): Int = 0

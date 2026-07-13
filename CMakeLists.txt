@@ -268,6 +268,10 @@ if(BUILD_TESTING)
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_interface_cache.sh
             $<TARGET_FILE:zeta>
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_interface_cache)
+    add_test(NAME interface_diagnostics
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/interface_diagnostics.sh
+            $<TARGET_FILE:zeta>
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/interface_diagnostics)
     add_test(NAME compile_string_properties COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_properties.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/string-properties)
