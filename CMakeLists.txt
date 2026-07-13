@@ -24,6 +24,13 @@ target_compile_options(zeta PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
 include(CTest)
 if(BUILD_TESTING)
+    add_test(NAME compile_public_struct_declaration COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_struct_declaration.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/public-struct-declaration)
+    add_test(NAME run_public_struct_declaration
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/public-struct-declaration)
+    set_tests_properties(run_public_struct_declaration PROPERTIES
+        DEPENDS compile_public_struct_declaration)
     add_test(NAME compile_vec_empty COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_empty.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/vec-empty)

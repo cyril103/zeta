@@ -370,7 +370,7 @@ std::shared_ptr<EnumType> Parser::instantiateEnumeration(
         instantiateEnumType(enumeration, std::move(arguments), location));
 }
 
-std::shared_ptr<StructType> Parser::structure() {
+std::shared_ptr<StructType> Parser::structure(bool publicType) {
     const Token start = previous();
     const Token& name = consume(TokenKind::Identifier, "nom de structure attendu");
     if (structures_.contains(name.text))
@@ -378,6 +378,7 @@ std::shared_ptr<StructType> Parser::structure() {
     auto result = std::make_shared<StructType>();
     result->location = start.location;
     result->name = name.text;
+    result->publicType = publicType;
     structures_.emplace(name.text, result);
     activeTypeParameters_.clear();
     if (match(TokenKind::LeftBracket)) {
@@ -430,6 +431,7 @@ std::shared_ptr<StructType> Parser::instantiateStructure(
     auto instance = std::make_shared<StructType>();
     instance->location = location;
     instance->name = structure->name;
+    instance->publicType = structure->publicType;
     instance->typeArguments = arguments;
     for (const StructField& field : structure->fields) {
         ValueType type = field.type;
@@ -475,7 +477,12 @@ Program Parser::parse() {
         skipSeparators();
     }
     while (!check(TokenKind::End)) {
-        if (match(TokenKind::Struct)) program.structures.push_back(structure());
+        if (check(TokenKind::Pub) && current_ + 1U < tokens_.size() &&
+            tokens_[current_ + 1U].kind == TokenKind::Struct) {
+            current_ += 2U;
+            program.structures.push_back(structure(true));
+        }
+        else if (match(TokenKind::Struct)) program.structures.push_back(structure());
         else if (match(TokenKind::Enum)) program.enumerations.push_back(enumeration());
         else program.statements.push_back(statement());
         if (!check(TokenKind::End) && !matchSeparator()) {

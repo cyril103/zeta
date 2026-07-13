@@ -78,6 +78,7 @@ struct StructField {
 struct StructType {
     SourceLocation location;
     std::string name;
+    bool publicType{false};
     std::vector<std::string> typeParameters;
     std::vector<ValueType> typeArguments;
     std::vector<StructField> fields;

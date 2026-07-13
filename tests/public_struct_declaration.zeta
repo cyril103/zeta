@@ -1,0 +1,9 @@
+pub struct Pair[T] {
+    first: T
+    second: T
+}
+
+def main(): Int = {
+    val pair: Pair[Int] = Pair[Int] { first: 19, second: 23 }
+    pair.first + pair.second - 42
+}
