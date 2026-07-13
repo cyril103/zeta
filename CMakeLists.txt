@@ -147,11 +147,6 @@ if(BUILD_TESTING)
         -o ${CMAKE_CURRENT_BINARY_DIR}/vec-nested)
     add_test(NAME run_vec_nested COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vec-nested)
     set_tests_properties(run_vec_nested PROPERTIES DEPENDS compile_vec_nested)
-    add_test(NAME compile_vectors_module COMMAND zeta
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors_module.zeta
-        -o ${CMAKE_CURRENT_BINARY_DIR}/vectors-module)
-    add_test(NAME run_vectors_module COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vectors-module)
-    set_tests_properties(run_vectors_module PROPERTIES DEPENDS compile_vectors_module)
     add_test(NAME compile_enum_declaration COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_declaration.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/enum-declaration)
@@ -246,9 +241,10 @@ if(BUILD_TESTING)
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/precompiled_stdlib.sh
             $<TARGET_FILE:zeta>
             ${CMAKE_CURRENT_SOURCE_DIR}/stdlib
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/stdlib/vec_generic_fixture.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/io_output.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/collections_module.zeta
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/vectors_module.zeta)
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/precompiled_vec_fixture.zeta)
     add_test(NAME persisted_module_interfaces
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/persisted_interfaces.sh
             $<TARGET_FILE:zeta>

@@ -1,12 +1,12 @@
-import vectors
+import vec_generic_fixture
 
 def main(): Int = {
     var values: Vec[Int] = Vec[Int]()
     values.push(40)
     values.push(2)
-    val length: Int = vectors.consumeLength(values)
+    val length: Int = vec_generic_fixture.consumeLength(values)
 
     val empty: Vec[String] = Vec[String]()
-    val isEmpty: Bool = vectors.consumeIsEmpty(empty)
+    val isEmpty: Bool = vec_generic_fixture.consumeIsEmpty(empty)
     if (length == 2 && isEmpty) 0 else 1
 }
