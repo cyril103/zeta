@@ -81,10 +81,17 @@ struct StructType {
     bool publicType{false};
     std::vector<std::string> typeParameters;
     std::vector<ValueType> typeArguments;
+    std::shared_ptr<const StructType> genericDefinition;
+    mutable std::unordered_map<std::string, std::weak_ptr<const StructType>> instances;
     std::vector<StructField> fields;
     std::size_t size{0};
     std::size_t alignment{1};
 };
+
+std::shared_ptr<const StructType> instantiateStructType(
+    const std::shared_ptr<const StructType>& structure,
+    std::vector<ValueType> arguments,
+    SourceLocation location);
 
 struct EnumVariant {
     SourceLocation location;

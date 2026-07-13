@@ -240,6 +240,10 @@ if(BUILD_TESTING)
             $<TARGET_FILE:zeta>
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/modules_integration
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/collections_module.zeta)
+    add_test(NAME public_struct_interfaces
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_struct_interfaces.sh
+            $<TARGET_FILE:zeta>
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_struct_interfaces)
     add_test(NAME separate_compilation_cache
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/separate_compilation_cache.sh
             $<TARGET_FILE:zeta> ${CMAKE_CURRENT_SOURCE_DIR}/tests/modules_integration)

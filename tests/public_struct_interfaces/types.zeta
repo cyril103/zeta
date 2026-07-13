@@ -1,0 +1,13 @@
+pub struct Point {
+    x: Int
+    y: Int
+}
+
+pub struct Pair[T] {
+    first: T
+    second: T
+}
+
+pub def origin(): Point = Point { x: 0, y: 0 }
+
+pub def zero(): Int = 0

@@ -6,8 +6,11 @@
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace {
+using StructRegistry = std::unordered_map<std::string, std::shared_ptr<StructType>>;
+
 std::string encodeType(const ValueType& type) {
     switch (type.kind) {
     case ValueType::Kind::Int: return "I";
@@ -27,7 +30,14 @@ std::string encodeType(const ValueType& type) {
     case ValueType::Kind::Vec: return "G(" + encodeType(*type.element) + ")";
     case ValueType::Kind::TypeParameter: return "T(" + type.typeParameter + ")";
     case ValueType::Kind::Struct:
-        throw std::runtime_error("les structures publiques ne sont pas encore sérialisables");
+    {
+        std::string encoded = "U" + std::to_string(type.structure->name.size()) + ":" +
+            type.structure->name + "[" +
+            std::to_string(type.structure->typeArguments.size()) + ":";
+        for (const ValueType& argument : type.structure->typeArguments)
+            encoded += encodeType(argument);
+        return encoded + "]";
+    }
     case ValueType::Kind::Enum:
     {
         std::string encoded = "E" + type.enumeration->name + "[" +
@@ -40,7 +50,8 @@ std::string encodeType(const ValueType& type) {
     throw std::runtime_error("type Zeta inconnu dans l'interface");
 }
 
-ValueType decodeType(const std::string& encoded, std::size_t& cursor) {
+ValueType decodeType(const std::string& encoded, std::size_t& cursor,
+                     const StructRegistry& structures) {
     if (cursor >= encoded.size()) throw std::runtime_error("type tronqué dans l'interface");
     const char kind = encoded[cursor++];
     if (kind == 'I') return ValueType::Int;
@@ -60,6 +71,37 @@ ValueType decodeType(const std::string& encoded, std::size_t& cursor) {
         cursor = end + 1U;
         return ValueType(ValueType::Kind::TypeParameter, name);
     }
+    if (kind == 'U') {
+        const std::size_t lengthBegin = cursor;
+        while (cursor < encoded.size() &&
+               std::isdigit(static_cast<unsigned char>(encoded[cursor]))) ++cursor;
+        if (lengthBegin == cursor || cursor >= encoded.size() || encoded[cursor++] != ':')
+            throw std::runtime_error("nom de structure invalide dans l'interface");
+        const std::size_t nameLength = std::stoull(
+            encoded.substr(lengthBegin, cursor - lengthBegin - 1U));
+        if (cursor + nameLength > encoded.size())
+            throw std::runtime_error("nom de structure tronqué dans l'interface");
+        const std::string name = encoded.substr(cursor, nameLength);
+        cursor += nameLength;
+        if (cursor >= encoded.size() || encoded[cursor++] != '[')
+            throw std::runtime_error("arguments de structure absents dans l'interface");
+        const std::size_t countBegin = cursor;
+        while (cursor < encoded.size() &&
+               std::isdigit(static_cast<unsigned char>(encoded[cursor]))) ++cursor;
+        if (countBegin == cursor || cursor >= encoded.size() || encoded[cursor++] != ':')
+            throw std::runtime_error("arguments de structure invalides dans l'interface");
+        const std::size_t count = std::stoull(
+            encoded.substr(countBegin, cursor - countBegin - 1U));
+        std::vector<ValueType> arguments;
+        for (std::size_t i = 0; i < count; ++i)
+            arguments.push_back(decodeType(encoded, cursor, structures));
+        if (cursor >= encoded.size() || encoded[cursor++] != ']')
+            throw std::runtime_error("arguments de structure non fermés dans l'interface");
+        const auto found = structures.find(name);
+        if (found == structures.end())
+            throw std::runtime_error("structure publique inconnue '" + name + "'");
+        return ValueType(instantiateStructType(found->second, std::move(arguments), {}));
+    }
     if (kind == 'E') {
         const std::size_t nameEnd = encoded.find('[', cursor);
         if (nameEnd == std::string::npos)
@@ -73,7 +115,7 @@ ValueType decodeType(const std::string& encoded, std::size_t& cursor) {
         const std::size_t count = std::stoull(encoded.substr(cursor, countEnd - cursor));
         cursor = countEnd + 1U;
         for (std::size_t i = 0; i < count; ++i)
-            enumeration->typeArguments.push_back(decodeType(encoded, cursor));
+            enumeration->typeArguments.push_back(decodeType(encoded, cursor, structures));
         if (cursor >= encoded.size() || encoded[cursor++] != ']')
             throw std::runtime_error("arguments d'énumération non fermés dans l'interface");
         return ValueType(enumeration);
@@ -93,7 +135,7 @@ ValueType decodeType(const std::string& encoded, std::size_t& cursor) {
     }
     if (cursor >= encoded.size() || encoded[cursor++] != '(')
         throw std::runtime_error("type composé invalide dans l'interface");
-    ValueType element = decodeType(encoded, cursor);
+    ValueType element = decodeType(encoded, cursor, structures);
     if (cursor >= encoded.size() || encoded[cursor++] != ')')
         throw std::runtime_error("type composé non fermé dans l'interface");
     if (kind == 'A') return ValueType(std::make_shared<ValueType>(element), length);
@@ -107,9 +149,9 @@ ValueType decodeType(const std::string& encoded, std::size_t& cursor) {
     throw std::runtime_error("code de type inconnu dans l'interface");
 }
 
-ValueType decodeType(const std::string& encoded) {
+ValueType decodeType(const std::string& encoded, const StructRegistry& structures = {}) {
     std::size_t cursor = 0;
-    ValueType type = decodeType(encoded, cursor);
+    ValueType type = decodeType(encoded, cursor, structures);
     if (cursor != encoded.size()) throw std::runtime_error("suffixe de type invalide dans l'interface");
     return type;
 }
@@ -150,6 +192,17 @@ std::string InterfaceCodec::serialize(
     for (const std::string& import : imports)
         output << "import " << std::quoted(import) << '\n';
     if (!genericSource.empty()) output << "generic_source " << hexEncode(genericSource) << '\n';
+    for (const std::shared_ptr<const StructType>& structure : interface.structures) {
+        output << "structure " << std::quoted(structure->name) << ' '
+               << structure->size << ' ' << structure->alignment << ' '
+               << structure->typeParameters.size() << ' ' << structure->fields.size();
+        for (const std::string& parameter : structure->typeParameters)
+            output << ' ' << std::quoted(parameter);
+        output << '\n';
+        for (const StructField& field : structure->fields)
+            output << "field " << std::quoted(field.name) << ' ' << field.offset << ' '
+                   << std::quoted(encodeType(field.type)) << '\n';
+    }
     std::vector<std::string> names;
     for (const auto& [name, symbol] : interface.exports) {
         static_cast<void>(symbol);
@@ -187,6 +240,7 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
         version != ZetaVersion::InterfaceFormat)
         throw std::runtime_error("format .zti inconnu ou incompatible");
     PersistedInterface result;
+    StructRegistry structures;
     if (!(input >> word) || word != "module" || !(input >> std::quoted(result.interface.name)))
         throw std::runtime_error("nom de module absent de l'interface");
     if (!(input >> word) || word != "fingerprint" || !(input >> result.fingerprint))
@@ -205,6 +259,49 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
             result.genericSource = hexDecode(encoded);
             continue;
         }
+        if (word == "structure") {
+            std::string name;
+            std::size_t size = 0, alignment = 0, parameterCount = 0, fieldCount = 0;
+            if (!(input >> std::quoted(name) >> size >> alignment >> parameterCount >> fieldCount) ||
+                name.empty() || alignment == 0U)
+                throw std::runtime_error("structure .zti invalide");
+            if (structures.contains(name))
+                throw std::runtime_error("structure .zti dupliquée : " + name);
+            auto structure = std::make_shared<StructType>();
+            structure->name = name;
+            structure->publicType = true;
+            structure->size = size;
+            structure->alignment = alignment;
+            for (std::size_t i = 0; i < parameterCount; ++i) {
+                std::string parameter;
+                if (!(input >> std::quoted(parameter)) || parameter.empty())
+                    throw std::runtime_error("paramètre de structure .zti invalide");
+                if (std::find(structure->typeParameters.begin(),
+                              structure->typeParameters.end(), parameter) !=
+                    structure->typeParameters.end())
+                    throw std::runtime_error("paramètre de structure .zti dupliqué");
+                structure->typeParameters.push_back(std::move(parameter));
+            }
+            structures.emplace(name, structure);
+            for (std::size_t i = 0; i < fieldCount; ++i) {
+                std::string fieldWord, fieldName, encodedType;
+                std::size_t offset = 0;
+                if (!(input >> fieldWord >> std::quoted(fieldName) >> offset >>
+                      std::quoted(encodedType)) || fieldWord != "field" || fieldName.empty())
+                    throw std::runtime_error("champ de structure .zti invalide");
+                if (std::any_of(structure->fields.begin(), structure->fields.end(),
+                    [&](const StructField& field) { return field.name == fieldName; }))
+                    throw std::runtime_error("champ de structure .zti dupliqué");
+                ValueType type = decodeType(encodedType, structures);
+                if (type.kind != ValueType::Kind::TypeParameter &&
+                    offset + valueTypeSize(type) > size)
+                    throw std::runtime_error("champ hors disposition dans la structure .zti");
+                structure->fields.push_back(StructField{{}, std::move(fieldName),
+                                                        std::move(type), offset});
+            }
+            result.interface.structures.push_back(std::move(structure));
+            continue;
+        }
         if (word != "export") throw std::runtime_error("entrée .zti inconnue : " + word);
         std::string name, returnType;
         int kind = 0, callable = 0, native = 0;
@@ -216,7 +313,7 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
         for (std::size_t i = 0; i < parameterCount; ++i) {
             std::string encoded;
             if (!(input >> std::quoted(encoded))) throw std::runtime_error("paramètre .zti invalide");
-            parameters.push_back(decodeType(encoded));
+            parameters.push_back(decodeType(encoded, structures));
         }
         std::size_t genericCount = 0;
         if (!(input >> genericCount)) throw std::runtime_error("généricité .zti invalide");
@@ -225,7 +322,7 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
             input >> std::quoted(ignoredName) >> std::quoted(ignoredConstraint);
         }
         result.interface.exports.emplace(name, ExportedSymbol{
-            static_cast<BindingKind>(kind), decodeType(returnType), callable != 0,
+            static_cast<BindingKind>(kind), decodeType(returnType, structures), callable != 0,
             native != 0, std::move(parameters), nullptr});
     }
     return result;

@@ -42,6 +42,45 @@ bool symbolic(const ValueType& type) {
 }
 }
 
+std::shared_ptr<const StructType> instantiateStructType(
+    const std::shared_ptr<const StructType>& structure,
+    std::vector<ValueType> arguments,
+    SourceLocation location) {
+    const auto definition = structure->genericDefinition
+        ? structure->genericDefinition : structure;
+    if (arguments.size() != definition->typeParameters.size())
+        throw std::runtime_error("arité invalide pour la structure " + definition->name);
+    if (arguments.empty()) return definition;
+
+    std::string key = definition->name;
+    for (const ValueType& argument : arguments) key += "[" + typeName(argument) + "]";
+    if (const auto cached = definition->instances.find(key);
+        cached != definition->instances.end())
+        if (const auto instance = cached->second.lock()) return instance;
+
+    auto instance = std::make_shared<StructType>();
+    instance->location = location;
+    instance->name = definition->name;
+    instance->publicType = definition->publicType;
+    instance->typeArguments = std::move(arguments);
+    instance->genericDefinition = definition;
+    for (const StructField& sourceField : definition->fields) {
+        const ValueType type = substitute(sourceField.type, definition->typeParameters,
+                                          instance->typeArguments);
+        const std::size_t alignment = valueTypeAlignment(type);
+        const std::size_t offset = (instance->size + alignment - 1U) /
+                                   alignment * alignment;
+        instance->fields.push_back(StructField{
+            sourceField.location, sourceField.name, type, offset});
+        instance->size = offset + valueTypeSize(type);
+        instance->alignment = std::max(instance->alignment, alignment);
+    }
+    instance->size = (instance->size + instance->alignment - 1U) /
+                     instance->alignment * instance->alignment;
+    definition->instances.insert_or_assign(std::move(key), instance);
+    return instance;
+}
+
 std::shared_ptr<const EnumType> instantiateEnumType(
     const std::shared_ptr<const EnumType>& enumeration,
     std::vector<ValueType> arguments,

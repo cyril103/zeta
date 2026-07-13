@@ -423,31 +423,8 @@ std::shared_ptr<StructType> Parser::instantiateStructure(
         throw CompileError(location, "la structure '" + structure->name + "' attend " +
             std::to_string(structure->typeParameters.size()) + " argument(s) de type, reçu " +
             std::to_string(arguments.size()));
-    if (arguments.empty()) return structure;
-    std::string key = structure->name;
-    for (const ValueType& argument : arguments) key += "[" + typeName(argument) + "]";
-    if (const auto cached = structureInstances_.find(key); cached != structureInstances_.end())
-        return cached->second;
-    auto instance = std::make_shared<StructType>();
-    instance->location = location;
-    instance->name = structure->name;
-    instance->publicType = structure->publicType;
-    instance->typeArguments = arguments;
-    for (const StructField& field : structure->fields) {
-        ValueType type = field.type;
-        if (type.kind == ValueType::Kind::TypeParameter) {
-            const auto parameter = std::find(structure->typeParameters.begin(), structure->typeParameters.end(), type.typeParameter);
-            type = arguments[static_cast<std::size_t>(parameter - structure->typeParameters.begin())];
-        }
-        const std::size_t alignment = valueTypeAlignment(type);
-        const std::size_t offset = (instance->size + alignment - 1U) / alignment * alignment;
-        instance->fields.push_back(StructField{field.location, field.name, type, offset});
-        instance->size = offset + valueTypeSize(type);
-        instance->alignment = std::max(instance->alignment, alignment);
-    }
-    instance->size = (instance->size + instance->alignment - 1U) / instance->alignment * instance->alignment;
-    structureInstances_.emplace(key, instance);
-    return instance;
+    return std::const_pointer_cast<StructType>(
+        instantiateStructType(structure, std::move(arguments), location));
 }
 
 void Parser::skipSeparators() {
