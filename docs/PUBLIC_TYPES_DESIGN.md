@@ -48,11 +48,12 @@ que le producteur, sans source et sans recréer un type homonyme local.
 
 ## Compatibilité
 
-Les structures ont introduit le format `.zti` 5 et le cache de module 8. L'ajout
-ultérieur des enums publiques porte les versions courantes à 6 et 9. La
-désérialisation vérifie les tailles, alignements, offsets, doublons et références
-de types avant d'exposer l'interface. Une version antérieure reste diagnostiquée
-comme incompatible plutôt que devinée.
+Les structures ont introduit le format `.zti` 5 et le cache de module 8, puis les
+enums publiques les versions 6 et 9. La représentation structurée des génériques
+porte les versions courantes à 7 et 10. La désérialisation vérifie les tailles,
+alignements, offsets, doublons et références de types avant d'exposer
+l'interface. Une version antérieure reste diagnostiquée comme incompatible
+plutôt que devinée.
 
 La livraison couvre la syntaxe et la visibilité, la table de types en mémoire,
 la sérialisation versionnée et la résolution qualifiée côté consommateur. Le test

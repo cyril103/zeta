@@ -59,7 +59,8 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
 - objet `start.o` minimal et initialisation topologique des modules ;
 - cache incrémental invalidé par les sources et les interfaces importées ;
 - interfaces persistantes versionnées `.zti` consommables avec un `.o` sans source ;
-- corps génériques publics conservés pour la monomorphisation côté consommateur ;
+- représentation syntaxique structurée des génériques publics, monomorphisable
+  côté consommateur sans lexer ni source ;
 - stdlib précompilable avec `zeta --build-stdlib` ;
 - manifeste partagé vérifiant compilateur, ABI, format `.zti` et empreintes des sources ;
 - sélection alternative de la stdlib avec `--stdlib <dossier>`.
@@ -84,8 +85,6 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
 - les durées de vie restent lexicales avec réduction à la dernière utilisation,
   sans inférence générale interprocédurale ;
 - les fonctions locales capturantes ne sont pas encore de véritables fermetures ;
-- les corps génériques sont conservés textuellement dans les interfaces, pas sous
-  forme d'AST sérialisée compacte ;
 - l'IR ne possède pas encore de pipeline d'optimisation ;
 - la cible unique reste Linux x86-64 avec FASM et `ld`.
 
@@ -171,14 +170,16 @@ Travail livré :
 5. syntaxe `pub enum`, validation des charges publiques et empreinte ABI des
    variantes ;
 6. sérialisation des discriminants, charges, champs et paramètres génériques des
-   enums dans le format `.zti` 6 ;
+   enums dans les interfaces versionnées ;
 7. annotations, constructions et motifs `match` qualifiés pour les enums
-   ordinaires et génériques distribuées sans source.
+   ordinaires et génériques distribuées sans source ;
+8. remplacement de `generic_source` par `generic_tokens 1`, représentation
+   canonique chargée directement par le parseur dans le format `.zti` 7.
 
 Travail restant :
 
-1. remplacement des sources génériques incorporées par une AST versionnée ;
-2. diagnostics plus détaillés pour toutes les incompatibilités ABI ;
+1. diagnostics plus détaillés pour toutes les incompatibilités ABI ;
+2. réduction des tokens génériques à la fermeture des déclarations nécessaires ;
 3. commande explicite de construction d'une bibliothèque ;
 4. installation dans un cache partagé indépendant d'un projet ;
 5. déduplication robuste des instances génériques entre consommateurs.
@@ -220,6 +221,6 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Remplacer le texte source des fonctions génériques publiques incorporé aux
-interfaces par une représentation versionnée, structurée et indépendante du
-parseur de sources complet.
+Détailler les diagnostics d'interfaces incompatibles : distinguer version,
+disposition, référence nominale, corps générique et objet manquant, avec des tests
+négatifs ciblés pour chaque frontière.

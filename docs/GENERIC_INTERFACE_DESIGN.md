@@ -1,10 +1,9 @@
 # Représentation structurée des génériques dans `.zti`
 
-Les interfaces actuelles copient le fichier source complet dès qu'un symbole
-générique public existe. Le chargeur relance ensuite le lexer et le parseur sur
-ce texte. Cette dépendance conserve les commentaires, la mise en forme et toutes
-les ambiguïtés futures du lexer alors que l'interface a déjà son propre numéro de
-version.
+Avant le format `.zti` 7, les interfaces copiaient le fichier source complet dès
+qu'un symbole générique public existait. Le chargeur relançait ensuite le lexer
+et le parseur sur ce texte, en conservant commentaires, mise en forme et
+ambiguïtés du lexer dans une interface pourtant versionnée.
 
 ## Fermeture sémantique
 
@@ -55,9 +54,9 @@ donc plus invalider ses consommateurs, contrairement à une modification de toke
 
 ## Migration
 
-Le champ textuel `generic_source` disparaît lors du passage au nouveau format ;
-aucune double lecture ambiguë n'est autorisée. Le numéro du format `.zti`, celui
-du cache de module et les tests de stdlib précompilée sont incrémentés ensemble.
+Le champ textuel `generic_source` a disparu dans le format `.zti` 7 ; aucune
+double lecture ambiguë n'est autorisée. Le cache de module est passé à la version
+10 et les tests de stdlib précompilée valident le nouveau chemin.
 
 Les tests vérifient notamment :
 

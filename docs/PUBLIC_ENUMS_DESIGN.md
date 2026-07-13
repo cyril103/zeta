@@ -60,10 +60,10 @@ et de distribution.
 
 ## Compatibilité
 
-L'ajout des définitions d'enums porte le format `.zti` à la version 6 et le cache
-des modules à la version 9. Une interface tronquée, une variante dupliquée, un
-champ hors charge ou une disposition incohérente est rejeté avant l'analyse du
-consommateur.
+Les enums ont introduit le format `.zti` 6 et le cache de modules 9. La
+représentation structurée des génériques porte les versions courantes à 7 et 10.
+Une interface tronquée, une variante dupliquée, un champ hors charge ou une
+disposition incohérente est rejeté avant l'analyse du consommateur.
 
 La validation d'intégration compile une enum ordinaire et une enum générique,
 exécute leurs constructions et leurs `match`, puis répète la compilation après

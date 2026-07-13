@@ -209,11 +209,11 @@ des variantes.
 ## Interfaces de modules
 
 Les signatures `.zti` sérialisent désormais le nom et les arguments d'une enum.
-Les corps génériques incorporés permettent notamment de reconstruire `Option[T]`
-et de monomorphiser les fonctions de `collections` côté consommateur.
+Les tokens génériques structurés permettent notamment de reconstruire `Option[T]`
+et de monomorphiser les fonctions de `collections` côté consommateur sans lexer.
 
 Les déclarations `pub enum` exportent désormais leurs variantes, champs,
-discriminants et disposition complète dans le format `.zti` 6. Un consommateur
+discriminants et disposition complète dans le format `.zti` versionné. Un consommateur
 peut annoter, construire et filtrer `module.Enum[T]` avec uniquement l'interface
 et l'objet du producteur. Le contrat détaillé se trouve dans
 `docs/PUBLIC_ENUMS_DESIGN.md`.

@@ -277,8 +277,10 @@ d'interface invalide également ses consommateurs. Un objet inchangé est réuti
 Chaque objet est accompagné d'une interface persistante versionnée `.zti`. Une
 dépendance peut être distribuée sous la forme `module.zti` + `module.o` : si son
 source `.zeta` est absent, le compilateur charge les signatures et les imports
-depuis l'interface. Les corps des fonctions génériques publiques sont incorporés
-dans le `.zti` afin d'être monomorphisés dans le module consommateur.
+depuis l'interface. La syntaxe canonique des modules qui exportent des fonctions
+génériques est conservée sous forme de tokens typés dans le `.zti`. Le
+consommateur les fournit directement au parseur, sans texte source ni nouveau
+passage par le lexer, afin de monomorphiser les instances demandées.
 
 Une structure exportée se déclare avec `pub struct`. Son nom, ses paramètres de
 type, ses champs et sa disposition ABI sont conservés dans l'interface. Le
