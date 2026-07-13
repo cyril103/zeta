@@ -245,7 +245,10 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/io_output.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/collections_module.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/precompiled_vec_fixture.zeta
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_read.zeta)
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_read.zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_compare.zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_mutate.zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_ordered.zeta)
     add_test(NAME persisted_module_interfaces
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/persisted_interfaces.sh
             $<TARGET_FILE:zeta>

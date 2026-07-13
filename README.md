@@ -697,15 +697,21 @@ import sequences
 
 val found: Bool = sequences.contains(values.asSlice(), 20)
 val position: Option[Int] = sequences.indexOf(values.asSlice(), 20)
+val lastPosition: Option[Int] = sequences.lastIndexOf(values.asSlice(), 20)
 val occurrences: Int = sequences.count(values.asSlice(), 20)
 val minimum: Option[Int] = sequences.minimum(values.asSlice())
 val maximum: Option[Int] = sequences.maximum(values.asSlice())
 val swaps: Int = sequences.reverse(values.asSliceMut())
+val sorted: Bool = sequences.isSorted(values.asSlice())
+val sortSwaps: Int = sequences.sort(values.asSliceMut())
+val sortedPosition: Option[Int] = sequences.binarySearch(values.asSlice(), 20)
 ```
 
-`contains`, `indexOf` et `count` exigent `Equatable`; `minimum` et `maximum`
-exigent `Ordered`; `reverse` exige `Copy` et renvoie le nombre d'échanges. Les
-mêmes fonctions acceptent les slices issues de tableaux.
+Les comparaisons comprennent aussi `equals`, `startsWith` et `endsWith`.
+`contains`, les recherches, le comptage et les comparaisons exigent `Equatable` ;
+les extrema, `isSorted`, `sort` et `binarySearch` exigent `Ordered`. Les mutations
+`reverse`, `fill` et `swap` exigent `Copy` ; `swap` renvoie `false` pour un indice
+invalide. Les mêmes fonctions acceptent les slices issues de tableaux.
 
 ## Expressions sur plusieurs lignes
 
