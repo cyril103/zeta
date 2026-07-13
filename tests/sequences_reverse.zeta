@@ -1,0 +1,23 @@
+import sequences
+
+def main(): Int = {
+    var values: Vec[Int] = Vec[Int]()
+    values.push(10)
+    values.push(20)
+    values.push(30)
+    values.push(40)
+    values.push(50)
+
+    val vecSwaps: Int = sequences.reverse(values.asSliceMut())
+    val reversed: Slice[Int] = values.asSlice()
+    val vecOk: Bool = reversed[0] == 50 && reversed[1] == 40 &&
+        reversed[2] == 30 && reversed[3] == 20 && reversed[4] == 10
+
+    var letters: [Char; 4] = ['a', 'b', 'c', 'd']
+    val letterView: SliceMut[Char] = SliceMut(&mut letters)
+    val arraySwaps: Int = sequences.reverse(letterView)
+    val arrayOk: Bool = letters[0] == 'd' && letters[1] == 'c' &&
+        letters[2] == 'b' && letters[3] == 'a'
+
+    if (vecSwaps != 2) 1 else if (!vecOk) 2 else if (arraySwaps != 2) 3 else if (!arrayOk) 4 else 0
+}

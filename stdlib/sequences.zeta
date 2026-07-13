@@ -62,3 +62,18 @@ pub def maximum[T: Ordered](values: Slice[T]): Option[T] = {
         Option[T].Some(value: result)
     }
 }
+
+pub def reverse[T: Copy](values: SliceMut[T]): Int = {
+    var left: Int = 0
+    var right: Int = values.length - 1
+    var swaps: Int = 0
+    while (left < right) do {
+        val temporary: T = values[left]
+        values[left] = values[right]
+        values[right] = temporary
+        left = left + 1
+        right = right - 1
+        swaps = swaps + 1
+    }
+    swaps
+}
