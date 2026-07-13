@@ -101,3 +101,7 @@ nouveau et conserve le code d'erreur de bornes `101`.
 
 La matrice d'exécution couvre `Byte`, `Int`, `Double`, `Bool`, `Char`, les
 structures copiables et propriétaires, `String`, `Box[T]` et `Vec[Vec[T]]`.
+
+Le module `vectors` traverse les interfaces `.zti` avec des fonctions génériques
+consommatrices. Sa compilation sans les sources de la stdlib valide l'encodage de
+`Vec[T]`, sa monomorphisation côté application et la liaison de l'objet partagé.

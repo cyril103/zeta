@@ -563,6 +563,11 @@ empêchent toute croissance ou mutation concurrente jusqu'à leur dernière
 utilisation. Un échec d'allocation ou un dépassement de capacité termine le
 processus avec le code `105`.
 
+Le module standard `vectors` fournit `consumeLength` et `consumeIsEmpty`. Ces
+helpers consommateurs servent aussi de frontière générique précompilée pour
+`Vec[T]` ; l'accès ordinaire aux propriétés reste directement disponible sur le
+type.
+
 ## Expressions sur plusieurs lignes
 
 Une expression sur plusieurs lignes doit être placée entre accolades. Le bloc

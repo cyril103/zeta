@@ -32,6 +32,7 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
 - références `&T` et `&mut T` avec contrôle des alias ;
 - `Slice[T]` et `SliceMut[T]` sous la forme `{adresse, longueur}` ;
 - `Box[T]`, déplacement sans copie et destruction déterministe ;
+- `Vec[T]`, croissance dynamique, déplacement, destruction et vues empruntées ;
 - structures ordinaires et génériques, construction nommée et mutation des champs ;
 - énumérations ordinaires et génériques, variantes à charge utile et `match`
   exhaustif ;
@@ -72,6 +73,8 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
 - `strings` : décodage par offset d'octet, `Option[Char]`, vues bornées et recherche.
 - `Vec[T]` : collection possédée dynamique, croissance contrôlée, vues empruntées
   et accès sûrs avec `Option[T]`.
+- `vectors` : helpers consommateurs génériques distribués avec la stdlib
+  précompilée.
 
 ## Limites connues
 
@@ -129,9 +132,9 @@ Travail livré :
 `strings.charAtByte` rend l'unité explicite et retourne `Option[Char]`. L'itération
 avance avec `nextByteOffset`, sans confondre octets et points de code.
 
-## Priorité 3 — Collections dynamiques
+## Priorité 3 — Collections dynamiques — terminée
 
-Objectif : ajouter un premier conteneur possédé, probablement `Vec[T]`.
+Objectif : ajouter un premier conteneur possédé, `Vec[T]`.
 
 Conception arrêtée dans `docs/VEC_DESIGN.md` : représentation ABI sur trois mots,
 capacité exprimée en éléments, croissance géométrique et arrêt avec le code `105`
@@ -146,7 +149,7 @@ en cas d'échec d'allocation ou de dépassement de taille.
 5. fournir `push`, `pop`, `get`, `set`, `reserve` et `clear` — terminé ;
 6. tester les types primitifs, structures, `String`, `Box[T]` et vecteurs
    imbriqués — terminé ;
-7. intégrer le module à la stdlib précompilée.
+7. intégrer le module à la stdlib précompilée — terminé.
 
 Le comportement en cas d'échec d'allocation est désormais défini avant l'ajout de
 plusieurs conteneurs.
@@ -202,5 +205,5 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Intégrer l'usage de `Vec[T]` à la stdlib précompilée et finaliser la documentation,
-dernière étape de la priorité 3 sur les collections dynamiques.
+Stabiliser la visibilité et l'export des structures dans les interfaces `.zti`,
+première étape de la priorité 4 sur la distribution de bibliothèques.

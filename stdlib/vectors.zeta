@@ -1,0 +1,4 @@
+// Helpers consommateurs pour valider Vec[T] à travers les interfaces précompilées.
+pub def consumeLength[T](values: Vec[T]): Int = values.length
+
+pub def consumeIsEmpty[T](values: Vec[T]): Bool = values.isEmpty
