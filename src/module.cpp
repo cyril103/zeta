@@ -3,6 +3,7 @@
 #include "lexer.hpp"
 #include "parser.hpp"
 #include "interface.hpp"
+#include "generic_tokens.hpp"
 #include "version.hpp"
 
 #include <algorithm>
@@ -265,8 +266,14 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
                   importedEnumerations(imports, graph_.interfaces));
     Program program = parser.parse();
     graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source),
-                                        false, {}, syntaxTokens});
+                                        false, {}, {}});
     buildInterface(name);
+    std::unordered_set<std::string> genericExports;
+    for (const auto& [exportName, symbol] : graph_.interfaces.at(name).exports)
+        if (symbol.declaration != nullptr && !symbol.declaration->typeParameters.empty())
+            genericExports.insert(exportName);
+    graph_.modules.at(name).genericTokens =
+        reduceGenericTokens(syntaxTokens, genericExports);
     loading_.erase(name);
 }
 
@@ -376,7 +383,7 @@ void ModuleLoader::buildFingerprints() {
         for (const std::string& signature : exports)
             interfaceHash = hashText(signature, interfaceHash);
         if (exportsGenericBody)
-            interfaceHash = hashText(hexHash(hashTokens(module.syntaxTokens)), interfaceHash);
+            interfaceHash = hashText(hexHash(hashTokens(module.genericTokens)), interfaceHash);
         graph_.interfaceFingerprints.emplace(name, hexHash(interfaceHash));
     }
 

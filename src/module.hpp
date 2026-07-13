@@ -34,7 +34,7 @@ struct Module {
     std::uint64_t sourceHash;
     bool precompiled{false};
     std::filesystem::path objectPath;
-    std::vector<Token> syntaxTokens;
+    std::vector<Token> genericTokens;
 };
 
 struct ModuleGraph {
