@@ -98,7 +98,8 @@ enum Option[T] {
 
 Travail prévu :
 
-1. définir la syntaxe des variantes et leur construction ;
+1. définir la syntaxe des variantes et leur construction — conception terminée
+   dans `docs/ENUM_DESIGN.md` ;
 2. calculer une disposition ABI avec discriminant et charge utile ;
 3. ajouter une expression de correspondance exhaustive ;
 4. diagnostiquer les variantes inconnues, doublons et correspondances incomplètes ;
@@ -193,7 +194,7 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Commencer la priorité 1 par un document `docs/ENUM_DESIGN.md` couvrant : syntaxe,
-disposition mémoire, généricité, exhaustivité et interaction avec la propriété.
-Implémenter ensuite les énumérations non génériques avant `Option[T]` et la
-correspondance exhaustive.
+Implémenter la première tranche de `docs/ENUM_DESIGN.md` : lexer, déclaration des
+énumérations non génériques, calcul de leur disposition et diagnostics de
+définition. Ajouter ensuite leur construction qualifiée avant la correspondance
+exhaustive.
