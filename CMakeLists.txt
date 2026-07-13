@@ -128,6 +128,14 @@ if(BUILD_TESTING)
     add_test(NAME separate_compilation_cache
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/separate_compilation_cache.sh
             $<TARGET_FILE:zeta> ${CMAKE_CURRENT_SOURCE_DIR}/tests/modules_integration)
+    add_test(NAME compile_string_properties COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_properties.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/string-properties)
+    add_test(NAME run_string_properties COMMAND ${CMAKE_CURRENT_BINARY_DIR}/string-properties)
+    set_tests_properties(run_string_properties PROPERTIES DEPENDS compile_string_properties)
+    add_test(NAME reject_string_unknown_property COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_unknown_property.zeta)
+    set_tests_properties(reject_string_unknown_property PROPERTIES WILL_FAIL TRUE)
     add_test(NAME compile_string_double_conversion COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_double_conversion.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/string-double-conversion)

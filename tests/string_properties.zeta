@@ -1,0 +1,7 @@
+def main(): Int = {
+    val empty: String = ""
+    val unicode: String = "hé🚀"
+    val joined: String = unicode + "!"
+    if (empty.isEmpty && empty.lengthBytes == 0 &&
+        !unicode.isEmpty && unicode.lengthBytes == 7 && joined.lengthBytes == 8) 0 else 1
+}

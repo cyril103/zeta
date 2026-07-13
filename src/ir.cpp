@@ -680,6 +680,14 @@ ValueId IrGenerator::expression(
             return output;
         } else if constexpr (std::is_same_v<T, FieldExpr>) {
             const ValueId object = expression(*node.object, parameters);
+            if (node.object->inferredType == ValueType::String) {
+                const ValueId output = nextValue(expressionNode.inferredType);
+                if (node.field == "lengthBytes")
+                    ir_.instructions.push_back(IrStringLength{output, object});
+                else
+                    ir_.instructions.push_back(IrStringEmpty{output, object});
+                return output;
+            }
             if (node.object->inferredType.kind == ValueType::Kind::Slice) {
                 const ValueId output = nextValue(ValueType::Int);
                 ir_.instructions.push_back(IrSliceLength{output, object});
@@ -1031,6 +1039,10 @@ std::string IrGenerator::print(const IrProgram& program) {
             else if constexpr (std::is_same_v<T, IrStringConcat>)
                 out << "  $" << item.output << " = concat $" << item.left
                     << ", $" << item.right << '\n';
+            else if constexpr (std::is_same_v<T, IrStringLength>)
+                out << "  $" << item.output << " = string_length $" << item.string << '\n';
+            else if constexpr (std::is_same_v<T, IrStringEmpty>)
+                out << "  $" << item.output << " = string_empty $" << item.string << '\n';
             else if constexpr (std::is_same_v<T, IrArrayConstruct>) {
                 out << "  $" << item.output << " = array " << typeName(item.type) << " [";
                 for (std::size_t i = 0; i < item.elements.size(); ++i) {

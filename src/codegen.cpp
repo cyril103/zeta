@@ -340,6 +340,13 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     << "    rep movsb\n"
                     << "    pop r13\n"
                     << "    pop r12\n";
+            } else if constexpr (std::is_same_v<T, IrStringLength>) {
+                out << "    mov rax, qword [rbp-" << valueOffset(program, item.string) - 8U << "]\n"
+                    << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
+            } else if constexpr (std::is_same_v<T, IrStringEmpty>) {
+                out << "    cmp qword [rbp-" << valueOffset(program, item.string) - 8U << "], 0\n"
+                    << "    sete al\n"
+                    << "    mov byte [rbp-" << valueOffset(program, item.output) << "], al\n";
             } else if constexpr (std::is_same_v<T, IrArrayConstruct>) {
                 const std::size_t output = valueOffset(program, item.output);
                 const std::size_t elementBytes = valueTypeSize(*item.type.element);

@@ -596,6 +596,10 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
         else if constexpr (std::is_same_v<T, EnumExpr>) return ValueType(node.type);
         else if constexpr (std::is_same_v<T, FieldExpr>) {
             const ValueType object = inferType(*node.object);
+            if (object == ValueType::String && node.field == "lengthBytes")
+                return ValueType::Int;
+            if (object == ValueType::String && node.field == "isEmpty")
+                return ValueType::Bool;
             if (object.kind == ValueType::Kind::Slice && node.field == "length")
                 return ValueType::Int;
             if (object.kind != ValueType::Kind::Struct) return ValueType::Int;
@@ -711,6 +715,13 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
         }
         else if constexpr (std::is_same_v<T, FieldExpr>) {
             const ValueType object = inferType(*node.object);
+            if (object == ValueType::String) {
+                checkExpression(*node.object, object);
+                if (node.field == "lengthBytes") return ValueType::Int;
+                if (node.field == "isEmpty") return ValueType::Bool;
+                throw CompileError(expression.location,
+                                   "propriété String inconnue '" + node.field + "'");
+            }
             if (object.kind == ValueType::Kind::Slice && node.field == "length") {
                 checkExpression(*node.object, object);
                 return ValueType::Int;
