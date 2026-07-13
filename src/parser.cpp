@@ -209,6 +209,7 @@ ValueType Parser::consumeType(const std::string& message) {
     if (match(TokenKind::BoolType)) return ValueType::Bool;
     if (match(TokenKind::CharType)) return ValueType::Char;
     if (match(TokenKind::StringType)) return ValueType::String;
+    if (match(TokenKind::StringViewType)) return ValueType::StringView;
     if (check(TokenKind::Identifier)) {
         const auto found = structures_.find(peek().text);
         if (found != structures_.end()) {

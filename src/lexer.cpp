@@ -168,6 +168,7 @@ std::vector<Token> Lexer::scan() {
             if (text == "Bool") kind = TokenKind::BoolType;
             if (text == "Char") kind = TokenKind::CharType;
             if (text == "String") kind = TokenKind::StringType;
+            if (text == "StringView") kind = TokenKind::StringViewType;
             if (text == "Slice") kind = TokenKind::SliceType;
             if (text == "SliceMut") kind = TokenKind::SliceMutType;
             if (text == "Box") kind = TokenKind::BoxType;

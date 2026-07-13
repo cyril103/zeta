@@ -11,7 +11,8 @@ namespace {
 std::string globalLabel(const IrSlot& slot) { return "zeta_global_" + slot.name; }
 std::size_t align16(std::size_t value) { return (value + 15U) & ~std::size_t{15U}; }
 bool isPairValue(ValueType type) {
-    return type == ValueType::String || type.kind == ValueType::Kind::Slice;
+    return type == ValueType::String || type == ValueType::StringView ||
+        type.kind == ValueType::Kind::Slice;
 }
 bool isAggregateValue(ValueType type) {
     return type.kind == ValueType::Kind::Struct || type.kind == ValueType::Kind::Enum;
@@ -23,7 +24,7 @@ std::size_t valueSize(ValueType type) {
     if (type.kind == ValueType::Kind::Array || isAggregateValue(type))
         return valueTypeSize(type);
     if (type.kind == ValueType::Kind::Reference || type.kind == ValueType::Kind::Box) return 8U;
-    if (type == ValueType::String || type.kind == ValueType::Kind::Slice) return 16U;
+    if (isPairValue(type)) return 16U;
     return type == ValueType::Double ? 8U : 4U;
 }
 std::size_t slotBytes(const IrProgram& program) {
@@ -494,7 +495,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
                 if (item.type.kind == ValueType::Kind::Array ||
                     isAggregateValue(item.type) ||
-                    item.type.kind == ValueType::Kind::Slice) {
+                    isPairValue(item.type)) {
                     emitBlockCopy(out, address,
                         "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]",
                         valueTypeSize(item.type));
@@ -805,7 +806,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
                 if (item.type.kind == ValueType::Kind::Array ||
                     isAggregateValue(item.type) ||
-                    item.type.kind == ValueType::Kind::Slice) {
+                    isPairValue(item.type)) {
                     emitBlockCopy(out,
                         "[rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
                         address, valueTypeSize(item.type));
@@ -831,7 +832,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
             } else if constexpr (std::is_same_v<T, IrCopy>) {
                 if (item.type.kind == ValueType::Kind::Array ||
                     isAggregateValue(item.type) ||
-                    item.type.kind == ValueType::Kind::Slice) {
+                    isPairValue(item.type)) {
                     emitBlockCopy(out,
                         "[rbp-" + std::to_string(valueOffset(program, item.input)) + "]",
                         "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]",
@@ -889,7 +890,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     out << "    mov qword [rbp-" << offset << "], rax\n";
                     if (valueTypeSize(item.returnType) > 8U)
                         out << "    mov qword [rbp-" << offset << "+8], rdx\n";
-                } else if (item.returnType == ValueType::String) {
+                } else if (isPairValue(item.returnType)) {
                     const std::size_t offset = valueOffset(program, item.output);
                     out << "    mov qword [rbp-" << offset << "], rax\n"
                         << "    mov qword [rbp-" << offset - 8U << "], rdx\n";
@@ -963,7 +964,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     out << "    mov rax, qword [rbp-" << offset << "]\n";
                     if (valueTypeSize(item.type) > 8U)
                         out << "    mov rdx, qword [rbp-" << offset << "+8]\n";
-                } else if (item.type == ValueType::String) {
+                } else if (isPairValue(item.type)) {
                     const std::size_t offset = valueOffset(program, item.value);
                     out << "    mov rax, qword [rbp-" << offset << "]\n"
                         << "    mov rdx, qword [rbp-" << offset - 8U << "]\n";

@@ -21,6 +21,7 @@ enum class TokenKind {
     BoolType,
     CharType,
     StringType,
+    StringViewType,
     SliceType,
     SliceMutType,
     BoxType,
@@ -92,6 +93,7 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::BoolType: return "'Bool'";
     case TokenKind::CharType: return "'Char'";
     case TokenKind::StringType: return "'String'";
+    case TokenKind::StringViewType: return "'StringView'";
     case TokenKind::SliceType: return "'Slice'";
     case TokenKind::SliceMutType: return "'SliceMut'";
     case TokenKind::BoxType: return "'Box'";

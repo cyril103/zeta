@@ -14,7 +14,7 @@ struct StructType;
 struct EnumType;
 
 struct ValueType {
-    enum class Kind { Int, Byte, Double, Bool, Char, String, Array, Reference, Slice, Box, TypeParameter, Struct, Enum };
+    enum class Kind { Int, Byte, Double, Bool, Char, String, StringView, Array, Reference, Slice, Box, TypeParameter, Struct, Enum };
 
     Kind kind;
     std::shared_ptr<const ValueType> element;
@@ -49,6 +49,7 @@ struct ValueType {
     static const ValueType Bool;
     static const ValueType Char;
     static const ValueType String;
+    static const ValueType StringView;
 
     friend bool operator==(const ValueType& left, const ValueType& right) {
         if (left.kind != right.kind) return false;
@@ -182,6 +183,7 @@ inline const ValueType ValueType::Double{ValueType::Kind::Double};
 inline const ValueType ValueType::Bool{ValueType::Kind::Bool};
 inline const ValueType ValueType::Char{ValueType::Kind::Char};
 inline const ValueType ValueType::String{ValueType::Kind::String};
+inline const ValueType ValueType::StringView{ValueType::Kind::StringView};
 
 inline std::string typeName(ValueType type) {
     if (type == ValueType::Int) return "Int";
@@ -190,6 +192,7 @@ inline std::string typeName(ValueType type) {
     if (type == ValueType::Bool) return "Bool";
     if (type == ValueType::Char) return "Char";
     if (type == ValueType::String) return "String";
+    if (type == ValueType::StringView) return "StringView";
     if (type.kind == ValueType::Kind::Array)
         return "[" + typeName(*type.element) + "; " + std::to_string(type.length) + "]";
     if (type.kind == ValueType::Kind::Slice)
@@ -231,7 +234,8 @@ inline std::size_t valueTypeSize(const ValueType& type) {
     if (type == ValueType::Byte || type == ValueType::Bool) return 1U;
     if (type == ValueType::Int || type == ValueType::Char) return 4U;
     if (type == ValueType::Double) return 8U;
-    if (type == ValueType::String || type.kind == ValueType::Kind::Slice) return 16U;
+    if (type == ValueType::String || type == ValueType::StringView ||
+        type.kind == ValueType::Kind::Slice) return 16U;
     if (type.kind == ValueType::Kind::Reference || type.kind == ValueType::Kind::Box) return 8U;
     if (type.kind == ValueType::Kind::Struct) return type.structure->size;
     if (type.kind == ValueType::Kind::Enum) return type.enumeration->size;
@@ -243,6 +247,7 @@ inline std::size_t valueTypeAlignment(const ValueType& type) {
     if (type == ValueType::Byte || type == ValueType::Bool) return 1U;
     if (type == ValueType::Int || type == ValueType::Char) return 4U;
     if (type == ValueType::Double || type == ValueType::String ||
+        type == ValueType::StringView ||
         type.kind == ValueType::Kind::Slice) return 8U;
     if (type.kind == ValueType::Kind::Reference || type.kind == ValueType::Kind::Box) return 8U;
     if (type.kind == ValueType::Kind::Struct) return type.structure->alignment;

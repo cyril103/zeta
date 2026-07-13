@@ -16,6 +16,7 @@ std::string encodeType(const ValueType& type) {
     case ValueType::Kind::Bool: return "B";
     case ValueType::Kind::Char: return "C";
     case ValueType::Kind::String: return "S";
+    case ValueType::Kind::StringView: return "W";
     case ValueType::Kind::Array:
         return "A" + std::to_string(type.length) + "(" + encodeType(*type.element) + ")";
     case ValueType::Kind::Reference:
@@ -47,6 +48,7 @@ ValueType decodeType(const std::string& encoded, std::size_t& cursor) {
     if (kind == 'B') return ValueType::Bool;
     if (kind == 'C') return ValueType::Char;
     if (kind == 'S') return ValueType::String;
+    if (kind == 'W') return ValueType::StringView;
     if (kind == 'T') {
         if (cursor >= encoded.size() || encoded[cursor++] != '(')
             throw std::runtime_error("paramètre de type invalide dans l'interface");

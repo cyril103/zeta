@@ -350,6 +350,17 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
             borrowScopes_.back().push_back(declaration.name);
         }
     }
+    if (declaration.type == ValueType::StringView && !declaration.nativeSymbol) {
+        if (declaration.callable)
+            throw CompileError(declaration.location,
+                               "le retour de StringView n'est pas encore autorisé");
+        if (allowRecursion)
+            throw CompileError(declaration.location,
+                               "une StringView ne peut pas être stockée globalement");
+        if (declaration.kind != BindingKind::Val)
+            throw CompileError(declaration.location,
+                               "une StringView locale doit être déclarée avec 'val'");
+    }
     if (declaration.callable && declaration.type.kind == ValueType::Kind::Array)
         throw CompileError(declaration.location,
                            "le retour d'un tableau par valeur n'est pas encore pris en charge");
@@ -596,9 +607,11 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
         else if constexpr (std::is_same_v<T, EnumExpr>) return ValueType(node.type);
         else if constexpr (std::is_same_v<T, FieldExpr>) {
             const ValueType object = inferType(*node.object);
-            if (object == ValueType::String && node.field == "lengthBytes")
+            if ((object == ValueType::String || object == ValueType::StringView) &&
+                node.field == "lengthBytes")
                 return ValueType::Int;
-            if (object == ValueType::String && node.field == "isEmpty")
+            if ((object == ValueType::String || object == ValueType::StringView) &&
+                node.field == "isEmpty")
                 return ValueType::Bool;
             if (object.kind == ValueType::Kind::Slice && node.field == "length")
                 return ValueType::Int;
@@ -715,12 +728,13 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
         }
         else if constexpr (std::is_same_v<T, FieldExpr>) {
             const ValueType object = inferType(*node.object);
-            if (object == ValueType::String) {
+            if (object == ValueType::String || object == ValueType::StringView) {
                 checkExpression(*node.object, object);
                 if (node.field == "lengthBytes") return ValueType::Int;
                 if (node.field == "isEmpty") return ValueType::Bool;
                 throw CompileError(expression.location,
-                                   "propriété String inconnue '" + node.field + "'");
+                                   "propriété " + typeName(object) + " inconnue '" +
+                                   node.field + "'");
             }
             if (object.kind == ValueType::Kind::Slice && node.field == "length") {
                 checkExpression(*node.object, object);

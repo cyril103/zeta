@@ -3,6 +3,34 @@ format ELF64
 section '.text' executable
 
 public zeta_fn_strings__decodeAtByte
+public zeta_fn_strings__view
+public zeta_fn_strings__viewIsValid
+
+; Retourne {0, 0} si les bornes ne satisfont pas 0 <= début <= fin <= longueur.
+zeta_fn_strings__view:
+    mov rax, qword [rsp+8]
+    mov r8, qword [rsp+16]
+    movsxd rcx, dword [rsp+24]
+    movsxd rdx, dword [rsp+32]
+    test rcx, rcx
+    js .invalid_view
+    cmp rdx, rcx
+    jl .invalid_view
+    cmp rdx, r8
+    jg .invalid_view
+    add rax, rcx
+    sub rdx, rcx
+    ret
+.invalid_view:
+    xor eax, eax
+    xor edx, edx
+    ret
+
+zeta_fn_strings__viewIsValid:
+    xor eax, eax
+    cmp qword [rsp+8], 0
+    setne al
+    ret
 
 ; String {adresse, longueur}, puis offset Int. Retourne le point de code ou -1.
 zeta_fn_strings__decodeAtByte:

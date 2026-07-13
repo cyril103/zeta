@@ -1,0 +1,4 @@
+import strings
+
+def invalid(value: String): StringView = strings.view(value, 0, 1)
+def main(): Int = 0

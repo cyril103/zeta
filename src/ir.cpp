@@ -134,7 +134,8 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
             stackOffset += (parameter.type.kind == ValueType::Kind::Struct ||
                             parameter.type.kind == ValueType::Kind::Enum)
                 ? (valueTypeSize(parameter.type) + 7U) / 8U * 8U
-                : parameter.type == ValueType::String || parameter.type.kind == ValueType::Kind::Slice ? 16U : 8U;
+                : parameter.type == ValueType::String || parameter.type == ValueType::StringView ||
+                    parameter.type.kind == ValueType::Kind::Slice ? 16U : 8U;
         }
         emitTailExpression(*function->initializer, parameters, *function);
     }
@@ -161,7 +162,8 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
             stackOffset += (parameterType.kind == ValueType::Kind::Struct ||
                             parameterType.kind == ValueType::Kind::Enum)
                 ? (valueTypeSize(parameterType) + 7U) / 8U * 8U
-                : parameterType == ValueType::String || parameterType.kind == ValueType::Kind::Slice ? 16U : 8U;
+                : parameterType == ValueType::String || parameterType == ValueType::StringView ||
+                    parameterType.kind == ValueType::Kind::Slice ? 16U : 8U;
         }
         emitTailExpression(*function.initializer, parameters, function);
     }
@@ -314,7 +316,8 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
             stackOffset += (parameter.type.kind == ValueType::Kind::Struct ||
                             parameter.type.kind == ValueType::Kind::Enum)
                 ? (valueTypeSize(parameter.type) + 7U) / 8U * 8U
-                : parameter.type == ValueType::String || parameter.type.kind == ValueType::Kind::Slice ? 16U : 8U;
+                : parameter.type == ValueType::String || parameter.type == ValueType::StringView ||
+                    parameter.type.kind == ValueType::Kind::Slice ? 16U : 8U;
         }
         emitTailExpression(*function->initializer, parameters, *function);
         for (const std::string& alias : aliases) symbols_.erase(alias);
@@ -341,7 +344,8 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
             stackOffset += (parameterType.kind == ValueType::Kind::Struct ||
                             parameterType.kind == ValueType::Kind::Enum)
                 ? (valueTypeSize(parameterType) + 7U) / 8U * 8U
-                : parameterType == ValueType::String || parameterType.kind == ValueType::Kind::Slice ? 16U : 8U;
+                : parameterType == ValueType::String || parameterType == ValueType::StringView ||
+                    parameterType.kind == ValueType::Kind::Slice ? 16U : 8U;
         }
         emitTailExpression(*function.initializer, parameters, function);
     }
@@ -680,7 +684,8 @@ ValueId IrGenerator::expression(
             return output;
         } else if constexpr (std::is_same_v<T, FieldExpr>) {
             const ValueId object = expression(*node.object, parameters);
-            if (node.object->inferredType == ValueType::String) {
+            if (node.object->inferredType == ValueType::String ||
+                node.object->inferredType == ValueType::StringView) {
                 const ValueId output = nextValue(expressionNode.inferredType);
                 if (node.field == "lengthBytes")
                     ir_.instructions.push_back(IrStringLength{output, object});

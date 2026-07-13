@@ -1,0 +1,14 @@
+import strings
+
+def main(): Int = {
+    val text: String = "hé🚀!"
+    val middle: StringView = strings.view(text, 1, 7)
+    val empty: StringView = strings.view(text, 3, 3)
+    val invalidOrder: StringView = strings.view(text, 7, 1)
+    val invalidNegative: StringView = strings.view(text, -1, 2)
+    val invalidEnd: StringView = strings.view(text, 0, 9)
+    if (strings.viewIsValid(middle) && middle.lengthBytes == 6 &&
+        strings.viewIsValid(empty) && empty.isEmpty &&
+        !strings.viewIsValid(invalidOrder) && !strings.viewIsValid(invalidNegative) &&
+        !strings.viewIsValid(invalidEnd)) 0 else 1
+}

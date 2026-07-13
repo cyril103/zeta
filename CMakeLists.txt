@@ -146,6 +146,14 @@ if(BUILD_TESTING)
         -o ${CMAKE_CURRENT_BINARY_DIR}/string-char-iteration)
     add_test(NAME run_string_char_iteration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/string-char-iteration)
     set_tests_properties(run_string_char_iteration PROPERTIES DEPENDS compile_string_char_iteration)
+    add_test(NAME compile_string_views COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_views.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/string-views)
+    add_test(NAME run_string_views COMMAND ${CMAKE_CURRENT_BINARY_DIR}/string-views)
+    set_tests_properties(run_string_views PROPERTIES DEPENDS compile_string_views)
+    add_test(NAME reject_string_view_return COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_view_return.zeta)
+    set_tests_properties(reject_string_view_return PROPERTIES WILL_FAIL TRUE)
     add_test(NAME compile_string_double_conversion COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_double_conversion.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/string-double-conversion)
