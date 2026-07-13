@@ -105,7 +105,7 @@ struct IrTailCall {
     std::vector<ValueId> arguments;
     std::vector<ValueType> argumentTypes;
 };
-struct IrFunctionStart { std::string name; };
+struct IrFunctionStart { std::string name; bool linkOnce{false}; };
 struct IrParameter { ValueId output; std::size_t index; std::size_t stackOffset; ValueType type; };
 struct IrReturn { ValueId value; ValueType type; };
 struct IrDrop { ValueId value; ValueType type; };
@@ -132,6 +132,9 @@ public:
     IrProgram generate(const TypedProgram& program);
     IrProgram generate(const ModuleGraph& graph);
     IrProgram generateModule(const ModuleGraph& graph, const std::string& module);
+    static std::vector<std::string> genericDefinitions(const IrProgram& program);
+    static void removeGenericDefinitions(IrProgram& program,
+                                         const std::unordered_set<std::string>& names);
     static std::string print(const IrProgram& program);
 
 private:

@@ -7,7 +7,9 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 cp "$fixtures"/*.zeta "$work/"
 
-if "$compiler" "$work/main.zeta" -o "$work/app" >"$work/error" 2>&1; then
-    exit 1
-fi
-grep -q "multiple definition.*zeta_fn_api__identity__Int__g" "$work/error"
+"$compiler" "$work/main.zeta" -o "$work/app" >/dev/null
+"$work/app"
+
+count=$(nm --defined-only "$work/app.modules"/*.o |
+    grep -c ' zeta_fn_api__identity__Int__g')
+test "$count" -eq 1

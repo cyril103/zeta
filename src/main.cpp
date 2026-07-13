@@ -19,6 +19,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <vector>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace fs = std::filesystem;
 
@@ -440,6 +442,21 @@ int main(int argc, char** argv) {
         IrGenerator irGenerator;
         const IrProgram ir = irGenerator.generate(modules);
 
+        std::unordered_map<std::string, IrProgram> moduleIrs;
+        std::unordered_set<std::string> claimedGenericInstances;
+        for (const std::string& moduleName : modules.compilationOrder) {
+            if (modules.modules.at(moduleName).precompiled) continue;
+            IrGenerator moduleGenerator;
+            IrProgram moduleIr = moduleGenerator.generateModule(modules, moduleName);
+            std::unordered_set<std::string> duplicates;
+            for (const std::string& definition :
+                 IrGenerator::genericDefinitions(moduleIr))
+                if (!claimedGenericInstances.insert(definition).second)
+                    duplicates.insert(definition);
+            IrGenerator::removeGenericDefinitions(moduleIr, duplicates);
+            moduleIrs.emplace(moduleName, std::move(moduleIr));
+        }
+
         fs::path irPath = outputPath;
         irPath += ".ir";
         fs::path assemblyPath = outputPath;
@@ -483,8 +500,7 @@ int main(int argc, char** argv) {
                 objects.push_back(moduleObject);
                 continue;
             }
-            IrGenerator moduleGenerator;
-            const IrProgram moduleIr = moduleGenerator.generateModule(modules, moduleName);
+            const IrProgram& moduleIr = moduleIrs.at(moduleName);
             const fs::path moduleIrPath = moduleDirectory / (moduleName + ".ir");
             const fs::path moduleInterfacePath = moduleDirectory / (moduleName + ".zti");
             const fs::path moduleAssembly = moduleDirectory / (moduleName + ".asm");
@@ -494,17 +510,21 @@ int main(int argc, char** argv) {
             const std::string fingerprint = "zeta-module-object-v" +
                 std::string(ZetaVersion::ModuleCache) + ":" +
                 modules.fingerprints.at(moduleName);
+            std::string objectFingerprint = fingerprint;
+            for (const std::string& definition : IrGenerator::genericDefinitions(moduleIr))
+                objectFingerprint += ":generic-owner:" + definition;
             writeFile(moduleIrPath, IrGenerator::print(moduleIr));
             writeFile(moduleInterfacePath, InterfaceCodec::serialize(
                 modules.interfaces.at(moduleName),
                 modules.interfaceFingerprints.at(moduleName),
                 modules.dependencies.at(moduleName),
                 modules.modules.at(moduleName).genericTokens));
-            if (!fs::exists(cachedModuleObject) || readOptionalFile(moduleStamp) != fingerprint) {
+            if (!fs::exists(cachedModuleObject) ||
+                readOptionalFile(moduleStamp) != objectFingerprint) {
                 writeFile(moduleAssembly,
                     FasmCodeGenerator::generateObject(moduleIr, false, moduleName));
                 runFasm(moduleAssembly, cachedModuleObject);
-                writeFile(moduleStamp, fingerprint);
+                writeFile(moduleStamp, objectFingerprint);
             }
             fs::copy_file(cachedModuleObject, moduleObject, fs::copy_options::overwrite_existing);
             objects.push_back(moduleObject);

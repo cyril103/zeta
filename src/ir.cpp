@@ -248,7 +248,7 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
             typeSubstitutions_.emplace(function.typeParameters[i], instance.types[i]);
         boxParameters_.clear();
         movedBoxes_.clear();
-        ir_.instructions.push_back(IrFunctionStart{instance.linkName});
+        ir_.instructions.push_back(IrFunctionStart{instance.linkName, true});
         std::unordered_map<std::string, ValueId> parameters;
         std::size_t stackOffset = 16U;
         for (std::size_t i = 0; i < function.parameters.size(); ++i) {
@@ -432,7 +432,7 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
             typeSubstitutions_.emplace(function.typeParameters[i], instance.types[i]);
         boxParameters_.clear();
         movedBoxes_.clear();
-        ir_.instructions.push_back(IrFunctionStart{instance.linkName});
+        ir_.instructions.push_back(IrFunctionStart{instance.linkName, true});
         std::unordered_map<std::string, ValueId> parameters;
         std::size_t stackOffset = 16U;
         for (std::size_t i = 0; i < function.parameters.size(); ++i) {
@@ -453,6 +453,28 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
     }
     typeSubstitutions_.clear();
     return std::move(ir_);
+}
+
+std::vector<std::string> IrGenerator::genericDefinitions(const IrProgram& program) {
+    std::vector<std::string> result;
+    for (const IrInstruction& instruction : program.instructions)
+        if (const auto* function = std::get_if<IrFunctionStart>(&instruction);
+            function != nullptr && function->linkOnce)
+            result.push_back(function->name);
+    return result;
+}
+
+void IrGenerator::removeGenericDefinitions(
+    IrProgram& program, const std::unordered_set<std::string>& names) {
+    std::vector<IrInstruction> retained;
+    retained.reserve(program.instructions.size());
+    bool removing = false;
+    for (IrInstruction& instruction : program.instructions) {
+        if (const auto* function = std::get_if<IrFunctionStart>(&instruction))
+            removing = function->linkOnce && names.contains(function->name);
+        if (!removing) retained.push_back(std::move(instruction));
+    }
+    program.instructions = std::move(retained);
 }
 
 void IrGenerator::emitIndexStore(
