@@ -693,11 +693,12 @@ Declaration Parser::declaration(BindingKind kind) {
     const Token start = previous();
     const Token& name = consume(TokenKind::Identifier,
                                 "identifiant attendu après '" + start.text + "'");
+    const auto enclosingTypeParameters = activeTypeParameters_;
     bool callable = false;
     std::vector<std::string> typeParameters;
     std::vector<std::string> typeConstraints;
     std::vector<Parameter> parameters;
-    activeTypeParameters_.clear();
+    if (kind == BindingKind::Def) activeTypeParameters_.clear();
     if (kind == BindingKind::Def && match(TokenKind::LeftBracket)) {
         do {
             const Token& parameter = consume(TokenKind::Identifier,
@@ -739,14 +740,14 @@ Declaration Parser::declaration(BindingKind kind) {
     if (nativeSymbol) {
         if (!callable)
             throw CompileError(start.location, "une déclaration native doit être une fonction");
-        activeTypeParameters_.clear();
+        activeTypeParameters_ = enclosingTypeParameters;
         return Declaration{start.location, name.text, type, kind, publicSymbol, true,
                            callable, std::move(parameters), std::move(typeParameters),
                            std::move(typeConstraints), nullptr};
     }
     consume(TokenKind::Equal, "'=' attendu après le type");
     ExprPtr initializer = expression();
-    activeTypeParameters_.clear();
+    activeTypeParameters_ = enclosingTypeParameters;
     return Declaration{start.location, name.text, type, kind, publicSymbol, false,
                        callable, std::move(parameters), std::move(typeParameters),
                        std::move(typeConstraints), std::move(initializer)};
