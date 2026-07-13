@@ -285,7 +285,7 @@ std::filesystem::path ModuleLoader::resolveImport(const std::string& name) const
     const std::filesystem::path local = sourceDirectory_ / (name + ".zeta");
     if (std::filesystem::exists(local)) return local;
     const std::filesystem::path localInterface = sourceDirectory_ / (name + ".zti");
-    if (std::filesystem::exists(localInterface)) return localInterface;
+    if (preferPrecompiled_ && std::filesystem::exists(localInterface)) return localInterface;
     const std::filesystem::path sharedInterface =
         sharedLibraryDirectory_ / (name + ".zti");
     if (!sharedLibraryDirectory_.empty() && std::filesystem::exists(sharedInterface))
