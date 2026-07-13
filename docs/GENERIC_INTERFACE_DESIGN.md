@@ -15,8 +15,32 @@ ses dépendances.
 La première représentation structurée conserve la syntaxe canonique du module
 sous forme d'une suite de tokens. Elle élimine le texte brut et le lexer tout en
 préservant exactement les déclarations nécessaires à l'analyse et à la
-monomorphisation. Une réduction ultérieure pourra supprimer les déclarations qui
-ne sont pas dans la fermeture des exports génériques.
+monomorphisation. La fermeture ci-dessous supprime les déclarations qui ne sont
+pas nécessaires aux exports génériques.
+
+## Fermeture de déclarations
+
+La réduction travaille sur les frontières syntaxiques du niveau global, sans
+réinterpréter les expressions :
+
+1. les lignes `import` de tête sont conservées afin que les noms qualifiés restent
+   reconnus par le parseur ;
+2. les déclarations globales sont découpées en suivant les profondeurs de
+   parenthèses, crochets et accolades ;
+3. les déclarations des exports génériques publics constituent les racines ;
+4. tout identifiant rencontré dans une déclaration retenue qui correspond au nom
+   d'une autre déclaration globale ajoute celle-ci à la fermeture ;
+5. l'étape précédente est répétée jusqu'au point fixe ;
+6. les imports et déclarations retenues sont réémis dans leur ordre original,
+   séparés canoniquement, puis suivis d'un unique token `End`.
+
+La recherche par identifiant est volontairement conservative. Un nom de champ ou
+une variable locale homonyme peut retenir une déclaration globale supplémentaire,
+mais aucune dépendance réelle ne doit être supprimée. Les commentaires, lignes
+vides et déclarations globales sans lien avec les racines disparaissent.
+
+Une racine générique absente du découpage est une erreur interne de production de
+l'interface ; elle ne doit jamais produire silencieusement un bloc incomplet.
 
 ## Format
 
