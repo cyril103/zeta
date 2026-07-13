@@ -1,0 +1,2 @@
+// Primitives UTF-8 de bas niveau. -1 signale une fin ou un offset invalide.
+pub native def decodeAtByte(value: String, offset: Int): Int

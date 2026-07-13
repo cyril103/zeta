@@ -1,0 +1,12 @@
+import strings
+
+def main(): Int = {
+    val value: String = "hé€🚀"
+    if (strings.decodeAtByte(value, 0) == Int('h') &&
+        strings.decodeAtByte(value, 1) == Int('é') &&
+        strings.decodeAtByte(value, 3) == Int('€') &&
+        strings.decodeAtByte(value, 6) == Int('🚀') &&
+        strings.decodeAtByte(value, 2) == -1 &&
+        strings.decodeAtByte(value, -1) == -1 &&
+        strings.decodeAtByte(value, value.lengthBytes) == -1) 0 else 1
+}
