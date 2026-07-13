@@ -1,0 +1,3 @@
+import api
+
+def main(): Int = api.identity[Int](0)

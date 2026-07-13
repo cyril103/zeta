@@ -42,6 +42,25 @@ std::string hexHash(std::uint64_t hash) {
     return output.str();
 }
 
+std::uint64_t hashTokens(const std::vector<Token>& tokens) {
+    std::uint64_t hash = 1469598103934665603ULL;
+    bool hasToken = false;
+    bool pendingSeparator = false;
+    for (const Token& token : tokens) {
+        if (token.kind == TokenKind::Separator) {
+            pendingSeparator = hasToken;
+            continue;
+        }
+        if (pendingSeparator && token.kind != TokenKind::End)
+            hash = hashText("separator", hash);
+        pendingSeparator = false;
+        hash = hashText(std::to_string(static_cast<int>(token.kind)) + ":" +
+                        std::to_string(token.text.size()) + ":" + token.text, hash);
+        hasToken = true;
+    }
+    return hash;
+}
+
 std::vector<Program::Import> discoverImports(const std::vector<Token>& tokens) {
     std::vector<Program::Import> imports;
     std::size_t cursor = 0;
@@ -186,7 +205,7 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
                 std::move(parameters), {}, {}, nullptr});
         }
         graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source),
-                                            true, objectPath, persisted.genericSource});
+                                            true, objectPath, persisted.genericSource, {}});
         Module& storedModule = graph_.modules.at(name);
         for (Statement& statement : storedModule.program.statements) {
             auto* declaration = std::get_if<Declaration>(&statement.value);
@@ -205,6 +224,7 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
     }
     Lexer lexer(source);
     std::vector<Token> tokens = lexer.scan();
+    const std::vector<Token> syntaxTokens = tokens;
     const std::vector<Program::Import> imports = discoverImports(tokens);
     for (const Program::Import& import : imports)
         loadModule(import.module, resolveImport(import.module));
@@ -212,7 +232,7 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
                   importedEnumerations(imports, graph_.interfaces));
     Program program = parser.parse();
     graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source),
-                                        false, {}, source});
+                                        false, {}, source, syntaxTokens});
     buildInterface(name);
     loading_.erase(name);
 }
@@ -322,7 +342,8 @@ void ModuleLoader::buildFingerprints() {
         std::sort(exports.begin(), exports.end());
         for (const std::string& signature : exports)
             interfaceHash = hashText(signature, interfaceHash);
-        if (exportsGenericBody) interfaceHash = hashText(hexHash(module.sourceHash), interfaceHash);
+        if (exportsGenericBody)
+            interfaceHash = hashText(hexHash(hashTokens(module.syntaxTokens)), interfaceHash);
         graph_.interfaceFingerprints.emplace(name, hexHash(interfaceHash));
     }
 

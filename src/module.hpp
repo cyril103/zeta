@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ast.hpp"
+#include "token.hpp"
 
 #include <filesystem>
 #include <cstdint>
@@ -34,6 +35,7 @@ struct Module {
     bool precompiled{false};
     std::filesystem::path objectPath;
     std::string sourceText;
+    std::vector<Token> syntaxTokens;
 };
 
 struct ModuleGraph {
