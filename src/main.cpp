@@ -86,7 +86,89 @@ void runRelocatableLink(const std::vector<fs::path>& objects, const fs::path& ou
 
 void usage() {
     std::cerr << "Usage: zeta <source.zeta> [-o executable] [--stdlib dossier]\n"
+                 "       zeta --build-library <source.zeta> -o dossier [--stdlib dossier]\n"
                  "       zeta --build-stdlib [--stdlib dossier]\n";
+}
+
+class TemporaryFiles {
+public:
+    void add(fs::path path) { paths_.push_back(std::move(path)); }
+    ~TemporaryFiles() {
+        for (const fs::path& path : paths_) {
+            std::error_code ignored;
+            fs::remove(path, ignored);
+        }
+    }
+
+private:
+    std::vector<fs::path> paths_;
+};
+
+bool hasNativeExports(const ModuleInterface& interface) {
+    for (const auto& [name, exported] : interface.exports) {
+        static_cast<void>(name);
+        if (exported.nativeSymbol) return true;
+    }
+    return false;
+}
+
+void buildLibrary(const ModuleGraph& modules, const fs::path& outputDirectory) {
+    if (fs::exists(outputDirectory) && !fs::is_directory(outputDirectory))
+        throw std::runtime_error("la sortie de --build-library doit être un dossier");
+    fs::create_directories(outputDirectory);
+
+    const std::string& moduleName = modules.root;
+    const Module& module = modules.modules.at(moduleName);
+    if (module.precompiled)
+        throw std::runtime_error("--build-library attend un module source");
+
+    const std::string temporarySuffix = ".tmp." + std::to_string(getpid());
+    const fs::path temporaryInterface =
+        outputDirectory / ("." + moduleName + ".zti" + temporarySuffix);
+    const fs::path temporaryAssembly =
+        outputDirectory / ("." + moduleName + ".asm" + temporarySuffix);
+    const fs::path temporaryObject =
+        outputDirectory / ("." + moduleName + ".o" + temporarySuffix);
+    const fs::path temporaryRuntime =
+        outputDirectory / ("." + moduleName + ".runtime.o" + temporarySuffix);
+    const fs::path temporaryLinked =
+        outputDirectory / ("." + moduleName + ".linked.o" + temporarySuffix);
+    TemporaryFiles temporaryFiles;
+    for (const fs::path& path : {temporaryInterface, temporaryAssembly, temporaryObject,
+                                 temporaryRuntime, temporaryLinked}) {
+        std::error_code ignored;
+        fs::remove(path, ignored);
+        temporaryFiles.add(path);
+    }
+
+    IrGenerator generator;
+    const IrProgram ir = generator.generateModule(modules, moduleName);
+    writeFile(temporaryInterface, InterfaceCodec::serialize(
+        modules.interfaces.at(moduleName),
+        modules.interfaceFingerprints.at(moduleName),
+        modules.dependencies.at(moduleName), module.genericTokens));
+    writeFile(temporaryAssembly,
+              FasmCodeGenerator::generateObject(ir, false, moduleName));
+    runFasm(temporaryAssembly, temporaryObject);
+
+    fs::path publishedObject = temporaryObject;
+    if (hasNativeExports(modules.interfaces.at(moduleName))) {
+#ifdef ZETA_RUNTIME_DIR
+        const fs::path runtimeAssembly = fs::path(ZETA_RUNTIME_DIR) / (moduleName + ".asm");
+#else
+        const fs::path runtimeAssembly;
+#endif
+        if (readOptionalFile(runtimeAssembly).empty())
+            throw std::runtime_error("runtime natif introuvable pour le module " + moduleName);
+        runFasm(runtimeAssembly, temporaryRuntime);
+        runRelocatableLink({temporaryObject, temporaryRuntime}, temporaryLinked);
+        publishedObject = temporaryLinked;
+    }
+
+    const fs::path interfacePath = outputDirectory / (moduleName + ".zti");
+    const fs::path objectPath = outputDirectory / (moduleName + ".o");
+    fs::rename(temporaryInterface, interfacePath);
+    fs::rename(publishedObject, objectPath);
 }
 
 std::string startAssembly(const ModuleGraph& modules) {
@@ -114,10 +196,13 @@ int main(int argc, char** argv) {
     fs::path outputPath;
     fs::path standardLibraryPath;
     bool buildStandardLibrary = false;
+    bool buildLibraryModule = false;
     for (int i = 1; i < argc; ++i) {
         const std::string argument = argv[i];
         if (argument == "--build-stdlib") {
             buildStandardLibrary = true;
+        } else if (argument == "--build-library") {
+            buildLibraryModule = true;
         } else if (argument == "-o") {
             if (++i >= argc) {
                 usage();
@@ -141,6 +226,15 @@ int main(int argc, char** argv) {
 #ifdef ZETA_STDLIB_DIR
         standardLibraryPath = ZETA_STDLIB_DIR;
 #endif
+    }
+    if (buildStandardLibrary && buildLibraryModule) {
+        usage();
+        return 2;
+    }
+    if (buildLibraryModule &&
+        (sourcePath.empty() || outputPath.empty() || sourcePath.extension() != ".zeta")) {
+        usage();
+        return 2;
     }
     std::vector<std::string> standardModules;
     if (buildStandardLibrary) {
@@ -176,7 +270,13 @@ int main(int argc, char** argv) {
                 modules.modules.at(moduleName).genericTokens.empty()) continue;
             SemanticAnalyzer semanticAnalyzer;
             semanticAnalyzer.analyze(modules.modules.at(moduleName).program, &modules.interfaces,
-                                     moduleName == modules.root);
+                                     moduleName == modules.root && !buildLibraryModule);
+        }
+        if (buildLibraryModule) {
+            buildLibrary(modules, outputPath);
+            std::cout << "Bibliothèque créée : " << outputPath / (modules.root + ".zti")
+                      << " et " << outputPath / (modules.root + ".o") << '\n';
+            return 0;
         }
         IrGenerator irGenerator;
         const IrProgram ir = irGenerator.generate(modules);
