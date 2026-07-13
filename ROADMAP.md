@@ -61,6 +61,8 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
 - interfaces persistantes versionnées `.zti` consommables avec un `.o` sans source ;
 - représentation syntaxique structurée des génériques publics, monomorphisable
   côté consommateur sans lexer ni source ;
+- identité canonique et déduplication `link-once` des instances génériques entre
+  modules source, bibliothèques séparées et cache partagé ;
 - stdlib précompilable avec `zeta --build-stdlib` ;
 - bibliothèques ordinaires constructibles avec `zeta --build-library` sans point
   d'entrée ni exécutable intermédiaire ;
@@ -156,7 +158,7 @@ en cas d'échec d'allocation ou de dépassement de taille.
 Le comportement en cas d'échec d'allocation est désormais défini avant l'ajout de
 plusieurs conteneurs.
 
-## Priorité 4 — Interfaces publiques complètes — en cours
+## Priorité 4 — Interfaces publiques complètes — terminée
 
 Objectif : stabiliser `.zti` comme véritable format de distribution de bibliothèques.
 
@@ -187,10 +189,14 @@ Travail livré :
     sans `main`, cache de projet ni exécutable factice ;
 12. commande `--install-library`, cache partagé configurable, résolution
     transitive, validation des dépendances et remplacement protégé par empreinte.
+13. identité canonique couvrant ABI, empreinte, producteur et types qualifiés,
+    propriétaire source unique et symboles ELF faibles pour les bibliothèques
+    construites séparément.
 
-Travail restant :
-
-1. déduplication robuste des instances génériques entre consommateurs.
+Critère de sortie : deux consommateurs source ou précompilés de la même instance
+générique se lient sans collision et n'exposent qu'une définition effective,
+tandis que deux producteurs, types qualifiés ou empreintes incompatibles restent
+distincts — couvert par les tests de distribution et de cache partagé.
 
 ## Priorité 5 — Optimisations IR
 
@@ -229,5 +235,6 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Dédupliquer les instances génériques identiques émises par plusieurs modules
-consommateurs, sans masquer les incompatibilités de type ou d'ABI.
+Introduire une vérification structurelle systématique de l'IR avant toute
+génération assembleur : définitions et usages des valeurs, types, slots, labels,
+terminaisons de fonctions et cohérence des appels.
