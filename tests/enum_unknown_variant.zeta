@@ -1,0 +1,6 @@
+enum Etat { Present }
+
+def main(): Int = {
+    val etat: Etat = Etat.Absent
+    0
+}

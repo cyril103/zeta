@@ -123,7 +123,8 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
                 boxParameters_.insert_or_assign(parameter.name,
                                                  std::pair{value, parameter.type});
             ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameter.type});
-            stackOffset += parameter.type.kind == ValueType::Kind::Struct
+            stackOffset += (parameter.type.kind == ValueType::Kind::Struct ||
+                            parameter.type.kind == ValueType::Kind::Enum)
                 ? (valueTypeSize(parameter.type) + 7U) / 8U * 8U
                 : parameter.type == ValueType::String || parameter.type.kind == ValueType::Kind::Slice ? 16U : 8U;
         }
@@ -149,7 +150,8 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
                 boxParameters_.insert_or_assign(parameter.name,
                                                  std::pair{value, parameterType});
             ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameterType});
-            stackOffset += parameterType.kind == ValueType::Kind::Struct
+            stackOffset += (parameterType.kind == ValueType::Kind::Struct ||
+                            parameterType.kind == ValueType::Kind::Enum)
                 ? (valueTypeSize(parameterType) + 7U) / 8U * 8U
                 : parameterType == ValueType::String || parameterType.kind == ValueType::Kind::Slice ? 16U : 8U;
         }
@@ -301,7 +303,8 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
                 boxParameters_.insert_or_assign(parameter.name,
                                                  std::pair{value, parameter.type});
             ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameter.type});
-            stackOffset += parameter.type.kind == ValueType::Kind::Struct
+            stackOffset += (parameter.type.kind == ValueType::Kind::Struct ||
+                            parameter.type.kind == ValueType::Kind::Enum)
                 ? (valueTypeSize(parameter.type) + 7U) / 8U * 8U
                 : parameter.type == ValueType::String || parameter.type.kind == ValueType::Kind::Slice ? 16U : 8U;
         }
@@ -327,7 +330,8 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
                 boxParameters_.insert_or_assign(function.parameters[i].name,
                                                  std::pair{value, parameterType});
             ir_.instructions.push_back(IrParameter{value, i, stackOffset, parameterType});
-            stackOffset += parameterType.kind == ValueType::Kind::Struct
+            stackOffset += (parameterType.kind == ValueType::Kind::Struct ||
+                            parameterType.kind == ValueType::Kind::Enum)
                 ? (valueTypeSize(parameterType) + 7U) / 8U * 8U
                 : parameterType == ValueType::String || parameterType.kind == ValueType::Kind::Slice ? 16U : 8U;
         }
@@ -649,6 +653,14 @@ ValueId IrGenerator::expression(
             const ValueId output = nextValue(expressionNode.inferredType);
             ir_.instructions.push_back(IrStructConstruct{output, std::move(fields), expressionNode.inferredType});
             return output;
+        } else if constexpr (std::is_same_v<T, EnumExpr>) {
+            std::vector<ValueId> fields;
+            for (const ExprPtr& field : node.fields)
+                fields.push_back(expression(*field, parameters));
+            const ValueId output = nextValue(expressionNode.inferredType);
+            ir_.instructions.push_back(IrEnumConstruct{
+                output, node.variant, std::move(fields), expressionNode.inferredType});
+            return output;
         } else if constexpr (std::is_same_v<T, FieldExpr>) {
             const ValueId object = expression(*node.object, parameters);
             const auto& fields = node.object->inferredType.structure->fields;
@@ -935,6 +947,15 @@ std::string IrGenerator::print(const IrProgram& program) {
             }
             else if constexpr (std::is_same_v<T, IrStructConstruct>) {
                 out << "  $" << item.output << " = struct " << typeName(item.type) << " [";
+                for (std::size_t i = 0; i < item.fields.size(); ++i) {
+                    if (i != 0) out << ", ";
+                    out << '$' << item.fields[i];
+                }
+                out << "]\n";
+            }
+            else if constexpr (std::is_same_v<T, IrEnumConstruct>) {
+                out << "  $" << item.output << " = enum " << typeName(item.type) << '.'
+                    << item.type.enumeration->variants[item.variant].name << " [";
                 for (std::size_t i = 0; i < item.fields.size(); ++i) {
                     if (i != 0) out << ", ";
                     out << '$' << item.fields[i];

@@ -13,11 +13,15 @@ std::size_t align16(std::size_t value) { return (value + 15U) & ~std::size_t{15U
 bool isPairValue(ValueType type) {
     return type == ValueType::String || type.kind == ValueType::Kind::Slice;
 }
+bool isAggregateValue(ValueType type) {
+    return type.kind == ValueType::Kind::Struct || type.kind == ValueType::Kind::Enum;
+}
 std::size_t typeSize(ValueType type) {
     return valueTypeSize(type);
 }
 std::size_t valueSize(ValueType type) {
-    if (type.kind == ValueType::Kind::Array || type.kind == ValueType::Kind::Struct) return valueTypeSize(type);
+    if (type.kind == ValueType::Kind::Array || isAggregateValue(type))
+        return valueTypeSize(type);
     if (type.kind == ValueType::Kind::Reference || type.kind == ValueType::Kind::Box) return 8U;
     if (type == ValueType::String || type.kind == ValueType::Kind::Slice) return 16U;
     return type == ValueType::Double ? 8U : 4U;
@@ -166,6 +170,18 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         "[rbp-" + std::to_string(output) + "+" + std::to_string(field.offset) + "]",
                         valueTypeSize(field.type));
                 }
+            } else if constexpr (std::is_same_v<T, IrEnumConstruct>) {
+                const std::size_t output = valueOffset(program, item.output);
+                out << "    mov dword [rbp-" << output << "], " << item.variant << '\n';
+                const EnumVariant& variant = item.type.enumeration->variants[item.variant];
+                for (std::size_t i = 0; i < item.fields.size(); ++i) {
+                    const StructField& field = variant.fields[i];
+                    emitBlockCopy(out,
+                        "[rbp-" + std::to_string(valueOffset(program, item.fields[i])) + "]",
+                        "[rbp-" + std::to_string(output) + "+" +
+                            std::to_string(item.type.enumeration->payloadOffset + field.offset) + "]",
+                        valueTypeSize(field.type));
+                }
             } else if constexpr (std::is_same_v<T, IrFieldLoad>) {
                 const StructField& field = item.objectType.structure->fields[item.field];
                 emitBlockCopy(out, "[rbp-" + std::to_string(valueOffset(program, item.object)) + "+" + std::to_string(field.offset) + "]",
@@ -268,7 +284,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     ? "[" + globalLabel(slot) + "]"
                     : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
                 if (item.type.kind == ValueType::Kind::Array ||
-                    item.type.kind == ValueType::Kind::Struct ||
+                    isAggregateValue(item.type) ||
                     item.type.kind == ValueType::Kind::Slice) {
                     emitBlockCopy(out, address,
                         "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]",
@@ -559,7 +575,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     ? "[" + globalLabel(slot) + "]"
                     : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
                 if (item.type.kind == ValueType::Kind::Array ||
-                    item.type.kind == ValueType::Kind::Struct ||
+                    isAggregateValue(item.type) ||
                     item.type.kind == ValueType::Kind::Slice) {
                     emitBlockCopy(out,
                         "[rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
@@ -585,7 +601,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 }
             } else if constexpr (std::is_same_v<T, IrCopy>) {
                 if (item.type.kind == ValueType::Kind::Array ||
-                    item.type.kind == ValueType::Kind::Struct ||
+                    isAggregateValue(item.type) ||
                     item.type.kind == ValueType::Kind::Slice) {
                     emitBlockCopy(out,
                         "[rbp-" + std::to_string(valueOffset(program, item.input)) + "]",
@@ -611,7 +627,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 }
             } else if constexpr (std::is_same_v<T, IrCall>) {
                 for (std::size_t i = item.arguments.size(); i-- > 0;) {
-                    if (item.argumentTypes[i].kind == ValueType::Kind::Struct) {
+                    if (isAggregateValue(item.argumentTypes[i])) {
                         const std::size_t bytes = (valueTypeSize(item.argumentTypes[i]) + 7U) / 8U * 8U;
                         out << "    sub rsp, " << bytes << '\n';
                         emitBlockCopy(out, "[rbp-" + std::to_string(valueOffset(program, item.arguments[i])) + "]",
@@ -636,10 +652,10 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 out << "    call zeta_fn_" << item.function << '\n';
                 std::size_t argumentBytes = 0;
                 for (ValueType type : item.argumentTypes)
-                    argumentBytes += type.kind == ValueType::Kind::Struct
+                    argumentBytes += isAggregateValue(type)
                         ? (valueTypeSize(type) + 7U) / 8U * 8U : isPairValue(type) ? 16U : 8U;
                 if (argumentBytes != 0) out << "    add rsp, " << argumentBytes << '\n';
-                if (item.returnType.kind == ValueType::Kind::Struct) {
+                if (isAggregateValue(item.returnType)) {
                     const std::size_t offset = valueOffset(program, item.output);
                     out << "    mov qword [rbp-" << offset << "], rax\n";
                     if (valueTypeSize(item.returnType) > 8U)
@@ -657,7 +673,12 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
             } else if constexpr (std::is_same_v<T, IrTailCall>) {
                 std::size_t stackOffset = 16U;
                 for (std::size_t i = 0; i < item.arguments.size(); ++i) {
-                    if (isPairValue(item.argumentTypes[i])) {
+                    if (isAggregateValue(item.argumentTypes[i])) {
+                        emitBlockCopy(out,
+                            "[rbp-" + std::to_string(valueOffset(program, item.arguments[i])) + "]",
+                            "[rbp+" + std::to_string(stackOffset) + "]",
+                            valueTypeSize(item.argumentTypes[i]));
+                    } else if (isPairValue(item.argumentTypes[i])) {
                         const std::size_t source = valueOffset(program, item.arguments[i]);
                         out << "    mov rax, qword [rbp-" << source << "]\n"
                             << "    mov rdx, qword [rbp-" << source - 8U << "]\n"
@@ -675,7 +696,9 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         out << "    mov eax, dword [rbp-" << valueOffset(program, item.arguments[i]) << "]\n"
                             << "    mov dword [rbp+" << stackOffset << "], eax\n";
                     }
-                    stackOffset += isPairValue(item.argumentTypes[i]) ? 16U : 8U;
+                    stackOffset += isAggregateValue(item.argumentTypes[i])
+                        ? (valueTypeSize(item.argumentTypes[i]) + 7U) / 8U * 8U
+                        : isPairValue(item.argumentTypes[i]) ? 16U : 8U;
                 }
                 out << "    jmp zeta_fn_" << item.function << "_body\n";
             } else if constexpr (std::is_same_v<T, IrFunctionStart>) {
@@ -685,7 +708,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 if (frameSize != 0) out << "    sub rsp, " << frameSize << '\n';
                 out << "zeta_fn_" << item.name << "_body:\n";
             } else if constexpr (std::is_same_v<T, IrParameter>) {
-                if (item.type.kind == ValueType::Kind::Struct) {
+                if (isAggregateValue(item.type)) {
                     emitBlockCopy(out, "[rbp+" + std::to_string(item.stackOffset) + "]",
                         "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]", valueTypeSize(item.type));
                 } else if (isPairValue(item.type)) {
@@ -706,7 +729,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
                 }
             } else if constexpr (std::is_same_v<T, IrReturn>) {
-                if (item.type.kind == ValueType::Kind::Struct) {
+                if (isAggregateValue(item.type)) {
                     const std::size_t offset = valueOffset(program, item.value);
                     out << "    mov rax, qword [rbp-" << offset << "]\n";
                     if (valueTypeSize(item.type) > 8U)

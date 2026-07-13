@@ -1,0 +1,6 @@
+enum Resultat { Valeur(value: Int) }
+
+def main(): Int = {
+    val resultat: Resultat = Resultat.Valeur(value: true)
+    0
+}

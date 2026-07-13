@@ -833,6 +833,55 @@ ExprPtr Parser::primary() {
     }
     if (match(TokenKind::Identifier)) {
         const Token token = previous();
+        if (const auto definition = enumerations_.find(token.text);
+            definition != enumerations_.end() && check(TokenKind::Dot)) {
+            consume(TokenKind::Dot, "'.' attendu après le nom d'énumération");
+            const Token& variantToken =
+                consume(TokenKind::Identifier, "nom de variante attendu après '.'");
+            const auto& variants = definition->second->variants;
+            const auto variant = std::find_if(variants.begin(), variants.end(),
+                [&](const EnumVariant& candidate) { return candidate.name == variantToken.text; });
+            if (variant == variants.end())
+                throw CompileError(variantToken.location, "variante inconnue '" +
+                    variantToken.text + "' pour " + token.text);
+
+            std::vector<ExprPtr> fields(variant->fields.size());
+            if (variant->fields.empty()) {
+                if (check(TokenKind::LeftParen))
+                    throw CompileError(peek().location,
+                                       "la variante vide '" + variant->name +
+                                       "' ne prend pas d'arguments");
+            } else {
+                consume(TokenKind::LeftParen,
+                        "'(' attendue après la variante '" + variant->name + "'");
+                std::unordered_set<std::string> initialized;
+                do {
+                    const Token& field = consume(TokenKind::Identifier,
+                                                 "nom de champ de variante attendu");
+                    const auto found = std::find_if(variant->fields.begin(),
+                        variant->fields.end(), [&](const StructField& candidate) {
+                            return candidate.name == field.text;
+                        });
+                    if (found == variant->fields.end())
+                        throw CompileError(field.location, "champ inconnu '" + field.text +
+                            "' pour " + token.text + "." + variant->name);
+                    if (!initialized.insert(field.text).second)
+                        throw CompileError(field.location, "champ '" + field.text +
+                            "' initialisé plusieurs fois");
+                    consume(TokenKind::Colon, "':' attendu après le nom du champ");
+                    fields[static_cast<std::size_t>(found - variant->fields.begin())] = expression();
+                } while (match(TokenKind::Comma));
+                consume(TokenKind::RightParen, "')' attendue après les champs de variante");
+                for (std::size_t i = 0; i < fields.size(); ++i)
+                    if (!fields[i])
+                        throw CompileError(variantToken.location, "champ '" +
+                            variant->fields[i].name + "' manquant pour " + token.text +
+                            "." + variant->name);
+            }
+            return std::make_unique<Expression>(Expression{token.location,
+                EnumExpr{definition->second,
+                    static_cast<std::size_t>(variant - variants.begin()), std::move(fields)}});
+        }
         if (const auto definition = structures_.find(token.text);
             definition != structures_.end() &&
             (check(TokenKind::LeftBrace) || check(TokenKind::LeftBracket))) {

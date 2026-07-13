@@ -40,6 +40,20 @@ if(BUILD_TESTING)
     add_test(NAME reject_enum_empty COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_empty.zeta)
     set_tests_properties(reject_enum_empty PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_enum_construction COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_construction.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/enum-construction)
+    add_test(NAME run_enum_construction COMMAND ${CMAKE_CURRENT_BINARY_DIR}/enum-construction)
+    set_tests_properties(run_enum_construction PROPERTIES DEPENDS compile_enum_construction)
+    add_test(NAME reject_enum_unknown_variant COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_unknown_variant.zeta)
+    set_tests_properties(reject_enum_unknown_variant PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_enum_missing_field COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_missing_field.zeta)
+    set_tests_properties(reject_enum_missing_field PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_enum_field_type_mismatch COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_field_type_mismatch.zeta)
+    set_tests_properties(reject_enum_field_type_mismatch PROPERTIES WILL_FAIL TRUE)
     add_test(NAME precompiled_standard_library
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/precompiled_stdlib.sh
             $<TARGET_FILE:zeta>

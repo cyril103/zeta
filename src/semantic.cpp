@@ -120,7 +120,8 @@ void collectExpressionNames(const Expression& expression,
         using T = std::decay_t<decltype(node)>;
         if constexpr (std::is_same_v<T, ArrayExpr>) {
             for (const ExprPtr& element : node.elements) collectExpressionNames(*element, uses);
-        } else if constexpr (std::is_same_v<T, StructExpr>) {
+        } else if constexpr (std::is_same_v<T, StructExpr> ||
+                             std::is_same_v<T, EnumExpr>) {
             for (const ExprPtr& field : node.fields) collectExpressionNames(*field, uses);
         } else if constexpr (std::is_same_v<T, FieldExpr>) {
             collectExpressionNames(*node.object, uses);
@@ -337,10 +338,12 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
     if (declaration.callable && declaration.type.kind == ValueType::Kind::Array)
         throw CompileError(declaration.location,
                            "le retour d'un tableau par valeur n'est pas encore pris en charge");
-    if (declaration.callable && declaration.type.kind == ValueType::Kind::Struct &&
+    if (declaration.callable &&
+        (declaration.type.kind == ValueType::Kind::Struct ||
+         declaration.type.kind == ValueType::Kind::Enum) &&
         valueTypeSize(declaration.type) > 16U)
         throw CompileError(declaration.location,
-                           "le retour ABI d'une structure est limité à 16 octets");
+                           "le retour ABI d'un agrégat est limité à 16 octets");
     for (const Parameter& parameter : declaration.parameters)
         if (parameter.type.kind == ValueType::Kind::Array)
             throw CompileError(parameter.location,
@@ -575,6 +578,7 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
                              node.elements.size());
         }
         else if constexpr (std::is_same_v<T, StructExpr>) return ValueType(node.type);
+        else if constexpr (std::is_same_v<T, EnumExpr>) return ValueType(node.type);
         else if constexpr (std::is_same_v<T, FieldExpr>) {
             const ValueType object = inferType(*node.object);
             if (object.kind != ValueType::Kind::Struct) return ValueType::Int;
@@ -675,6 +679,13 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             const ValueType type(node.type);
             for (std::size_t i = 0; i < node.fields.size(); ++i)
                 checkExpression(*node.fields[i], node.type->fields[i].type);
+            return type;
+        }
+        else if constexpr (std::is_same_v<T, EnumExpr>) {
+            const ValueType type(node.type);
+            const EnumVariant& variant = node.type->variants[node.variant];
+            for (std::size_t i = 0; i < node.fields.size(); ++i)
+                checkExpression(*node.fields[i], variant.fields[i].type);
             return type;
         }
         else if constexpr (std::is_same_v<T, FieldExpr>) {
