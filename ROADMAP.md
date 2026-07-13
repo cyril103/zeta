@@ -47,6 +47,8 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
 - conversions `String(Int)`, `String(Byte)`, `String(Double)`, `String(Bool)` et
   `String(Char)` ;
 - passage et retour par valeur, affichage avec le module `io`.
+- propriétés `lengthBytes` et `isEmpty`, décodage et itération UTF-8 contrôlés ;
+- vues `StringView` non possédées, comparaison exacte et recherche par sous-vue.
 
 ### Modules et outillage
 
@@ -67,12 +69,12 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
   `Slice[Byte]` ;
 - `collections` : accès génériques sûrs `first`, `second` et `at` sur `Slice[T]`,
   avec `Option[T]`, `isNone` et `unwrapOr`.
+- `strings` : décodage par offset d'octet, `Option[Char]`, vues bornées et recherche.
 
 ## Limites connues
 
 - pas de collection dynamique possédée (`Vec[T]`, dictionnaire, ensemble) ;
-- pas encore d'API publique pour la longueur, l'indexation Unicode ou les
-  sous-chaînes de `String` ;
+- les `StringView` restent locales et ne peuvent pas encore être retournées ;
 - les références ne peuvent pas être retournées ni stockées globalement ;
 - les durées de vie restent lexicales avec réduction à la dernière utilisation,
   sans inférence générale interprocédurale ;
@@ -109,11 +111,11 @@ Travail livré :
 Critère de sortie : une fonction `first` sûre doit pouvoir retourner `None` pour
 une slice vide sans arrêt du processus — couvert par les tests d'intégration.
 
-## Priorité 2 — API String et vues UTF-8
+## Priorité 2 — API String et vues UTF-8 — terminée
 
 Objectif : rendre `String` utilisable autrement que par concaténation et affichage.
 
-Ordre recommandé :
+Travail livré :
 
 1. `lengthBytes` et `isEmpty` ;
 2. validation et décodage d'un point de code UTF-8 ;
@@ -122,8 +124,8 @@ Ordre recommandé :
 5. recherche et comparaison de vues ;
 6. factorisation complète du formatage entre `String(value)` et `io.print...`.
 
-Les APIs d'indexation devront retourner `Option[Char]` plutôt qu'utiliser un index
-d'octet ambigu.
+`strings.charAtByte` rend l'unité explicite et retourne `Option[Char]`. L'itération
+avance avec `nextByteOffset`, sans confondre octets et points de code.
 
 ## Priorité 3 — Collections dynamiques
 
@@ -193,5 +195,5 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Commencer la priorité 2 avec `String.lengthBytes` et `String.isEmpty`, puis définir
-le contrat des vues UTF-8 avant toute indexation par point de code.
+Concevoir la représentation et les invariants de `Vec[T]`, première étape de la
+priorité 3 sur les collections dynamiques possédées.

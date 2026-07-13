@@ -120,8 +120,21 @@ val age: Int = 18
 val message: String = "age = " + String(age)
 ```
 
-Les sous-chaînes, la longueur publique et l'accès à un `Char` restent à ajouter.
-Les autres opérateurs arithmétiques et les comparaisons d'ordre sont interdits.
+`value.lengthBytes` expose la longueur encodée et `value.isEmpty` teste le cas
+vide. Le module `strings` fournit `charAtByte`, qui retourne `Option[Char]`, et
+`nextByteOffset` pour parcourir les points de code sans confondre index de
+caractère et offset d'octet.
+
+Une `StringView` est une vue locale non possédée `{adresse, longueur}`. Elle se
+construit sans allocation avec `strings.view(value, start, end)`. Les bornes sont
+des offsets d'octets et `strings.viewIsValid` distingue une vue invalide d'une vue
+vide valide. Les vues supportent `lengthBytes`, `isEmpty`, `==`, `!=`,
+`strings.indexOf` et `strings.contains`. Elles ne peuvent pas encore être stockées
+globalement ni retournées par une fonction utilisateur.
+
+Les fonctions typées de `io` utilisent la conversion canonique `String(value)` ;
+leur formatage est donc identique à celui employé dans une concaténation. Les
+autres opérateurs arithmétiques et les comparaisons d'ordre restent interdits.
 
 ## Expressions conditionnelles
 
