@@ -27,7 +27,7 @@ private:
     const Token& consume(TokenKind kind, const std::string& message);
     ValueType consumeType(const std::string& message);
     std::shared_ptr<StructType> structure(bool publicType = false);
-    std::shared_ptr<EnumType> enumeration();
+    std::shared_ptr<EnumType> enumeration(bool publicType = false);
     std::shared_ptr<EnumType> instantiateEnumeration(
         const std::shared_ptr<EnumType>& enumeration, std::vector<ValueType> arguments,
         SourceLocation location);

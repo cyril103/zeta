@@ -100,6 +100,7 @@ std::shared_ptr<const EnumType> instantiateEnumType(
     auto instance = std::make_shared<EnumType>();
     instance->location = location;
     instance->name = definition->name;
+    instance->publicType = definition->publicType;
     instance->typeArguments = std::move(arguments);
     instance->genericDefinition = definition;
     std::size_t maximumPayloadSize = 0;

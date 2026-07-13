@@ -1,0 +1,10 @@
+struct Hidden {
+    value: Int
+}
+
+pub enum Exposed {
+    Value(hidden: Hidden)
+    Empty
+}
+
+def main(): Int = 0

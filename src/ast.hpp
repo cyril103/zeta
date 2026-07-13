@@ -104,6 +104,7 @@ struct EnumVariant {
 struct EnumType {
     SourceLocation location;
     std::string name;
+    bool publicType{false};
     std::vector<std::string> typeParameters;
     std::vector<ValueType> typeArguments;
     std::shared_ptr<const EnumType> genericDefinition;

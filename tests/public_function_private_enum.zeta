@@ -1,0 +1,7 @@
+enum Hidden {
+    Value
+}
+
+pub def hidden(): Hidden = Hidden.Value
+
+def main(): Int = 0

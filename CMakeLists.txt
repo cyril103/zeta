@@ -34,6 +34,19 @@ if(BUILD_TESTING)
     add_test(NAME reject_public_struct_private_field COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_struct_private_field.zeta)
     set_tests_properties(reject_public_struct_private_field PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_public_enum_declaration COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_enum_declaration.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/public-enum-declaration)
+    add_test(NAME run_public_enum_declaration
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/public-enum-declaration)
+    set_tests_properties(run_public_enum_declaration PROPERTIES
+        DEPENDS compile_public_enum_declaration)
+    add_test(NAME reject_public_enum_private_payload COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_enum_private_payload.zeta)
+    set_tests_properties(reject_public_enum_private_payload PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_public_function_private_enum COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_function_private_enum.zeta)
+    set_tests_properties(reject_public_function_private_enum PROPERTIES WILL_FAIL TRUE)
     add_test(NAME compile_vec_empty COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_empty.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/vec-empty)

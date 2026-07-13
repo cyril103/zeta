@@ -1,0 +1,12 @@
+pub enum Result[T] {
+    Ok(value: T)
+    Error(code: Int)
+}
+
+def main(): Int = {
+    val result: Result[Int] = Result[Int].Ok(value: 42)
+    match (result) {
+        Result[Int].Ok(value) => value - 42
+        Result[Int].Error(code) => code
+    }
+}

@@ -133,6 +133,7 @@ Parser::Parser(std::vector<Token> tokens, ImportedStructures importedStructures)
     : tokens_(std::move(tokens)), importedStructures_(std::move(importedStructures)) {
     auto option = std::make_shared<EnumType>();
     option->name = "Option";
+    option->publicType = true;
     option->typeParameters.push_back("T");
     EnumVariant some;
     some.name = "Some";
@@ -286,7 +287,7 @@ ValueType Parser::consumeType(const std::string& message) {
     throw CompileError(peek().location, message + ", reçu " + tokenName(peek().kind));
 }
 
-std::shared_ptr<EnumType> Parser::enumeration() {
+std::shared_ptr<EnumType> Parser::enumeration(bool publicType) {
     const Token start = previous();
     const Token& name = consume(TokenKind::Identifier, "nom d'énumération attendu");
     if (name.text == "Option" && !optionShadowed_) {
@@ -299,6 +300,7 @@ std::shared_ptr<EnumType> Parser::enumeration() {
     auto result = std::make_shared<EnumType>();
     result->location = start.location;
     result->name = name.text;
+    result->publicType = publicType;
     enumerations_.emplace(name.text, result);
 
     activeTypeParameters_.clear();
@@ -519,6 +521,11 @@ Program Parser::parse() {
             tokens_[current_ + 1U].kind == TokenKind::Struct) {
             current_ += 2U;
             program.structures.push_back(structure(true));
+        }
+        else if (check(TokenKind::Pub) && current_ + 1U < tokens_.size() &&
+                 tokens_[current_ + 1U].kind == TokenKind::Enum) {
+            current_ += 2U;
+            program.enumerations.push_back(enumeration(true));
         }
         else if (match(TokenKind::Struct)) program.structures.push_back(structure());
         else if (match(TokenKind::Enum)) program.enumerations.push_back(enumeration());

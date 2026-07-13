@@ -286,6 +286,24 @@ void ModuleLoader::buildFingerprints() {
                     ":" + std::to_string(field.offset);
             exports.push_back(std::move(signature));
         }
+        for (const std::shared_ptr<const EnumType>& enumeration :
+             graph_.interfaces.at(name).enumerations) {
+            std::string signature = "enum:" + enumeration->name + ":" +
+                std::to_string(enumeration->size) + ":" +
+                std::to_string(enumeration->alignment) + ":" +
+                std::to_string(enumeration->payloadOffset);
+            for (const std::string& parameter : enumeration->typeParameters)
+                signature += ":type:" + parameter;
+            for (const EnumVariant& variant : enumeration->variants) {
+                signature += ":variant:" + variant.name + ":" +
+                    std::to_string(variant.payloadSize) + ":" +
+                    std::to_string(variant.payloadAlignment);
+                for (const StructField& field : variant.fields)
+                    signature += ":field:" + field.name + ":" + typeName(field.type) +
+                        ":" + std::to_string(field.offset);
+            }
+            exports.push_back(std::move(signature));
+        }
         std::sort(exports.begin(), exports.end());
         for (const std::string& signature : exports)
             interfaceHash = hashText(signature, interfaceHash);
@@ -314,7 +332,7 @@ void ModuleLoader::buildInterfaces() {
 void ModuleLoader::buildInterface(const std::string& name) {
     if (graph_.interfaces.contains(name)) return;
     const Module& module = graph_.modules.at(name);
-    ModuleInterface interface{name, {}, {}};
+    ModuleInterface interface{name, {}, {}, {}};
     const auto validatePublicType = [&](const auto& self, const ValueType& type,
                                         SourceLocation location) -> void {
             if (type.kind == ValueType::Kind::Struct) {
@@ -322,6 +340,15 @@ void ModuleLoader::buildInterface(const std::string& name) {
                     throw CompileError(location, "le type privé '" +
                         type.structure->name + "' fuit dans l'interface publique de " + name);
                 for (const ValueType& argument : type.structure->typeArguments)
+                    self(self, argument, location);
+                return;
+            }
+            if (type.kind == ValueType::Kind::Enum) {
+                if (!type.enumeration->publicType)
+                    throw CompileError(location, "le type privé '" +
+                        type.enumeration->name +
+                        "' fuit dans l'interface publique de " + name);
+                for (const ValueType& argument : type.enumeration->typeArguments)
                     self(self, argument, location);
                 return;
             }
@@ -337,6 +364,13 @@ void ModuleLoader::buildInterface(const std::string& name) {
         for (const StructField& field : structure->fields)
             validatePublicType(validatePublicType, field.type, field.location);
         interface.structures.push_back(structure);
+    }
+    for (const std::shared_ptr<const EnumType>& enumeration : module.program.enumerations) {
+        if (!enumeration->publicType) continue;
+        for (const EnumVariant& variant : enumeration->variants)
+            for (const StructField& field : variant.fields)
+                validatePublicType(validatePublicType, field.type, field.location);
+        interface.enumerations.push_back(enumeration);
     }
     for (const Statement& statement : module.program.statements) {
         const auto* declaration = std::get_if<Declaration>(&statement.value);
