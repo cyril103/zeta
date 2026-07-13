@@ -1,0 +1,64 @@
+// Algorithmes génériques sur les séquences contiguës en lecture.
+
+pub def contains[T: Equatable](values: Slice[T], expected: T): Bool = {
+    var index: Int = 0
+    while (index < values.length) do {
+        if (values[index] == expected) { return true } else false
+        index = index + 1
+    }
+    false
+}
+
+pub def indexOf[T: Equatable](values: Slice[T], expected: T): Option[Int] = {
+    var index: Int = 0
+    while (index < values.length) do {
+        if (values[index] == expected) {
+            return Option[Int].Some(value: index)
+        } else false
+        index = index + 1
+    }
+    Option[Int].None
+}
+
+pub def count[T: Equatable](values: Slice[T], expected: T): Int = {
+    var index: Int = 0
+    var total: Int = 0
+    while (index < values.length) do {
+        if (values[index] == expected) {
+            total = total + 1
+            true
+        } else false
+        index = index + 1
+    }
+    total
+}
+
+pub def minimum[T: Ordered](values: Slice[T]): Option[T] = {
+    if (values.length == 0) Option[T].None else {
+        var result: T = values[0]
+        var index: Int = 1
+        while (index < values.length) do {
+            if (values[index] < result) {
+                result = values[index]
+                true
+            } else false
+            index = index + 1
+        }
+        Option[T].Some(value: result)
+    }
+}
+
+pub def maximum[T: Ordered](values: Slice[T]): Option[T] = {
+    if (values.length == 0) Option[T].None else {
+        var result: T = values[0]
+        var index: Int = 1
+        while (index < values.length) do {
+            if (values[index] > result) {
+                result = values[index]
+                true
+            } else false
+            index = index + 1
+        }
+        Option[T].Some(value: result)
+    }
+}

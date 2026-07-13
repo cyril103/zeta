@@ -343,6 +343,12 @@ if(BUILD_TESTING)
     add_test(NAME run_collections_module COMMAND ${CMAKE_CURRENT_BINARY_DIR}/collections-module)
     set_tests_properties(run_collections_module PROPERTIES DEPENDS compile_collections_module)
 
+    add_test(NAME compile_sequences_read COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_read.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/sequences-read)
+    add_test(NAME run_sequences_read COMMAND ${CMAKE_CURRENT_BINARY_DIR}/sequences-read)
+    set_tests_properties(run_sequences_read PROPERTIES DEPENDS compile_sequences_read)
+
     add_test(NAME compile_empty_slice_option COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_zero_length.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/empty-slice-option)

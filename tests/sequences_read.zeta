@@ -1,0 +1,27 @@
+import collections
+import sequences
+
+def main(): Int = {
+    var values: Vec[Int] = Vec[Int]()
+    values.push(30)
+    values.push(10)
+    values.push(20)
+    values.push(10)
+
+    val containsTen: Bool = sequences.contains(values.asSlice(), 10)
+    val containsForty: Bool = sequences.contains(values.asSlice(), 40)
+    val firstTen: Int = collections.unwrapOr(
+        sequences.indexOf(values.asSlice(), 10), -1)
+    val tens: Int = sequences.count(values.asSlice(), 10)
+    val minimum: Int = collections.unwrapOr(
+        sequences.minimum(values.asSlice()), -1)
+    val maximum: Int = collections.unwrapOr(
+        sequences.maximum(values.asSlice()), -1)
+
+    val empty: [Int; 0] = []
+    val emptyView: Slice[Int] = Slice(&empty)
+    val emptyMinimum: Bool = collections.isNone(sequences.minimum(emptyView))
+
+    if (containsTen && !containsForty && firstTen == 1 && tens == 2 &&
+        minimum == 10 && maximum == 30 && emptyMinimum) 0 else 1
+}
