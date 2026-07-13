@@ -129,8 +129,10 @@ std::uint32_t decodeCharacter(const Token& token) {
 }
 }
 
-Parser::Parser(std::vector<Token> tokens, ImportedStructures importedStructures)
-    : tokens_(std::move(tokens)), importedStructures_(std::move(importedStructures)) {
+Parser::Parser(std::vector<Token> tokens, ImportedStructures importedStructures,
+               ImportedEnumerations importedEnumerations)
+    : tokens_(std::move(tokens)), importedStructures_(std::move(importedStructures)),
+      importedEnumerations_(std::move(importedEnumerations)) {
     auto option = std::make_shared<EnumType>();
     option->name = "Option";
     option->publicType = true;
@@ -252,6 +254,22 @@ ValueType Parser::consumeType(const std::string& message) {
                             "']' attendue après les arguments de type");
                 }
                 return ValueType(instantiateStructure(
+                    imported->second, std::move(arguments), token.location));
+            }
+            if (const auto imported = importedEnumerations_.find(qualified);
+                imported != importedEnumerations_.end()) {
+                const Token token = tokens_[current_];
+                current_ += 3U;
+                std::vector<ValueType> arguments;
+                if (match(TokenKind::LeftBracket)) {
+                    if (!check(TokenKind::RightBracket)) {
+                        do arguments.push_back(consumeType("argument de type attendu"));
+                        while (match(TokenKind::Comma));
+                    }
+                    consume(TokenKind::RightBracket,
+                            "']' attendue après les arguments de type");
+                }
+                return ValueType(instantiateEnumeration(
                     imported->second, std::move(arguments), token.location));
             }
         }
@@ -382,16 +400,72 @@ std::shared_ptr<EnumType> Parser::enumeration(bool publicType) {
     return result;
 }
 
-std::shared_ptr<EnumType> Parser::instantiateEnumeration(
-    const std::shared_ptr<EnumType>& enumeration, std::vector<ValueType> arguments,
+std::shared_ptr<const EnumType> Parser::instantiateEnumeration(
+    const std::shared_ptr<const EnumType>& enumeration, std::vector<ValueType> arguments,
     SourceLocation location) {
     if (arguments.size() != enumeration->typeParameters.size())
         throw CompileError(location, "l'énumération '" + enumeration->name + "' attend " +
             std::to_string(enumeration->typeParameters.size()) +
             " argument(s) de type, reçu " + std::to_string(arguments.size()));
-    if (arguments.empty()) return enumeration;
-    return std::const_pointer_cast<EnumType>(
-        instantiateEnumType(enumeration, std::move(arguments), location));
+    return instantiateEnumType(enumeration, std::move(arguments), location);
+}
+
+ExprPtr Parser::enumExpression(
+    SourceLocation location, const std::string& displayName,
+    const std::shared_ptr<const EnumType>& definition) {
+    std::vector<ValueType> typeArguments;
+    if (match(TokenKind::LeftBracket)) {
+        if (!check(TokenKind::RightBracket)) {
+            do typeArguments.push_back(consumeType("argument de type attendu"));
+            while (match(TokenKind::Comma));
+        }
+        consume(TokenKind::RightBracket, "']' attendue après les arguments de type");
+    }
+    const auto enumeration = instantiateEnumeration(
+        definition, std::move(typeArguments), location);
+    consume(TokenKind::Dot, "'.' attendu après le nom d'énumération");
+    const Token& variantToken =
+        consume(TokenKind::Identifier, "nom de variante attendu après '.'");
+    const auto& variants = enumeration->variants;
+    const auto variant = std::find_if(variants.begin(), variants.end(),
+        [&](const EnumVariant& candidate) { return candidate.name == variantToken.text; });
+    if (variant == variants.end())
+        throw CompileError(variantToken.location, "variante inconnue '" +
+            variantToken.text + "' pour " + displayName);
+
+    std::vector<ExprPtr> fields(variant->fields.size());
+    if (variant->fields.empty()) {
+        if (check(TokenKind::LeftParen))
+            throw CompileError(peek().location, "la variante vide '" + variant->name +
+                               "' ne prend pas d'arguments");
+    } else {
+        consume(TokenKind::LeftParen,
+                "'(' attendue après la variante '" + variant->name + "'");
+        std::unordered_set<std::string> initialized;
+        do {
+            const Token& field = consume(TokenKind::Identifier,
+                                         "nom de champ de variante attendu");
+            const auto found = std::find_if(variant->fields.begin(), variant->fields.end(),
+                [&](const StructField& candidate) { return candidate.name == field.text; });
+            if (found == variant->fields.end())
+                throw CompileError(field.location, "champ inconnu '" + field.text +
+                    "' pour " + displayName + "." + variant->name);
+            if (!initialized.insert(field.text).second)
+                throw CompileError(field.location, "champ '" + field.text +
+                    "' initialisé plusieurs fois");
+            consume(TokenKind::Colon, "':' attendu après le nom du champ");
+            fields[static_cast<std::size_t>(found - variant->fields.begin())] = expression();
+        } while (match(TokenKind::Comma));
+        consume(TokenKind::RightParen, "')' attendue après les champs de variante");
+        for (std::size_t i = 0; i < fields.size(); ++i)
+            if (!fields[i])
+                throw CompileError(variantToken.location, "champ '" +
+                    variant->fields[i].name + "' manquant pour " + displayName +
+                    "." + variant->name);
+    }
+    return std::make_unique<Expression>(Expression{location,
+        EnumExpr{enumeration, static_cast<std::size_t>(variant - variants.begin()),
+                 std::move(fields)}});
 }
 
 std::shared_ptr<StructType> Parser::structure(bool publicType) {
@@ -977,66 +1051,19 @@ ExprPtr Parser::primary() {
                 return structureExpression(
                     token.location, qualified, imported->second);
             }
+            if (const auto imported = importedEnumerations_.find(qualified);
+                imported != importedEnumerations_.end() &&
+                current_ + 2U < tokens_.size() &&
+                (tokens_[current_ + 2U].kind == TokenKind::Dot ||
+                 tokens_[current_ + 2U].kind == TokenKind::LeftBracket)) {
+                current_ += 2U;
+                return enumExpression(token.location, qualified, imported->second);
+            }
         }
         if (const auto definition = enumerations_.find(token.text);
             definition != enumerations_.end() &&
             (check(TokenKind::Dot) || check(TokenKind::LeftBracket))) {
-            std::vector<ValueType> typeArguments;
-            if (match(TokenKind::LeftBracket)) {
-                if (!check(TokenKind::RightBracket)) {
-                    do typeArguments.push_back(consumeType("argument de type attendu"));
-                    while (match(TokenKind::Comma));
-                }
-                consume(TokenKind::RightBracket, "']' attendue après les arguments de type");
-            }
-            const auto enumeration = instantiateEnumeration(
-                definition->second, std::move(typeArguments), token.location);
-            consume(TokenKind::Dot, "'.' attendu après le nom d'énumération");
-            const Token& variantToken =
-                consume(TokenKind::Identifier, "nom de variante attendu après '.'");
-            const auto& variants = enumeration->variants;
-            const auto variant = std::find_if(variants.begin(), variants.end(),
-                [&](const EnumVariant& candidate) { return candidate.name == variantToken.text; });
-            if (variant == variants.end())
-                throw CompileError(variantToken.location, "variante inconnue '" +
-                    variantToken.text + "' pour " + token.text);
-
-            std::vector<ExprPtr> fields(variant->fields.size());
-            if (variant->fields.empty()) {
-                if (check(TokenKind::LeftParen))
-                    throw CompileError(peek().location,
-                                       "la variante vide '" + variant->name +
-                                       "' ne prend pas d'arguments");
-            } else {
-                consume(TokenKind::LeftParen,
-                        "'(' attendue après la variante '" + variant->name + "'");
-                std::unordered_set<std::string> initialized;
-                do {
-                    const Token& field = consume(TokenKind::Identifier,
-                                                 "nom de champ de variante attendu");
-                    const auto found = std::find_if(variant->fields.begin(),
-                        variant->fields.end(), [&](const StructField& candidate) {
-                            return candidate.name == field.text;
-                        });
-                    if (found == variant->fields.end())
-                        throw CompileError(field.location, "champ inconnu '" + field.text +
-                            "' pour " + token.text + "." + variant->name);
-                    if (!initialized.insert(field.text).second)
-                        throw CompileError(field.location, "champ '" + field.text +
-                            "' initialisé plusieurs fois");
-                    consume(TokenKind::Colon, "':' attendu après le nom du champ");
-                    fields[static_cast<std::size_t>(found - variant->fields.begin())] = expression();
-                } while (match(TokenKind::Comma));
-                consume(TokenKind::RightParen, "')' attendue après les champs de variante");
-                for (std::size_t i = 0; i < fields.size(); ++i)
-                    if (!fields[i])
-                        throw CompileError(variantToken.location, "champ '" +
-                            variant->fields[i].name + "' manquant pour " + token.text +
-                            "." + variant->name);
-            }
-            return std::make_unique<Expression>(Expression{token.location,
-                EnumExpr{enumeration,
-                    static_cast<std::size_t>(variant - variants.begin()), std::move(fields)}});
+            return enumExpression(token.location, token.text, definition->second);
         }
         if (const auto definition = structures_.find(token.text);
             definition != structures_.end() &&
@@ -1113,10 +1140,26 @@ ExprPtr Parser::matchExpression(SourceLocation location) {
     while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
         const Token& typeToken = consume(TokenKind::Identifier,
                                          "nom d'énumération attendu dans le motif");
-        const auto definition = enumerations_.find(typeToken.text);
-        if (definition == enumerations_.end())
-            throw CompileError(typeToken.location,
-                               "énumération inconnue '" + typeToken.text + "'");
+        std::shared_ptr<const EnumType> definition;
+        std::string displayName = typeToken.text;
+        if (check(TokenKind::Dot) && current_ + 1U < tokens_.size() &&
+            tokens_[current_ + 1U].kind == TokenKind::Identifier) {
+            const std::string qualified =
+                typeToken.text + "." + tokens_[current_ + 1U].text;
+            if (const auto imported = importedEnumerations_.find(qualified);
+                imported != importedEnumerations_.end()) {
+                definition = imported->second;
+                displayName = qualified;
+                current_ += 2U;
+            }
+        }
+        if (definition == nullptr) {
+            const auto local = enumerations_.find(typeToken.text);
+            if (local == enumerations_.end())
+                throw CompileError(typeToken.location,
+                                   "énumération inconnue '" + displayName + "'");
+            definition = local->second;
+        }
         std::vector<ValueType> typeArguments;
         if (match(TokenKind::LeftBracket)) {
             if (!check(TokenKind::RightBracket)) {
@@ -1126,7 +1169,7 @@ ExprPtr Parser::matchExpression(SourceLocation location) {
             consume(TokenKind::RightBracket, "']' attendue après les arguments de type");
         }
         const auto patternType = instantiateEnumeration(
-            definition->second, std::move(typeArguments), typeToken.location);
+            definition, std::move(typeArguments), typeToken.location);
         if (matchedType == nullptr) matchedType = patternType;
         else if (matchedType.get() != patternType.get())
             throw CompileError(typeToken.location,

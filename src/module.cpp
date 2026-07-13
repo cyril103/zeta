@@ -72,6 +72,19 @@ Parser::ImportedStructures importedStructures(
     }
     return result;
 }
+
+Parser::ImportedEnumerations importedEnumerations(
+    const std::vector<Program::Import>& imports,
+    const std::unordered_map<std::string, ModuleInterface>& interfaces) {
+    Parser::ImportedEnumerations result;
+    for (const Program::Import& import : imports) {
+        const auto module = interfaces.find(import.module);
+        if (module == interfaces.end()) continue;
+        for (const std::shared_ptr<const EnumType>& enumeration : module->second.enumerations)
+            result.emplace(import.module + "." + enumeration->name, enumeration);
+    }
+    return result;
+}
 }
 
 ModuleGraph ModuleLoader::load(const std::filesystem::path& rootPath) {
@@ -150,7 +163,8 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
         Program program;
         if (!persisted.genericSource.empty()) {
             Lexer lexer(persisted.genericSource);
-            Parser parser(lexer.scan(), importedStructures(imports, graph_.interfaces));
+            Parser parser(lexer.scan(), importedStructures(imports, graph_.interfaces),
+                          importedEnumerations(imports, graph_.interfaces));
             program = parser.parse();
         }
         program.imports.clear();
@@ -194,7 +208,8 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
     const std::vector<Program::Import> imports = discoverImports(tokens);
     for (const Program::Import& import : imports)
         loadModule(import.module, resolveImport(import.module));
-    Parser parser(std::move(tokens), importedStructures(imports, graph_.interfaces));
+    Parser parser(std::move(tokens), importedStructures(imports, graph_.interfaces),
+                  importedEnumerations(imports, graph_.interfaces));
     Program program = parser.parse();
     graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source),
                                         false, {}, source});

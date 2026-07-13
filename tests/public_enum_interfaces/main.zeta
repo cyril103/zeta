@@ -1,3 +1,25 @@
 import types
 
-def main(): Int = types.zero()
+def main(): Int = {
+    val returned: types.State = types.ready()
+    val constructed: types.State = types.State.Failed(code: 0)
+    val generic: types.Outcome[Int] = types.zeroOutcome()
+    val genericConstructed: types.Outcome[Int] = types.Outcome[Int].Error(code: 0)
+    val stateValue: Int = match (returned) {
+        types.State.Ready => 0
+        types.State.Failed(code) => code
+    }
+    val constructedValue: Int = match (constructed) {
+        types.State.Ready => 1
+        types.State.Failed(code) => code
+    }
+    val genericValue: Int = match (generic) {
+        types.Outcome[Int].Ok(value) => value
+        types.Outcome[Int].Error(code) => code
+    }
+    val genericConstructedValue: Int = match (genericConstructed) {
+        types.Outcome[Int].Ok(value) => value
+        types.Outcome[Int].Error(code) => code
+    }
+    stateValue + constructedValue + genericValue + genericConstructedValue
+}
