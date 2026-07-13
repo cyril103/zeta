@@ -283,6 +283,24 @@ déclarations sans lien sont omises. Le consommateur fournit cette séquence
 directement au parseur, sans texte source ni nouveau passage par le lexer, afin de
 monomorphiser les instances demandées.
 
+Une paire distribuable peut être construite directement, sans déclarer `main` et
+sans créer d'exécutable intermédiaire :
+
+```sh
+zeta --build-library geometry.zeta -o dist
+```
+
+La commande écrit `dist/geometry.zti` et `dist/geometry.o`. Le dossier de sortie
+est obligatoire. Il ne reçoit ni cache, ni IR, ni assembleur, ni objet de point
+d'entrée. Si le module expose des fonctions natives, leur runtime est fusionné
+dans le même objet relogeable.
+
+Seul le module racine est publié par une invocation. Ses imports sont enregistrés
+dans l'interface mais doivent être construits et distribués séparément. Pour
+compiler un consommateur sans les sources, toutes les paires `.zti`/`.o` du
+graphe doivent être placées à côté de son fichier racine (ou dans le dossier de
+bibliothèque standard sélectionné avec `--stdlib`).
+
 Une structure exportée se déclare avec `pub struct`. Son nom, ses paramètres de
 type, ses champs et sa disposition ABI sont conservés dans l'interface. Le
 consommateur emploie toujours un nom qualifié, aussi bien comme type que comme
