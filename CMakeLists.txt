@@ -11,6 +11,7 @@ add_executable(zeta
     src/lexer.cpp
     src/parser.cpp
     src/module.cpp
+    src/generic_tokens.cpp
     src/interface.cpp
     src/semantic.cpp
     src/ir.cpp
