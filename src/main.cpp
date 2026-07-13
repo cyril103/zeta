@@ -91,7 +91,8 @@ void weakenGenericSymbols(const fs::path& object, const IrProgram& ir) {
     const std::vector<std::string> definitions = IrGenerator::genericDefinitions(ir);
     if (definitions.empty()) return;
     const pid_t child = fork();
-    if (child < 0) throw std::runtime_error("impossible de lancer objcopy");
+    if (child < 0)
+        throw std::runtime_error("[GEN002] impossible de lancer objcopy");
     if (child == 0) {
         std::vector<std::string> arguments{"objcopy"};
         for (const std::string& definition : definitions)
@@ -105,7 +106,8 @@ void weakenGenericSymbols(const fs::path& object, const IrProgram& ir) {
     }
     int status{};
     if (waitpid(child, &status, 0) < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0)
-        throw std::runtime_error("objcopy n'a pas pu marquer les instances génériques");
+        throw std::runtime_error(
+            "[GEN002] objcopy n'a pas pu marquer les instances génériques");
 }
 
 void usage() {
@@ -465,16 +467,22 @@ int main(int argc, char** argv) {
         const IrProgram ir = irGenerator.generate(modules);
 
         std::unordered_map<std::string, IrProgram> moduleIrs;
-        std::unordered_set<std::string> claimedGenericInstances;
+        std::unordered_map<std::string, std::string> claimedGenericInstances;
         for (const std::string& moduleName : modules.compilationOrder) {
             if (modules.modules.at(moduleName).precompiled) continue;
             IrGenerator moduleGenerator;
             IrProgram moduleIr = moduleGenerator.generateModule(modules, moduleName);
             std::unordered_set<std::string> duplicates;
-            for (const std::string& definition :
-                 IrGenerator::genericDefinitions(moduleIr))
-                if (!claimedGenericInstances.insert(definition).second)
-                    duplicates.insert(definition);
+            for (const auto& [definition, identity] :
+                 IrGenerator::genericDefinitionIdentities(moduleIr)) {
+                const auto [existing, inserted] =
+                    claimedGenericInstances.emplace(definition, identity);
+                if (!inserted && existing->second != identity)
+                    throw std::runtime_error(
+                        "[GEN001] collision de symbole générique canonique '" +
+                        definition + "'");
+                if (!inserted) duplicates.insert(definition);
+            }
             IrGenerator::removeGenericDefinitions(moduleIr, duplicates);
             moduleIrs.emplace(moduleName, std::move(moduleIr));
         }

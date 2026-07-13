@@ -154,8 +154,14 @@ void IrGenerator::indexGenericOrigins(const ModuleGraph& graph) {
 void IrGenerator::registerGenericInstance(
     const Declaration& declaration, const std::vector<ValueType>& types) {
     const std::string linkName = genericLinkName(declaration, types);
-    if (genericInstanceNames_.insert(linkName).second)
-        genericInstances_.push_back(GenericInstance{&declaration, types, linkName});
+    const std::string identity = genericIdentity(declaration, types);
+    const auto [existing, inserted] = genericInstanceNames_.emplace(linkName, identity);
+    if (!inserted && existing->second != identity)
+        throw std::runtime_error("[GEN001] collision de symbole générique canonique '" +
+                                 linkName + "'");
+    if (inserted)
+        genericInstances_.push_back(GenericInstance{
+            &declaration, types, linkName, identity});
 }
 
 IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
@@ -221,7 +227,7 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
     for (const Declaration* function : functions) {
         boxParameters_.clear();
         movedBoxes_.clear();
-        ir_.instructions.push_back(IrFunctionStart{function->name});
+        ir_.instructions.push_back(IrFunctionStart{function->name, false, {}});
         std::unordered_map<std::string, ValueId> parameters;
         std::size_t stackOffset = 16U;
         for (std::size_t i = 0; i < function->parameters.size(); ++i) {
@@ -248,7 +254,8 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
             typeSubstitutions_.emplace(function.typeParameters[i], instance.types[i]);
         boxParameters_.clear();
         movedBoxes_.clear();
-        ir_.instructions.push_back(IrFunctionStart{instance.linkName, true});
+        ir_.instructions.push_back(IrFunctionStart{
+            instance.linkName, true, instance.identity});
         std::unordered_map<std::string, ValueId> parameters;
         std::size_t stackOffset = 16U;
         for (std::size_t i = 0; i < function.parameters.size(); ++i) {
@@ -404,7 +411,7 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
             }
         }
         const Declaration* function = record.declaration;
-        ir_.instructions.push_back(IrFunctionStart{record.linkName});
+        ir_.instructions.push_back(IrFunctionStart{record.linkName, false, {}});
         std::unordered_map<std::string, ValueId> parameters;
         std::size_t stackOffset = 16U;
         for (std::size_t i = 0; i < function->parameters.size(); ++i) {
@@ -432,7 +439,8 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
             typeSubstitutions_.emplace(function.typeParameters[i], instance.types[i]);
         boxParameters_.clear();
         movedBoxes_.clear();
-        ir_.instructions.push_back(IrFunctionStart{instance.linkName, true});
+        ir_.instructions.push_back(IrFunctionStart{
+            instance.linkName, true, instance.identity});
         std::unordered_map<std::string, ValueId> parameters;
         std::size_t stackOffset = 16U;
         for (std::size_t i = 0; i < function.parameters.size(); ++i) {
@@ -461,6 +469,16 @@ std::vector<std::string> IrGenerator::genericDefinitions(const IrProgram& progra
         if (const auto* function = std::get_if<IrFunctionStart>(&instruction);
             function != nullptr && function->linkOnce)
             result.push_back(function->name);
+    return result;
+}
+
+std::vector<std::pair<std::string, std::string>>
+IrGenerator::genericDefinitionIdentities(const IrProgram& program) {
+    std::vector<std::pair<std::string, std::string>> result;
+    for (const IrInstruction& instruction : program.instructions)
+        if (const auto* function = std::get_if<IrFunctionStart>(&instruction);
+            function != nullptr && function->linkOnce)
+            result.emplace_back(function->name, function->genericIdentity);
     return result;
 }
 

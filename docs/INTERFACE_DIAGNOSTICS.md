@@ -61,3 +61,14 @@ Cette matrice est implémentée par `tests/interface_diagnostics.sh`. Le codec
 propage `InterfaceError` jusqu'au chargeur, qui ajoute le chemin sans perdre le
 code. Les objets sont contrôlés dès que le couple `.zti` + `.o` est résolu ; les
 artefacts incompatibles n'atteignent donc plus `ld`.
+
+Les instances génériques distribuées ajoutent deux diagnostics stables :
+
+- `GEN001` signale que deux identités canoniques différentes aboutiraient au même
+  symbole ELF ; aucune instance n'est alors supprimée silencieusement ;
+- `GEN002` signale l'impossibilité de marquer une instance comme définition ELF
+  faible `link-once` pendant la production de l'objet.
+
+L'identité couvre l'ABI, l'empreinte productrice, le module, la fonction et les
+types concrets qualifiés. L'ABI 4 rend ce schéma de symboles obligatoire et le
+format 11 du cache de modules empêche la réutilisation des anciens objets.

@@ -329,6 +329,15 @@ Les diagnostics `LIB001` signalent une paire d'installation invalide et `LIB002`
 une dépendance absente ou corrompue. Une publication échouée conserve la paire
 précédente et ne laisse aucun fichier temporaire dans le cache.
 
+Les monomorphisations génériques sont partagées entre consommateurs. Une instance
+est identifiée par son producteur, son empreinte d'interface, ses types concrets
+qualifiés et l'ABI. Dans une compilation source, un seul module topologique en
+émet le corps. Dans des bibliothèques construites séparément, chaque copie est un
+symbole ELF faible `link-once` : `ld` n'en conserve qu'une. Deux producteurs, deux
+types qualifiés homonymes ou deux empreintes incompatibles restent au contraire
+des instances distinctes. `GEN001` protège les collisions d'identité et `GEN002`
+le marquage ELF.
+
 Une structure exportée se déclare avec `pub struct`. Son nom, ses paramètres de
 type, ses champs et sa disposition ABI sont conservés dans l'interface. Le
 consommateur emploie toujours un nom qualifié, aussi bien comme type que comme

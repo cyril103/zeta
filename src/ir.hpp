@@ -105,7 +105,11 @@ struct IrTailCall {
     std::vector<ValueId> arguments;
     std::vector<ValueType> argumentTypes;
 };
-struct IrFunctionStart { std::string name; bool linkOnce{false}; };
+struct IrFunctionStart {
+    std::string name;
+    bool linkOnce{false};
+    std::string genericIdentity;
+};
 struct IrParameter { ValueId output; std::size_t index; std::size_t stackOffset; ValueType type; };
 struct IrReturn { ValueId value; ValueType type; };
 struct IrDrop { ValueId value; ValueType type; };
@@ -133,6 +137,8 @@ public:
     IrProgram generate(const ModuleGraph& graph);
     IrProgram generateModule(const ModuleGraph& graph, const std::string& module);
     static std::vector<std::string> genericDefinitions(const IrProgram& program);
+    static std::vector<std::pair<std::string, std::string>>
+        genericDefinitionIdentities(const IrProgram& program);
     static void removeGenericDefinitions(IrProgram& program,
                                          const std::unordered_set<std::string>& names);
     static std::string print(const IrProgram& program);
@@ -142,6 +148,7 @@ private:
         const Declaration* declaration;
         std::vector<ValueType> types;
         std::string linkName;
+        std::string identity;
     };
     struct GenericOrigin {
         std::string module;
@@ -190,7 +197,7 @@ private:
     std::unordered_map<std::string, std::pair<ValueId, ValueType>> boxParameters_;
     std::unordered_map<std::string, ValueType> typeSubstitutions_;
     std::vector<GenericInstance> genericInstances_;
-    std::unordered_set<std::string> genericInstanceNames_;
+    std::unordered_map<std::string, std::string> genericInstanceNames_;
     std::unordered_map<const Declaration*, GenericOrigin> genericOrigins_;
     std::unordered_map<const StructType*, std::string> structureOrigins_;
     std::unordered_map<const EnumType*, std::string> enumerationOrigins_;
