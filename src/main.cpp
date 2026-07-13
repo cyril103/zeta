@@ -90,7 +90,8 @@ void usage() {
                  " [--library-cache dossier]\n"
                  "       zeta --build-library <source.zeta> -o dossier [--stdlib dossier]"
                  " [--library-cache dossier]\n"
-                 "       zeta --install-library <module.zti> [--library-cache dossier]\n"
+                 "       zeta --install-library <module.zti> [--library-cache dossier]"
+                 " [--force]\n"
                  "       zeta --build-stdlib [--stdlib dossier]\n";
 }
 
@@ -190,7 +191,28 @@ fs::path libraryCacheDirectory(const fs::path& configured) {
     return root / ("abi-" + std::string(ZetaVersion::Abi));
 }
 
-void installLibrary(const fs::path& interfaceSource, const fs::path& configuredCache) {
+PersistedInterface validateInstalledDependency(const fs::path& cache,
+                                               const std::string& moduleName) {
+    const fs::path interfacePath = cache / (moduleName + ".zti");
+    const fs::path objectPath = cache / (moduleName + ".o");
+    if (!fs::is_regular_file(interfacePath) || !fs::is_regular_file(objectPath))
+        throw std::runtime_error("[LIB002] dépendance '" + moduleName +
+                                 "' absente du cache partagé");
+    try {
+        PersistedInterface dependency =
+            InterfaceCodec::deserialize(readOptionalFile(interfacePath));
+        if (dependency.interface.name != moduleName)
+            throw std::runtime_error("nom de module incohérent");
+        validatePrecompiledObject(objectPath);
+        return dependency;
+    } catch (const std::exception& error) {
+        throw std::runtime_error("[LIB002] dépendance '" + moduleName +
+                                 "' invalide : " + error.what());
+    }
+}
+
+void installLibrary(const fs::path& interfaceSource, const fs::path& configuredCache,
+                    bool force) {
     if (interfaceSource.extension() != ".zti")
         throw std::runtime_error("[LIB001] --install-library attend un fichier .zti");
     fs::path objectSource = interfaceSource;
@@ -213,6 +235,30 @@ void installLibrary(const fs::path& interfaceSource, const fs::path& configuredC
 
     const fs::path cache = libraryCacheDirectory(configuredCache);
     fs::create_directories(cache);
+    for (const std::string& dependency : persisted.imports)
+        validateInstalledDependency(cache, dependency);
+
+    const fs::path interfaceTarget = cache / (moduleName + ".zti");
+    const fs::path objectTarget = cache / (moduleName + ".o");
+    const bool hadInterface = fs::exists(interfaceTarget);
+    const bool hadObject = fs::exists(objectTarget);
+    if ((hadInterface || hadObject) && !force) {
+        if (!hadInterface || !hadObject)
+            throw std::runtime_error("[LIB003] installation existante incomplète pour '" +
+                                     moduleName + "' ; utiliser --force");
+        try {
+            const PersistedInterface installed =
+                InterfaceCodec::deserialize(readOptionalFile(interfaceTarget));
+            validatePrecompiledObject(objectTarget);
+            if (installed.interface.name != moduleName ||
+                installed.fingerprint != persisted.fingerprint)
+                throw std::runtime_error("empreinte différente");
+        } catch (const std::exception&) {
+            throw std::runtime_error("[LIB003] conflit d'empreinte pour '" + moduleName +
+                                     "' ; utiliser --force");
+        }
+    }
+
     const std::string suffix = ".tmp." + std::to_string(getpid());
     const fs::path interfaceTemporary = cache / ("." + moduleName + ".zti" + suffix);
     const fs::path objectTemporary = cache / ("." + moduleName + ".o" + suffix);
@@ -229,10 +275,6 @@ void installLibrary(const fs::path& interfaceSource, const fs::path& configuredC
     fs::copy_file(objectSource, objectTemporary);
     validatePrecompiledObject(objectTemporary);
 
-    const fs::path interfaceTarget = cache / (moduleName + ".zti");
-    const fs::path objectTarget = cache / (moduleName + ".o");
-    const bool hadInterface = fs::exists(interfaceTarget);
-    const bool hadObject = fs::exists(objectTarget);
     if (hadInterface) fs::rename(interfaceTarget, interfaceBackup);
     if (hadObject) fs::rename(objectTarget, objectBackup);
     try {
@@ -279,6 +321,7 @@ int main(int argc, char** argv) {
     bool buildStandardLibrary = false;
     bool buildLibraryModule = false;
     bool installLibraryModule = false;
+    bool forceLibraryInstall = false;
     for (int i = 1; i < argc; ++i) {
         const std::string argument = argv[i];
         if (argument == "--build-stdlib") {
@@ -287,6 +330,8 @@ int main(int argc, char** argv) {
             buildLibraryModule = true;
         } else if (argument == "--install-library") {
             installLibraryModule = true;
+        } else if (argument == "--force") {
+            forceLibraryInstall = true;
         } else if (argument == "-o") {
             if (++i >= argc) {
                 usage();
@@ -323,6 +368,10 @@ int main(int argc, char** argv) {
         usage();
         return 2;
     }
+    if (forceLibraryInstall && !installLibraryModule) {
+        usage();
+        return 2;
+    }
     if (buildLibraryModule &&
         (sourcePath.empty() || outputPath.empty() || sourcePath.extension() != ".zeta")) {
         usage();
@@ -355,7 +404,7 @@ int main(int argc, char** argv) {
             return 2;
         }
         try {
-            installLibrary(sourcePath, libraryCachePath);
+            installLibrary(sourcePath, libraryCachePath, forceLibraryInstall);
             std::cout << "Bibliothèque installée : " <<
                 libraryCacheDirectory(libraryCachePath) / sourcePath.filename() << '\n';
             return 0;
