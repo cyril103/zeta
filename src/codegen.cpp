@@ -376,6 +376,92 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 out << "    mov qword [rbp-" << output << "], 0\n"
                     << "    mov qword [rbp-" << output - 8U << "], 0\n"
                     << "    mov qword [rbp-" << output - 16U << "], 0\n";
+            } else if constexpr (std::is_same_v<T, IrVecProperty>) {
+                const std::size_t vector = valueOffset(program, item.vector);
+                const std::size_t output = valueOffset(program, item.output);
+                if (item.property == "length")
+                    out << "    mov eax, dword [rbp-" << vector - 8U << "]\n";
+                else if (item.property == "capacity")
+                    out << "    mov eax, dword [rbp-" << vector - 16U << "]\n";
+                else
+                    out << "    cmp qword [rbp-" << vector - 8U << "], 0\n"
+                        << "    sete al\n"
+                        << "    movzx eax, al\n";
+                out << "    mov dword [rbp-" << output << "], eax\n";
+            } else if constexpr (std::is_same_v<T, IrVecReserve>) {
+                const std::size_t id = resourceSequence++;
+                const std::size_t output = valueOffset(program, item.output);
+                const IrSlot& slot = program.slots[item.slot];
+                const std::string address = slot.global
+                    ? "[" + globalLabel(slot) + "]"
+                    : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
+                const std::size_t elementSize = valueTypeSize(*item.type.element);
+                const std::string capacityReady = "ir_vec_capacity_ready_" + std::to_string(id);
+                const std::string requestedReady = "ir_vec_requested_ready_" + std::to_string(id);
+                const std::string oldReleased = "ir_vec_old_released_" + std::to_string(id);
+                const std::string done = "ir_vec_reserve_done_" + std::to_string(id);
+                out << "    push r12\n"
+                    << "    push r13\n"
+                    << "    push r14\n"
+                    << "    push r15\n"
+                    << "    movsxd r12, dword [rbp-" << valueOffset(program, item.additional) << "]\n"
+                    << "    test r12, r12\n"
+                    << "    js ir_vec_allocation_error\n"
+                    << "    mov r13, qword " << displacedAddress(address, 8U) << "\n"
+                    << "    add r13, r12\n"
+                    << "    jc ir_vec_allocation_error\n"
+                    << "    cmp r13, 2147483647\n"
+                    << "    ja ir_vec_allocation_error\n"
+                    << "    mov r14, qword " << displacedAddress(address, 16U) << "\n"
+                    << "    cmp r13, r14\n"
+                    << "    jbe " << done << "\n"
+                    << "    mov r15, r14\n"
+                    << "    shl r15, 1\n"
+                    << "    jc ir_vec_allocation_error\n"
+                    << "    cmp r15, 4\n"
+                    << "    jae " << capacityReady << "\n"
+                    << "    mov r15, 4\n"
+                    << capacityReady << ":\n"
+                    << "    cmp r15, r13\n"
+                    << "    jae " << requestedReady << "\n"
+                    << "    mov r15, r13\n"
+                    << requestedReady << ":\n"
+                    << "    cmp r15, 2147483647\n"
+                    << "    ja ir_vec_allocation_error\n"
+                    << "    mov rsi, r15\n"
+                    << "    imul rsi, " << elementSize << "\n"
+                    << "    jo ir_vec_allocation_error\n"
+                    << "    mov eax, 9\n"
+                    << "    xor edi, edi\n"
+                    << "    mov edx, 3\n"
+                    << "    mov r10d, 34\n"
+                    << "    mov r8, -1\n"
+                    << "    xor r9d, r9d\n"
+                    << "    syscall\n"
+                    << "    test rax, rax\n"
+                    << "    js ir_vec_allocation_error\n"
+                    << "    mov r12, rax\n"
+                    << "    mov rdi, r12\n"
+                    << "    mov rsi, qword " << address << "\n"
+                    << "    mov rcx, qword " << displacedAddress(address, 8U) << "\n"
+                    << "    imul rcx, " << elementSize << "\n"
+                    << "    rep movsb\n"
+                    << "    mov rdi, qword " << address << "\n"
+                    << "    test rdi, rdi\n"
+                    << "    jz " << oldReleased << "\n"
+                    << "    mov rsi, r14\n"
+                    << "    imul rsi, " << elementSize << "\n"
+                    << "    mov eax, 11\n"
+                    << "    syscall\n"
+                    << oldReleased << ":\n"
+                    << "    mov qword " << address << ", r12\n"
+                    << "    mov qword " << displacedAddress(address, 16U) << ", r15\n"
+                    << done << ":\n"
+                    << "    mov dword [rbp-" << output << "], 0\n"
+                    << "    pop r15\n"
+                    << "    pop r14\n"
+                    << "    pop r13\n"
+                    << "    pop r12\n";
             } else if constexpr (std::is_same_v<T, IrStructConstruct>) {
                 const std::size_t output = valueOffset(program, item.output);
                 for (std::size_t i = 0; i < item.fields.size(); ++i) {
@@ -1034,6 +1120,15 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
     })) {
         out << "ir_box_allocation_error:\n"
                "    mov edi, 102\n"
+               "    mov eax, 60\n"
+               "    syscall\n";
+    }
+    if (std::any_of(program.instructions.begin(), program.instructions.end(),
+                    [](const IrInstruction& instruction) {
+                        return std::holds_alternative<IrVecReserve>(instruction);
+                    })) {
+        out << "ir_vec_allocation_error:\n"
+               "    mov edi, 105\n"
                "    mov eax, 60\n"
                "    syscall\n";
     }

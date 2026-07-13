@@ -35,6 +35,22 @@ if(BUILD_TESTING)
     add_test(NAME reject_vec_use_after_move COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_use_after_move.zeta)
     set_tests_properties(reject_vec_use_after_move PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_vec_reserve COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_reserve.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/vec-reserve)
+    add_test(NAME run_vec_reserve COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vec-reserve)
+    set_tests_properties(run_vec_reserve PROPERTIES DEPENDS compile_vec_reserve)
+    add_test(NAME reject_vec_reserve_immutable COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_reserve_immutable.zeta)
+    set_tests_properties(reject_vec_reserve_immutable PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_vec_reserve_negative COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_reserve_negative.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/vec-reserve-negative)
+    add_test(NAME run_vec_reserve_negative COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_exit_code.sh
+        ${CMAKE_CURRENT_BINARY_DIR}/vec-reserve-negative 105)
+    set_tests_properties(run_vec_reserve_negative PROPERTIES
+        DEPENDS compile_vec_reserve_negative)
     add_test(NAME compile_enum_declaration COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_declaration.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/enum-declaration)

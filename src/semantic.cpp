@@ -140,6 +140,10 @@ void collectExpressionNames(const Expression& expression,
             for (const ExprPtr& field : node.fields) collectExpressionNames(*field, uses);
         } else if constexpr (std::is_same_v<T, FieldExpr>) {
             collectExpressionNames(*node.object, uses);
+        } else if constexpr (std::is_same_v<T, MethodCallExpr>) {
+            collectExpressionNames(*node.object, uses);
+            for (const ExprPtr& argument : node.arguments)
+                collectExpressionNames(*argument, uses);
         } else if constexpr (std::is_same_v<T, IndexExpr>) {
             collectExpressionNames(*node.array, uses);
             collectExpressionNames(*node.index, uses);
@@ -622,11 +626,17 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
                 return ValueType::Bool;
             if (object.kind == ValueType::Kind::Slice && node.field == "length")
                 return ValueType::Int;
+            if (object.kind == ValueType::Kind::Vec &&
+                (node.field == "length" || node.field == "capacity"))
+                return ValueType::Int;
+            if (object.kind == ValueType::Kind::Vec && node.field == "isEmpty")
+                return ValueType::Bool;
             if (object.kind != ValueType::Kind::Struct) return ValueType::Int;
             for (const StructField& field : object.structure->fields)
                 if (field.name == node.field) return field.type;
             return ValueType::Int;
         }
+        else if constexpr (std::is_same_v<T, MethodCallExpr>) return ValueType::Int;
         else if constexpr (std::is_same_v<T, IndexExpr>) {
             ValueType arrayType = inferType(*node.array);
             if (arrayType.kind == ValueType::Kind::Reference) arrayType = *arrayType.element;
@@ -719,6 +729,9 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
         else if constexpr (std::is_same_v<T, VecExpr>) {
             const ValueType type(ValueType::Kind::Vec,
                                  std::make_shared<ValueType>(node.elementType));
+            if (valueTypeSize(node.elementType) == 0U)
+                throw CompileError(expression.location,
+                                   "Vec ne prend pas encore en charge les éléments de taille nulle");
             if (expected.kind == ValueType::Kind::Vec && expected != type)
                 mismatch(expression.location, expected, type);
             return type;
@@ -754,6 +767,14 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 checkExpression(*node.object, object);
                 return ValueType::Int;
             }
+            if (object.kind == ValueType::Kind::Vec) {
+                checkExpression(*node.object, object);
+                if (node.field == "length" || node.field == "capacity")
+                    return ValueType::Int;
+                if (node.field == "isEmpty") return ValueType::Bool;
+                throw CompileError(expression.location,
+                                   "propriété Vec inconnue '" + node.field + "'");
+            }
             if (object.kind != ValueType::Kind::Struct)
                 throw CompileError(node.object->location, "l'accès à un champ exige une structure");
             checkExpression(*node.object, object);
@@ -761,6 +782,39 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 if (field.name == node.field) return field.type;
             throw CompileError(expression.location, "champ inconnu '" + node.field +
                 "' pour " + typeName(object));
+        }
+        else if constexpr (std::is_same_v<T, MethodCallExpr>) {
+            const auto* name = std::get_if<NameExpr>(&node.object->value);
+            if (name == nullptr)
+                throw CompileError(node.object->location,
+                                   "une méthode mutante de Vec exige un identifiant");
+            const SemanticSymbol* symbol = symbols_.lookup(name->name);
+            if (symbol == nullptr || symbol->type.kind != ValueType::Kind::Vec)
+                throw CompileError(node.object->location,
+                                   "la méthode '" + node.method + "' exige un Vec");
+            if (node.method != "reserve")
+                throw CompileError(expression.location,
+                                   "méthode Vec inconnue '" + node.method + "'");
+            if (symbol->parameter || symbol->kind != BindingKind::Var)
+                throw CompileError(node.object->location,
+                                   "'reserve' exige un Vec déclaré avec 'var'");
+            if (const auto borrowed = borrows_.find(name->name);
+                borrowed != borrows_.end() &&
+                (borrowed->second.mutableBorrow || borrowed->second.shared != 0))
+                throw CompileError(node.object->location,
+                                   "le Vec '" + name->name + "' est emprunté");
+            if (movedBoxes_.contains(name->name))
+                throw CompileError(node.object->location,
+                                   "utilisation de '" + name->name +
+                                   "' après son déplacement");
+            if (node.arguments.size() != 1U)
+                throw CompileError(expression.location,
+                                   "'reserve' attend 1 argument, reçu " +
+                                   std::to_string(node.arguments.size()));
+            checkExpression(*node.arguments.front(), ValueType::Int);
+            node.object->inferredType = symbol->type;
+            node.object->typed = true;
+            return ValueType::Int;
         }
         else if constexpr (std::is_same_v<T, IndexExpr>) {
             const ValueType operandType = inferType(*node.array);

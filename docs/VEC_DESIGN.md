@@ -15,6 +15,9 @@ la capacité est nulle, et des éléments initialisés exactement dans l'interva
 d'une allocation est `capacité * sizeof(T)` ; les multiplications et additions
 de capacité sont contrôlées avant tout appel au système.
 
+La première version refuse les types d'éléments de taille nulle ; leur prise en
+charge nécessitera une convention de capacité sans allocation distincte.
+
 ## Syntaxe et API
 
 La construction vide s'écrit `Vec[T]()`. Le type expose des propriétés en lecture

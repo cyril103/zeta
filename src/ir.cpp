@@ -706,11 +706,26 @@ ValueId IrGenerator::expression(
                 ir_.instructions.push_back(IrSliceLength{output, object});
                 return output;
             }
+            if (node.object->inferredType.kind == ValueType::Kind::Vec) {
+                const ValueId output = nextValue(expressionNode.inferredType);
+                ir_.instructions.push_back(IrVecProperty{output, object, node.field});
+                return output;
+            }
             const auto& fields = node.object->inferredType.structure->fields;
             const auto found = std::find_if(fields.begin(), fields.end(), [&](const StructField& field) { return field.name == node.field; });
             const ValueId output = nextValue(expressionNode.inferredType);
             ir_.instructions.push_back(IrFieldLoad{output, object, node.object->inferredType,
                 static_cast<std::size_t>(found - fields.begin())});
+            return output;
+        } else if constexpr (std::is_same_v<T, MethodCallExpr>) {
+            const auto& name = std::get<NameExpr>(node.object->value);
+            const auto found = symbols_.find(name.name);
+            if (found == symbols_.end())
+                throw CompileError(expressionNode.location, "Vec inconnu '" + name.name + "'");
+            const ValueId additional = expression(*node.arguments.front(), parameters);
+            const ValueId output = nextValue(ValueType::Int);
+            ir_.instructions.push_back(IrVecReserve{
+                output, found->second.slot, additional, resolveType(node.object->inferredType)});
             return output;
         } else if constexpr (std::is_same_v<T, IndexExpr>) {
             const ValueId array = expression(*node.array, parameters);
@@ -1066,6 +1081,12 @@ std::string IrGenerator::print(const IrProgram& program) {
             }
             else if constexpr (std::is_same_v<T, IrVecConstruct>)
                 out << "  $" << item.output << " = vec " << typeName(item.type) << " []\n";
+            else if constexpr (std::is_same_v<T, IrVecProperty>)
+                out << "  $" << item.output << " = vec_" << item.property
+                    << " $" << item.vector << '\n';
+            else if constexpr (std::is_same_v<T, IrVecReserve>)
+                out << "  $" << item.output << " = vec_reserve %"
+                    << program.slots[item.slot].name << ", $" << item.additional << '\n';
             else if constexpr (std::is_same_v<T, IrStructConstruct>) {
                 out << "  $" << item.output << " = struct " << typeName(item.type) << " [";
                 for (std::size_t i = 0; i < item.fields.size(); ++i) {

@@ -280,6 +280,7 @@ struct EnumExpr {
     std::vector<ExprPtr> fields;
 };
 struct FieldExpr { ExprPtr object; std::string field; };
+struct MethodCallExpr { ExprPtr object; std::string method; std::vector<ExprPtr> arguments; };
 struct IndexExpr { ExprPtr array; ExprPtr index; };
 struct AddressExpr { bool mutableBorrow; ExprPtr operand; };
 struct DereferenceExpr { ExprPtr operand; };
@@ -308,7 +309,7 @@ struct MatchExpr {
 
 struct Expression {
     SourceLocation location;
-    std::variant<IntegerExpr, DoubleExpr, BoolExpr, CharacterExpr, StringExpr, ArrayExpr, VecExpr, StructExpr, EnumExpr, FieldExpr, IndexExpr, AddressExpr, DereferenceExpr, NameExpr, CallExpr, ConversionExpr,
+    std::variant<IntegerExpr, DoubleExpr, BoolExpr, CharacterExpr, StringExpr, ArrayExpr, VecExpr, StructExpr, EnumExpr, FieldExpr, MethodCallExpr, IndexExpr, AddressExpr, DereferenceExpr, NameExpr, CallExpr, ConversionExpr,
                  UnaryExpr, BinaryExpr, BlockExpr, IfExpr, MatchExpr> value;
     ValueType inferredType{ValueType::Int};
     bool typed{false};

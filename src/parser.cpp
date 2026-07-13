@@ -622,10 +622,7 @@ Declaration Parser::declaration(BindingKind kind) {
 std::string Parser::qualifiedName() {
     std::string name = previous().text;
     const bool moduleName = importedModules_.contains(name);
-    std::size_t cursor = current_;
-    while (cursor + 1 < tokens_.size() && tokens_[cursor].kind == TokenKind::Dot &&
-           tokens_[cursor + 1].kind == TokenKind::Identifier) cursor += 2;
-    if (!moduleName && (cursor >= tokens_.size() || tokens_[cursor].kind != TokenKind::LeftParen)) return name;
+    if (!moduleName) return name;
     while (match(TokenKind::Dot)) {
         const Token& part = consume(TokenKind::Identifier,
                                     "identifiant attendu après '.'");
@@ -756,8 +753,20 @@ ExprPtr Parser::postfix() {
     while (check(TokenKind::LeftBracket) || check(TokenKind::Dot)) {
         if (match(TokenKind::Dot)) {
             const Token& field = consume(TokenKind::Identifier, "nom de champ attendu après '.'");
-            expr = std::make_unique<Expression>(Expression{
-                field.location, FieldExpr{std::move(expr), field.text}});
+            if (match(TokenKind::LeftParen)) {
+                std::vector<ExprPtr> arguments;
+                if (!check(TokenKind::RightParen)) {
+                    do arguments.push_back(expression());
+                    while (match(TokenKind::Comma));
+                }
+                consume(TokenKind::RightParen, "')' attendue après les arguments");
+                expr = std::make_unique<Expression>(Expression{
+                    field.location, MethodCallExpr{
+                        std::move(expr), field.text, std::move(arguments)}});
+            } else {
+                expr = std::make_unique<Expression>(Expression{
+                    field.location, FieldExpr{std::move(expr), field.text}});
+            }
             continue;
         }
         consume(TokenKind::LeftBracket, "'[' attendue");
@@ -1177,9 +1186,21 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
             current_ + 2 < tokens_.size() &&
             tokens_[current_ + 1].kind == TokenKind::Identifier &&
             tokens_[current_ + 2].kind == TokenKind::Equal;
-        if (!startsDeclaration && !startsAssignment() && !startsDereferenceAssignment) break;
+        const bool startsMethodCall = check(TokenKind::Identifier) &&
+            current_ + 3 < tokens_.size() &&
+            tokens_[current_ + 1].kind == TokenKind::Dot &&
+            tokens_[current_ + 2].kind == TokenKind::Identifier &&
+            tokens_[current_ + 3].kind == TokenKind::LeftParen;
+        if (!startsDeclaration && !startsAssignment() && !startsDereferenceAssignment &&
+            !startsMethodCall) break;
 
-        statements.push_back(std::make_unique<Statement>(statement()));
+        if (startsMethodCall) {
+            const SourceLocation methodLocation = peek().location;
+            statements.push_back(std::make_unique<Statement>(
+                ExpressionStatement{methodLocation, expression()}));
+        } else {
+            statements.push_back(std::make_unique<Statement>(statement()));
+        }
         if (!check(TokenKind::RightBrace) && !matchSeparator()) {
             throw CompileError(peek().location,
                                "fin de ligne ou ';' attendue après l'instruction du bloc");

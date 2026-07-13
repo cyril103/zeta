@@ -138,7 +138,7 @@ en cas d'échec d'allocation ou de dépassement de taille.
 Étapes :
 
 1. définir la représentation `{adresse, longueur, capacité}` — conception terminée ;
-2. introduire allocation, croissance et libération déterministes ;
+2. introduire allocation, croissance et libération déterministes — terminé ;
 3. appliquer les règles de déplacement aux éléments non `Copy` ;
 4. exposer des vues `Slice[T]` et `SliceMut[T]` sans copie ;
 5. fournir `push`, `pop`, `get`, `set`, `reserve` et `clear` ;
@@ -199,5 +199,5 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Implémenter le type `Vec[T]` et sa représentation ABI, première étape technique de
-la priorité 3 sur les collections dynamiques possédées.
+Appliquer la destruction récursive et les déplacements aux éléments de `Vec[T]`,
+prochaine étape de la priorité 3 sur les collections dynamiques possédées.

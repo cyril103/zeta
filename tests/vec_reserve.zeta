@@ -1,0 +1,8 @@
+def main(): Int = {
+    var values: Vec[Int] = Vec[Int]()
+    values.reserve(1)
+    if (values.length == 0 && values.capacity == 4 && values.isEmpty) {
+        values.reserve(5)
+        if (values.length == 0 && values.capacity == 8 && values.isEmpty) 0 else 2
+    } else 1
+}
