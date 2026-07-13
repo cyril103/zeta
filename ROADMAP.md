@@ -64,6 +64,8 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
 - stdlib précompilable avec `zeta --build-stdlib` ;
 - bibliothèques ordinaires constructibles avec `zeta --build-library` sans point
   d'entrée ni exécutable intermédiaire ;
+- installation atomique des paires `.zti` + `.o` dans un cache partagé isolé par
+  ABI, avec résolution locale prioritaire et remplacement explicite ;
 - manifeste partagé vérifiant compilateur, ABI, format `.zti` et empreintes des sources ;
 - sélection alternative de la stdlib avec `--stdlib <dossier>`.
 
@@ -181,11 +183,14 @@ Travail livré :
    type, variante et champ, avec validation précoce des objets ELF64 x86-64 ;
 10. réduction conservative de `generic_tokens` à la fermeture transitive des
     exports génériques et de leurs déclarations globales dépendantes.
+11. commande `--build-library` produisant directement la paire du module racine,
+    sans `main`, cache de projet ni exécutable factice ;
+12. commande `--install-library`, cache partagé configurable, résolution
+    transitive, validation des dépendances et remplacement protégé par empreinte.
 
 Travail restant :
 
-1. installation dans un cache partagé indépendant d'un projet ;
-2. déduplication robuste des instances génériques entre consommateurs.
+1. déduplication robuste des instances génériques entre consommateurs.
 
 ## Priorité 5 — Optimisations IR
 
@@ -224,5 +229,5 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Installer les couples `.zti` + `.o` dans un cache partagé indépendant du projet,
-puis permettre au chargeur d'y résoudre les imports absents du dossier source.
+Dédupliquer les instances génériques identiques émises par plusieurs modules
+consommateurs, sans masquer les incompatibilités de type ou d'ABI.

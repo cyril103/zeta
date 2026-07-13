@@ -301,6 +301,34 @@ compiler un consommateur sans les sources, toutes les paires `.zti`/`.o` du
 graphe doivent être placées à côté de son fichier racine (ou dans le dossier de
 bibliothèque standard sélectionné avec `--stdlib`).
 
+Une paire construite peut aussi être installée dans le cache partagé :
+
+```sh
+zeta --install-library dist/geometry.zti
+```
+
+`geometry.o` doit se trouver à côté de l'interface. Le compilateur vérifie les
+deux artefacts et exige que les dépendances soient déjà installées. Il place la
+paire dans un sous-dossier propre à l'ABI, puis les compilations suivantes peuvent
+résoudre `import geometry` sans source ni copie locale.
+
+Le cache est sélectionné par `--library-cache <dossier>`, puis par
+`ZETA_LIBRARY_CACHE`, `$XDG_CACHE_HOME/zeta/libraries` ou enfin
+`$HOME/.cache/zeta/libraries`. La recherche privilégie toujours un `.zeta`, puis
+une paire `.zti`/`.o`, placés à côté du programme. Le cache partagé vient ensuite,
+avant la bibliothèque standard.
+
+Réinstaller la même empreinte est autorisé. Une interface différente est refusée
+avec `LIB003` ; son remplacement doit être demandé explicitement :
+
+```sh
+zeta --install-library dist/geometry.zti --force
+```
+
+Les diagnostics `LIB001` signalent une paire d'installation invalide et `LIB002`
+une dépendance absente ou corrompue. Une publication échouée conserve la paire
+précédente et ne laisse aucun fichier temporaire dans le cache.
+
 Une structure exportée se déclare avec `pub struct`. Son nom, ses paramètres de
 type, ses champs et sa disposition ABI sont conservés dans l'interface. Le
 consommateur emploie toujours un nom qualifié, aussi bien comme type que comme
