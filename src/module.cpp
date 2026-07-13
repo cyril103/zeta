@@ -6,6 +6,7 @@
 #include "version.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <fstream>
 #include <functional>
@@ -16,8 +17,32 @@
 namespace {
 std::string readSource(const std::filesystem::path& path) {
     std::ifstream input(path, std::ios::binary);
-    if (!input) throw std::runtime_error("module introuvable : " + path.string());
+    if (!input) throw std::runtime_error("[MOD001] fichier introuvable : " + path.string());
     return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+}
+
+void validatePrecompiledObject(const std::filesystem::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    std::array<unsigned char, 20> header{};
+    if (!input.read(reinterpret_cast<char*>(header.data()),
+                    static_cast<std::streamsize>(header.size())))
+        throw std::runtime_error("[ABI001] " + path.string() +
+                                 " : objet trop court pour un en-tête ELF");
+    if (header[0] != 0x7FU || header[1] != 'E' || header[2] != 'L' || header[3] != 'F')
+        throw std::runtime_error("[ABI001] " + path.string() +
+                                 " : magie ELF invalide");
+    const bool elf64 = header[4] == 2U;
+    const bool littleEndian = header[5] == 1U;
+    const bool currentVersion = header[6] == 1U;
+    const std::uint16_t objectType =
+        static_cast<std::uint16_t>(header[16]) |
+        (static_cast<std::uint16_t>(header[17]) << 8U);
+    const std::uint16_t machine =
+        static_cast<std::uint16_t>(header[18]) |
+        (static_cast<std::uint16_t>(header[19]) << 8U);
+    if (!elf64 || !littleEndian || !currentVersion || objectType != 1U || machine != 62U)
+        throw std::runtime_error("[ABI002] " + path.string() +
+            " : objet incompatible, ELF64 little-endian relogeable x86-64 attendu");
 }
 
 bool validModuleName(const std::string& name) {
@@ -164,14 +189,22 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
 
     const std::string source = readSource(path);
     if (path.extension() == ".zti") {
-        PersistedInterface persisted = InterfaceCodec::deserialize(source);
+        PersistedInterface persisted;
+        try {
+            persisted = InterfaceCodec::deserialize(source);
+        } catch (const InterfaceError& error) {
+            throw InterfaceError(error.code(), path.string() + " : " + error.detail());
+        }
         if (persisted.interface.name != name)
-            throw std::runtime_error("l'interface " + path.string() +
-                                     " décrit le module '" + persisted.interface.name + "'");
+            throw std::runtime_error("[MOD002] " + path.string() +
+                " : l'interface décrit le module '" + persisted.interface.name +
+                "', module importé '" + name + "'");
         std::filesystem::path objectPath = path;
         objectPath.replace_extension(".o");
         if (!std::filesystem::exists(objectPath))
-            throw std::runtime_error("objet précompilé manquant : " + objectPath.string());
+            throw std::runtime_error("[MOD003] objet précompilé manquant : " +
+                                     objectPath.string());
+        validatePrecompiledObject(objectPath);
         std::vector<Program::Import> imports;
         for (const std::string& import : persisted.imports)
             imports.push_back(Program::Import{SourceLocation{}, import});
@@ -251,7 +284,7 @@ std::filesystem::path ModuleLoader::resolveImport(const std::string& name) const
     const std::filesystem::path standardInterface = standardLibraryDirectory_ / (name + ".zti");
     if (!standardLibraryDirectory_.empty() && std::filesystem::exists(standardInterface))
         return standardInterface;
-    throw std::runtime_error("module introuvable : " + name);
+    throw std::runtime_error("[MOD001] module introuvable : " + name);
 }
 
 bool ModuleLoader::validPrecompiledModule(const std::string& name) const {
