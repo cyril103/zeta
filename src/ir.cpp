@@ -723,6 +723,34 @@ ValueId IrGenerator::expression(
             if (found == symbols_.end())
                 throw CompileError(expressionNode.location, "Vec inconnu '" + name.name + "'");
             const ValueType vectorType = resolveType(node.object->inferredType);
+            if (node.method == "get") {
+                const ValueId index = expression(*node.arguments.front(), parameters);
+                const ValueId output = nextValue(resolveType(expressionNode.inferredType));
+                ir_.instructions.push_back(IrVecGet{output, found->second.slot, index,
+                    resolveType(expressionNode.inferredType), *vectorType.element});
+                return output;
+            }
+            if (node.method == "pop") {
+                const ValueId output = nextValue(resolveType(expressionNode.inferredType));
+                ir_.instructions.push_back(IrVecPop{output, found->second.slot,
+                    resolveType(expressionNode.inferredType), *vectorType.element});
+                return output;
+            }
+            if (node.method == "set") {
+                const ValueId index = expression(*node.arguments[0], parameters);
+                const ValueId value = expression(*node.arguments[1], parameters);
+                if (isCopyValueType(*vectorType.element) &&
+                    valueTypeNeedsDrop(*vectorType.element) &&
+                    std::holds_alternative<NameExpr>(node.arguments[1]->value))
+                    ir_.instructions.push_back(IrRetain{value, *vectorType.element});
+                if (isMoveOnlyValueType(*vectorType.element))
+                    if (const auto* moved = std::get_if<NameExpr>(&node.arguments[1]->value))
+                        movedBoxes_.insert(moved->name);
+                const ValueId output = nextValue(ValueType::Int);
+                ir_.instructions.push_back(IrVecSet{
+                    output, found->second.slot, index, value, *vectorType.element});
+                return output;
+            }
             if (node.method == "asSlice" || node.method == "asSliceMut") {
                 const ValueId output = nextValue(resolveType(expressionNode.inferredType));
                 ir_.instructions.push_back(IrVecView{
@@ -1123,6 +1151,16 @@ std::string IrGenerator::print(const IrProgram& program) {
             else if constexpr (std::is_same_v<T, IrVecView>)
                 out << "  $" << item.output << " = vec_view %"
                     << program.slots[item.slot].name << " as " << typeName(item.type) << '\n';
+            else if constexpr (std::is_same_v<T, IrVecGet>)
+                out << "  $" << item.output << " = vec_get %"
+                    << program.slots[item.slot].name << ", $" << item.index << '\n';
+            else if constexpr (std::is_same_v<T, IrVecPop>)
+                out << "  $" << item.output << " = vec_pop %"
+                    << program.slots[item.slot].name << '\n';
+            else if constexpr (std::is_same_v<T, IrVecSet>)
+                out << "  $" << item.output << " = vec_set %"
+                    << program.slots[item.slot].name << ", $" << item.index
+                    << ", $" << item.value << '\n';
             else if constexpr (std::is_same_v<T, IrStructConstruct>) {
                 out << "  $" << item.output << " = struct " << typeName(item.type) << " [";
                 for (std::size_t i = 0; i < item.fields.size(); ++i) {

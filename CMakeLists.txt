@@ -81,6 +81,31 @@ if(BUILD_TESTING)
     add_test(NAME reject_vec_slice_mut_immutable COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_slice_mut_immutable.zeta)
     set_tests_properties(reject_vec_slice_mut_immutable PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_vec_complete_api COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_complete_api.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/vec-complete-api)
+    add_test(NAME run_vec_complete_api COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vec-complete-api)
+    set_tests_properties(run_vec_complete_api PROPERTIES DEPENDS compile_vec_complete_api)
+    add_test(NAME compile_vec_complete_owned_api COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_complete_owned_api.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/vec-complete-owned-api)
+    add_test(NAME run_vec_complete_owned_api
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vec-complete-owned-api)
+    set_tests_properties(run_vec_complete_owned_api PROPERTIES
+        DEPENDS compile_vec_complete_owned_api)
+    add_test(NAME reject_vec_get_non_copy COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_get_non_copy.zeta)
+    set_tests_properties(reject_vec_get_non_copy PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_vec_pop_immutable COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_pop_immutable.zeta)
+    set_tests_properties(reject_vec_pop_immutable PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_vec_set_bounds COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_set_bounds.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/vec-set-bounds)
+    add_test(NAME run_vec_set_bounds COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_exit_code.sh
+        ${CMAKE_CURRENT_BINARY_DIR}/vec-set-bounds 101)
+    set_tests_properties(run_vec_set_bounds PROPERTIES DEPENDS compile_vec_set_bounds)
     add_test(NAME compile_enum_declaration COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_declaration.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/enum-declaration)

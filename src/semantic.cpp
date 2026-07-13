@@ -652,6 +652,11 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
                 return ValueType(ValueType::Kind::Slice,
                     std::make_shared<ValueType>(*object.element),
                     node.method == "asSliceMut");
+            if (object.kind == ValueType::Kind::Vec &&
+                (node.method == "get" || node.method == "pop") &&
+                node.optionDefinition != nullptr)
+                return ValueType(instantiateEnumType(node.optionDefinition,
+                    {*object.element}, expression.location));
             return ValueType::Int;
         }
         else if constexpr (std::is_same_v<T, IndexExpr>) {
@@ -826,6 +831,60 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 return ValueType(ValueType::Kind::Slice,
                     std::make_shared<ValueType>(*symbol->type.element),
                     node.method == "asSliceMut");
+            }
+            if (node.method == "get") {
+                if (node.arguments.size() != 1U)
+                    throw CompileError(expression.location,
+                                       "'get' attend 1 argument");
+                if (!isCopyValueType(*symbol->type.element))
+                    throw CompileError(expression.location,
+                                       "'get' exige un type d'élément Copy");
+                if (movedBoxes_.contains(name->name))
+                    throw CompileError(node.object->location,
+                                       "utilisation de '" + name->name +
+                                       "' après son déplacement");
+                if (const auto borrowed = borrows_.find(name->name);
+                    borrowed != borrows_.end() && borrowed->second.mutableBorrow)
+                    throw CompileError(node.object->location,
+                                       "le Vec '" + name->name + "' possède un emprunt mutable");
+                checkExpression(*node.arguments.front(), ValueType::Int);
+                node.object->inferredType = symbol->type;
+                node.object->typed = true;
+                return ValueType(instantiateEnumType(node.optionDefinition,
+                    {*symbol->type.element}, expression.location));
+            }
+            if (node.method == "pop" || node.method == "set") {
+                if (symbol->parameter || symbol->kind != BindingKind::Var)
+                    throw CompileError(node.object->location,
+                                       "'" + node.method +
+                                       "' exige un Vec déclaré avec 'var'");
+                if (const auto borrowed = borrows_.find(name->name);
+                    borrowed != borrows_.end() &&
+                    (borrowed->second.mutableBorrow || borrowed->second.shared != 0))
+                    throw CompileError(node.object->location,
+                                       "le Vec '" + name->name + "' est emprunté");
+                if (movedBoxes_.contains(name->name))
+                    throw CompileError(node.object->location,
+                                       "utilisation de '" + name->name +
+                                       "' après son déplacement");
+                const std::size_t expectedArguments = node.method == "pop" ? 0U : 2U;
+                if (node.arguments.size() != expectedArguments)
+                    throw CompileError(expression.location, "'" + node.method + "' attend " +
+                        std::to_string(expectedArguments) + " argument(s), reçu " +
+                        std::to_string(node.arguments.size()));
+                if (node.method == "set") {
+                    checkExpression(*node.arguments[0], ValueType::Int);
+                    checkExpression(*node.arguments[1], *symbol->type.element);
+                    if (isMoveOnlyValueType(*symbol->type.element))
+                        if (const auto* moved =
+                                std::get_if<NameExpr>(&node.arguments[1]->value))
+                            movedBoxes_.insert(moved->name);
+                }
+                node.object->inferredType = symbol->type;
+                node.object->typed = true;
+                if (node.method == "set") return ValueType::Int;
+                return ValueType(instantiateEnumType(node.optionDefinition,
+                    {*symbol->type.element}, expression.location));
             }
             if (node.method != "reserve" && node.method != "push" &&
                 node.method != "clear")

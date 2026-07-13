@@ -129,6 +129,21 @@ std::uint32_t decodeCharacter(const Token& token) {
 }
 }
 
+Parser::Parser(std::vector<Token> tokens) : tokens_(std::move(tokens)) {
+    auto option = std::make_shared<EnumType>();
+    option->name = "Option";
+    option->typeParameters.push_back("T");
+    EnumVariant some;
+    some.name = "Some";
+    some.fields.push_back(StructField{
+        {}, "value", ValueType(ValueType::Kind::TypeParameter, "T"), 0U});
+    option->variants.push_back(std::move(some));
+    EnumVariant none;
+    none.name = "None";
+    option->variants.push_back(std::move(none));
+    enumerations_.emplace("Option", std::move(option));
+}
+
 const Token& Parser::peek() const { return tokens_[current_]; }
 const Token& Parser::previous() const { return tokens_[current_ - 1]; }
 bool Parser::check(TokenKind kind) const { return peek().kind == kind; }
@@ -252,6 +267,10 @@ ValueType Parser::consumeType(const std::string& message) {
 std::shared_ptr<EnumType> Parser::enumeration() {
     const Token start = previous();
     const Token& name = consume(TokenKind::Identifier, "nom d'énumération attendu");
+    if (name.text == "Option" && !optionShadowed_) {
+        enumerations_.erase(name.text);
+        optionShadowed_ = true;
+    }
     if (structures_.contains(name.text) || enumerations_.contains(name.text))
         throw CompileError(name.location, "type '" + name.text + "' déclaré plusieurs fois");
 
@@ -762,7 +781,9 @@ ExprPtr Parser::postfix() {
                 consume(TokenKind::RightParen, "')' attendue après les arguments");
                 expr = std::make_unique<Expression>(Expression{
                     field.location, MethodCallExpr{
-                        std::move(expr), field.text, std::move(arguments)}});
+                        std::move(expr), field.text, std::move(arguments),
+                        field.text == "get" || field.text == "pop"
+                            ? enumerations_.at("Option") : nullptr}});
             } else {
                 expr = std::make_unique<Expression>(Expression{
                     field.location, FieldExpr{std::move(expr), field.text}});

@@ -280,7 +280,12 @@ struct EnumExpr {
     std::vector<ExprPtr> fields;
 };
 struct FieldExpr { ExprPtr object; std::string field; };
-struct MethodCallExpr { ExprPtr object; std::string method; std::vector<ExprPtr> arguments; };
+struct MethodCallExpr {
+    ExprPtr object;
+    std::string method;
+    std::vector<ExprPtr> arguments;
+    std::shared_ptr<const EnumType> optionDefinition;
+};
 struct IndexExpr { ExprPtr array; ExprPtr index; };
 struct AddressExpr { bool mutableBorrow; ExprPtr operand; };
 struct DereferenceExpr { ExprPtr operand; };

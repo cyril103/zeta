@@ -1,0 +1,32 @@
+def main(): Int = {
+    var values: Vec[Int] = Vec[Int]()
+    values.push(10)
+    values.push(20)
+    values.set(1, 32)
+
+    val first: Option[Int] = values.get(0)
+    val missing: Option[Int] = values.get(9)
+    val firstValue: Int = match (first) {
+        Option[Int].Some(value) => value
+        Option[Int].None => 0
+    }
+    val isMissing: Bool = match (missing) {
+        Option[Int].Some(_) => false
+        Option[Int].None => true
+    }
+
+    val last: Option[Int] = values.pop()
+    val lastValue: Int = match (last) {
+        Option[Int].Some(value) => value
+        Option[Int].None => 0
+    }
+    val remaining: Option[Int] = values.pop()
+    val empty: Option[Int] = values.pop()
+    val isEmpty: Bool = match (empty) {
+        Option[Int].Some(_) => false
+        Option[Int].None => true
+    }
+
+    if (firstValue == 10 && lastValue == 32 && isMissing && isEmpty &&
+        values.length == 0 && values.capacity == 4) 0 else 1
+}

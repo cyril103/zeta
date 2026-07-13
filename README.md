@@ -541,10 +541,27 @@ Les enums génériques s'instancient explicitement, par exemple
 `Option[Int].Some(value: 42)`. Elles suivent les mêmes règles `Copy`, déplacement,
 destruction et égalité structurelle que leur charge utile.
 
+`Option[T]` est disponible comme type générique de base. Les modules standard
+utilisent cette définition commune au lieu de déclarer chacun leur propre type.
+
 Le module standard `collections` fournit `first`, `second` et `at` sur `Slice[T]`.
 Ces fonctions retournent `Option[T]` et n'évaluent jamais un accès hors limites.
 `collections.isNone(option)` teste l'absence et
 `collections.unwrapOr(option, fallback)` extrait une valeur avec repli.
+
+## Vecteurs dynamiques
+
+`Vec[T]()` construit un propriétaire vide représenté par
+`{adresse, longueur, capacité}`. Un vecteur est toujours déplacé et jamais copié.
+Il fournit `push`, `pop`, `get`, `set`, `reserve`, `clear`, ainsi que les
+propriétés `length`, `capacity` et `isEmpty`. `get` et `pop` retournent
+`Option[T]` ; `get` exige que `T` soit `Copy`, tandis que `pop` transfère la
+valeur.
+
+`asSlice()` et `asSliceMut()` créent des vues sans allocation. Les emprunts
+empêchent toute croissance ou mutation concurrente jusqu'à leur dernière
+utilisation. Un échec d'allocation ou un dépassement de capacité termine le
+processus avec le code `105`.
 
 ## Expressions sur plusieurs lignes
 

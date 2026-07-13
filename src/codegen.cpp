@@ -543,6 +543,101 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     << "    mov qword [rbp-" << output << "], rax\n"
                     << "    mov rax, qword " << displacedAddress(address, 8U) << "\n"
                     << "    mov qword [rbp-" << output - 8U << "], rax\n";
+            } else if constexpr (std::is_same_v<T, IrVecGet>) {
+                const std::size_t id = resourceSequence++;
+                const IrSlot& slot = program.slots[item.slot];
+                const std::string address = slot.global
+                    ? "[" + globalLabel(slot) + "]"
+                    : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
+                const std::size_t output = valueOffset(program, item.output);
+                const auto& variants = item.optionType.enumeration->variants;
+                const std::size_t some = static_cast<std::size_t>(std::find_if(
+                    variants.begin(), variants.end(), [](const EnumVariant& variant) {
+                        return variant.name == "Some";
+                    }) - variants.begin());
+                const std::size_t none = static_cast<std::size_t>(std::find_if(
+                    variants.begin(), variants.end(), [](const EnumVariant& variant) {
+                        return variant.name == "None";
+                    }) - variants.begin());
+                const std::string absent = "ir_vec_get_none_" + std::to_string(id);
+                const std::string done = "ir_vec_get_done_" + std::to_string(id);
+                out << "    movsxd rax, dword [rbp-" << valueOffset(program, item.index) << "]\n"
+                    << "    test rax, rax\n"
+                    << "    js " << absent << "\n"
+                    << "    cmp rax, qword " << displacedAddress(address, 8U) << "\n"
+                    << "    jae " << absent << "\n"
+                    << "    imul rax, " << valueTypeSize(item.elementType) << "\n"
+                    << "    mov rsi, qword " << address << "\n"
+                    << "    add rsi, rax\n"
+                    << "    mov dword [rbp-" << output << "], " << some << "\n";
+                const std::string payload = "[rbp-" + std::to_string(output) + "+" +
+                    std::to_string(item.optionType.enumeration->payloadOffset) + "]";
+                emitBlockCopy(out, "[rsi]", payload, valueTypeSize(item.elementType));
+                if (valueTypeNeedsDrop(item.elementType))
+                    emitValueRetain(out, payload, item.elementType,
+                                    "ir_vec_get_retain_" + std::to_string(id));
+                out << "    jmp " << done << "\n"
+                    << absent << ":\n"
+                    << "    mov dword [rbp-" << output << "], " << none << "\n"
+                    << done << ":\n";
+            } else if constexpr (std::is_same_v<T, IrVecPop>) {
+                const std::size_t id = resourceSequence++;
+                const IrSlot& slot = program.slots[item.slot];
+                const std::string address = slot.global
+                    ? "[" + globalLabel(slot) + "]"
+                    : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
+                const std::size_t output = valueOffset(program, item.output);
+                const auto& variants = item.optionType.enumeration->variants;
+                const std::size_t some = static_cast<std::size_t>(std::find_if(
+                    variants.begin(), variants.end(), [](const EnumVariant& variant) {
+                        return variant.name == "Some";
+                    }) - variants.begin());
+                const std::size_t none = static_cast<std::size_t>(std::find_if(
+                    variants.begin(), variants.end(), [](const EnumVariant& variant) {
+                        return variant.name == "None";
+                    }) - variants.begin());
+                const std::string absent = "ir_vec_pop_none_" + std::to_string(id);
+                const std::string done = "ir_vec_pop_done_" + std::to_string(id);
+                out << "    mov rax, qword " << displacedAddress(address, 8U) << "\n"
+                    << "    test rax, rax\n"
+                    << "    jz " << absent << "\n"
+                    << "    dec rax\n"
+                    << "    mov qword " << displacedAddress(address, 8U) << ", rax\n"
+                    << "    imul rax, " << valueTypeSize(item.elementType) << "\n"
+                    << "    mov rsi, qword " << address << "\n"
+                    << "    add rsi, rax\n"
+                    << "    mov dword [rbp-" << output << "], " << some << "\n";
+                emitBlockCopy(out, "[rsi]",
+                    "[rbp-" + std::to_string(output) + "+" +
+                        std::to_string(item.optionType.enumeration->payloadOffset) + "]",
+                    valueTypeSize(item.elementType));
+                out << "    jmp " << done << "\n"
+                    << absent << ":\n"
+                    << "    mov dword [rbp-" << output << "], " << none << "\n"
+                    << done << ":\n";
+            } else if constexpr (std::is_same_v<T, IrVecSet>) {
+                const std::size_t id = resourceSequence++;
+                const IrSlot& slot = program.slots[item.slot];
+                const std::string address = slot.global
+                    ? "[" + globalLabel(slot) + "]"
+                    : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
+                out << "    push r12\n"
+                    << "    movsxd rax, dword [rbp-" << valueOffset(program, item.index) << "]\n"
+                    << "    test rax, rax\n"
+                    << "    js ir_array_bounds_error\n"
+                    << "    cmp rax, qword " << displacedAddress(address, 8U) << "\n"
+                    << "    jae ir_array_bounds_error\n"
+                    << "    imul rax, " << valueTypeSize(item.elementType) << "\n"
+                    << "    mov r12, qword " << address << "\n"
+                    << "    add r12, rax\n";
+                if (valueTypeNeedsDrop(item.elementType))
+                    emitValueDrop(out, "[r12]", item.elementType,
+                                  "ir_vec_set_old_" + std::to_string(id));
+                emitBlockCopy(out,
+                    "[rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
+                    "[r12]", valueTypeSize(item.elementType));
+                out << "    mov dword [rbp-" << valueOffset(program, item.output) << "], 0\n"
+                    << "    pop r12\n";
             } else if constexpr (std::is_same_v<T, IrStructConstruct>) {
                 const std::size_t output = valueOffset(program, item.output);
                 for (std::size_t i = 0; i < item.fields.size(); ++i) {
@@ -1188,7 +1283,8 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
     bool hasArrayAccess = false;
     for (const IrInstruction& instruction : program.instructions)
         hasArrayAccess = hasArrayAccess || std::holds_alternative<IrIndexLoad>(instruction) ||
-                         std::holds_alternative<IrIndexStore>(instruction);
+                         std::holds_alternative<IrIndexStore>(instruction) ||
+                         std::holds_alternative<IrVecSet>(instruction);
     if (hasArrayAccess) {
         out << "\nir_array_bounds_error:\n"
                "    mov edi, 101\n"

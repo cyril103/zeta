@@ -5,11 +5,6 @@ pub native def viewIsValid(value: StringView): Bool
 pub native def indexOf(haystack: StringView, needle: StringView): Int
 pub def contains(haystack: StringView, needle: StringView): Bool = indexOf(haystack, needle) >= 0
 
-enum Option[T] {
-    Some(value: T)
-    None
-}
-
 pub def charAtByte(value: String, offset: Int): Option[Char] = {
     val decoded: Int = decodeAtByte(value, offset)
     if (decoded < 0) Option[Char].None else Option[Char].Some(value: Char(decoded))

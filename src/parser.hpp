@@ -9,7 +9,7 @@
 
 class Parser {
 public:
-    explicit Parser(std::vector<Token> tokens) : tokens_(std::move(tokens)) {}
+    explicit Parser(std::vector<Token> tokens);
     Program parse();
 
 private:
@@ -63,4 +63,5 @@ private:
     std::unordered_map<std::string, std::shared_ptr<EnumType>> enumerations_;
     std::unordered_map<std::string, std::shared_ptr<StructType>> structureInstances_;
     std::unordered_set<std::string> importedModules_;
+    bool optionShadowed_{false};
 };

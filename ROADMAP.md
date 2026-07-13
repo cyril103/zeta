@@ -70,10 +70,12 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
 - `collections` : accès génériques sûrs `first`, `second` et `at` sur `Slice[T]`,
   avec `Option[T]`, `isNone` et `unwrapOr`.
 - `strings` : décodage par offset d'octet, `Option[Char]`, vues bornées et recherche.
+- `Vec[T]` : collection possédée dynamique, croissance contrôlée, vues empruntées
+  et accès sûrs avec `Option[T]`.
 
 ## Limites connues
 
-- pas de collection dynamique possédée (`Vec[T]`, dictionnaire, ensemble) ;
+- pas encore de dictionnaire ni d'ensemble dynamique ;
 - les `StringView` restent locales et ne peuvent pas encore être retournées ;
 - les références ne peuvent pas être retournées ni stockées globalement ;
 - les durées de vie restent lexicales avec réduction à la dernière utilisation,
@@ -141,8 +143,7 @@ en cas d'échec d'allocation ou de dépassement de taille.
 2. introduire allocation, croissance et libération déterministes — terminé ;
 3. appliquer les règles de déplacement aux éléments non `Copy` — terminé ;
 4. exposer des vues `Slice[T]` et `SliceMut[T]` sans copie — terminé ;
-5. fournir `push`, `pop`, `get`, `set`, `reserve` et `clear` — `push`, `reserve`
-   et `clear` terminés ;
+5. fournir `push`, `pop`, `get`, `set`, `reserve` et `clear` — terminé ;
 6. tester les types primitifs, structures, `String` et `Box[T]` ;
 7. intégrer le module à la stdlib précompilée.
 
@@ -200,5 +201,5 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Compléter l'API de `Vec[T]` avec `pop`, `get` et `set`, prochaine étape de la
-priorité 3 sur les collections dynamiques possédées.
+Compléter la matrice de tests de `Vec[T]` avec structures et combinaisons
+imbriquées, prochaine étape de la priorité 3 sur les collections dynamiques.

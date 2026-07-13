@@ -1,8 +1,4 @@
 // Accès sûrs aux vues Slice. Aucun index invalide n'est évalué.
-enum Option[T] {
-    Some(value: T)
-    None
-}
 
 pub def first[T: Copy](values: Slice[T]): Option[T] = if (values.length == 0) Option[T].None else Option[T].Some(value: values[0])
 

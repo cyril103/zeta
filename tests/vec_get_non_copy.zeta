@@ -1,0 +1,6 @@
+def main(): Int = {
+    var values: Vec[Box[Int]] = Vec[Box[Int]]()
+    values.push(Box(1))
+    val invalid: Option[Box[Int]] = values.get(0)
+    0
+}

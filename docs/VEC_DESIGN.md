@@ -93,3 +93,8 @@ Les méthodes `asSlice` et `asSliceMut` produisent maintenant les deux mots
 `{adresse, longueur}` directement depuis le propriétaire. Elles participent au
 suivi lexical des emprunts : toute opération susceptible de modifier ou déplacer
 le vecteur est refusée jusqu'à la dernière utilisation de la vue.
+
+L'API prévue est complète. `get` copie uniquement un élément `Copy`, `pop`
+transfère le dernier élément après avoir réduit la longueur, et les deux rendent
+le type de base `Option[T]`. `set` détruit l'ancien élément avant de transférer le
+nouveau et conserve le code d'erreur de bornes `101`.

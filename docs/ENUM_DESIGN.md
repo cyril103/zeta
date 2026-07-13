@@ -159,7 +159,7 @@ en citant les types impliqués. La monomorphisation réutilise les contraintes e
 le nommage existants ; elle ne doit pas produire deux définitions pour la même
 instance dans un module.
 
-`Option[T]` appartient à la bibliothèque standard, mais son nom pourra être
+`Option[T]` est désormais un type générique de base, mais son nom peut être
 reconnu sans traitement intrinsèque. Sa sémantique provient uniquement de la
 déclaration générique ci-dessus.
 

@@ -1,0 +1,21 @@
+def main(): Int = {
+    val original: String = "alpha"
+    var texts: Vec[String] = Vec[String]()
+    texts.push(original)
+    texts.set(0, "beta")
+    val copied: Option[String] = texts.get(0)
+    val copiedIsValid: Bool = match (copied) {
+        Option[String].Some(value) => value == "beta"
+        Option[String].None => false
+    }
+
+    var boxes: Vec[Box[Int]] = Vec[Box[Int]]()
+    boxes.push(Box(42))
+    val popped: Option[Box[Int]] = boxes.pop()
+    val boxValue: Int = match (popped) {
+        Option[Box[Int]].Some(value) => *value
+        Option[Box[Int]].None => 0
+    }
+
+    if (original == "alpha" && copiedIsValid && boxValue == 42 && boxes.isEmpty) 0 else 1
+}
