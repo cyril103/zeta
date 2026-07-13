@@ -661,22 +661,33 @@ Ces fonctions retournent `Option[T]` et n'évaluent jamais un accès hors limite
 
 ## Vecteurs dynamiques
 
+`Vec[T]` est un type intégré au langage : aucun import n'est nécessaire.
 `Vec[T]()` construit un propriétaire vide représenté par
-`{adresse, longueur, capacité}`. Un vecteur est toujours déplacé et jamais copié.
-Il fournit `push`, `pop`, `get`, `set`, `reserve`, `clear`, ainsi que les
-propriétés `length`, `capacity` et `isEmpty`. `get` et `pop` retournent
-`Option[T]` ; `get` exige que `T` soit `Copy`, tandis que `pop` transfère la
-valeur.
+`{adresse, longueur, capacité}` :
+
+```zeta
+def main(): Int = {
+    var values: Vec[Int] = Vec[Int]()
+    values.push(10)
+    values.push(20)
+
+    val first: Option[Int] = values.get(0)
+    val last: Option[Int] = values.pop()
+    values.reserve(8)
+
+    if (values.length == 1 && !values.isEmpty) 0 else 1
+}
+```
+
+Un vecteur est toujours déplacé et jamais copié. Il fournit `push`, `pop`,
+`get`, `set`, `reserve`, `clear`, ainsi que les propriétés `length`, `capacity`
+et `isEmpty`. `get` et `pop` retournent `Option[T]` ; `get` exige que `T` soit
+`Copy`, tandis que `pop` transfère la valeur.
 
 `asSlice()` et `asSliceMut()` créent des vues sans allocation. Les emprunts
 empêchent toute croissance ou mutation concurrente jusqu'à leur dernière
 utilisation. Un échec d'allocation ou un dépassement de capacité termine le
 processus avec le code `105`.
-
-Le module standard `vectors` fournit `consumeLength` et `consumeIsEmpty`. Ces
-helpers consommateurs servent aussi de frontière générique précompilée pour
-`Vec[T]` ; l'accès ordinaire aux propriétés reste directement disponible sur le
-type.
 
 ## Expressions sur plusieurs lignes
 

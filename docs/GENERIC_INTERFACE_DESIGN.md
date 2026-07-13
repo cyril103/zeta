@@ -88,6 +88,7 @@ double lecture ambiguë n'est autorisée. Le cache de module est passé à la ve
 Les tests vérifient notamment :
 
 - la disparition de `generic_source` et du texte hexadécimal ;
-- la compilation de `collections` et `vectors` sans leurs sources ;
+- la compilation de `collections` et de la fixture interne
+  `vec_generic_fixture` sans leurs sources ;
 - le rejet d'une version de tokens inconnue ou d'une suite sans `End` ;
 - la stabilité de l'interface lors d'un changement limité aux commentaires.

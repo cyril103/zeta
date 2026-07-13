@@ -79,9 +79,7 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
   avec `Option[T]`, `isNone` et `unwrapOr`.
 - `strings` : décodage par offset d'octet, `Option[Char]`, vues bornées et recherche.
 - `Vec[T]` : collection possédée dynamique, croissance contrôlée, vues empruntées
-  et accès sûrs avec `Option[T]`.
-- `vectors` : helpers consommateurs génériques distribués avec la stdlib
-  précompilée.
+  et accès sûrs avec `Option[T]`, intégrée au langage et utilisable sans import.
 
 ## Limites connues
 
