@@ -1,0 +1,34 @@
+import collections
+import sequences
+
+def main(): Int = {
+    var values: Vec[Int] = Vec[Int]()
+    values.push(10)
+    values.push(20)
+    values.push(10)
+    values.push(30)
+
+    val sameArray: [Int; 4] = [10, 20, 10, 30]
+    val differentArray: [Int; 4] = [10, 20, 30, 10]
+    val prefixArray: [Int; 2] = [10, 20]
+    val suffixArray: [Int; 2] = [10, 30]
+    val tooLongArray: [Int; 5] = [10, 20, 10, 30, 40]
+
+    val same: Slice[Int] = Slice(&sameArray)
+    val different: Slice[Int] = Slice(&differentArray)
+    val prefix: Slice[Int] = Slice(&prefixArray)
+    val suffix: Slice[Int] = Slice(&suffixArray)
+    val tooLong: Slice[Int] = Slice(&tooLongArray)
+
+    val lastTen: Int = collections.unwrapOr(
+        sequences.lastIndexOf(values.asSlice(), 10), -1)
+    val equal: Bool = sequences.equals(values.asSlice(), same)
+    val notEqual: Bool = sequences.equals(values.asSlice(), different)
+    val starts: Bool = sequences.startsWith(values.asSlice(), prefix)
+    val ends: Bool = sequences.endsWith(values.asSlice(), suffix)
+    val rejectsLongPrefix: Bool = !sequences.startsWith(values.asSlice(), tooLong)
+    val rejectsLongSuffix: Bool = !sequences.endsWith(values.asSlice(), tooLong)
+
+    if (lastTen == 2 && equal && !notEqual && starts && ends &&
+        rejectsLongPrefix && rejectsLongSuffix) 0 else 1
+}

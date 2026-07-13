@@ -20,6 +20,17 @@ pub def indexOf[T: Equatable](values: Slice[T], expected: T): Option[Int] = {
     Option[Int].None
 }
 
+pub def lastIndexOf[T: Equatable](values: Slice[T], expected: T): Option[Int] = {
+    var index: Int = values.length - 1
+    while (index >= 0) do {
+        if (values[index] == expected) {
+            return Option[Int].Some(value: index)
+        } else false
+        index = index - 1
+    }
+    Option[Int].None
+}
+
 pub def count[T: Equatable](values: Slice[T], expected: T): Int = {
     var index: Int = 0
     var total: Int = 0
@@ -60,6 +71,43 @@ pub def maximum[T: Ordered](values: Slice[T]): Option[T] = {
             index = index + 1
         }
         Option[T].Some(value: result)
+    }
+}
+
+pub def equals[T: Equatable](left: Slice[T], right: Slice[T]): Bool = {
+    if (left.length != right.length) false else {
+        var index: Int = 0
+        var equal: Bool = true
+        while (index < left.length && equal) do {
+            equal = left[index] == right[index]
+            index = index + 1
+        }
+        equal
+    }
+}
+
+pub def startsWith[T: Equatable](values: Slice[T], prefix: Slice[T]): Bool = {
+    if (prefix.length > values.length) false else {
+        var index: Int = 0
+        var matches: Bool = true
+        while (index < prefix.length && matches) do {
+            matches = values[index] == prefix[index]
+            index = index + 1
+        }
+        matches
+    }
+}
+
+pub def endsWith[T: Equatable](values: Slice[T], suffix: Slice[T]): Bool = {
+    if (suffix.length > values.length) false else {
+        val offset: Int = values.length - suffix.length
+        var index: Int = 0
+        var matches: Bool = true
+        while (index < suffix.length && matches) do {
+            matches = values[offset + index] == suffix[index]
+            index = index + 1
+        }
+        matches
     }
 }
 
