@@ -56,3 +56,8 @@ La matrice négative couvre au minimum : version `.zti`, entrée inconnue,
 référence nominale absente, champ de structure hors limites, champ d'enum hors
 charge, version des tokens génériques, token `End` absent, nom de module interne,
 objet absent, magie ELF invalide et architecture incompatible.
+
+Cette matrice est implémentée par `tests/interface_diagnostics.sh`. Le codec
+propage `InterfaceError` jusqu'au chargeur, qui ajoute le chemin sans perdre le
+code. Les objets sont contrôlés dès que le couple `.zti` + `.o` est résolu ; les
+artefacts incompatibles n'atteignent donc plus `ld`.

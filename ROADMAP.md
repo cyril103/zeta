@@ -174,15 +174,16 @@ Travail livré :
 7. annotations, constructions et motifs `match` qualifiés pour les enums
    ordinaires et génériques distribuées sans source ;
 8. remplacement de `generic_source` par `generic_tokens 1`, représentation
-   canonique chargée directement par le parseur dans le format `.zti` 7.
+   canonique chargée directement par le parseur dans le format `.zti` 7 ;
+9. diagnostics stables `ZTI`, `MOD` et `ABI`, contextualisés par chemin, export,
+   type, variante et champ, avec validation précoce des objets ELF64 x86-64.
 
 Travail restant :
 
-1. diagnostics plus détaillés pour toutes les incompatibilités ABI ;
-2. réduction des tokens génériques à la fermeture des déclarations nécessaires ;
-3. commande explicite de construction d'une bibliothèque ;
-4. installation dans un cache partagé indépendant d'un projet ;
-5. déduplication robuste des instances génériques entre consommateurs.
+1. réduction des tokens génériques à la fermeture des déclarations nécessaires ;
+2. commande explicite de construction d'une bibliothèque ;
+3. installation dans un cache partagé indépendant d'un projet ;
+4. déduplication robuste des instances génériques entre consommateurs.
 
 ## Priorité 5 — Optimisations IR
 
@@ -221,6 +222,6 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Détailler les diagnostics d'interfaces incompatibles : distinguer version,
-disposition, référence nominale, corps générique et objet manquant, avec des tests
-négatifs ciblés pour chaque frontière.
+Réduire `generic_tokens` à la fermeture des déclarations nécessaires pour chaque
+module : exports génériques, types référencés et dépendances de corps, sans
+réintroduire de texte source ni modifier les résultats de monomorphisation.

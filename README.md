@@ -327,6 +327,13 @@ def unwrap(result: protocol.Result[Int]): Int = match (result) {
 La même syntaxe fonctionne lorsque `protocol.zeta` est absent et que seuls
 `protocol.zti` et `protocol.o` sont distribués.
 
+Les artefacts distribués sont vérifiés avant l'analyse et l'édition de liens. Les
+diagnostics portent un code stable et le chemin concerné : `ZTI001`/`ZTI010` pour
+le format, `ZTI100` pour les références de types, `ZTI200` pour les dispositions,
+`ZTI300` pour les génériques, `MOD001` à `MOD003` pour la résolution, et `ABI001`
+ou `ABI002` pour un objet absent du format ELF64 relogeable x86-64 attendu. Les
+erreurs de disposition précisent le type, la variante et le champ disponibles.
+
 La bibliothèque standard peut être précompilée une fois avec :
 
 ```sh
