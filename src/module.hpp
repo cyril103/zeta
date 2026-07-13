@@ -69,3 +69,5 @@ private:
     std::unordered_set<std::string> loading_;
     bool preferPrecompiled_{true};
 };
+
+void validatePrecompiledObject(const std::filesystem::path& path);

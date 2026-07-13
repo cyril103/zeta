@@ -22,7 +22,7 @@ std::string readSource(const std::filesystem::path& path) {
     return {std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
 }
 
-void validatePrecompiledObject(const std::filesystem::path& path) {
+void validatePrecompiledObjectFile(const std::filesystem::path& path) {
     std::ifstream input(path, std::ios::binary);
     std::array<unsigned char, 20> header{};
     if (!input.read(reinterpret_cast<char*>(header.data()),
@@ -130,6 +130,10 @@ Parser::ImportedEnumerations importedEnumerations(
     }
     return result;
 }
+}
+
+void validatePrecompiledObject(const std::filesystem::path& path) {
+    validatePrecompiledObjectFile(path);
 }
 
 ModuleGraph ModuleLoader::load(const std::filesystem::path& rootPath) {

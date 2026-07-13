@@ -13,6 +13,7 @@
 #include <iomanip>
 #include <sstream>
 #include <cstdint>
+#include <cstdlib>
 #include <stdexcept>
 #include <string>
 #include <sys/wait.h>
@@ -87,6 +88,7 @@ void runRelocatableLink(const std::vector<fs::path>& objects, const fs::path& ou
 void usage() {
     std::cerr << "Usage: zeta <source.zeta> [-o executable] [--stdlib dossier]\n"
                  "       zeta --build-library <source.zeta> -o dossier [--stdlib dossier]\n"
+                 "       zeta --install-library <module.zti> [--library-cache dossier]\n"
                  "       zeta --build-stdlib [--stdlib dossier]\n";
 }
 
@@ -171,6 +173,82 @@ void buildLibrary(const ModuleGraph& modules, const fs::path& outputDirectory) {
     fs::rename(publishedObject, objectPath);
 }
 
+fs::path defaultLibraryCache() {
+    if (const char* configured = std::getenv("ZETA_LIBRARY_CACHE"))
+        if (*configured != '\0') return configured;
+    if (const char* xdg = std::getenv("XDG_CACHE_HOME"))
+        if (*xdg != '\0') return fs::path(xdg) / "zeta" / "libraries";
+    if (const char* home = std::getenv("HOME"))
+        if (*home != '\0') return fs::path(home) / ".cache" / "zeta" / "libraries";
+    throw std::runtime_error("[LIB001] emplacement du cache de bibliothèques inconnu");
+}
+
+fs::path libraryCacheDirectory(const fs::path& configured) {
+    const fs::path root = configured.empty() ? defaultLibraryCache() : configured;
+    return root / ("abi-" + std::string(ZetaVersion::Abi));
+}
+
+void installLibrary(const fs::path& interfaceSource, const fs::path& configuredCache) {
+    if (interfaceSource.extension() != ".zti")
+        throw std::runtime_error("[LIB001] --install-library attend un fichier .zti");
+    fs::path objectSource = interfaceSource;
+    objectSource.replace_extension(".o");
+    if (!fs::is_regular_file(interfaceSource) || !fs::is_regular_file(objectSource))
+        throw std::runtime_error("[LIB001] paire .zti/.o incomplète pour " +
+                                 interfaceSource.stem().string());
+
+    PersistedInterface persisted;
+    try {
+        persisted = InterfaceCodec::deserialize(readOptionalFile(interfaceSource));
+    } catch (const InterfaceError& error) {
+        throw InterfaceError(error.code(), interfaceSource.string() + " : " + error.detail());
+    }
+    const std::string moduleName = interfaceSource.stem().string();
+    if (persisted.interface.name != moduleName)
+        throw std::runtime_error("[LIB001] l'interface décrit le module '" +
+            persisted.interface.name + "', fichier '" + moduleName + "'");
+    validatePrecompiledObject(objectSource);
+
+    const fs::path cache = libraryCacheDirectory(configuredCache);
+    fs::create_directories(cache);
+    const std::string suffix = ".tmp." + std::to_string(getpid());
+    const fs::path interfaceTemporary = cache / ("." + moduleName + ".zti" + suffix);
+    const fs::path objectTemporary = cache / ("." + moduleName + ".o" + suffix);
+    const fs::path interfaceBackup = cache / ("." + moduleName + ".zti.bak" + suffix);
+    const fs::path objectBackup = cache / ("." + moduleName + ".o.bak" + suffix);
+    TemporaryFiles temporaryFiles;
+    for (const fs::path& path : {interfaceTemporary, objectTemporary,
+                                 interfaceBackup, objectBackup}) {
+        std::error_code ignored;
+        fs::remove(path, ignored);
+        temporaryFiles.add(path);
+    }
+    fs::copy_file(interfaceSource, interfaceTemporary);
+    fs::copy_file(objectSource, objectTemporary);
+    validatePrecompiledObject(objectTemporary);
+
+    const fs::path interfaceTarget = cache / (moduleName + ".zti");
+    const fs::path objectTarget = cache / (moduleName + ".o");
+    const bool hadInterface = fs::exists(interfaceTarget);
+    const bool hadObject = fs::exists(objectTarget);
+    if (hadInterface) fs::rename(interfaceTarget, interfaceBackup);
+    if (hadObject) fs::rename(objectTarget, objectBackup);
+    try {
+        fs::rename(interfaceTemporary, interfaceTarget);
+        fs::rename(objectTemporary, objectTarget);
+    } catch (...) {
+        std::error_code ignored;
+        fs::remove(interfaceTarget, ignored);
+        fs::remove(objectTarget, ignored);
+        if (hadInterface) fs::rename(interfaceBackup, interfaceTarget);
+        if (hadObject) fs::rename(objectBackup, objectTarget);
+        throw;
+    }
+    std::error_code ignored;
+    fs::remove(interfaceBackup, ignored);
+    fs::remove(objectBackup, ignored);
+}
+
 std::string startAssembly(const ModuleGraph& modules) {
     std::string assembly = "format ELF64\nsection '.text' executable\npublic start\n";
     for (const std::string& module : modules.compilationOrder)
@@ -195,14 +273,18 @@ int main(int argc, char** argv) {
     fs::path sourcePath;
     fs::path outputPath;
     fs::path standardLibraryPath;
+    fs::path libraryCachePath;
     bool buildStandardLibrary = false;
     bool buildLibraryModule = false;
+    bool installLibraryModule = false;
     for (int i = 1; i < argc; ++i) {
         const std::string argument = argv[i];
         if (argument == "--build-stdlib") {
             buildStandardLibrary = true;
         } else if (argument == "--build-library") {
             buildLibraryModule = true;
+        } else if (argument == "--install-library") {
+            installLibraryModule = true;
         } else if (argument == "-o") {
             if (++i >= argc) {
                 usage();
@@ -215,6 +297,12 @@ int main(int argc, char** argv) {
                 return 2;
             }
             standardLibraryPath = argv[i];
+        } else if (argument == "--library-cache") {
+            if (++i >= argc) {
+                usage();
+                return 2;
+            }
+            libraryCachePath = argv[i];
         } else if (sourcePath.empty()) {
             sourcePath = argument;
         } else {
@@ -227,7 +315,9 @@ int main(int argc, char** argv) {
         standardLibraryPath = ZETA_STDLIB_DIR;
 #endif
     }
-    if (buildStandardLibrary && buildLibraryModule) {
+    const int selectedModes = static_cast<int>(buildStandardLibrary) +
+        static_cast<int>(buildLibraryModule) + static_cast<int>(installLibraryModule);
+    if (selectedModes > 1) {
         usage();
         return 2;
     }
@@ -256,6 +346,21 @@ int main(int argc, char** argv) {
     if (sourcePath.empty()) {
         usage();
         return 2;
+    }
+    if (installLibraryModule) {
+        if (!outputPath.empty() || sourcePath.extension() != ".zti") {
+            usage();
+            return 2;
+        }
+        try {
+            installLibrary(sourcePath, libraryCachePath);
+            std::cout << "Bibliothèque installée : " <<
+                libraryCacheDirectory(libraryCachePath) / sourcePath.filename() << '\n';
+            return 0;
+        } catch (const std::exception& error) {
+            std::cerr << "Erreur: " << error.what() << '\n';
+            return 1;
+        }
     }
     if (outputPath.empty()) {
         outputPath = sourcePath;
