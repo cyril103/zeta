@@ -1,0 +1,4 @@
+import left
+import right
+
+def main(): Int = left.left() + right.right() - 42

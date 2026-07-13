@@ -269,6 +269,10 @@ if(BUILD_TESTING)
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_interface_cache.sh
             $<TARGET_FILE:zeta>
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_interface_cache)
+    add_test(NAME characterize_generic_instance_collision
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_instance_collision.sh
+            $<TARGET_FILE:zeta>
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_instance_dedup)
     add_test(NAME interface_diagnostics
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/interface_diagnostics.sh
             $<TARGET_FILE:zeta>
