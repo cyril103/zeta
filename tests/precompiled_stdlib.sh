@@ -11,6 +11,8 @@ sequences_program=$7
 sequences_compare_program=$8
 sequences_mutate_program=$9
 sequences_ordered_program=${10}
+sequences_bounds_program=${11}
+sequences_aggregate_program=${12}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 mkdir "$work/stdlib"
@@ -48,6 +50,10 @@ mv "$work/stdlib"/*.zeta "$work/sources/"
 "$work/sequences-mutate-app"
 "$compiler" "$sequences_ordered_program" -o "$work/sequences-ordered-app" --stdlib "$work/stdlib" >/dev/null
 "$work/sequences-ordered-app"
+"$compiler" "$sequences_bounds_program" -o "$work/sequences-bounds-app" --stdlib "$work/stdlib" >/dev/null
+"$work/sequences-bounds-app"
+"$compiler" "$sequences_aggregate_program" -o "$work/sequences-aggregate-app" --stdlib "$work/stdlib" >/dev/null
+"$work/sequences-aggregate-app"
 
 # Une source modifiée invalide son artefact partagé et force le fallback source.
 mv "$work/sources/io.zeta" "$work/stdlib/io.zeta"

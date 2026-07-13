@@ -248,7 +248,9 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_read.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_compare.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_mutate.zeta
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_ordered.zeta)
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_ordered.zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_bounds.zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_aggregate.zeta)
     add_test(NAME persisted_module_interfaces
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/persisted_interfaces.sh
             $<TARGET_FILE:zeta>

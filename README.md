@@ -705,13 +705,19 @@ val swaps: Int = sequences.reverse(values.asSliceMut())
 val sorted: Bool = sequences.isSorted(values.asSlice())
 val sortSwaps: Int = sequences.sort(values.asSliceMut())
 val sortedPosition: Option[Int] = sequences.binarySearch(values.asSlice(), 20)
+val firstInsertion: Int = sequences.lowerBound(values.asSlice(), 20)
+val lastInsertion: Int = sequences.upperBound(values.asSlice(), 20)
+val total: Option[Int] = sequences.sum(values.asSlice())
+val multiplied: Option[Int] = sequences.product(values.asSlice())
 ```
 
 Les comparaisons comprennent aussi `equals`, `startsWith` et `endsWith`.
-`contains`, les recherches, le comptage et les comparaisons exigent `Equatable` ;
-les extrema, `isSorted`, `sort` et `binarySearch` exigent `Ordered`. Les mutations
-`reverse`, `fill` et `swap` exigent `Copy` ; `swap` renvoie `false` pour un indice
-invalide. Les mêmes fonctions acceptent les slices issues de tableaux.
+`contains`, les recherches, le comptage, `allEqual` et les comparaisons exigent
+`Equatable` ; les extrema, `isSorted`, `sort`, `binarySearch`, `lowerBound` et
+`upperBound` exigent `Ordered`. `sum` et `product` exigent `Numeric` et retournent
+`None` pour une séquence vide. Les mutations `reverse`, `fill` et `swap` exigent
+`Copy` ; `swap` renvoie `false` pour un indice invalide. Les mêmes fonctions
+acceptent les slices issues de tableaux.
 
 ## Expressions sur plusieurs lignes
 
