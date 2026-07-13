@@ -689,6 +689,24 @@ empêchent toute croissance ou mutation concurrente jusqu'à leur dernière
 utilisation. Un échec d'allocation ou un dépassement de capacité termine le
 processus avec le code `105`.
 
+Le module standard `sequences` fournit des algorithmes génériques utilisables sur
+un `Vec` à travers ses vues, sans déplacer le propriétaire :
+
+```zeta
+import sequences
+
+val found: Bool = sequences.contains(values.asSlice(), 20)
+val position: Option[Int] = sequences.indexOf(values.asSlice(), 20)
+val occurrences: Int = sequences.count(values.asSlice(), 20)
+val minimum: Option[Int] = sequences.minimum(values.asSlice())
+val maximum: Option[Int] = sequences.maximum(values.asSlice())
+val swaps: Int = sequences.reverse(values.asSliceMut())
+```
+
+`contains`, `indexOf` et `count` exigent `Equatable`; `minimum` et `maximum`
+exigent `Ordered`; `reverse` exige `Copy` et renvoie le nombre d'échanges. Les
+mêmes fonctions acceptent les slices issues de tableaux.
+
 ## Expressions sur plusieurs lignes
 
 Une expression sur plusieurs lignes doit être placée entre accolades. Le bloc

@@ -78,6 +78,8 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
 - `collections` : accès génériques sûrs `first`, `second` et `at` sur `Slice[T]`,
   avec `Option[T]`, `isNone` et `unwrapOr`.
 - `strings` : décodage par offset d'octet, `Option[Char]`, vues bornées et recherche.
+- `sequences` : recherche, comptage, extrema et inversion génériques sur les vues
+  contiguës issues de `Vec[T]` ou de tableaux.
 - `Vec[T]` : collection possédée dynamique, croissance contrôlée, vues empruntées
   et accès sûrs avec `Option[T]`, intégrée au langage et utilisable sans import.
 

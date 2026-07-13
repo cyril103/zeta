@@ -88,7 +88,7 @@ les tests de stdlib précompilée valident le nouveau chemin.
 Les tests vérifient notamment :
 
 - la disparition de `generic_source` et du texte hexadécimal ;
-- la compilation de `collections` et de la fixture interne
+- la compilation de `collections`, `sequences` et de la fixture interne
   `vec_generic_fixture` sans leurs sources ;
 - le rejet d'une version de tokens inconnue ou d'une suite sans `End` ;
 - la stabilité de l'interface lors d'un changement limité aux commentaires.

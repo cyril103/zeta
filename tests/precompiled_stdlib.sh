@@ -7,6 +7,7 @@ vec_fixture=$3
 io_program=$4
 collections_program=$5
 vec_program=$6
+sequences_program=$7
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 mkdir "$work/stdlib"
@@ -19,6 +20,8 @@ test -f "$work/stdlib/precompiled/io.o"
 test -f "$work/stdlib/precompiled/io.zti"
 test -f "$work/stdlib/precompiled/collections.o"
 test -f "$work/stdlib/precompiled/collections.zti"
+test -f "$work/stdlib/precompiled/sequences.o"
+test -f "$work/stdlib/precompiled/sequences.zti"
 test ! -e "$work/stdlib/precompiled/vectors.o"
 test ! -e "$work/stdlib/precompiled/vectors.zti"
 test -f "$work/stdlib/precompiled/vec_generic_fixture.o"
@@ -34,6 +37,8 @@ mv "$work/stdlib"/*.zeta "$work/sources/"
 "$work/collections-app"
 "$compiler" "$vec_program" -o "$work/vec-fixture-app" --stdlib "$work/stdlib" >/dev/null
 "$work/vec-fixture-app"
+"$compiler" "$sequences_program" -o "$work/sequences-app" --stdlib "$work/stdlib" >/dev/null
+"$work/sequences-app"
 
 # Une source modifiée invalide son artefact partagé et force le fallback source.
 mv "$work/sources/io.zeta" "$work/stdlib/io.zeta"
