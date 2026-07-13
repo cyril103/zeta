@@ -87,6 +87,27 @@ void runRelocatableLink(const std::vector<fs::path>& objects, const fs::path& ou
         throw std::runtime_error("ld -r n'a pas pu produire l'objet stdlib");
 }
 
+void weakenGenericSymbols(const fs::path& object, const IrProgram& ir) {
+    const std::vector<std::string> definitions = IrGenerator::genericDefinitions(ir);
+    if (definitions.empty()) return;
+    const pid_t child = fork();
+    if (child < 0) throw std::runtime_error("impossible de lancer objcopy");
+    if (child == 0) {
+        std::vector<std::string> arguments{"objcopy"};
+        for (const std::string& definition : definitions)
+            arguments.push_back("--weaken-symbol=zeta_fn_" + definition);
+        arguments.push_back(object.string());
+        std::vector<char*> raw;
+        for (std::string& argument : arguments) raw.push_back(argument.data());
+        raw.push_back(nullptr);
+        execvp("objcopy", raw.data());
+        _exit(127);
+    }
+    int status{};
+    if (waitpid(child, &status, 0) < 0 || !WIFEXITED(status) || WEXITSTATUS(status) != 0)
+        throw std::runtime_error("objcopy n'a pas pu marquer les instances génériques");
+}
+
 void usage() {
     std::cerr << "Usage: zeta <source.zeta> [-o executable] [--stdlib dossier]"
                  " [--library-cache dossier]\n"
@@ -157,6 +178,7 @@ void buildLibrary(const ModuleGraph& modules, const fs::path& outputDirectory) {
     writeFile(temporaryAssembly,
               FasmCodeGenerator::generateObject(ir, false, moduleName));
     runFasm(temporaryAssembly, temporaryObject);
+    weakenGenericSymbols(temporaryObject, ir);
 
     fs::path publishedObject = temporaryObject;
     if (hasNativeExports(modules.interfaces.at(moduleName))) {
@@ -524,6 +546,7 @@ int main(int argc, char** argv) {
                 writeFile(moduleAssembly,
                     FasmCodeGenerator::generateObject(moduleIr, false, moduleName));
                 runFasm(moduleAssembly, cachedModuleObject);
+                weakenGenericSymbols(cachedModuleObject, moduleIr);
                 writeFile(moduleStamp, objectFingerprint);
             }
             fs::copy_file(cachedModuleObject, moduleObject, fs::copy_options::overwrite_existing);
