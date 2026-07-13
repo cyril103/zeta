@@ -42,6 +42,25 @@ bool symbolic(const ValueType& type) {
 }
 }
 
+std::shared_ptr<EnumType> builtinOptionType() {
+    static const std::shared_ptr<EnumType> option = [] {
+        auto definition = std::make_shared<EnumType>();
+        definition->name = "Option";
+        definition->publicType = true;
+        definition->typeParameters.push_back("T");
+        EnumVariant some;
+        some.name = "Some";
+        some.fields.push_back(StructField{
+            {}, "value", ValueType(ValueType::Kind::TypeParameter, "T"), 0U});
+        definition->variants.push_back(std::move(some));
+        EnumVariant none;
+        none.name = "None";
+        definition->variants.push_back(std::move(none));
+        return definition;
+    }();
+    return option;
+}
+
 std::shared_ptr<const StructType> instantiateStructType(
     const std::shared_ptr<const StructType>& structure,
     std::vector<ValueType> arguments,

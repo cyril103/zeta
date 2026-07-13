@@ -115,6 +115,8 @@ struct EnumType {
     std::size_t alignment{4};
 };
 
+std::shared_ptr<EnumType> builtinOptionType();
+
 std::shared_ptr<const EnumType> instantiateEnumType(
     const std::shared_ptr<const EnumType>& enumeration,
     std::vector<ValueType> arguments,

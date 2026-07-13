@@ -133,19 +133,7 @@ Parser::Parser(std::vector<Token> tokens, ImportedStructures importedStructures,
                ImportedEnumerations importedEnumerations)
     : tokens_(std::move(tokens)), importedStructures_(std::move(importedStructures)),
       importedEnumerations_(std::move(importedEnumerations)) {
-    auto option = std::make_shared<EnumType>();
-    option->name = "Option";
-    option->publicType = true;
-    option->typeParameters.push_back("T");
-    EnumVariant some;
-    some.name = "Some";
-    some.fields.push_back(StructField{
-        {}, "value", ValueType(ValueType::Kind::TypeParameter, "T"), 0U});
-    option->variants.push_back(std::move(some));
-    EnumVariant none;
-    none.name = "None";
-    option->variants.push_back(std::move(none));
-    enumerations_.emplace("Option", std::move(option));
+    enumerations_.emplace("Option", builtinOptionType());
 }
 
 const Token& Parser::peek() const { return tokens_[current_]; }

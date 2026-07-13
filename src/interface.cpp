@@ -129,11 +129,8 @@ ValueType decodeType(const std::string& encoded, std::size_t& cursor,
                 found->second, std::move(arguments), {}));
         if (name != "Option")
             interfaceFailure("ZTI100", "énumération publique inconnue '" + name + "'");
-        auto option = std::make_shared<EnumType>();
-        option->name = name;
-        option->publicType = true;
-        option->typeArguments = std::move(arguments);
-        return ValueType(option);
+        return ValueType(instantiateEnumType(
+            builtinOptionType(), std::move(arguments), {}));
     }
     bool mutableView = false;
     if ((kind == 'R' || kind == 'V') && cursor < encoded.size() && encoded[cursor] == 'M') {
