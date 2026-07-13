@@ -1,6 +1,7 @@
 #include "ir.hpp"
 
 #include "diagnostic.hpp"
+#include "version.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -8,6 +9,26 @@
 #include <limits>
 #include <sstream>
 #include <type_traits>
+
+namespace {
+std::string genericHash(const std::string& identity) {
+    std::uint64_t hash = 1469598103934665603ULL;
+    for (const unsigned char byte : identity) {
+        hash ^= byte;
+        hash *= 1099511628211ULL;
+    }
+    std::ostringstream encoded;
+    encoded << std::hex << std::setfill('0') << std::setw(16) << hash;
+    return encoded.str();
+}
+
+std::string symbolPart(const std::string& value) {
+    std::string result;
+    for (const char character : value)
+        result += std::isalnum(static_cast<unsigned char>(character)) ? character : '_';
+    return result;
+}
+}
 
 ValueId IrGenerator::nextValue(ValueType type) {
     ir_.valueTypes.push_back(resolveType(type));
@@ -44,13 +65,90 @@ ValueType IrGenerator::resolveType(const ValueType& type) const {
 
 std::string IrGenerator::genericLinkName(
     const Declaration& declaration, const std::vector<ValueType>& types) const {
-    std::string name = declaration.name;
-    for (const ValueType& type : types) {
-        name += "__";
-        for (char character : typeName(type))
-            name += std::isalnum(static_cast<unsigned char>(character)) ? character : '_';
+    const auto origin = genericOrigins_.find(&declaration);
+    std::string name = origin == genericOrigins_.end()
+        ? declaration.name : origin->second.module + "__" + declaration.name;
+    for (const ValueType& type : types) name += "__" + symbolPart(typeName(type));
+    return name + "__g" + genericHash(genericIdentity(declaration, types));
+}
+
+std::string IrGenerator::genericTypeIdentity(const ValueType& type) const {
+    if (type == ValueType::Int) return "I";
+    if (type == ValueType::Byte) return "B";
+    if (type == ValueType::Double) return "D";
+    if (type == ValueType::Bool) return "Z";
+    if (type == ValueType::Char) return "C";
+    if (type == ValueType::String) return "S";
+    if (type == ValueType::StringView) return "W";
+    if (type.kind == ValueType::Kind::Array)
+        return "A" + std::to_string(type.length) + "(" + genericTypeIdentity(*type.element) + ")";
+    if (type.kind == ValueType::Kind::Reference)
+        return std::string(type.mutableReference ? "RM(" : "R(") +
+            genericTypeIdentity(*type.element) + ")";
+    if (type.kind == ValueType::Kind::Slice)
+        return std::string(type.mutableReference ? "VM(" : "V(") +
+            genericTypeIdentity(*type.element) + ")";
+    if (type.kind == ValueType::Kind::Box)
+        return "O(" + genericTypeIdentity(*type.element) + ")";
+    if (type.kind == ValueType::Kind::Vec)
+        return "G(" + genericTypeIdentity(*type.element) + ")";
+    if (type.kind == ValueType::Kind::TypeParameter) return "T(" + type.typeParameter + ")";
+    if (type.kind == ValueType::Kind::Struct) {
+        const StructType* definition = type.structure->genericDefinition
+            ? type.structure->genericDefinition.get() : type.structure.get();
+        const auto origin = structureOrigins_.find(definition);
+        std::string result = "Q(" + (origin == structureOrigins_.end() ? std::string{} :
+            origin->second + ".") + definition->name;
+        for (const ValueType& argument : type.structure->typeArguments)
+            result += ";" + genericTypeIdentity(argument);
+        return result + ")";
     }
-    return name;
+    if (type.kind == ValueType::Kind::Enum) {
+        const EnumType* definition = type.enumeration->genericDefinition
+            ? type.enumeration->genericDefinition.get() : type.enumeration.get();
+        const auto origin = enumerationOrigins_.find(definition);
+        std::string result = "E(" + (origin == enumerationOrigins_.end() ? std::string{} :
+            origin->second + ".") + definition->name;
+        for (const ValueType& argument : type.enumeration->typeArguments)
+            result += ";" + genericTypeIdentity(argument);
+        return result + ")";
+    }
+    return "?";
+}
+
+std::string IrGenerator::genericIdentity(
+    const Declaration& declaration, const std::vector<ValueType>& types) const {
+    const auto origin = genericOrigins_.find(&declaration);
+    std::string identity = "abi=" + std::string(ZetaVersion::Abi) + ";interface=";
+    if (origin != genericOrigins_.end())
+        identity += origin->second.interfaceFingerprint + ";module=" + origin->second.module;
+    identity += ";function=" + declaration.name;
+    for (const ValueType& type : types) identity += ";type=" + genericTypeIdentity(type);
+    return identity;
+}
+
+void IrGenerator::indexGenericOrigins(const ModuleGraph& graph) {
+    genericOrigins_.clear();
+    structureOrigins_.clear();
+    enumerationOrigins_.clear();
+    for (const auto& [moduleName, module] : graph.modules) {
+        const std::string fingerprint = graph.interfaceFingerprints.at(moduleName);
+        for (const Statement& statement : module.program.statements) {
+            const auto* declaration = std::get_if<Declaration>(&statement.value);
+            if (declaration != nullptr && !declaration->typeParameters.empty())
+                genericOrigins_.emplace(declaration, GenericOrigin{moduleName, fingerprint});
+        }
+        for (const std::shared_ptr<const StructType>& structure : module.program.structures)
+            structureOrigins_.emplace(structure.get(), moduleName);
+        for (const std::shared_ptr<const EnumType>& enumeration : module.program.enumerations)
+            enumerationOrigins_.emplace(enumeration.get(), moduleName);
+    }
+    for (const auto& [moduleName, interface] : graph.interfaces) {
+        for (const std::shared_ptr<const StructType>& structure : interface.structures)
+            structureOrigins_.insert_or_assign(structure.get(), moduleName);
+        for (const std::shared_ptr<const EnumType>& enumeration : interface.enumerations)
+            enumerationOrigins_.insert_or_assign(enumeration.get(), moduleName);
+    }
 }
 
 void IrGenerator::registerGenericInstance(
@@ -181,6 +279,7 @@ IrProgram IrGenerator::generate(const ModuleGraph& graph) {
 }
 
 IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::string& moduleFilter) {
+    indexGenericOrigins(graph);
     if (!moduleFilter.empty()) {
         moduleFilter_ = moduleFilter;
         emitEntryPoint_ = false;

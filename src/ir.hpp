@@ -140,6 +140,10 @@ private:
         std::vector<ValueType> types;
         std::string linkName;
     };
+    struct GenericOrigin {
+        std::string module;
+        std::string interfaceFingerprint;
+    };
     struct Symbol {
         SlotId slot;
         BindingKind kind;
@@ -167,6 +171,10 @@ private:
     ValueType resolveType(const ValueType& type) const;
     std::string genericLinkName(const Declaration& declaration,
                                 const std::vector<ValueType>& types) const;
+    std::string genericIdentity(const Declaration& declaration,
+                                const std::vector<ValueType>& types) const;
+    std::string genericTypeIdentity(const ValueType& type) const;
+    void indexGenericOrigins(const ModuleGraph& graph);
     void registerGenericInstance(const Declaration& declaration,
                                  const std::vector<ValueType>& types);
     IrProgram ir_;
@@ -180,6 +188,9 @@ private:
     std::unordered_map<std::string, ValueType> typeSubstitutions_;
     std::vector<GenericInstance> genericInstances_;
     std::unordered_set<std::string> genericInstanceNames_;
+    std::unordered_map<const Declaration*, GenericOrigin> genericOrigins_;
+    std::unordered_map<const StructType*, std::string> structureOrigins_;
+    std::unordered_map<const EnumType*, std::string> enumerationOrigins_;
     std::optional<std::string> moduleFilter_;
     bool emitEntryPoint_{true};
 };
