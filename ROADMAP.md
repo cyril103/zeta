@@ -33,6 +33,8 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
 - `Slice[T]` et `SliceMut[T]` sous la forme `{adresse, longueur}` ;
 - `Box[T]`, déplacement sans copie et destruction déterministe ;
 - structures ordinaires et génériques, construction nommée et mutation des champs ;
+- énumérations ordinaires et génériques, variantes à charge utile et `match`
+  exhaustif ;
 - fonctions génériques monomorphisées avec inférence et contraintes intégrées
   `Copy`, `Numeric`, `Ordered` et `Equatable`.
 
@@ -63,13 +65,11 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
 
 - `io` : affichage de `String`, `Char`, `Int`, `Byte`, `Bool`, `Double` et
   `Slice[Byte]` ;
-- `collections` : premiers algorithmes génériques `first`, `second` et `at` sur
-  `Slice[T]`.
+- `collections` : accès génériques sûrs `first`, `second` et `at` sur `Slice[T]`,
+  avec `Option[T]`, `isNone` et `unwrapOr`.
 
 ## Limites connues
 
-- aucune énumération ni correspondance de motifs ;
-- aucune abstraction sûre comme `Option[T]` pour représenter une absence ;
 - pas de collection dynamique possédée (`Vec[T]`, dictionnaire, ensemble) ;
 - pas encore d'API publique pour la longueur, l'indexation Unicode ou les
   sous-chaînes de `String` ;
@@ -83,7 +83,7 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
 - l'IR ne possède pas encore de pipeline d'optimisation ;
 - la cible unique reste Linux x86-64 avec FASM et `ld`.
 
-## Priorité 1 — Énumérations et Option
+## Priorité 1 — Énumérations et Option — terminée
 
 Objectif : permettre aux APIs de signaler explicitement l'absence ou l'échec.
 
@@ -96,10 +96,9 @@ enum Option[T] {
 }
 ```
 
-Travail prévu :
+Travail livré :
 
-1. définir la syntaxe des variantes et leur construction — conception terminée
-   dans `docs/ENUM_DESIGN.md` ;
+1. syntaxe des variantes et construction qualifiée ;
 2. calculer une disposition ABI avec discriminant et charge utile ;
 3. ajouter une expression de correspondance exhaustive ;
 4. diagnostiquer les variantes inconnues, doublons et correspondances incomplètes ;
@@ -108,7 +107,7 @@ Travail prévu :
 7. remplacer les accès partiels de `collections` par des variantes sûres.
 
 Critère de sortie : une fonction `first` sûre doit pouvoir retourner `None` pour
-une slice vide sans arrêt du processus.
+une slice vide sans arrêt du processus — couvert par les tests d'intégration.
 
 ## Priorité 2 — API String et vues UTF-8
 
@@ -194,7 +193,5 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Implémenter la première tranche de `docs/ENUM_DESIGN.md` : lexer, déclaration des
-énumérations non génériques, calcul de leur disposition et diagnostics de
-définition. Ajouter ensuite leur construction qualifiée avant la correspondance
-exhaustive.
+Commencer la priorité 2 avec `String.lengthBytes` et `String.isEmpty`, puis définir
+le contrat des vues UTF-8 avant toute indexation par point de code.

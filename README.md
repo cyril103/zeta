@@ -447,6 +447,9 @@ def remplace (values : SliceMut[Int], index : Int, value : Int) : Int = {
 }
 ```
 
+La propriété en lecture seule `values.length` expose le nombre d'éléments. Les
+tableaux de longueur zéro sont valides et permettent de construire une slice vide.
+
 Chaque accès vérifie dynamiquement `0 <= index < longueur` et termine avec le code
 `101` en cas d'échec. Les slices d'éléments tableaux acceptent aussi l'indexation
 imbriquée. Les invariants sont détaillés dans `docs/SLICE_DESIGN.md`.
@@ -504,8 +507,31 @@ var pair: Pair[Int, Bool] = Pair[Int, Bool] { first: 42, second: true }
 pair.first = 43
 ```
 
-Le module standard `collections` fournit les premiers algorithmes génériques sur
-`Slice[T]` : `first`, `second` et `at`.
+## Énumérations et correspondance exhaustive
+
+Une énumération est une union discriminée nominale. Ses variantes se construisent
+avec leur type et leurs champs nommés ; `match` doit couvrir chaque variante :
+
+```text
+enum Resultat {
+    Valeur(value: Int)
+    Absent
+}
+
+def valeurOuZero(resultat: Resultat): Int = match (resultat) {
+    Resultat.Valeur(value) => value
+    Resultat.Absent => 0
+}
+```
+
+Les enums génériques s'instancient explicitement, par exemple
+`Option[Int].Some(value: 42)`. Elles suivent les mêmes règles `Copy`, déplacement,
+destruction et égalité structurelle que leur charge utile.
+
+Le module standard `collections` fournit `first`, `second` et `at` sur `Slice[T]`.
+Ces fonctions retournent `Option[T]` et n'évaluent jamais un accès hors limites.
+`collections.isNone(option)` teste l'absence et
+`collections.unwrapOr(option, fallback)` extrait une valeur avec repli.
 
 ## Expressions sur plusieurs lignes
 

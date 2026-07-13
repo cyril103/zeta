@@ -2,12 +2,11 @@
 
 Les énumérations de Zeta sont des unions discriminées nominales. Chaque valeur
 contient exactement une variante active, identifiée par un discriminant, et la
-charge utile éventuelle de cette variante. Elles préparent `Option[T]`, puis les
-APIs partielles sûres de la bibliothèque standard.
+charge utile éventuelle de cette variante. Elles portent `Option[T]` et les APIs
+d'accès sûres de la bibliothèque standard.
 
-La première implémentation doit couvrir les énumérations non génériques, leur
-construction et une correspondance exhaustive. La généricité et `Option[T]`
-s'appuieront ensuite sur la monomorphisation déjà utilisée pour les structures.
+L'implémentation couvre les énumérations non génériques et génériques, leur
+construction, la correspondance exhaustive et `Option[T]` dans `collections`.
 
 ## Déclaration et construction
 
@@ -209,16 +208,15 @@ des variantes.
 
 ## Interfaces de modules
 
-Une enum publique devra exporter dans `.zti` son nom, ses paramètres, l'ordre et
-les champs de ses variantes, ainsi que sa disposition. Une fonction publique ne
-peut exposer une enum dont la définition n'est pas elle-même exportable.
+Les signatures `.zti` sérialisent désormais le nom et les arguments d'une enum.
+Les corps génériques incorporés permettent notamment de reconstruire `Option[T]`
+et de monomorphiser les fonctions de `collections` côté consommateur.
 
-La première étape non générique peut rester limitée aux types définis et utilisés
-dans un même module, comme les structures aujourd'hui. L'export persistant sera
-traité avec les interfaces publiques complètes ; cette limite doit produire un
-diagnostic plutôt qu'une interface inutilisable.
+L'export autonome de définitions publiques complètes — variantes, champs et
+disposition sans source générique incorporée — reste prévu avec les interfaces
+publiques complètes.
 
-## Découpage d'implémentation
+## Découpage d'implémentation — terminé
 
 1. lexer, déclaration non générique, calcul de disposition et diagnostics de
    définition ;
