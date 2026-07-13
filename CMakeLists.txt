@@ -273,6 +273,10 @@ if(BUILD_TESTING)
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_instance_collision.sh
             $<TARGET_FILE:zeta>
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_instance_dedup)
+    add_test(NAME distribute_deduplicated_generic_instances
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_instance_distribution.sh
+            $<TARGET_FILE:zeta>
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_instance_dedup)
     add_test(NAME interface_diagnostics
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/interface_diagnostics.sh
             $<TARGET_FILE:zeta>
