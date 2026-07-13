@@ -1,0 +1,9 @@
+struct Hidden {
+    value: Int
+}
+
+pub struct Exposed {
+    hidden: Hidden
+}
+
+def main(): Int = 0

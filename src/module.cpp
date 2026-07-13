@@ -234,6 +234,18 @@ void ModuleLoader::buildFingerprints() {
             }
             exports.push_back(std::move(signature));
         }
+        for (const std::shared_ptr<const StructType>& structure :
+             graph_.interfaces.at(name).structures) {
+            std::string signature = "struct:" + structure->name + ":" +
+                std::to_string(structure->size) + ":" +
+                std::to_string(structure->alignment);
+            for (const std::string& parameter : structure->typeParameters)
+                signature += ":type:" + parameter;
+            for (const StructField& field : structure->fields)
+                signature += ":field:" + field.name + ":" + typeName(field.type) +
+                    ":" + std::to_string(field.offset);
+            exports.push_back(std::move(signature));
+        }
         std::sort(exports.begin(), exports.end());
         for (const std::string& signature : exports)
             interfaceHash = hashText(signature, interfaceHash);
@@ -255,13 +267,39 @@ void ModuleLoader::buildFingerprints() {
 void ModuleLoader::buildInterfaces() {
     for (const auto& [name, module] : graph_.modules) {
         if (graph_.interfaces.contains(name)) continue;
-        ModuleInterface interface{name, {}};
+        ModuleInterface interface{name, {}, {}};
+        const auto validatePublicType = [&](const auto& self, const ValueType& type,
+                                            SourceLocation location) -> void {
+            if (type.kind == ValueType::Kind::Struct) {
+                if (!type.structure->publicType)
+                    throw CompileError(location, "le type privé '" +
+                        type.structure->name + "' fuit dans l'interface publique de " + name);
+                for (const ValueType& argument : type.structure->typeArguments)
+                    self(self, argument, location);
+                return;
+            }
+            if (type.kind == ValueType::Kind::Array ||
+                type.kind == ValueType::Kind::Reference ||
+                type.kind == ValueType::Kind::Slice ||
+                type.kind == ValueType::Kind::Box ||
+                type.kind == ValueType::Kind::Vec)
+                self(self, *type.element, location);
+        };
+        for (const std::shared_ptr<const StructType>& structure : module.program.structures) {
+            if (!structure->publicType) continue;
+            for (const StructField& field : structure->fields)
+                validatePublicType(validatePublicType, field.type, field.location);
+            interface.structures.push_back(structure);
+        }
         for (const Statement& statement : module.program.statements) {
             const auto* declaration = std::get_if<Declaration>(&statement.value);
             if (declaration == nullptr || !declaration->publicSymbol) continue;
             std::vector<ValueType> parameterTypes;
-            for (const Parameter& parameter : declaration->parameters)
+            validatePublicType(validatePublicType, declaration->type, declaration->location);
+            for (const Parameter& parameter : declaration->parameters) {
+                validatePublicType(validatePublicType, parameter.type, parameter.location);
                 parameterTypes.push_back(parameter.type);
+            }
             if (!interface.exports.emplace(declaration->name,
                     ExportedSymbol{declaration->kind, declaration->type,
                                    declaration->callable, declaration->nativeSymbol,

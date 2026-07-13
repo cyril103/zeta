@@ -21,6 +21,7 @@ struct ExportedSymbol {
 struct ModuleInterface {
     std::string name;
     std::unordered_map<std::string, ExportedSymbol> exports;
+    std::vector<std::shared_ptr<const StructType>> structures;
 };
 
 struct Module {
