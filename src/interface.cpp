@@ -12,6 +12,10 @@ namespace {
 using StructRegistry = std::unordered_map<std::string, std::shared_ptr<StructType>>;
 using EnumRegistry = std::unordered_map<std::string, std::shared_ptr<EnumType>>;
 
+[[noreturn]] void interfaceFailure(const std::string& code, const std::string& detail) {
+    throw InterfaceError(code, detail);
+}
+
 std::string encodeType(const ValueType& type) {
     switch (type.kind) {
     case ValueType::Kind::Int: return "I";
@@ -48,13 +52,13 @@ std::string encodeType(const ValueType& type) {
         return encoded + "]";
     }
     }
-    throw std::runtime_error("type Zeta inconnu dans l'interface");
+    interfaceFailure("ZTI100", "type Zeta inconnu dans l'interface");
 }
 
 ValueType decodeType(const std::string& encoded, std::size_t& cursor,
                      const StructRegistry& structures,
                      const EnumRegistry& enumerations) {
-    if (cursor >= encoded.size()) throw std::runtime_error("type tronqué dans l'interface");
+    if (cursor >= encoded.size()) interfaceFailure("ZTI100", "type tronqué");
     const char kind = encoded[cursor++];
     if (kind == 'I') return ValueType::Int;
     if (kind == 'Y') return ValueType::Byte;
@@ -65,10 +69,10 @@ ValueType decodeType(const std::string& encoded, std::size_t& cursor,
     if (kind == 'W') return ValueType::StringView;
     if (kind == 'T') {
         if (cursor >= encoded.size() || encoded[cursor++] != '(')
-            throw std::runtime_error("paramètre de type invalide dans l'interface");
+            interfaceFailure("ZTI100", "paramètre de type invalide");
         const std::size_t end = encoded.find(')', cursor);
         if (end == std::string::npos)
-            throw std::runtime_error("paramètre de type non fermé dans l'interface");
+            interfaceFailure("ZTI100", "paramètre de type non fermé");
         const std::string name = encoded.substr(cursor, end - cursor);
         cursor = end + 1U;
         return ValueType(ValueType::Kind::TypeParameter, name);
@@ -78,53 +82,53 @@ ValueType decodeType(const std::string& encoded, std::size_t& cursor,
         while (cursor < encoded.size() &&
                std::isdigit(static_cast<unsigned char>(encoded[cursor]))) ++cursor;
         if (lengthBegin == cursor || cursor >= encoded.size() || encoded[cursor++] != ':')
-            throw std::runtime_error("nom de structure invalide dans l'interface");
+            interfaceFailure("ZTI100", "nom de structure invalide");
         const std::size_t nameLength = std::stoull(
             encoded.substr(lengthBegin, cursor - lengthBegin - 1U));
         if (cursor + nameLength > encoded.size())
-            throw std::runtime_error("nom de structure tronqué dans l'interface");
+            interfaceFailure("ZTI100", "nom de structure tronqué");
         const std::string name = encoded.substr(cursor, nameLength);
         cursor += nameLength;
         if (cursor >= encoded.size() || encoded[cursor++] != '[')
-            throw std::runtime_error("arguments de structure absents dans l'interface");
+            interfaceFailure("ZTI100", "arguments de structure absents");
         const std::size_t countBegin = cursor;
         while (cursor < encoded.size() &&
                std::isdigit(static_cast<unsigned char>(encoded[cursor]))) ++cursor;
         if (countBegin == cursor || cursor >= encoded.size() || encoded[cursor++] != ':')
-            throw std::runtime_error("arguments de structure invalides dans l'interface");
+            interfaceFailure("ZTI100", "arguments de structure invalides");
         const std::size_t count = std::stoull(
             encoded.substr(countBegin, cursor - countBegin - 1U));
         std::vector<ValueType> arguments;
         for (std::size_t i = 0; i < count; ++i)
             arguments.push_back(decodeType(encoded, cursor, structures, enumerations));
         if (cursor >= encoded.size() || encoded[cursor++] != ']')
-            throw std::runtime_error("arguments de structure non fermés dans l'interface");
+            interfaceFailure("ZTI100", "arguments de structure non fermés");
         const auto found = structures.find(name);
         if (found == structures.end())
-            throw std::runtime_error("structure publique inconnue '" + name + "'");
+            interfaceFailure("ZTI100", "structure publique inconnue '" + name + "'");
         return ValueType(instantiateStructType(found->second, std::move(arguments), {}));
     }
     if (kind == 'E') {
         const std::size_t nameEnd = encoded.find('[', cursor);
         if (nameEnd == std::string::npos)
-            throw std::runtime_error("nom d'énumération non fermé dans l'interface");
+            interfaceFailure("ZTI100", "nom d'énumération non fermé");
         const std::string name = encoded.substr(cursor, nameEnd - cursor);
         cursor = nameEnd + 1U;
         const std::size_t countEnd = encoded.find(':', cursor);
         if (countEnd == std::string::npos)
-            throw std::runtime_error("arguments d'énumération invalides dans l'interface");
+            interfaceFailure("ZTI100", "arguments d'énumération invalides");
         const std::size_t count = std::stoull(encoded.substr(cursor, countEnd - cursor));
         cursor = countEnd + 1U;
         std::vector<ValueType> arguments;
         for (std::size_t i = 0; i < count; ++i)
             arguments.push_back(decodeType(encoded, cursor, structures, enumerations));
         if (cursor >= encoded.size() || encoded[cursor++] != ']')
-            throw std::runtime_error("arguments d'énumération non fermés dans l'interface");
+            interfaceFailure("ZTI100", "arguments d'énumération non fermés");
         if (const auto found = enumerations.find(name); found != enumerations.end())
             return ValueType(instantiateEnumType(
                 found->second, std::move(arguments), {}));
         if (name != "Option")
-            throw std::runtime_error("énumération publique inconnue '" + name + "'");
+            interfaceFailure("ZTI100", "énumération publique inconnue '" + name + "'");
         auto option = std::make_shared<EnumType>();
         option->name = name;
         option->publicType = true;
@@ -141,14 +145,14 @@ ValueType decodeType(const std::string& encoded, std::size_t& cursor,
         const std::size_t begin = cursor;
         while (cursor < encoded.size() && std::isdigit(static_cast<unsigned char>(encoded[cursor])))
             ++cursor;
-        if (begin == cursor) throw std::runtime_error("taille de tableau absente dans l'interface");
+        if (begin == cursor) interfaceFailure("ZTI100", "taille de tableau absente");
         length = static_cast<std::size_t>(std::stoull(encoded.substr(begin, cursor - begin)));
     }
     if (cursor >= encoded.size() || encoded[cursor++] != '(')
-        throw std::runtime_error("type composé invalide dans l'interface");
+        interfaceFailure("ZTI100", "type composé invalide");
     ValueType element = decodeType(encoded, cursor, structures, enumerations);
     if (cursor >= encoded.size() || encoded[cursor++] != ')')
-        throw std::runtime_error("type composé non fermé dans l'interface");
+        interfaceFailure("ZTI100", "type composé non fermé");
     if (kind == 'A') return ValueType(std::make_shared<ValueType>(element), length);
     if (kind == 'R') return ValueType(std::make_shared<ValueType>(element), mutableView);
     if (kind == 'V') return ValueType(ValueType::Kind::Slice,
@@ -157,15 +161,25 @@ ValueType decodeType(const std::string& encoded, std::size_t& cursor,
         std::make_shared<ValueType>(element));
     if (kind == 'G') return ValueType(ValueType::Kind::Vec,
         std::make_shared<ValueType>(element));
-    throw std::runtime_error("code de type inconnu dans l'interface");
+    interfaceFailure("ZTI100", "code de type inconnu");
 }
 
 ValueType decodeType(const std::string& encoded, const StructRegistry& structures = {},
                      const EnumRegistry& enumerations = {}) {
     std::size_t cursor = 0;
     ValueType type = decodeType(encoded, cursor, structures, enumerations);
-    if (cursor != encoded.size()) throw std::runtime_error("suffixe de type invalide dans l'interface");
+    if (cursor != encoded.size()) interfaceFailure("ZTI100", "suffixe de type invalide");
     return type;
+}
+
+ValueType decodeTypeContext(const std::string& encoded, const StructRegistry& structures,
+                            const EnumRegistry& enumerations,
+                            const std::string& context) {
+    try {
+        return decodeType(encoded, structures, enumerations);
+    } catch (const InterfaceError& error) {
+        throw InterfaceError(error.code(), context + " : " + error.detail());
+    }
 }
 
 }
@@ -258,21 +272,22 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
     int version = 0;
     if (!(input >> word >> version) || word != "ZTI" ||
         version != ZetaVersion::InterfaceFormat)
-        throw std::runtime_error("format .zti inconnu ou incompatible");
+        interfaceFailure("ZTI001", "format .zti inconnu ou incompatible");
     PersistedInterface result;
     StructRegistry structures;
     EnumRegistry enumerations;
     std::unordered_map<std::string, std::size_t> structureFieldCounts;
     std::unordered_map<std::string, std::size_t> enumerationVariantCounts;
     if (!(input >> word) || word != "module" || !(input >> std::quoted(result.interface.name)))
-        throw std::runtime_error("nom de module absent de l'interface");
+        interfaceFailure("ZTI010", "nom de module absent de l'interface");
     if (!(input >> word) || word != "fingerprint" || !(input >> result.fingerprint))
-        throw std::runtime_error("empreinte absente de l'interface");
+        interfaceFailure("ZTI010", "empreinte absente de l'interface");
     while (input >> word) {
         if (word == "end") break;
         if (word == "import") {
             std::string name;
-            if (!(input >> std::quoted(name))) throw std::runtime_error("import .zti invalide");
+            if (!(input >> std::quoted(name)))
+                interfaceFailure("ZTI010", "import .zti invalide");
             result.imports.push_back(std::move(name));
             continue;
         }
@@ -282,7 +297,7 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
             if (!(input >> tokenVersion >> count) ||
                 tokenVersion != ZetaVersion::GenericTokens || count == 0U ||
                 !result.genericTokens.empty())
-                throw std::runtime_error("représentation générique .zti invalide");
+                interfaceFailure("ZTI300", "représentation générique .zti invalide");
             for (std::size_t i = 0; i < count; ++i) {
                 std::string tokenWord, text;
                 int kind = 0;
@@ -290,15 +305,15 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
                 if (!(input >> tokenWord >> kind >> line >> column >> std::quoted(text)) ||
                     tokenWord != "token" || kind < 0 ||
                     kind > static_cast<int>(TokenKind::End) || line == 0U || column == 0U)
-                    throw std::runtime_error("token générique .zti invalide");
+                    interfaceFailure("ZTI300", "token générique .zti invalide");
                 const TokenKind tokenKind = static_cast<TokenKind>(kind);
                 if (tokenKind == TokenKind::End && i + 1U != count)
-                    throw std::runtime_error("fin prématurée des tokens génériques .zti");
+                    interfaceFailure("ZTI300", "fin prématurée des tokens génériques .zti");
                 result.genericTokens.push_back(Token{
                     tokenKind, std::move(text), SourceLocation{line, column}});
             }
             if (result.genericTokens.back().kind != TokenKind::End)
-                throw std::runtime_error("fin des tokens génériques .zti absente");
+                interfaceFailure("ZTI300", "fin des tokens génériques .zti absente");
             continue;
         }
         if (word == "structure") {
@@ -306,9 +321,9 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
             std::size_t size = 0, alignment = 0, parameterCount = 0, fieldCount = 0;
             if (!(input >> std::quoted(name) >> size >> alignment >> parameterCount >> fieldCount) ||
                 name.empty() || alignment == 0U)
-                throw std::runtime_error("structure .zti invalide");
+                interfaceFailure("ZTI200", "disposition de structure invalide");
             if (structures.contains(name))
-                throw std::runtime_error("structure .zti dupliquée : " + name);
+                interfaceFailure("ZTI010", "structure dupliquée '" + name + "'");
             auto structure = std::make_shared<StructType>();
             structure->name = name;
             structure->publicType = true;
@@ -317,11 +332,13 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
             for (std::size_t i = 0; i < parameterCount; ++i) {
                 std::string parameter;
                 if (!(input >> std::quoted(parameter)) || parameter.empty())
-                    throw std::runtime_error("paramètre de structure .zti invalide");
+                    interfaceFailure("ZTI010", "structure '" + name +
+                        "' : paramètre de type invalide");
                 if (std::find(structure->typeParameters.begin(),
                               structure->typeParameters.end(), parameter) !=
                     structure->typeParameters.end())
-                    throw std::runtime_error("paramètre de structure .zti dupliqué");
+                    interfaceFailure("ZTI010", "structure '" + name +
+                        "' : paramètre de type dupliqué '" + parameter + "'");
                 structure->typeParameters.push_back(std::move(parameter));
             }
             structures.emplace(name, structure);
@@ -336,9 +353,9 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
             if (!(input >> std::quoted(name) >> size >> alignment >> payloadOffset >>
                   parameterCount >> variantCount) || name.empty() || alignment < 4U ||
                 payloadOffset > size)
-                throw std::runtime_error("énumération .zti invalide");
+                interfaceFailure("ZTI200", "disposition d'énumération invalide");
             if (enumerations.contains(name))
-                throw std::runtime_error("énumération .zti dupliquée : " + name);
+                interfaceFailure("ZTI010", "énumération dupliquée '" + name + "'");
             auto enumeration = std::make_shared<EnumType>();
             enumeration->name = name;
             enumeration->publicType = true;
@@ -348,11 +365,13 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
             for (std::size_t i = 0; i < parameterCount; ++i) {
                 std::string parameter;
                 if (!(input >> std::quoted(parameter)) || parameter.empty())
-                    throw std::runtime_error("paramètre d'énumération .zti invalide");
+                    interfaceFailure("ZTI010", "énumération '" + name +
+                        "' : paramètre de type invalide");
                 if (std::find(enumeration->typeParameters.begin(),
                               enumeration->typeParameters.end(), parameter) !=
                     enumeration->typeParameters.end())
-                    throw std::runtime_error("paramètre d'énumération .zti dupliqué");
+                    interfaceFailure("ZTI010", "énumération '" + name +
+                        "' : paramètre de type dupliqué '" + parameter + "'");
                 enumeration->typeParameters.push_back(std::move(parameter));
             }
             enumerations.emplace(name, enumeration);
@@ -363,23 +382,27 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
         if (word == "structure_body") {
             std::string name;
             if (!(input >> std::quoted(name)) || !structures.contains(name))
-                throw std::runtime_error("corps de structure .zti invalide");
+                interfaceFailure("ZTI010", "corps de structure inconnu ou invalide");
             const auto structure = structures.at(name);
             if (!structure->fields.empty())
-                throw std::runtime_error("corps de structure .zti dupliqué");
+                interfaceFailure("ZTI010", "corps de structure dupliqué '" + name + "'");
             for (std::size_t i = 0; i < structureFieldCounts.at(name); ++i) {
                 std::string fieldWord, fieldName, encodedType;
                 std::size_t offset = 0;
                 if (!(input >> fieldWord >> std::quoted(fieldName) >> offset >>
                       std::quoted(encodedType)) || fieldWord != "field" || fieldName.empty())
-                    throw std::runtime_error("champ de structure .zti invalide");
+                    interfaceFailure("ZTI010", "structure '" + name +
+                        "' : entrée de champ invalide");
                 if (std::any_of(structure->fields.begin(), structure->fields.end(),
                     [&](const StructField& field) { return field.name == fieldName; }))
-                    throw std::runtime_error("champ de structure .zti dupliqué");
-                ValueType type = decodeType(encodedType, structures, enumerations);
+                    interfaceFailure("ZTI200", "structure '" + name +
+                        "' : champ dupliqué '" + fieldName + "'");
+                ValueType type = decodeTypeContext(encodedType, structures, enumerations,
+                    "structure '" + name + "', champ '" + fieldName + "'");
                 if (type.kind != ValueType::Kind::TypeParameter &&
                     offset + valueTypeSize(type) > structure->size)
-                    throw std::runtime_error("champ hors disposition dans la structure .zti");
+                    interfaceFailure("ZTI200", "structure '" + name + "', champ '" +
+                        fieldName + "' : champ hors disposition");
                 structure->fields.push_back(StructField{{}, std::move(fieldName),
                                                         std::move(type), offset});
             }
@@ -389,20 +412,22 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
         if (word == "enumeration_body") {
             std::string name;
             if (!(input >> std::quoted(name)) || !enumerations.contains(name))
-                throw std::runtime_error("corps d'énumération .zti invalide");
+                interfaceFailure("ZTI010", "corps d'énumération inconnu ou invalide");
             const auto enumeration = enumerations.at(name);
             if (!enumeration->variants.empty())
-                throw std::runtime_error("corps d'énumération .zti dupliqué");
+                interfaceFailure("ZTI010", "corps d'énumération dupliqué '" + name + "'");
             for (std::size_t i = 0; i < enumerationVariantCounts.at(name); ++i) {
                 std::string variantWord, variantName;
                 std::size_t payloadSize = 0, payloadAlignment = 0, fieldCount = 0;
                 if (!(input >> variantWord >> std::quoted(variantName) >> payloadSize >>
                       payloadAlignment >> fieldCount) || variantWord != "variant" ||
                     variantName.empty() || payloadAlignment == 0U)
-                    throw std::runtime_error("variante d'énumération .zti invalide");
+                    interfaceFailure("ZTI010", "énumération '" + name +
+                        "' : variante invalide");
                 if (std::any_of(enumeration->variants.begin(), enumeration->variants.end(),
                     [&](const EnumVariant& variant) { return variant.name == variantName; }))
-                    throw std::runtime_error("variante d'énumération .zti dupliquée");
+                    interfaceFailure("ZTI200", "énumération '" + name +
+                        "' : variante dupliquée '" + variantName + "'");
                 EnumVariant variant{{}, std::move(variantName), {},
                                     payloadSize, payloadAlignment};
                 for (std::size_t fieldIndex = 0; fieldIndex < fieldCount; ++fieldIndex) {
@@ -411,15 +436,21 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
                     if (!(input >> fieldWord >> std::quoted(fieldName) >> offset >>
                           std::quoted(encodedType)) || fieldWord != "enum_field" ||
                         fieldName.empty())
-                        throw std::runtime_error("champ d'énumération .zti invalide");
+                        interfaceFailure("ZTI010", "énumération '" + name +
+                            "', variante '" + variant.name + "' : entrée de champ invalide");
                     if (std::any_of(variant.fields.begin(), variant.fields.end(),
                         [&](const StructField& field) { return field.name == fieldName; }))
-                        throw std::runtime_error("champ d'énumération .zti dupliqué");
-                    ValueType type = decodeType(encodedType, structures, enumerations);
+                        interfaceFailure("ZTI200", "énumération '" + name +
+                            "', variante '" + variant.name + "' : champ dupliqué '" +
+                            fieldName + "'");
+                    ValueType type = decodeTypeContext(encodedType, structures, enumerations,
+                        "énumération '" + name + "', variante '" + variant.name +
+                        "', champ '" + fieldName + "'");
                     if (type.kind != ValueType::Kind::TypeParameter &&
                         offset + valueTypeSize(type) > payloadSize)
-                        throw std::runtime_error(
-                            "champ hors charge dans l'énumération .zti");
+                        interfaceFailure("ZTI200", "énumération '" + name +
+                            "', variante '" + variant.name + "', champ '" + fieldName +
+                            "' : champ hors charge");
                     variant.fields.push_back(StructField{
                         {}, std::move(fieldName), std::move(type), offset});
                 }
@@ -428,31 +459,41 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
             enumerationVariantCounts.erase(name);
             continue;
         }
-        if (word != "export") throw std::runtime_error("entrée .zti inconnue : " + word);
+        if (word != "export")
+            interfaceFailure("ZTI010", "entrée inconnue '" + word + "'");
         std::string name, returnType;
         int kind = 0, callable = 0, native = 0;
         std::size_t parameterCount = 0;
         if (!(input >> std::quoted(name) >> kind >> callable >> native >>
               std::quoted(returnType) >> parameterCount))
-            throw std::runtime_error("export .zti invalide");
+            interfaceFailure("ZTI010", "entrée d'export invalide");
         std::vector<ValueType> parameters;
         for (std::size_t i = 0; i < parameterCount; ++i) {
             std::string encoded;
-            if (!(input >> std::quoted(encoded))) throw std::runtime_error("paramètre .zti invalide");
-            parameters.push_back(decodeType(encoded, structures, enumerations));
+            if (!(input >> std::quoted(encoded)))
+                interfaceFailure("ZTI010", "export '" + name +
+                    "' : paramètre absent ou invalide");
+            parameters.push_back(decodeTypeContext(encoded, structures, enumerations,
+                "export '" + name + "', paramètre " + std::to_string(i + 1U)));
         }
         std::size_t genericCount = 0;
-        if (!(input >> genericCount)) throw std::runtime_error("généricité .zti invalide");
+        if (!(input >> genericCount))
+            interfaceFailure("ZTI010", "export '" + name +
+                "' : métadonnées génériques invalides");
         for (std::size_t i = 0; i < genericCount; ++i) {
             std::string ignoredName, ignoredConstraint;
-            input >> std::quoted(ignoredName) >> std::quoted(ignoredConstraint);
+            if (!(input >> std::quoted(ignoredName) >> std::quoted(ignoredConstraint)))
+                interfaceFailure("ZTI010", "export '" + name +
+                    "' : paramètre générique invalide");
         }
-        result.interface.exports.emplace(name, ExportedSymbol{
+        if (!result.interface.exports.emplace(name, ExportedSymbol{
             static_cast<BindingKind>(kind),
-            decodeType(returnType, structures, enumerations), callable != 0,
-            native != 0, std::move(parameters), nullptr});
+            decodeTypeContext(returnType, structures, enumerations,
+                              "export '" + name + "', type de retour"), callable != 0,
+            native != 0, std::move(parameters), nullptr}).second)
+            interfaceFailure("ZTI010", "export dupliqué '" + name + "'");
     }
     if (!structureFieldCounts.empty() || !enumerationVariantCounts.empty())
-        throw std::runtime_error("corps de type public absent de l'interface");
+        interfaceFailure("ZTI200", "corps de type public absent de l'interface");
     return result;
 }

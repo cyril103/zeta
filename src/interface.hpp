@@ -3,7 +3,22 @@
 #include "module.hpp"
 
 #include <string>
+#include <stdexcept>
 #include <vector>
+
+class InterfaceError : public std::runtime_error {
+public:
+    InterfaceError(std::string code, std::string detail)
+        : std::runtime_error("[" + code + "] " + detail),
+          code_(std::move(code)), detail_(std::move(detail)) {}
+
+    const std::string& code() const noexcept { return code_; }
+    const std::string& detail() const noexcept { return detail_; }
+
+private:
+    std::string code_;
+    std::string detail_;
+};
 
 struct PersistedInterface {
     ModuleInterface interface;
