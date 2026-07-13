@@ -109,14 +109,39 @@ void emitValueDrop(std::ostringstream& out, const std::string& address,
     }
     if (type.kind == ValueType::Kind::Vec) {
         const std::string done = label + "_done";
-        out << "    mov rdi, qword " << address << "\n"
-            << "    test rdi, rdi\n"
+        const std::string loop = label + "_element_loop";
+        const std::string release = label + "_release";
+        out << "    push r12\n"
+            << "    push r13\n"
+            << "    push r14\n"
+            << "    push r15\n"
+            << "    mov r12, qword " << address << "\n"
+            << "    test r12, r12\n"
             << "    jz " << done << "\n"
-            << "    mov rsi, qword " << displacedAddress(address, 16U) << "\n"
+            << "    mov r15, qword " << displacedAddress(address, 16U) << "\n";
+        if (valueTypeNeedsDrop(*type.element)) {
+            out << "    mov r13, qword " << displacedAddress(address, 8U) << "\n"
+                << loop << ":\n"
+                << "    test r13, r13\n"
+                << "    jz " << release << "\n"
+                << "    dec r13\n"
+                << "    mov r14, r13\n"
+                << "    imul r14, " << valueTypeSize(*type.element) << "\n"
+                << "    add r14, r12\n";
+            emitValueDrop(out, "[r14]", *type.element, label + "_element");
+            out << "    jmp " << loop << "\n";
+        }
+        out << release << ":\n"
+            << "    mov rdi, r12\n"
+            << "    mov rsi, r15\n"
             << "    imul rsi, " << valueTypeSize(*type.element) << "\n"
             << "    mov eax, 11\n"
             << "    syscall\n"
-            << done << ":\n";
+            << done << ":\n"
+            << "    pop r15\n"
+            << "    pop r14\n"
+            << "    pop r13\n"
+            << "    pop r12\n";
         return;
     }
     if (type.kind == ValueType::Kind::Array) {
@@ -462,6 +487,52 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     << "    pop r14\n"
                     << "    pop r13\n"
                     << "    pop r12\n";
+            } else if constexpr (std::is_same_v<T, IrVecPush>) {
+                const IrSlot& slot = program.slots[item.slot];
+                const std::string address = slot.global
+                    ? "[" + globalLabel(slot) + "]"
+                    : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
+                const std::size_t elementSize = valueTypeSize(*item.type.element);
+                out << "    mov rdi, qword " << address << "\n"
+                    << "    mov rax, qword " << displacedAddress(address, 8U) << "\n"
+                    << "    imul rax, " << elementSize << "\n"
+                    << "    add rdi, rax\n";
+                emitBlockCopy(out,
+                    "[rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
+                    "[rdi]", elementSize);
+                out << "    inc qword " << displacedAddress(address, 8U) << "\n"
+                    << "    mov dword [rbp-" << valueOffset(program, item.output) << "], 0\n";
+            } else if constexpr (std::is_same_v<T, IrVecClear>) {
+                const std::size_t id = resourceSequence++;
+                const IrSlot& slot = program.slots[item.slot];
+                const std::string address = slot.global
+                    ? "[" + globalLabel(slot) + "]"
+                    : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
+                const std::string loop = "ir_vec_clear_loop_" + std::to_string(id);
+                const std::string done = "ir_vec_clear_done_" + std::to_string(id);
+                if (valueTypeNeedsDrop(*item.type.element)) {
+                    out << "    push r12\n"
+                        << "    push r13\n"
+                        << "    push r14\n"
+                        << "    mov r12, qword " << address << "\n"
+                        << "    mov r13, qword " << displacedAddress(address, 8U) << "\n"
+                        << loop << ":\n"
+                        << "    test r13, r13\n"
+                        << "    jz " << done << "\n"
+                        << "    dec r13\n"
+                        << "    mov r14, r13\n"
+                        << "    imul r14, " << valueTypeSize(*item.type.element) << "\n"
+                        << "    add r14, r12\n";
+                    emitValueDrop(out, "[r14]", *item.type.element,
+                                  "ir_vec_clear_element_" + std::to_string(id));
+                    out << "    jmp " << loop << "\n"
+                        << done << ":\n"
+                        << "    pop r14\n"
+                        << "    pop r13\n"
+                        << "    pop r12\n";
+                }
+                out << "    mov qword " << displacedAddress(address, 8U) << ", 0\n"
+                    << "    mov dword [rbp-" << valueOffset(program, item.output) << "], 0\n";
             } else if constexpr (std::is_same_v<T, IrStructConstruct>) {
                 const std::size_t output = valueOffset(program, item.output);
                 for (std::size_t i = 0; i < item.fields.size(); ++i) {

@@ -1,0 +1,13 @@
+def main(): Int = {
+    var values: Vec[Int] = Vec[Int]()
+    values.push(10)
+    values.push(20)
+    values.push(12)
+    if (values.length == 3 && values.capacity == 4 && !values.isEmpty) {
+        values.clear()
+        if (values.length == 0 && values.capacity == 4 && values.isEmpty) {
+            values.push(42)
+            if (values.length == 1 && values.capacity == 4) 0 else 3
+        } else 2
+    } else 1
+}

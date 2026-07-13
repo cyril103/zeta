@@ -83,3 +83,8 @@ d'allocation, règles de déplacement et destruction des éléments, vues emprun
 API complète, matrice de tests, puis intégration à la stdlib précompilée. Les
 formats d'interface et de cache seront versionnés dès que `Vec[T]` pourra
 apparaître dans une signature publique.
+
+Le cycle propriétaire des éléments est désormais disponible : `push` transfère
+ou retient la valeur selon son type, la croissance déplace les emplacements sans
+les détruire, et `clear` comme la destruction finale parcourent les éléments en
+ordre inverse. `clear` conserve le bloc alloué pour sa réutilisation.

@@ -792,12 +792,13 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (symbol == nullptr || symbol->type.kind != ValueType::Kind::Vec)
                 throw CompileError(node.object->location,
                                    "la méthode '" + node.method + "' exige un Vec");
-            if (node.method != "reserve")
+            if (node.method != "reserve" && node.method != "push" &&
+                node.method != "clear")
                 throw CompileError(expression.location,
                                    "méthode Vec inconnue '" + node.method + "'");
             if (symbol->parameter || symbol->kind != BindingKind::Var)
                 throw CompileError(node.object->location,
-                                   "'reserve' exige un Vec déclaré avec 'var'");
+                                   "'" + node.method + "' exige un Vec déclaré avec 'var'");
             if (const auto borrowed = borrows_.find(name->name);
                 borrowed != borrows_.end() &&
                 (borrowed->second.mutableBorrow || borrowed->second.shared != 0))
@@ -807,11 +808,20 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 throw CompileError(node.object->location,
                                    "utilisation de '" + name->name +
                                    "' après son déplacement");
-            if (node.arguments.size() != 1U)
-                throw CompileError(expression.location,
-                                   "'reserve' attend 1 argument, reçu " +
-                                   std::to_string(node.arguments.size()));
-            checkExpression(*node.arguments.front(), ValueType::Int);
+            const std::size_t expectedArguments = node.method == "clear" ? 0U : 1U;
+            if (node.arguments.size() != expectedArguments)
+                throw CompileError(expression.location, "'" + node.method + "' attend " +
+                    std::to_string(expectedArguments) + " argument(s), reçu " +
+                    std::to_string(node.arguments.size()));
+            if (node.method == "reserve")
+                checkExpression(*node.arguments.front(), ValueType::Int);
+            else if (node.method == "push") {
+                checkExpression(*node.arguments.front(), *symbol->type.element);
+                if (isMoveOnlyValueType(*symbol->type.element))
+                    if (const auto* moved =
+                            std::get_if<NameExpr>(&node.arguments.front()->value))
+                        movedBoxes_.insert(moved->name);
+            }
             node.object->inferredType = symbol->type;
             node.object->typed = true;
             return ValueType::Int;

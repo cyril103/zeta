@@ -51,6 +51,22 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_BINARY_DIR}/vec-reserve-negative 105)
     set_tests_properties(run_vec_reserve_negative PROPERTIES
         DEPENDS compile_vec_reserve_negative)
+    add_test(NAME compile_vec_push_clear COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_push_clear.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/vec-push-clear)
+    add_test(NAME run_vec_push_clear COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vec-push-clear)
+    set_tests_properties(run_vec_push_clear PROPERTIES DEPENDS compile_vec_push_clear)
+    add_test(NAME compile_vec_owned_elements COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_owned_elements.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/vec-owned-elements)
+    add_test(NAME run_vec_owned_elements COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vec-owned-elements)
+    set_tests_properties(run_vec_owned_elements PROPERTIES DEPENDS compile_vec_owned_elements)
+    add_test(NAME reject_vec_push_use_after_move COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_push_use_after_move.zeta)
+    set_tests_properties(reject_vec_push_use_after_move PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_vec_push_wrong_type COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_push_wrong_type.zeta)
+    set_tests_properties(reject_vec_push_wrong_type PROPERTIES WILL_FAIL TRUE)
     add_test(NAME compile_enum_declaration COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_declaration.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/enum-declaration)

@@ -139,9 +139,10 @@ en cas d'échec d'allocation ou de dépassement de taille.
 
 1. définir la représentation `{adresse, longueur, capacité}` — conception terminée ;
 2. introduire allocation, croissance et libération déterministes — terminé ;
-3. appliquer les règles de déplacement aux éléments non `Copy` ;
+3. appliquer les règles de déplacement aux éléments non `Copy` — terminé ;
 4. exposer des vues `Slice[T]` et `SliceMut[T]` sans copie ;
-5. fournir `push`, `pop`, `get`, `set`, `reserve` et `clear` ;
+5. fournir `push`, `pop`, `get`, `set`, `reserve` et `clear` — `push`, `reserve`
+   et `clear` terminés ;
 6. tester les types primitifs, structures, `String` et `Box[T]` ;
 7. intégrer le module à la stdlib précompilée.
 
@@ -199,5 +200,5 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Appliquer la destruction récursive et les déplacements aux éléments de `Vec[T]`,
-prochaine étape de la priorité 3 sur les collections dynamiques possédées.
+Exposer les vues empruntées `Slice[T]` et `SliceMut[T]` d'un `Vec[T]`, prochaine
+étape de la priorité 3 sur les collections dynamiques possédées.

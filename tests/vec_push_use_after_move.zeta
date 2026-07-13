@@ -1,0 +1,6 @@
+def main(): Int = {
+    val owned: Box[Int] = Box(42)
+    var values: Vec[Box[Int]] = Vec[Box[Int]]()
+    values.push(owned)
+    *owned
+}

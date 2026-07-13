@@ -722,10 +722,31 @@ ValueId IrGenerator::expression(
             const auto found = symbols_.find(name.name);
             if (found == symbols_.end())
                 throw CompileError(expressionNode.location, "Vec inconnu '" + name.name + "'");
-            const ValueId additional = expression(*node.arguments.front(), parameters);
             const ValueId output = nextValue(ValueType::Int);
+            const ValueType vectorType = resolveType(node.object->inferredType);
+            if (node.method == "clear") {
+                ir_.instructions.push_back(IrVecClear{output, found->second.slot, vectorType});
+                return output;
+            }
+            if (node.method == "reserve") {
+                const ValueId additional = expression(*node.arguments.front(), parameters);
+                ir_.instructions.push_back(IrVecReserve{
+                    output, found->second.slot, additional, vectorType});
+                return output;
+            }
+            const ValueId value = expression(*node.arguments.front(), parameters);
+            if (isCopyValueType(*vectorType.element) && valueTypeNeedsDrop(*vectorType.element) &&
+                std::holds_alternative<NameExpr>(node.arguments.front()->value))
+                ir_.instructions.push_back(IrRetain{value, *vectorType.element});
+            if (isMoveOnlyValueType(*vectorType.element))
+                if (const auto* moved = std::get_if<NameExpr>(&node.arguments.front()->value))
+                    movedBoxes_.insert(moved->name);
+            const ValueId one = nextValue(ValueType::Int);
+            ir_.instructions.push_back(IrConst{one, 1, ValueType::Int});
             ir_.instructions.push_back(IrVecReserve{
-                output, found->second.slot, additional, resolveType(node.object->inferredType)});
+                output, found->second.slot, one, vectorType});
+            ir_.instructions.push_back(IrVecPush{
+                output, found->second.slot, value, vectorType});
             return output;
         } else if constexpr (std::is_same_v<T, IndexExpr>) {
             const ValueId array = expression(*node.array, parameters);
@@ -1087,6 +1108,12 @@ std::string IrGenerator::print(const IrProgram& program) {
             else if constexpr (std::is_same_v<T, IrVecReserve>)
                 out << "  $" << item.output << " = vec_reserve %"
                     << program.slots[item.slot].name << ", $" << item.additional << '\n';
+            else if constexpr (std::is_same_v<T, IrVecPush>)
+                out << "  $" << item.output << " = vec_push %"
+                    << program.slots[item.slot].name << ", $" << item.value << '\n';
+            else if constexpr (std::is_same_v<T, IrVecClear>)
+                out << "  $" << item.output << " = vec_clear %"
+                    << program.slots[item.slot].name << '\n';
             else if constexpr (std::is_same_v<T, IrStructConstruct>) {
                 out << "  $" << item.output << " = struct " << typeName(item.type) << " [";
                 for (std::size_t i = 0; i < item.fields.size(); ++i) {
