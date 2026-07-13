@@ -141,6 +141,11 @@ if(BUILD_TESTING)
         -o ${CMAKE_CURRENT_BINARY_DIR}/string-utf8-decode)
     add_test(NAME run_string_utf8_decode COMMAND ${CMAKE_CURRENT_BINARY_DIR}/string-utf8-decode)
     set_tests_properties(run_string_utf8_decode PROPERTIES DEPENDS compile_string_utf8_decode)
+    add_test(NAME compile_string_char_iteration COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_char_iteration.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/string-char-iteration)
+    add_test(NAME run_string_char_iteration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/string-char-iteration)
+    set_tests_properties(run_string_char_iteration PROPERTIES DEPENDS compile_string_char_iteration)
     add_test(NAME compile_string_double_conversion COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_double_conversion.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/string-double-conversion)

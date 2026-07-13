@@ -1,2 +1,30 @@
 // Primitives UTF-8 de bas niveau. -1 signale une fin ou un offset invalide.
 pub native def decodeAtByte(value: String, offset: Int): Int
+
+enum Option[T] {
+    Some(value: T)
+    None
+}
+
+pub def charAtByte(value: String, offset: Int): Option[Char] = {
+    val decoded: Int = decodeAtByte(value, offset)
+    if (decoded < 0) Option[Char].None else Option[Char].Some(value: Char(decoded))
+}
+
+pub def nextByteOffset(value: String, offset: Int): Int = {
+    val decoded: Int = decodeAtByte(value, offset)
+    if (decoded < 0) -1 else if (decoded <= 127) offset + 1
+    else if (decoded <= 2047) offset + 2
+    else if (decoded <= 65535) offset + 3
+    else offset + 4
+}
+
+pub def isNone[T: Copy](option: Option[T]): Bool = match (option) {
+    Option[T].Some(_) => false
+    Option[T].None => true
+}
+
+pub def unwrapOr[T: Copy](option: Option[T], fallback: T): T = match (option) {
+    Option[T].Some(value) => value
+    Option[T].None => fallback
+}
