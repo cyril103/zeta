@@ -276,6 +276,9 @@ if(BUILD_TESTING)
     add_test(NAME explicit_library_build
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/library_build.sh
             $<TARGET_FILE:zeta> ${CMAKE_CURRENT_SOURCE_DIR}/stdlib)
+    add_test(NAME shared_library_cache
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/shared_library_cache.sh
+            $<TARGET_FILE:zeta>)
     add_test(NAME compile_string_properties COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_properties.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/string-properties)
