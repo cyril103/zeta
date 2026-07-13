@@ -48,11 +48,14 @@ que le producteur, sans source et sans recréer un type homonyme local.
 
 ## Compatibilité
 
-L'ajout des enregistrements de types incrémente le format `.zti` et le cache de
-module. La désérialisation vérifie les tailles, alignements, offsets, doublons et
-références de types avant d'exposer l'interface. Une version antérieure reste
-diagnostiquée comme incompatible plutôt que devinée.
+L'ajout des enregistrements de types a porté le format `.zti` à la version 5 et le
+cache de module à la version 8. La désérialisation vérifie les tailles,
+alignements, offsets, doublons et références de types avant d'exposer
+l'interface. Une version antérieure reste diagnostiquée comme incompatible
+plutôt que devinée.
 
-La livraison est découpée en commits : syntaxe et visibilité, table de types en
-mémoire, sérialisation versionnée, résolution qualifiée côté consommateur, puis
-tests sans source pour structures ordinaires et génériques.
+La livraison couvre la syntaxe et la visibilité, la table de types en mémoire,
+la sérialisation versionnée et la résolution qualifiée côté consommateur. Le test
+d'intégration compile des structures ordinaires et génériques une première fois
+depuis les sources, puis une seconde fois avec uniquement l'interface et l'objet
+du module producteur.

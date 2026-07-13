@@ -84,7 +84,8 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
 - les durées de vie restent lexicales avec réduction à la dernière utilisation,
   sans inférence générale interprocédurale ;
 - les fonctions locales capturantes ne sont pas encore de véritables fermetures ;
-- les structures publiques ne sont pas encore exportées dans les `.zti` ;
+- les énumérations publiques ne sont pas encore exportées avec leurs variantes
+  dans les `.zti` ;
 - les corps génériques sont conservés textuellement dans les interfaces, pas sous
   forme d'AST sérialisée compacte ;
 - l'IR ne possède pas encore de pipeline d'optimisation ;
@@ -154,22 +155,30 @@ en cas d'échec d'allocation ou de dépassement de taille.
 Le comportement en cas d'échec d'allocation est désormais défini avant l'ajout de
 plusieurs conteneurs.
 
-## Priorité 4 — Interfaces publiques complètes
+## Priorité 4 — Interfaces publiques complètes — en cours
 
 Objectif : stabiliser `.zti` comme véritable format de distribution de bibliothèques.
 
 Le contrat d'identité qualifiée, de disposition sérialisée et de chargement en
 deux phases est défini dans `docs/PUBLIC_TYPES_DESIGN.md`.
 
-Travail prévu :
+Travail livré :
 
-1. visibilité et export des structures et futures énumérations ;
-2. sérialisation de leur disposition, champs, variantes et paramètres génériques ;
-3. remplacement des sources génériques incorporées par une AST versionnée ;
-4. diagnostics précis pour ABI ou interface incompatible ;
-5. commande explicite de construction d'une bibliothèque ;
-6. installation dans un cache partagé indépendant d'un projet ;
-7. déduplication robuste des instances génériques entre consommateurs.
+1. syntaxe `pub struct` et rejet des types privés qui fuient dans une interface ;
+2. sérialisation versionnée des tailles, alignements, champs et paramètres
+   génériques des structures ;
+3. résolution qualifiée `module.Type` après chargement en deux phases ;
+4. construction, annotation et passage par fonction de structures ordinaires et
+   génériques avec uniquement le couple `.zti` + `.o` du producteur.
+
+Travail restant :
+
+1. visibilité et export complets des énumérations et de leurs variantes ;
+2. remplacement des sources génériques incorporées par une AST versionnée ;
+3. diagnostics plus détaillés pour toutes les incompatibilités ABI ;
+4. commande explicite de construction d'une bibliothèque ;
+5. installation dans un cache partagé indépendant d'un projet ;
+6. déduplication robuste des instances génériques entre consommateurs.
 
 ## Priorité 5 — Optimisations IR
 
@@ -208,5 +217,5 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Stabiliser la visibilité et l'export des structures dans les interfaces `.zti`,
-première étape de la priorité 4 sur la distribution de bibliothèques.
+Étendre le même contrat public aux énumérations : `pub enum`, sérialisation des
+variantes et charges utiles, puis consommation qualifiée sans fichier source.

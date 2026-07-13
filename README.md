@@ -280,6 +280,28 @@ source `.zeta` est absent, le compilateur charge les signatures et les imports
 depuis l'interface. Les corps des fonctions génériques publiques sont incorporés
 dans le `.zti` afin d'être monomorphisés dans le module consommateur.
 
+Une structure exportée se déclare avec `pub struct`. Son nom, ses paramètres de
+type, ses champs et sa disposition ABI sont conservés dans l'interface. Le
+consommateur emploie toujours un nom qualifié, aussi bien comme type que comme
+constructeur :
+
+```text
+// geometry.zeta
+pub struct Point { x: Int, y: Int }
+
+// main.zeta
+import geometry
+
+def main(): Int = {
+    val point: geometry.Point = geometry.Point { x: 19, y: 23 }
+    point.x + point.y - 42
+}
+```
+
+Les structures génériques suivent la même syntaxe, par exemple
+`geometry.Pair[Int]`. Une structure privée ne peut pas apparaître dans les champs
+d'une structure publique ni dans la signature d'un symbole public.
+
 La bibliothèque standard peut être précompilée une fois avec :
 
 ```sh
