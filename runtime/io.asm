@@ -4,15 +4,6 @@ section '.text' executable
 
 public zeta_fn_io__print
 public zeta_fn_io__println
-public zeta_fn_io__printChar
-public zeta_fn_io__printInt
-public zeta_fn_io__printlnInt
-public zeta_fn_io__printByte
-public zeta_fn_io__printlnByte
-public zeta_fn_io__printBool
-public zeta_fn_io__printlnBool
-public zeta_fn_io__printDouble
-public zeta_fn_io__printlnDouble
 public zeta_fn_io__printBytes
 public zeta_fn_io__printlnBytes
 

@@ -1,5 +1,5 @@
 execute_process(COMMAND "${PROGRAM}" RESULT_VARIABLE result OUTPUT_VARIABLE output)
-set(expected "0 3.141593 -0.0025 1.25e+12\n")
+set(expected "0 3.141593 -0.0025 1250000000000\n")
 if(NOT result EQUAL 0 OR NOT output STREQUAL expected)
     message(FATAL_ERROR "affichage Double invalide: code=${result}, sortie=[${output}]")
 endif()

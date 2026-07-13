@@ -2,14 +2,14 @@
 // Les fonctions renvoient le nombre d'octets écrits, ou un code système négatif.
 pub native def print (value : String) : Int
 pub native def println (value : String) : Int
-pub native def printChar (value : Char) : Int
-pub native def printInt (value : Int) : Int
-pub native def printlnInt (value : Int) : Int
-pub native def printByte (value : Byte) : Int
-pub native def printlnByte (value : Byte) : Int
-pub native def printBool (value : Bool) : Int
-pub native def printlnBool (value : Bool) : Int
-pub native def printDouble (value : Double) : Int
-pub native def printlnDouble (value : Double) : Int
+pub def printChar(value: Char): Int = print(String(value))
+pub def printInt(value: Int): Int = print(String(value))
+pub def printlnInt(value: Int): Int = println(String(value))
+pub def printByte(value: Byte): Int = print(String(value))
+pub def printlnByte(value: Byte): Int = println(String(value))
+pub def printBool(value: Bool): Int = print(String(value))
+pub def printlnBool(value: Bool): Int = println(String(value))
+pub def printDouble(value: Double): Int = print(String(value))
+pub def printlnDouble(value: Double): Int = println(String(value))
 pub native def printBytes (value : Slice[Byte]) : Int
 pub native def printlnBytes (value : Slice[Byte]) : Int
