@@ -50,8 +50,10 @@ struct ModuleGraph {
 class ModuleLoader {
 public:
     explicit ModuleLoader(std::filesystem::path standardLibraryDirectory = {},
-                          bool preferPrecompiled = true)
+                          bool preferPrecompiled = true,
+                          std::filesystem::path sharedLibraryDirectory = {})
         : standardLibraryDirectory_(std::move(standardLibraryDirectory)),
+          sharedLibraryDirectory_(std::move(sharedLibraryDirectory)),
           preferPrecompiled_(preferPrecompiled) {}
     ModuleGraph load(const std::filesystem::path& rootPath);
 
@@ -65,6 +67,7 @@ private:
     void buildFingerprints();
     std::filesystem::path sourceDirectory_;
     std::filesystem::path standardLibraryDirectory_;
+    std::filesystem::path sharedLibraryDirectory_;
     ModuleGraph graph_;
     std::unordered_set<std::string> loading_;
     bool preferPrecompiled_{true};

@@ -86,8 +86,10 @@ void runRelocatableLink(const std::vector<fs::path>& objects, const fs::path& ou
 }
 
 void usage() {
-    std::cerr << "Usage: zeta <source.zeta> [-o executable] [--stdlib dossier]\n"
-                 "       zeta --build-library <source.zeta> -o dossier [--stdlib dossier]\n"
+    std::cerr << "Usage: zeta <source.zeta> [-o executable] [--stdlib dossier]"
+                 " [--library-cache dossier]\n"
+                 "       zeta --build-library <source.zeta> -o dossier [--stdlib dossier]"
+                 " [--library-cache dossier]\n"
                  "       zeta --install-library <module.zti> [--library-cache dossier]\n"
                  "       zeta --build-stdlib [--stdlib dossier]\n";
 }
@@ -368,7 +370,10 @@ int main(int argc, char** argv) {
     }
 
     try {
-        ModuleLoader loader(standardLibraryPath, !buildStandardLibrary);
+        const fs::path sharedLibraryDirectory = buildStandardLibrary
+            ? fs::path{} : libraryCacheDirectory(libraryCachePath);
+        ModuleLoader loader(standardLibraryPath, !buildStandardLibrary,
+                            sharedLibraryDirectory);
         ModuleGraph modules = loader.load(sourcePath);
         for (const std::string& moduleName : modules.compilationOrder) {
             if (modules.modules.at(moduleName).precompiled &&
