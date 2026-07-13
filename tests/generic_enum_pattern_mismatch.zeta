@@ -1,0 +1,8 @@
+enum Option[T] { Some(value: T), None }
+
+def read(option: Option[Byte]): Int = match (option) {
+    Option[Int].Some(value) => value
+    Option[Int].None => 0
+}
+
+def main(): Int = 0

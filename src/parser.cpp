@@ -227,10 +227,16 @@ ValueType Parser::consumeType(const std::string& message) {
         const auto enumFound = enumerations_.find(peek().text);
         if (enumFound != enumerations_.end()) {
             const Token token = tokens_[current_++];
-            if (check(TokenKind::LeftBracket))
-                throw CompileError(token.location,
-                                   "les énumérations génériques ne sont pas encore disponibles");
-            return ValueType(std::shared_ptr<const EnumType>(enumFound->second));
+            std::vector<ValueType> arguments;
+            if (match(TokenKind::LeftBracket)) {
+                if (!check(TokenKind::RightBracket)) {
+                    do arguments.push_back(consumeType("argument de type attendu"));
+                    while (match(TokenKind::Comma));
+                }
+                consume(TokenKind::RightBracket, "']' attendue après les arguments de type");
+            }
+            return ValueType(instantiateEnumeration(
+                enumFound->second, std::move(arguments), token.location));
         }
     }
     throw CompileError(peek().location, message + ", reçu " + tokenName(peek().kind));
@@ -247,9 +253,18 @@ std::shared_ptr<EnumType> Parser::enumeration() {
     result->name = name.text;
     enumerations_.emplace(name.text, result);
 
-    if (check(TokenKind::LeftBracket))
-        throw CompileError(peek().location,
-                           "les énumérations génériques ne sont pas encore disponibles");
+    activeTypeParameters_.clear();
+    if (match(TokenKind::LeftBracket)) {
+        do {
+            const Token& parameter = consume(TokenKind::Identifier,
+                                             "paramètre de type attendu");
+            if (!activeTypeParameters_.insert(parameter.text).second)
+                throw CompileError(parameter.location, "paramètre de type '" +
+                    parameter.text + "' déclaré plusieurs fois");
+            result->typeParameters.push_back(parameter.text);
+        } while (match(TokenKind::Comma));
+        consume(TokenKind::RightBracket, "']' attendue après les paramètres de type");
+    }
     consume(TokenKind::LeftBrace, "'{' attendue après le nom d'énumération");
     skipSeparators();
 
@@ -280,11 +295,13 @@ std::shared_ptr<EnumType> Parser::enumeration() {
                     throw CompileError(field.location,
                                        "l'énumération '" + name.text +
                                        "' ne peut pas se contenir directement");
-                const std::size_t alignment = valueTypeAlignment(type);
+                const std::size_t alignment = type.kind == ValueType::Kind::TypeParameter
+                    ? 1U : valueTypeAlignment(type);
                 const std::size_t offset =
                     (variant.payloadSize + alignment - 1U) / alignment * alignment;
                 variant.fields.push_back(StructField{field.location, field.text, type, offset});
-                variant.payloadSize = offset + valueTypeSize(type);
+                variant.payloadSize = offset +
+                    (type.kind == ValueType::Kind::TypeParameter ? 0U : valueTypeSize(type));
                 variant.payloadAlignment = std::max(variant.payloadAlignment, alignment);
             } while (match(TokenKind::Comma));
             consume(TokenKind::RightParen, "')' attendue après les champs de variante");
@@ -311,7 +328,84 @@ std::shared_ptr<EnumType> Parser::enumeration() {
         (4U + maximumPayloadAlignment - 1U) / maximumPayloadAlignment * maximumPayloadAlignment;
     result->size = (result->payloadOffset + maximumPayloadSize + result->alignment - 1U) /
                    result->alignment * result->alignment;
+    activeTypeParameters_.clear();
     return result;
+}
+
+ValueType Parser::substituteEnumFieldType(
+    const ValueType& type, const std::vector<std::string>& parameters,
+    const std::vector<ValueType>& arguments) {
+    if (type.kind == ValueType::Kind::TypeParameter) {
+        const auto parameter = std::find(parameters.begin(), parameters.end(),
+                                         type.typeParameter);
+        return arguments[static_cast<std::size_t>(parameter - parameters.begin())];
+    }
+    if (type.kind == ValueType::Kind::Array)
+        return ValueType(std::make_shared<ValueType>(substituteEnumFieldType(
+            *type.element, parameters, arguments)), type.length);
+    if (type.kind == ValueType::Kind::Reference)
+        return ValueType(std::make_shared<ValueType>(substituteEnumFieldType(
+            *type.element, parameters, arguments)), type.mutableReference);
+    if (type.kind == ValueType::Kind::Slice)
+        return ValueType(ValueType::Kind::Slice,
+            std::make_shared<ValueType>(substituteEnumFieldType(
+                *type.element, parameters, arguments)), type.mutableReference);
+    if (type.kind == ValueType::Kind::Box)
+        return ValueType(ValueType::Kind::Box,
+            std::make_shared<ValueType>(substituteEnumFieldType(
+                *type.element, parameters, arguments)));
+    return type;
+}
+
+std::shared_ptr<EnumType> Parser::instantiateEnumeration(
+    const std::shared_ptr<EnumType>& enumeration, std::vector<ValueType> arguments,
+    SourceLocation location) {
+    if (arguments.size() != enumeration->typeParameters.size())
+        throw CompileError(location, "l'énumération '" + enumeration->name + "' attend " +
+            std::to_string(enumeration->typeParameters.size()) +
+            " argument(s) de type, reçu " + std::to_string(arguments.size()));
+    if (arguments.empty()) return enumeration;
+
+    std::string key = enumeration->name;
+    for (const ValueType& argument : arguments) key += "[" + typeName(argument) + "]";
+    if (const auto cached = enumerationInstances_.find(key);
+        cached != enumerationInstances_.end())
+        return cached->second;
+
+    auto instance = std::make_shared<EnumType>();
+    instance->location = location;
+    instance->name = enumeration->name;
+    instance->typeArguments = arguments;
+    std::size_t maximumPayloadSize = 0;
+    std::size_t maximumPayloadAlignment = 1;
+    for (const EnumVariant& sourceVariant : enumeration->variants) {
+        EnumVariant variant{sourceVariant.location, sourceVariant.name, {}};
+        for (const StructField& sourceField : sourceVariant.fields) {
+            const ValueType type = substituteEnumFieldType(sourceField.type,
+                enumeration->typeParameters, arguments);
+            const std::size_t alignment = valueTypeAlignment(type);
+            const std::size_t offset =
+                (variant.payloadSize + alignment - 1U) / alignment * alignment;
+            variant.fields.push_back(StructField{
+                sourceField.location, sourceField.name, type, offset});
+            variant.payloadSize = offset + valueTypeSize(type);
+            variant.payloadAlignment = std::max(variant.payloadAlignment, alignment);
+        }
+        variant.payloadSize =
+            (variant.payloadSize + variant.payloadAlignment - 1U) /
+            variant.payloadAlignment * variant.payloadAlignment;
+        maximumPayloadSize = std::max(maximumPayloadSize, variant.payloadSize);
+        maximumPayloadAlignment = std::max(maximumPayloadAlignment,
+                                           variant.payloadAlignment);
+        instance->variants.push_back(std::move(variant));
+    }
+    instance->alignment = std::max<std::size_t>(4U, maximumPayloadAlignment);
+    instance->payloadOffset = (4U + maximumPayloadAlignment - 1U) /
+                              maximumPayloadAlignment * maximumPayloadAlignment;
+    instance->size = (instance->payloadOffset + maximumPayloadSize +
+                      instance->alignment - 1U) / instance->alignment * instance->alignment;
+    enumerationInstances_.emplace(std::move(key), instance);
+    return instance;
 }
 
 std::shared_ptr<StructType> Parser::structure() {
@@ -837,11 +931,22 @@ ExprPtr Parser::primary() {
     if (match(TokenKind::Identifier)) {
         const Token token = previous();
         if (const auto definition = enumerations_.find(token.text);
-            definition != enumerations_.end() && check(TokenKind::Dot)) {
+            definition != enumerations_.end() &&
+            (check(TokenKind::Dot) || check(TokenKind::LeftBracket))) {
+            std::vector<ValueType> typeArguments;
+            if (match(TokenKind::LeftBracket)) {
+                if (!check(TokenKind::RightBracket)) {
+                    do typeArguments.push_back(consumeType("argument de type attendu"));
+                    while (match(TokenKind::Comma));
+                }
+                consume(TokenKind::RightBracket, "']' attendue après les arguments de type");
+            }
+            const auto enumeration = instantiateEnumeration(
+                definition->second, std::move(typeArguments), token.location);
             consume(TokenKind::Dot, "'.' attendu après le nom d'énumération");
             const Token& variantToken =
                 consume(TokenKind::Identifier, "nom de variante attendu après '.'");
-            const auto& variants = definition->second->variants;
+            const auto& variants = enumeration->variants;
             const auto variant = std::find_if(variants.begin(), variants.end(),
                 [&](const EnumVariant& candidate) { return candidate.name == variantToken.text; });
             if (variant == variants.end())
@@ -882,7 +987,7 @@ ExprPtr Parser::primary() {
                             "." + variant->name);
             }
             return std::make_unique<Expression>(Expression{token.location,
-                EnumExpr{definition->second,
+                EnumExpr{enumeration,
                     static_cast<std::size_t>(variant - variants.begin()), std::move(fields)}});
         }
         if (const auto definition = structures_.find(token.text);
@@ -998,8 +1103,18 @@ ExprPtr Parser::matchExpression(SourceLocation location) {
         if (definition == enumerations_.end())
             throw CompileError(typeToken.location,
                                "énumération inconnue '" + typeToken.text + "'");
-        if (matchedType == nullptr) matchedType = definition->second;
-        else if (matchedType.get() != definition->second.get())
+        std::vector<ValueType> typeArguments;
+        if (match(TokenKind::LeftBracket)) {
+            if (!check(TokenKind::RightBracket)) {
+                do typeArguments.push_back(consumeType("argument de type attendu"));
+                while (match(TokenKind::Comma));
+            }
+            consume(TokenKind::RightBracket, "']' attendue après les arguments de type");
+        }
+        const auto patternType = instantiateEnumeration(
+            definition->second, std::move(typeArguments), typeToken.location);
+        if (matchedType == nullptr) matchedType = patternType;
+        else if (matchedType.get() != patternType.get())
             throw CompileError(typeToken.location,
                                "tous les motifs doivent appartenir à " + matchedType->name);
 

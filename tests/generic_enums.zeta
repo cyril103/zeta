@@ -1,0 +1,36 @@
+enum Option[T] {
+    Some(value: T)
+    None
+}
+
+enum Owned[T] {
+    Some(value: Box[T])
+    None
+}
+
+def intOr(option: Option[Int], fallback: Int): Int = match (option) {
+    Option[Int].Some(value) => value
+    Option[Int].None => fallback
+}
+
+def main(): Int = {
+    val integer: Option[Int] = Option[Int].Some(value: 42)
+    val empty: Option[Int] = Option[Int].None
+    val floating: Option[Double] = Option[Double].Some(value: 1.5)
+    val text: Option[String] = Option[String].Some(value: "ze" + "ta")
+    val textResult: Int = match (text) {
+        Option[String].Some(value) => if (value == "zeta") 1 else 0
+        Option[String].None => 0
+    }
+    val owned: Owned[Int] = Owned[Int].Some(value: Box(7))
+    val ownedResult: Int = match (owned) {
+        Owned[Int].Some(value) => *value
+        Owned[Int].None => 0
+    }
+    val floatResult: Int = match (floating) {
+        Option[Double].Some(value) => if (value == 1.5) 1 else 0
+        Option[Double].None => 0
+    }
+    if (intOr(integer, 0) == 42 && intOr(empty, 3) == 3 &&
+        textResult == 1 && ownedResult == 7 && floatResult == 1) 0 else 1
+}

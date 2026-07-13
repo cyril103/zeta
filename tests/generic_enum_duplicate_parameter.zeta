@@ -1,0 +1,3 @@
+enum Pair[T, T] { Value(first: T, second: T) }
+
+def main(): Int = 0

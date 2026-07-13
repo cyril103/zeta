@@ -96,6 +96,23 @@ if(BUILD_TESTING)
     add_test(NAME reject_enum_ordering COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_ordering.zeta)
     set_tests_properties(reject_enum_ordering PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_generic_enums COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_enums.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/generic-enums)
+    add_test(NAME run_generic_enums COMMAND ${CMAKE_CURRENT_BINARY_DIR}/generic-enums)
+    set_tests_properties(run_generic_enums PROPERTIES DEPENDS compile_generic_enums)
+    add_test(NAME reject_generic_enum_arity COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_enum_arity.zeta)
+    set_tests_properties(reject_generic_enum_arity PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_generic_enum_missing_argument COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_enum_missing_argument.zeta)
+    set_tests_properties(reject_generic_enum_missing_argument PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_generic_enum_duplicate_parameter COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_enum_duplicate_parameter.zeta)
+    set_tests_properties(reject_generic_enum_duplicate_parameter PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_generic_enum_pattern_mismatch COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_enum_pattern_mismatch.zeta)
+    set_tests_properties(reject_generic_enum_pattern_mismatch PROPERTIES WILL_FAIL TRUE)
     add_test(NAME precompiled_standard_library
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/precompiled_stdlib.sh
             $<TARGET_FILE:zeta>

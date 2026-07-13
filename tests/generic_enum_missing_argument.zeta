@@ -1,0 +1,6 @@
+enum Option[T] { Some(value: T), None }
+
+def main(): Int = {
+    val value: Option = Option.None
+    0
+}
