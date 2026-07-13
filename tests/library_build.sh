@@ -39,3 +39,19 @@ if "$compiler" --build-library --build-stdlib "$work/consumer/main.zeta" \
     -o "$work/conflicting" >/dev/null 2>&1; then
     exit 1
 fi
+
+# Les corps génériques publics restent instanciables sans le source producteur.
+mkdir -p "$work/generic-source" "$work/generic-published" "$work/generic-consumer"
+printf 'pub def identity[T](value: T): T = value\n' \
+    > "$work/generic-source/generic_api.zeta"
+"$compiler" --build-library "$work/generic-source/generic_api.zeta" \
+    -o "$work/generic-published" >/dev/null
+grep -q '^generic_tokens 1 ' "$work/generic-published/generic_api.zti"
+rm "$work/generic-source/generic_api.zeta"
+cp "$work/generic-published/generic_api.zti" "$work/generic-consumer/generic_api.zti"
+cp "$work/generic-published/generic_api.o" "$work/generic-consumer/generic_api.o"
+printf 'import generic_api\ndef main(): Int = generic_api.identity[Int](0)\n' \
+    > "$work/generic-consumer/main.zeta"
+"$compiler" "$work/generic-consumer/main.zeta" \
+    -o "$work/generic-consumer/app" >/dev/null
+"$work/generic-consumer/app"
