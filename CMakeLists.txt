@@ -362,6 +362,12 @@ if(BUILD_TESTING)
     add_test(NAME run_sequences_reverse COMMAND ${CMAKE_CURRENT_BINARY_DIR}/sequences-reverse)
     set_tests_properties(run_sequences_reverse PROPERTIES DEPENDS compile_sequences_reverse)
 
+    add_test(NAME compile_sequences_mutate COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_mutate.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/sequences-mutate)
+    add_test(NAME run_sequences_mutate COMMAND ${CMAKE_CURRENT_BINARY_DIR}/sequences-mutate)
+    set_tests_properties(run_sequences_mutate PROPERTIES DEPENDS compile_sequences_mutate)
+
     add_test(NAME compile_empty_slice_option COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_zero_length.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/empty-slice-option)

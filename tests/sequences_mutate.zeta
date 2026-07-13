@@ -1,0 +1,23 @@
+import sequences
+
+def main(): Int = {
+    var values: Vec[Int] = Vec[Int]()
+    values.push(1)
+    values.push(2)
+    values.push(3)
+    values.push(4)
+
+    val filled: Int = sequences.fill(values.asSliceMut(), 7)
+    val swapped: Bool = sequences.swap(values.asSliceMut(), 0, 3)
+    val rejected: Bool = !sequences.swap(values.asSliceMut(), -1, 2)
+    val view: Slice[Int] = values.asSlice()
+    val vecOk: Bool = view[0] == 7 && view[1] == 7 &&
+        view[2] == 7 && view[3] == 7
+
+    var letters: [Char; 3] = ['a', 'b', 'c']
+    val mutableLetters: SliceMut[Char] = SliceMut(&mut letters)
+    val arraySwapped: Bool = sequences.swap(mutableLetters, 0, 2)
+    val arrayOk: Bool = letters[0] == 'c' && letters[1] == 'b' && letters[2] == 'a'
+
+    if (filled == 4 && swapped && rejected && vecOk && arraySwapped && arrayOk) 0 else 1
+}

@@ -125,3 +125,21 @@ pub def reverse[T: Copy](values: SliceMut[T]): Int = {
     }
     swaps
 }
+
+pub def fill[T: Copy](values: SliceMut[T], value: T): Int = {
+    var index: Int = 0
+    while (index < values.length) do {
+        values[index] = value
+        index = index + 1
+    }
+    values.length
+}
+
+pub def swap[T: Copy](values: SliceMut[T], left: Int, right: Int): Bool = {
+    if (left < 0 || right < 0 || left >= values.length || right >= values.length) false else {
+        val temporary: T = values[left]
+        values[left] = values[right]
+        values[right] = temporary
+        true
+    }
+}
