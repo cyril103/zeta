@@ -158,6 +158,9 @@ plusieurs conteneurs.
 
 Objectif : stabiliser `.zti` comme véritable format de distribution de bibliothèques.
 
+Le contrat d'identité qualifiée, de disposition sérialisée et de chargement en
+deux phases est défini dans `docs/PUBLIC_TYPES_DESIGN.md`.
+
 Travail prévu :
 
 1. visibilité et export des structures et futures énumérations ;
