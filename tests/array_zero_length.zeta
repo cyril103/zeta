@@ -1,4 +1,7 @@
-def main () : Int = {
-    val invalide : [Int; 0] = []
-    0
+import collections
+
+def main(): Int = {
+    val empty: [Int; 0] = []
+    val view: Slice[Int] = Slice(&empty)
+    if (view.length == 0 && collections.isNone(collections.first(view))) 0 else 1
 }

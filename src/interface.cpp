@@ -27,7 +27,13 @@ std::string encodeType(const ValueType& type) {
     case ValueType::Kind::Struct:
         throw std::runtime_error("les structures publiques ne sont pas encore sérialisables");
     case ValueType::Kind::Enum:
-        throw std::runtime_error("les énumérations publiques ne sont pas encore sérialisables");
+    {
+        std::string encoded = "E" + type.enumeration->name + "[" +
+            std::to_string(type.enumeration->typeArguments.size()) + ":";
+        for (const ValueType& argument : type.enumeration->typeArguments)
+            encoded += encodeType(argument);
+        return encoded + "]";
+    }
     }
     throw std::runtime_error("type Zeta inconnu dans l'interface");
 }
@@ -50,6 +56,24 @@ ValueType decodeType(const std::string& encoded, std::size_t& cursor) {
         const std::string name = encoded.substr(cursor, end - cursor);
         cursor = end + 1U;
         return ValueType(ValueType::Kind::TypeParameter, name);
+    }
+    if (kind == 'E') {
+        const std::size_t nameEnd = encoded.find('[', cursor);
+        if (nameEnd == std::string::npos)
+            throw std::runtime_error("nom d'énumération non fermé dans l'interface");
+        auto enumeration = std::make_shared<EnumType>();
+        enumeration->name = encoded.substr(cursor, nameEnd - cursor);
+        cursor = nameEnd + 1U;
+        const std::size_t countEnd = encoded.find(':', cursor);
+        if (countEnd == std::string::npos)
+            throw std::runtime_error("arguments d'énumération invalides dans l'interface");
+        const std::size_t count = std::stoull(encoded.substr(cursor, countEnd - cursor));
+        cursor = countEnd + 1U;
+        for (std::size_t i = 0; i < count; ++i)
+            enumeration->typeArguments.push_back(decodeType(encoded, cursor));
+        if (cursor >= encoded.size() || encoded[cursor++] != ']')
+            throw std::runtime_error("arguments d'énumération non fermés dans l'interface");
+        return ValueType(enumeration);
     }
     bool mutableView = false;
     if ((kind == 'R' || kind == 'V') && cursor < encoded.size() && encoded[cursor] == 'M') {

@@ -28,6 +28,14 @@ ValueType IrGenerator::resolveType(const ValueType& type) const {
     if (type.kind == ValueType::Kind::Box)
         return ValueType(ValueType::Kind::Box,
                          std::make_shared<ValueType>(resolveType(*type.element)));
+    if (type.kind == ValueType::Kind::Enum &&
+        !type.enumeration->typeArguments.empty()) {
+        std::vector<ValueType> arguments;
+        for (const ValueType& argument : type.enumeration->typeArguments)
+            arguments.push_back(resolveType(argument));
+        return ValueType(instantiateEnumType(type.enumeration, std::move(arguments),
+                                             type.enumeration->location));
+    }
     return type;
 }
 
@@ -668,10 +676,15 @@ ValueId IrGenerator::expression(
             }
             const ValueId output = nextValue(expressionNode.inferredType);
             ir_.instructions.push_back(IrEnumConstruct{
-                output, node.variant, std::move(fields), expressionNode.inferredType});
+                output, node.variant, std::move(fields), resolveType(expressionNode.inferredType)});
             return output;
         } else if constexpr (std::is_same_v<T, FieldExpr>) {
             const ValueId object = expression(*node.object, parameters);
+            if (node.object->inferredType.kind == ValueType::Kind::Slice) {
+                const ValueId output = nextValue(ValueType::Int);
+                ir_.instructions.push_back(IrSliceLength{output, object});
+                return output;
+            }
             const auto& fields = node.object->inferredType.structure->fields;
             const auto found = std::find_if(fields.begin(), fields.end(), [&](const StructField& field) { return field.name == node.field; });
             const ValueId output = nextValue(expressionNode.inferredType);
@@ -900,20 +913,22 @@ ValueId IrGenerator::expression(
         } else if constexpr (std::is_same_v<T, IfExpr>) {
             const ValueId condition = expression(*node.condition, parameters);
             const ValueId output = nextValue(expressionNode.inferredType);
+            const ValueType resultType = resolveType(expressionNode.inferredType);
             const std::size_t elseLabel = nextLabel_++;
             const std::size_t endLabel = nextLabel_++;
             ir_.instructions.push_back(IrBranch{condition, false, elseLabel});
             const ValueId thenValue = expression(*node.thenBranch, parameters);
-            ir_.instructions.push_back(IrCopy{output, thenValue, expressionNode.inferredType});
+            ir_.instructions.push_back(IrCopy{output, thenValue, resultType});
             ir_.instructions.push_back(IrJump{endLabel});
             ir_.instructions.push_back(IrLabel{elseLabel});
             const ValueId elseValue = expression(*node.elseBranch, parameters);
-            ir_.instructions.push_back(IrCopy{output, elseValue, expressionNode.inferredType});
+            ir_.instructions.push_back(IrCopy{output, elseValue, resultType});
             ir_.instructions.push_back(IrLabel{endLabel});
             return output;
         } else {
             const ValueId input = expression(*node.operand, parameters);
-            const bool copiesInput = isCopyValueType(ValueType(node.type));
+            const ValueType resolvedEnum = resolveType(ValueType(node.type));
+            const bool copiesInput = isCopyValueType(resolvedEnum);
             if (!copiesInput)
                 if (const auto* moved = std::get_if<NameExpr>(&node.operand->value))
                     movedBoxes_.insert(moved->name);
@@ -938,26 +953,28 @@ ValueId IrGenerator::expression(
                 }
 
                 auto branchParameters = parameters;
-                const EnumVariant& variant = node.type->variants[branch.variant];
+                const EnumVariant& variant =
+                    resolvedEnum.enumeration->variants[branch.variant];
                 std::vector<std::string> branchOwners;
                 for (std::size_t i = 0; i < branch.bindings.size(); ++i) {
                     if (!branch.bindings[i] && !valueTypeNeedsDrop(variant.fields[i].type))
                         continue;
-                    const ValueId field = nextValue(variant.fields[i].type);
+                    const ValueType fieldType = resolveType(variant.fields[i].type);
+                    const ValueId field = nextValue(fieldType);
                     ir_.instructions.push_back(IrEnumFieldLoad{
-                        field, input, ValueType(node.type), branch.variant, i});
-                    if (copiesInput && valueTypeNeedsDrop(variant.fields[i].type))
-                        ir_.instructions.push_back(IrRetain{field, variant.fields[i].type});
+                        field, input, resolvedEnum, branch.variant, i});
+                    if (copiesInput && valueTypeNeedsDrop(fieldType))
+                        ir_.instructions.push_back(IrRetain{field, fieldType});
                     if (branch.bindings[i])
                         branchParameters.insert_or_assign(*branch.bindings[i], field);
-                    if (valueTypeNeedsDrop(variant.fields[i].type)) {
+                    if (valueTypeNeedsDrop(fieldType)) {
                         const std::string ownerName = branch.bindings[i]
                             ? *branch.bindings[i]
                             : "__match_ignored_" + std::to_string(endLabel) + "_" +
                               std::to_string(branchIndex) + "_" + std::to_string(i);
                         branchOwners.push_back(ownerName);
                         boxParameters_.insert_or_assign(
-                            ownerName, std::pair{field, variant.fields[i].type});
+                            ownerName, std::pair{field, fieldType});
                     }
                 }
                 const ValueId branchValue = expression(*branch.result, branchParameters);
@@ -966,7 +983,7 @@ ValueId IrGenerator::expression(
                         branchOwners.end())
                         movedBoxes_.insert(returned->name);
                 ir_.instructions.push_back(IrCopy{
-                    output, branchValue, expressionNode.inferredType});
+                    output, branchValue, resolveType(expressionNode.inferredType)});
                 for (const std::string& ownerName : branchOwners) {
                     const auto owner = boxParameters_.find(ownerName);
                     if (owner != boxParameters_.end() && !movedBoxes_.contains(ownerName))
@@ -1055,6 +1072,8 @@ std::string IrGenerator::print(const IrProgram& program) {
             else if constexpr (std::is_same_v<T, IrSliceConstruct>)
                 out << "  $" << item.output << " = slice $" << item.reference
                     << ", " << item.length << '\n';
+            else if constexpr (std::is_same_v<T, IrSliceLength>)
+                out << "  $" << item.output << " = length $" << item.slice << '\n';
             else if constexpr (std::is_same_v<T, IrBoxConstruct>)
                 out << "  $" << item.output << " = box $" << item.value << '\n';
             else if constexpr (std::is_same_v<T, IrIndexLoad>)

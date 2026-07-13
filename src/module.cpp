@@ -138,7 +138,14 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
         for (Statement& statement : storedModule.program.statements) {
             auto* declaration = std::get_if<Declaration>(&statement.value);
             if (declaration != nullptr && storedInterface.exports.contains(declaration->name))
-                storedInterface.exports.at(declaration->name).declaration = declaration;
+            {
+                ExportedSymbol& exported = storedInterface.exports.at(declaration->name);
+                exported.declaration = declaration;
+                exported.type = declaration->type;
+                exported.parameterTypes.clear();
+                for (const Parameter& parameter : declaration->parameters)
+                    exported.parameterTypes.push_back(parameter.type);
+            }
         }
         graph_.interfaceFingerprints.emplace(name, persisted.fingerprint);
         for (const Program::Import& import : storedModule.program.imports)

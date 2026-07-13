@@ -27,9 +27,6 @@ private:
     std::shared_ptr<EnumType> instantiateEnumeration(
         const std::shared_ptr<EnumType>& enumeration, std::vector<ValueType> arguments,
         SourceLocation location);
-    ValueType substituteEnumFieldType(
-        const ValueType& type, const std::vector<std::string>& parameters,
-        const std::vector<ValueType>& arguments);
     std::shared_ptr<StructType> instantiateStructure(
         const std::shared_ptr<StructType>& structure, std::vector<ValueType> arguments,
         SourceLocation location);
@@ -64,7 +61,6 @@ private:
     std::unordered_set<std::string> activeTypeParameters_;
     std::unordered_map<std::string, std::shared_ptr<StructType>> structures_;
     std::unordered_map<std::string, std::shared_ptr<EnumType>> enumerations_;
-    std::unordered_map<std::string, std::shared_ptr<EnumType>> enumerationInstances_;
     std::unordered_map<std::string, std::shared_ptr<StructType>> structureInstances_;
     std::unordered_set<std::string> importedModules_;
 };

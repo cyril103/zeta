@@ -380,7 +380,7 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                     "[rbp-" + std::to_string(valueOffset(program, item.input)) + "+" +
                         std::to_string(item.type.enumeration->payloadOffset + field.offset) + "]",
                     "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]",
-                    valueTypeSize(field.type));
+                    valueTypeSize(program.valueTypes[item.output]));
             } else if constexpr (std::is_same_v<T, IrFieldLoad>) {
                 const StructField& field = item.objectType.structure->fields[item.field];
                 emitBlockCopy(out, "[rbp-" + std::to_string(valueOffset(program, item.object)) + "+" + std::to_string(field.offset) + "]",
@@ -395,6 +395,9 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                 out << "    mov rax, qword [rbp-" << valueOffset(program, item.reference) << "]\n"
                     << "    mov qword [rbp-" << output << "], rax\n"
                     << "    mov qword [rbp-" << output - 8U << "], " << item.length << "\n";
+            } else if constexpr (std::is_same_v<T, IrSliceLength>) {
+                out << "    mov rax, qword [rbp-" << valueOffset(program, item.slice) - 8U << "]\n"
+                    << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
             } else if constexpr (std::is_same_v<T, IrBoxConstruct>) {
                 out << "    mov eax, 9\n"
                     << "    xor edi, edi\n"

@@ -37,6 +37,14 @@ ValueType substituteType(
     if (type.kind == ValueType::Kind::Box)
         return ValueType(ValueType::Kind::Box,
             std::make_shared<ValueType>(substituteType(*type.element, substitutions)));
+    if (type.kind == ValueType::Kind::Enum &&
+        !type.enumeration->typeArguments.empty()) {
+        std::vector<ValueType> arguments;
+        for (const ValueType& argument : type.enumeration->typeArguments)
+            arguments.push_back(substituteType(argument, substitutions));
+        return ValueType(instantiateEnumType(type.enumeration, std::move(arguments),
+                                             type.enumeration->location));
+    }
     return type;
 }
 bool inferTypeArguments(
@@ -60,6 +68,15 @@ bool inferTypeArguments(
         pattern.kind == ValueType::Kind::Slice ||
         pattern.kind == ValueType::Kind::Box)
         return inferTypeArguments(*pattern.element, *actual.element, substitutions);
+    if (pattern.kind == ValueType::Kind::Enum &&
+        pattern.enumeration->genericDefinition && actual.enumeration->genericDefinition ==
+            pattern.enumeration->genericDefinition) {
+        for (std::size_t i = 0; i < pattern.enumeration->typeArguments.size(); ++i)
+            if (!inferTypeArguments(pattern.enumeration->typeArguments[i],
+                                    actual.enumeration->typeArguments[i], substitutions))
+                return false;
+        return true;
+    }
     return pattern == actual;
 }
 bool isCopyType(const ValueType& type) {
@@ -579,6 +596,8 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
         else if constexpr (std::is_same_v<T, EnumExpr>) return ValueType(node.type);
         else if constexpr (std::is_same_v<T, FieldExpr>) {
             const ValueType object = inferType(*node.object);
+            if (object.kind == ValueType::Kind::Slice && node.field == "length")
+                return ValueType::Int;
             if (object.kind != ValueType::Kind::Struct) return ValueType::Int;
             for (const StructField& field : object.structure->fields)
                 if (field.name == node.field) return field.type;
@@ -659,9 +678,6 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 return ValueType(std::make_shared<ValueType>(
                     node.elements.empty() ? ValueType::Int : inferType(*node.elements.front())),
                     node.elements.size());
-            if (expected.length == 0)
-                throw CompileError(expression.location,
-                                   "la taille d'un tableau doit être supérieure à zéro");
             if (node.elements.size() != expected.length)
                 throw CompileError(expression.location, typeName(expected) + " attend " +
                     std::to_string(expected.length) + " élément(s), reçu " +
@@ -695,6 +711,10 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
         }
         else if constexpr (std::is_same_v<T, FieldExpr>) {
             const ValueType object = inferType(*node.object);
+            if (object.kind == ValueType::Kind::Slice && node.field == "length") {
+                checkExpression(*node.object, object);
+                return ValueType::Int;
+            }
             if (object.kind != ValueType::Kind::Struct)
                 throw CompileError(node.object->location, "l'accès à un champ exige une structure");
             checkExpression(*node.object, object);

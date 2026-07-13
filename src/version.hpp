@@ -5,8 +5,8 @@
 namespace ZetaVersion {
 inline constexpr std::string_view Compiler = "0.1.0";
 inline constexpr std::string_view Abi = "2";
-inline constexpr int InterfaceFormat = 1;
-inline constexpr std::string_view ModuleCache = "4";
+inline constexpr int InterfaceFormat = 2;
+inline constexpr std::string_view ModuleCache = "5";
 inline constexpr std::string_view StartCache = "2";
 inline constexpr std::string_view StdlibManifest = "1";
 }

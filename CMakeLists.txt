@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(zeta
+    src/ast.cpp
     src/main.cpp
     src/lexer.cpp
     src/parser.cpp
@@ -155,6 +156,12 @@ if(BUILD_TESTING)
         -o ${CMAKE_CURRENT_BINARY_DIR}/collections-module)
     add_test(NAME run_collections_module COMMAND ${CMAKE_CURRENT_BINARY_DIR}/collections-module)
     set_tests_properties(run_collections_module PROPERTIES DEPENDS compile_collections_module)
+
+    add_test(NAME compile_empty_slice_option COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_zero_length.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/empty-slice-option)
+    add_test(NAME run_empty_slice_option COMMAND ${CMAKE_CURRENT_BINARY_DIR}/empty-slice-option)
+    set_tests_properties(run_empty_slice_option PROPERTIES DEPENDS compile_empty_slice_option)
     add_test(NAME compile_generic_structs COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_structs.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/generic-structs)
@@ -727,7 +734,6 @@ if(BUILD_TESTING)
             native_main
             array_type_syntax
             array_literal_syntax
-            array_zero_length
             array_length_mismatch
             array_element_mismatch
             array_index_too_large

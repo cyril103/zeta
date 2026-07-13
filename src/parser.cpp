@@ -332,31 +332,6 @@ std::shared_ptr<EnumType> Parser::enumeration() {
     return result;
 }
 
-ValueType Parser::substituteEnumFieldType(
-    const ValueType& type, const std::vector<std::string>& parameters,
-    const std::vector<ValueType>& arguments) {
-    if (type.kind == ValueType::Kind::TypeParameter) {
-        const auto parameter = std::find(parameters.begin(), parameters.end(),
-                                         type.typeParameter);
-        return arguments[static_cast<std::size_t>(parameter - parameters.begin())];
-    }
-    if (type.kind == ValueType::Kind::Array)
-        return ValueType(std::make_shared<ValueType>(substituteEnumFieldType(
-            *type.element, parameters, arguments)), type.length);
-    if (type.kind == ValueType::Kind::Reference)
-        return ValueType(std::make_shared<ValueType>(substituteEnumFieldType(
-            *type.element, parameters, arguments)), type.mutableReference);
-    if (type.kind == ValueType::Kind::Slice)
-        return ValueType(ValueType::Kind::Slice,
-            std::make_shared<ValueType>(substituteEnumFieldType(
-                *type.element, parameters, arguments)), type.mutableReference);
-    if (type.kind == ValueType::Kind::Box)
-        return ValueType(ValueType::Kind::Box,
-            std::make_shared<ValueType>(substituteEnumFieldType(
-                *type.element, parameters, arguments)));
-    return type;
-}
-
 std::shared_ptr<EnumType> Parser::instantiateEnumeration(
     const std::shared_ptr<EnumType>& enumeration, std::vector<ValueType> arguments,
     SourceLocation location) {
@@ -365,47 +340,8 @@ std::shared_ptr<EnumType> Parser::instantiateEnumeration(
             std::to_string(enumeration->typeParameters.size()) +
             " argument(s) de type, reçu " + std::to_string(arguments.size()));
     if (arguments.empty()) return enumeration;
-
-    std::string key = enumeration->name;
-    for (const ValueType& argument : arguments) key += "[" + typeName(argument) + "]";
-    if (const auto cached = enumerationInstances_.find(key);
-        cached != enumerationInstances_.end())
-        return cached->second;
-
-    auto instance = std::make_shared<EnumType>();
-    instance->location = location;
-    instance->name = enumeration->name;
-    instance->typeArguments = arguments;
-    std::size_t maximumPayloadSize = 0;
-    std::size_t maximumPayloadAlignment = 1;
-    for (const EnumVariant& sourceVariant : enumeration->variants) {
-        EnumVariant variant{sourceVariant.location, sourceVariant.name, {}};
-        for (const StructField& sourceField : sourceVariant.fields) {
-            const ValueType type = substituteEnumFieldType(sourceField.type,
-                enumeration->typeParameters, arguments);
-            const std::size_t alignment = valueTypeAlignment(type);
-            const std::size_t offset =
-                (variant.payloadSize + alignment - 1U) / alignment * alignment;
-            variant.fields.push_back(StructField{
-                sourceField.location, sourceField.name, type, offset});
-            variant.payloadSize = offset + valueTypeSize(type);
-            variant.payloadAlignment = std::max(variant.payloadAlignment, alignment);
-        }
-        variant.payloadSize =
-            (variant.payloadSize + variant.payloadAlignment - 1U) /
-            variant.payloadAlignment * variant.payloadAlignment;
-        maximumPayloadSize = std::max(maximumPayloadSize, variant.payloadSize);
-        maximumPayloadAlignment = std::max(maximumPayloadAlignment,
-                                           variant.payloadAlignment);
-        instance->variants.push_back(std::move(variant));
-    }
-    instance->alignment = std::max<std::size_t>(4U, maximumPayloadAlignment);
-    instance->payloadOffset = (4U + maximumPayloadAlignment - 1U) /
-                              maximumPayloadAlignment * maximumPayloadAlignment;
-    instance->size = (instance->payloadOffset + maximumPayloadSize +
-                      instance->alignment - 1U) / instance->alignment * instance->alignment;
-    enumerationInstances_.emplace(std::move(key), instance);
-    return instance;
+    return std::const_pointer_cast<EnumType>(
+        instantiateEnumType(enumeration, std::move(arguments), location));
 }
 
 std::shared_ptr<StructType> Parser::structure() {

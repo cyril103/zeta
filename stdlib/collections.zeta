@@ -1,4 +1,23 @@
-// Premiers algorithmes génériques de collection pour les vues Slice.
-pub def first[T: Copy](values: Slice[T]): T = values[0]
-pub def second[T: Copy](values: Slice[T]): T = values[1]
-pub def at[T: Copy](values: Slice[T], index: Int): T = values[index]
+// Accès sûrs aux vues Slice. Aucun index invalide n'est évalué.
+enum Option[T] {
+    Some(value: T)
+    None
+}
+
+pub def first[T: Copy](values: Slice[T]): Option[T] = if (values.length == 0) Option[T].None else Option[T].Some(value: values[0])
+
+pub def second[T: Copy](values: Slice[T]): Option[T] = if (values.length < 2) Option[T].None else Option[T].Some(value: values[1])
+
+pub def at[T: Copy](values: Slice[T], index: Int): Option[T] = {
+    if (index < 0 || index >= values.length) Option[T].None else Option[T].Some(value: values[index])
+}
+
+pub def isNone[T: Copy](option: Option[T]): Bool = match (option) {
+    Option[T].Some(_) => false
+    Option[T].None => true
+}
+
+pub def unwrapOr[T: Copy](option: Option[T], fallback: T): T = match (option) {
+    Option[T].Some(value) => value
+    Option[T].None => fallback
+}

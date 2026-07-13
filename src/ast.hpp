@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -96,11 +97,18 @@ struct EnumType {
     std::string name;
     std::vector<std::string> typeParameters;
     std::vector<ValueType> typeArguments;
+    std::shared_ptr<const EnumType> genericDefinition;
+    mutable std::unordered_map<std::string, std::weak_ptr<const EnumType>> instances;
     std::vector<EnumVariant> variants;
     std::size_t payloadOffset{4};
     std::size_t size{4};
     std::size_t alignment{4};
 };
+
+std::shared_ptr<const EnumType> instantiateEnumType(
+    const std::shared_ptr<const EnumType>& enumeration,
+    std::vector<ValueType> arguments,
+    SourceLocation location);
 
 inline bool isCopyValueType(const ValueType& type) {
     if (type.kind == ValueType::Kind::Box ||
@@ -219,6 +227,7 @@ inline std::string typeName(ValueType type) {
 }
 
 inline std::size_t valueTypeSize(const ValueType& type) {
+    if (type.kind == ValueType::Kind::TypeParameter) return 0U;
     if (type == ValueType::Byte || type == ValueType::Bool) return 1U;
     if (type == ValueType::Int || type == ValueType::Char) return 4U;
     if (type == ValueType::Double) return 8U;
@@ -230,6 +239,7 @@ inline std::size_t valueTypeSize(const ValueType& type) {
 }
 
 inline std::size_t valueTypeAlignment(const ValueType& type) {
+    if (type.kind == ValueType::Kind::TypeParameter) return 1U;
     if (type == ValueType::Byte || type == ValueType::Bool) return 1U;
     if (type == ValueType::Int || type == ValueType::Char) return 4U;
     if (type == ValueType::Double || type == ValueType::String ||

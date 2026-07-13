@@ -3,7 +3,12 @@ import collections
 def main(): Int = {
     val numbers: [Int; 3] = [10, 20, 12]
     val view: Slice[Int] = Slice(&numbers)
-    if (collections.first(view) + collections.second(view) + collections.at(view, 2) == 42) {
+    val first: Int = collections.unwrapOr(collections.first(view), 0)
+    val second: Int = collections.unwrapOr(collections.second(view), 0)
+    val last: Int = collections.unwrapOr(collections.at(view, 2), 0)
+    val missing: Bool = collections.isNone(collections.at(view, 3))
+    val negative: Bool = collections.isNone(collections.at(view, -1))
+    if (first + second + last == 42 && missing && negative) {
         0
     } else {
         1
