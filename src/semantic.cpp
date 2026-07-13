@@ -37,6 +37,9 @@ ValueType substituteType(
     if (type.kind == ValueType::Kind::Box)
         return ValueType(ValueType::Kind::Box,
             std::make_shared<ValueType>(substituteType(*type.element, substitutions)));
+    if (type.kind == ValueType::Kind::Vec)
+        return ValueType(ValueType::Kind::Vec,
+            std::make_shared<ValueType>(substituteType(*type.element, substitutions)));
     if (type.kind == ValueType::Kind::Enum &&
         !type.enumeration->typeArguments.empty()) {
         std::vector<ValueType> arguments;
@@ -66,7 +69,8 @@ bool inferTypeArguments(
     if (pattern.kind == ValueType::Kind::Array ||
         pattern.kind == ValueType::Kind::Reference ||
         pattern.kind == ValueType::Kind::Slice ||
-        pattern.kind == ValueType::Kind::Box)
+        pattern.kind == ValueType::Kind::Box ||
+        pattern.kind == ValueType::Kind::Vec)
         return inferTypeArguments(*pattern.element, *actual.element, substitutions);
     if (pattern.kind == ValueType::Kind::Enum &&
         pattern.enumeration->genericDefinition && actual.enumeration->genericDefinition ==
@@ -603,6 +607,9 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
             return ValueType(std::make_shared<ValueType>(inferType(*node.elements.front())),
                              node.elements.size());
         }
+        else if constexpr (std::is_same_v<T, VecExpr>)
+            return ValueType(ValueType::Kind::Vec,
+                             std::make_shared<ValueType>(node.elementType));
         else if constexpr (std::is_same_v<T, StructExpr>) return ValueType(node.type);
         else if constexpr (std::is_same_v<T, EnumExpr>) return ValueType(node.type);
         else if constexpr (std::is_same_v<T, FieldExpr>) {
@@ -708,6 +715,13 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 }
             }
             return expected;
+        }
+        else if constexpr (std::is_same_v<T, VecExpr>) {
+            const ValueType type(ValueType::Kind::Vec,
+                                 std::make_shared<ValueType>(node.elementType));
+            if (expected.kind == ValueType::Kind::Vec && expected != type)
+                mismatch(expression.location, expected, type);
+            return type;
         }
         else if constexpr (std::is_same_v<T, StructExpr>) {
             const ValueType type(node.type);

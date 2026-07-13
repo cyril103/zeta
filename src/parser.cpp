@@ -203,6 +203,12 @@ ValueType Parser::consumeType(const std::string& message) {
         consume(TokenKind::RightBracket, "']' attendue après le type contenu");
         return ValueType(ValueType::Kind::Box, std::make_shared<ValueType>(element));
     }
+    if (match(TokenKind::VecType)) {
+        consume(TokenKind::LeftBracket, "'[' attendu après 'Vec'");
+        const ValueType element = consumeType("type d'élément attendu dans 'Vec'");
+        consume(TokenKind::RightBracket, "']' attendue après le type d'élément");
+        return ValueType(ValueType::Kind::Vec, std::make_shared<ValueType>(element));
+    }
     if (match(TokenKind::IntType)) return ValueType::Int;
     if (match(TokenKind::ByteType)) return ValueType::Byte;
     if (match(TokenKind::DoubleType)) return ValueType::Double;
@@ -812,6 +818,16 @@ ExprPtr Parser::primary() {
         consume(TokenKind::RightParen, "')' attendue après la valeur à allouer");
         return std::make_unique<Expression>(Expression{
             token.location, ConversionExpr{target, std::move(operand)}});
+    }
+    if (match(TokenKind::VecType)) {
+        const Token token = previous();
+        consume(TokenKind::LeftBracket, "'[' attendue après 'Vec'");
+        const ValueType element = consumeType("type d'élément attendu dans 'Vec'");
+        consume(TokenKind::RightBracket, "']' attendue après le type d'élément");
+        consume(TokenKind::LeftParen, "'(' attendue après le type de Vec");
+        consume(TokenKind::RightParen, "')' attendue pour construire un Vec vide");
+        return std::make_unique<Expression>(Expression{
+            token.location, VecExpr{element}});
     }
     if (match(TokenKind::IntType) || match(TokenKind::ByteType) ||
         match(TokenKind::DoubleType) || match(TokenKind::BoolType) ||

@@ -15,7 +15,8 @@ bool isPairValue(ValueType type) {
         type.kind == ValueType::Kind::Slice;
 }
 bool isAggregateValue(ValueType type) {
-    return type.kind == ValueType::Kind::Struct || type.kind == ValueType::Kind::Enum;
+    return type.kind == ValueType::Kind::Struct || type.kind == ValueType::Kind::Enum ||
+        type.kind == ValueType::Kind::Vec;
 }
 std::size_t typeSize(ValueType type) {
     return valueTypeSize(type);
@@ -104,6 +105,18 @@ void emitValueDrop(std::ostringstream& out, const std::string& address,
             << "    mov rsi, " << valueTypeSize(*type.element) << "\n"
             << "    mov eax, 11\n"
             << "    syscall\n";
+        return;
+    }
+    if (type.kind == ValueType::Kind::Vec) {
+        const std::string done = label + "_done";
+        out << "    mov rdi, qword " << address << "\n"
+            << "    test rdi, rdi\n"
+            << "    jz " << done << "\n"
+            << "    mov rsi, qword " << displacedAddress(address, 16U) << "\n"
+            << "    imul rsi, " << valueTypeSize(*type.element) << "\n"
+            << "    mov eax, 11\n"
+            << "    syscall\n"
+            << done << ":\n";
         return;
     }
     if (type.kind == ValueType::Kind::Array) {
@@ -358,6 +371,11 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         (i == 0 ? "]" : "+" + std::to_string(i * elementBytes) + "]");
                     emitBlockCopy(out, source, target, elementBytes);
                 }
+            } else if constexpr (std::is_same_v<T, IrVecConstruct>) {
+                const std::size_t output = valueOffset(program, item.output);
+                out << "    mov qword [rbp-" << output << "], 0\n"
+                    << "    mov qword [rbp-" << output - 8U << "], 0\n"
+                    << "    mov qword [rbp-" << output - 16U << "], 0\n";
             } else if constexpr (std::is_same_v<T, IrStructConstruct>) {
                 const std::size_t output = valueOffset(program, item.output);
                 for (std::size_t i = 0; i < item.fields.size(); ++i) {

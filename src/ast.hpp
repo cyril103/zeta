@@ -14,7 +14,7 @@ struct StructType;
 struct EnumType;
 
 struct ValueType {
-    enum class Kind { Int, Byte, Double, Bool, Char, String, StringView, Array, Reference, Slice, Box, TypeParameter, Struct, Enum };
+    enum class Kind { Int, Byte, Double, Bool, Char, String, StringView, Array, Reference, Slice, Box, Vec, TypeParameter, Struct, Enum };
 
     Kind kind;
     std::shared_ptr<const ValueType> element;
@@ -54,7 +54,7 @@ struct ValueType {
     friend bool operator==(const ValueType& left, const ValueType& right) {
         if (left.kind != right.kind) return false;
         if (left.kind != Kind::Array && left.kind != Kind::Reference &&
-            left.kind != Kind::Slice && left.kind != Kind::Box &&
+            left.kind != Kind::Slice && left.kind != Kind::Box && left.kind != Kind::Vec &&
             left.kind != Kind::TypeParameter && left.kind != Kind::Struct &&
             left.kind != Kind::Enum) return true;
         if (left.kind == Kind::Struct) return left.structure == right.structure;
@@ -112,7 +112,7 @@ std::shared_ptr<const EnumType> instantiateEnumType(
     SourceLocation location);
 
 inline bool isCopyValueType(const ValueType& type) {
-    if (type.kind == ValueType::Kind::Box ||
+    if (type.kind == ValueType::Kind::Box || type.kind == ValueType::Kind::Vec ||
         type.kind == ValueType::Kind::TypeParameter)
         return false;
     if (type.kind == ValueType::Kind::Reference || type.kind == ValueType::Kind::Slice)
@@ -132,7 +132,8 @@ inline bool isCopyValueType(const ValueType& type) {
 }
 
 inline bool valueTypeNeedsDrop(const ValueType& type) {
-    if (type == ValueType::String || type.kind == ValueType::Kind::Box) return true;
+    if (type == ValueType::String || type.kind == ValueType::Kind::Box ||
+        type.kind == ValueType::Kind::Vec) return true;
     if (type.kind == ValueType::Kind::Array)
         return valueTypeNeedsDrop(*type.element);
     if (type.kind == ValueType::Kind::Struct) {
@@ -148,7 +149,7 @@ inline bool valueTypeNeedsDrop(const ValueType& type) {
 }
 
 inline bool isMoveOnlyValueType(const ValueType& type) {
-    if (type.kind == ValueType::Kind::Box) return true;
+    if (type.kind == ValueType::Kind::Box || type.kind == ValueType::Kind::Vec) return true;
     if (type.kind == ValueType::Kind::Array)
         return !isCopyValueType(*type.element);
     if (type.kind == ValueType::Kind::Struct || type.kind == ValueType::Kind::Enum)
@@ -201,6 +202,8 @@ inline std::string typeName(ValueType type) {
                typeName(*type.element) + "]";
     if (type.kind == ValueType::Kind::Box)
         return "Box[" + typeName(*type.element) + "]";
+    if (type.kind == ValueType::Kind::Vec)
+        return "Vec[" + typeName(*type.element) + "]";
     if (type.kind == ValueType::Kind::TypeParameter) return type.typeParameter;
     if (type.kind == ValueType::Kind::Struct) {
         std::string name = type.structure->name;
@@ -237,6 +240,7 @@ inline std::size_t valueTypeSize(const ValueType& type) {
     if (type == ValueType::Double) return 8U;
     if (type == ValueType::String || type == ValueType::StringView ||
         type.kind == ValueType::Kind::Slice) return 16U;
+    if (type.kind == ValueType::Kind::Vec) return 24U;
     if (type.kind == ValueType::Kind::Reference || type.kind == ValueType::Kind::Box) return 8U;
     if (type.kind == ValueType::Kind::Struct) return type.structure->size;
     if (type.kind == ValueType::Kind::Enum) return type.enumeration->size;
@@ -250,6 +254,7 @@ inline std::size_t valueTypeAlignment(const ValueType& type) {
     if (type == ValueType::Double || type == ValueType::String ||
         type == ValueType::StringView ||
         type.kind == ValueType::Kind::Slice) return 8U;
+    if (type.kind == ValueType::Kind::Vec) return 8U;
     if (type.kind == ValueType::Kind::Reference || type.kind == ValueType::Kind::Box) return 8U;
     if (type.kind == ValueType::Kind::Struct) return type.structure->alignment;
     if (type.kind == ValueType::Kind::Enum) return type.enumeration->alignment;
@@ -267,6 +272,7 @@ struct BoolExpr { bool value; };
 struct CharacterExpr { std::uint32_t value; };
 struct StringExpr { std::string utf8; };
 struct ArrayExpr { std::vector<ExprPtr> elements; };
+struct VecExpr { ValueType elementType; };
 struct StructExpr { std::shared_ptr<const StructType> type; std::vector<ExprPtr> fields; };
 struct EnumExpr {
     std::shared_ptr<const EnumType> type;
@@ -302,7 +308,7 @@ struct MatchExpr {
 
 struct Expression {
     SourceLocation location;
-    std::variant<IntegerExpr, DoubleExpr, BoolExpr, CharacterExpr, StringExpr, ArrayExpr, StructExpr, EnumExpr, FieldExpr, IndexExpr, AddressExpr, DereferenceExpr, NameExpr, CallExpr, ConversionExpr,
+    std::variant<IntegerExpr, DoubleExpr, BoolExpr, CharacterExpr, StringExpr, ArrayExpr, VecExpr, StructExpr, EnumExpr, FieldExpr, IndexExpr, AddressExpr, DereferenceExpr, NameExpr, CallExpr, ConversionExpr,
                  UnaryExpr, BinaryExpr, BlockExpr, IfExpr, MatchExpr> value;
     ValueType inferredType{ValueType::Int};
     bool typed{false};

@@ -24,6 +24,7 @@ std::string encodeType(const ValueType& type) {
     case ValueType::Kind::Slice:
         return std::string(type.mutableReference ? "VM(" : "V(") + encodeType(*type.element) + ")";
     case ValueType::Kind::Box: return "O(" + encodeType(*type.element) + ")";
+    case ValueType::Kind::Vec: return "G(" + encodeType(*type.element) + ")";
     case ValueType::Kind::TypeParameter: return "T(" + type.typeParameter + ")";
     case ValueType::Kind::Struct:
         throw std::runtime_error("les structures publiques ne sont pas encore sérialisables");
@@ -100,6 +101,8 @@ ValueType decodeType(const std::string& encoded, std::size_t& cursor) {
     if (kind == 'V') return ValueType(ValueType::Kind::Slice,
         std::make_shared<ValueType>(element), mutableView);
     if (kind == 'O') return ValueType(ValueType::Kind::Box,
+        std::make_shared<ValueType>(element));
+    if (kind == 'G') return ValueType(ValueType::Kind::Vec,
         std::make_shared<ValueType>(element));
     throw std::runtime_error("code de type inconnu dans l'interface");
 }

@@ -25,6 +25,7 @@ enum class TokenKind {
     SliceType,
     SliceMutType,
     BoxType,
+    VecType,
     Identifier,
     Integer,
     Floating,
@@ -97,6 +98,7 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::SliceType: return "'Slice'";
     case TokenKind::SliceMutType: return "'SliceMut'";
     case TokenKind::BoxType: return "'Box'";
+    case TokenKind::VecType: return "'Vec'";
     case TokenKind::Identifier: return "un identifiant";
     case TokenKind::Integer: return "un entier";
     case TokenKind::Floating: return "un nombre à virgule flottante";

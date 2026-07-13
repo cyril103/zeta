@@ -1,0 +1,7 @@
+def consume[T](values: Vec[T]): Int = 0
+
+def main(): Int = {
+    val empty: Vec[Int] = Vec[Int]()
+    val moved: Vec[Int] = empty
+    consume(moved)
+}

@@ -28,6 +28,9 @@ ValueType IrGenerator::resolveType(const ValueType& type) const {
     if (type.kind == ValueType::Kind::Box)
         return ValueType(ValueType::Kind::Box,
                          std::make_shared<ValueType>(resolveType(*type.element)));
+    if (type.kind == ValueType::Kind::Vec)
+        return ValueType(ValueType::Kind::Vec,
+                         std::make_shared<ValueType>(resolveType(*type.element)));
     if (type.kind == ValueType::Kind::Enum &&
         !type.enumeration->typeArguments.empty()) {
         std::vector<ValueType> arguments;
@@ -662,6 +665,11 @@ ValueId IrGenerator::expression(
             ir_.instructions.push_back(IrArrayConstruct{output, std::move(elements),
                                                         expressionNode.inferredType});
             return output;
+        } else if constexpr (std::is_same_v<T, VecExpr>) {
+            const ValueId output = nextValue(expressionNode.inferredType);
+            ir_.instructions.push_back(IrVecConstruct{output,
+                                                       resolveType(expressionNode.inferredType)});
+            return output;
         } else if constexpr (std::is_same_v<T, StructExpr>) {
             std::vector<ValueId> fields;
             for (const ExprPtr& field : node.fields) fields.push_back(expression(*field, parameters));
@@ -1056,6 +1064,8 @@ std::string IrGenerator::print(const IrProgram& program) {
                 }
                 out << "]\n";
             }
+            else if constexpr (std::is_same_v<T, IrVecConstruct>)
+                out << "  $" << item.output << " = vec " << typeName(item.type) << " []\n";
             else if constexpr (std::is_same_v<T, IrStructConstruct>) {
                 out << "  $" << item.output << " = struct " << typeName(item.type) << " [";
                 for (std::size_t i = 0; i < item.fields.size(); ++i) {

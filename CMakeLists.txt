@@ -24,6 +24,17 @@ target_compile_options(zeta PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
 include(CTest)
 if(BUILD_TESTING)
+    add_test(NAME compile_vec_empty COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_empty.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/vec-empty)
+    add_test(NAME run_vec_empty COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vec-empty)
+    set_tests_properties(run_vec_empty PROPERTIES DEPENDS compile_vec_empty)
+    add_test(NAME reject_vec_type_mismatch COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_type_mismatch.zeta)
+    set_tests_properties(reject_vec_type_mismatch PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_vec_use_after_move COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_use_after_move.zeta)
+    set_tests_properties(reject_vec_use_after_move PROPERTIES WILL_FAIL TRUE)
     add_test(NAME compile_enum_declaration COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_declaration.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/enum-declaration)

@@ -26,13 +26,17 @@ ValueType substitute(
     if (type.kind == ValueType::Kind::Box)
         return ValueType(ValueType::Kind::Box,
             std::make_shared<ValueType>(substitute(*type.element, parameters, arguments)));
+    if (type.kind == ValueType::Kind::Vec)
+        return ValueType(ValueType::Kind::Vec,
+            std::make_shared<ValueType>(substitute(*type.element, parameters, arguments)));
     return type;
 }
 
 bool symbolic(const ValueType& type) {
     if (type.kind == ValueType::Kind::TypeParameter) return true;
     if (type.kind == ValueType::Kind::Array || type.kind == ValueType::Kind::Reference ||
-        type.kind == ValueType::Kind::Slice || type.kind == ValueType::Kind::Box)
+        type.kind == ValueType::Kind::Slice || type.kind == ValueType::Kind::Box ||
+        type.kind == ValueType::Kind::Vec)
         return symbolic(*type.element);
     return false;
 }

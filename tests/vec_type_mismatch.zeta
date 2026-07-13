@@ -1,0 +1,4 @@
+def main(): Int = {
+    val values: Vec[Int] = Vec[Bool]()
+    0
+}
