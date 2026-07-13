@@ -9,6 +9,10 @@ cp "$fixtures"/*.zeta "$work"/
 
 "$compiler" "$work/main.zeta" -o "$work/app" >/dev/null
 grep -q '^generic_tokens 1 ' "$work/app.modules/api.zti"
+grep -q '"Helper"' "$work/app.modules/api.zti"
+if grep -q '"UnusedRecord"\|"unusedFunction"' "$work/app.modules/api.zti"; then
+    exit 1
+fi
 if grep -q '^generic_source ' "$work/app.modules/api.zti"; then
     exit 1
 fi
@@ -24,6 +28,14 @@ test "$(stat -c %Y "$work/app.cache/api.o")" -gt "$api_before"
 test "$(stat -c %Y "$work/app.cache/main.o")" = "$main_before"
 test "$(sed -n 's/^fingerprint //p' "$work/app.modules/api.zti")" = "$fingerprint_before"
 "$work/app"
+
+api_after_comment=$(stat -c %Y "$work/app.cache/api.o")
+sleep 1
+sed -i 's/unusedFunction(): Int = 99/unusedFunction(): Int = 100/' "$work/api.zeta"
+"$compiler" "$work/main.zeta" -o "$work/app" >/dev/null
+test "$(stat -c %Y "$work/app.cache/api.o")" -gt "$api_after_comment"
+test "$(stat -c %Y "$work/app.cache/main.o")" = "$main_before"
+test "$(sed -n 's/^fingerprint //p' "$work/app.modules/api.zti")" = "$fingerprint_before"
 
 mkdir "$work/consumer"
 cp "$work/main.zeta" "$work/consumer/main.zeta"

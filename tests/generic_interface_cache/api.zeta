@@ -1,1 +1,14 @@
-pub def identity[T](value: T): T = value
+struct Helper {
+    marker: Int
+}
+
+struct UnusedRecord {
+    value: Int
+}
+
+def unusedFunction(): Int = 99
+
+pub def identity[T](value: T): T = {
+    val helper: Helper = Helper { marker: 0 }
+    if (helper.marker == 0) value else value
+}
