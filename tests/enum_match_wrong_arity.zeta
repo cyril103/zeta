@@ -1,0 +1,8 @@
+enum Resultat { Valeur(value: Int), Absent }
+
+def lire(resultat: Resultat): Int = match (resultat) {
+    Resultat.Valeur => 1
+    Resultat.Absent => 0
+}
+
+def main(): Int = 0

@@ -1,0 +1,6 @@
+enum Etat { Present, Absent }
+
+def main(): Int = match (42) {
+    Etat.Present => 1
+    Etat.Absent => 0
+}

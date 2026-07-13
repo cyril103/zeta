@@ -48,6 +48,7 @@ private:
     ExprPtr primary();
     ExprPtr blockExpression(SourceLocation location);
     ExprPtr ifExpression(SourceLocation location);
+    ExprPtr matchExpression(SourceLocation location);
 
     std::vector<Token> tokens_;
     std::size_t current_{0};

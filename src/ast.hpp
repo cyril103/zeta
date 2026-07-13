@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -205,11 +206,22 @@ struct UnaryExpr { std::string op; ExprPtr operand; };
 struct BinaryExpr { std::string op; ExprPtr left; ExprPtr right; };
 struct BlockExpr { std::vector<StatementPtr> statements; ExprPtr result; };
 struct IfExpr { ExprPtr condition; ExprPtr thenBranch; ExprPtr elseBranch; };
+struct MatchBranch {
+    SourceLocation location;
+    std::size_t variant;
+    std::vector<std::optional<std::string>> bindings;
+    ExprPtr result;
+};
+struct MatchExpr {
+    ExprPtr operand;
+    std::shared_ptr<const EnumType> type;
+    std::vector<MatchBranch> branches;
+};
 
 struct Expression {
     SourceLocation location;
     std::variant<IntegerExpr, DoubleExpr, BoolExpr, CharacterExpr, StringExpr, ArrayExpr, StructExpr, EnumExpr, FieldExpr, IndexExpr, AddressExpr, DereferenceExpr, NameExpr, CallExpr, ConversionExpr,
-                 UnaryExpr, BinaryExpr, BlockExpr, IfExpr> value;
+                 UnaryExpr, BinaryExpr, BlockExpr, IfExpr, MatchExpr> value;
     ValueType inferredType{ValueType::Int};
     bool typed{false};
 };

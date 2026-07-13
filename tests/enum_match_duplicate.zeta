@@ -1,0 +1,9 @@
+enum Etat { Present, Absent }
+
+def lire(etat: Etat): Int = match (etat) {
+    Etat.Present => 1
+    Etat.Present => 2
+    Etat.Absent => 0
+}
+
+def main(): Int = 0

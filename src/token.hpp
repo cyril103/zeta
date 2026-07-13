@@ -43,6 +43,7 @@ enum class TokenKind {
     Dot,
     Semicolon,
     Equal,
+    FatArrow,
     EqualEqual,
     Bang,
     BangEqual,
@@ -113,6 +114,7 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::Dot: return "'.'";
     case TokenKind::Semicolon: return "';'";
     case TokenKind::Equal: return "'='";
+    case TokenKind::FatArrow: return "'=>'";
     case TokenKind::EqualEqual: return "'=='";
     case TokenKind::Bang: return "'!'";
     case TokenKind::BangEqual: return "'!='";

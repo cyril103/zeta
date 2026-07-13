@@ -54,6 +54,23 @@ if(BUILD_TESTING)
     add_test(NAME reject_enum_field_type_mismatch COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_field_type_mismatch.zeta)
     set_tests_properties(reject_enum_field_type_mismatch PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_enum_match COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_match.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/enum-match)
+    add_test(NAME run_enum_match COMMAND ${CMAKE_CURRENT_BINARY_DIR}/enum-match)
+    set_tests_properties(run_enum_match PROPERTIES DEPENDS compile_enum_match)
+    add_test(NAME reject_enum_match_incomplete COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_match_incomplete.zeta)
+    set_tests_properties(reject_enum_match_incomplete PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_enum_match_duplicate COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_match_duplicate.zeta)
+    set_tests_properties(reject_enum_match_duplicate PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_enum_match_wrong_operand COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_match_wrong_operand.zeta)
+    set_tests_properties(reject_enum_match_wrong_operand PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_enum_match_wrong_arity COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_match_wrong_arity.zeta)
+    set_tests_properties(reject_enum_match_wrong_arity PROPERTIES WILL_FAIL TRUE)
     add_test(NAME precompiled_standard_library
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/precompiled_stdlib.sh
             $<TARGET_FILE:zeta>

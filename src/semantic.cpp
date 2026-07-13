@@ -148,6 +148,10 @@ void collectExpressionNames(const Expression& expression,
             collectExpressionNames(*node.condition, uses);
             collectExpressionNames(*node.thenBranch, uses);
             collectExpressionNames(*node.elseBranch, uses);
+        } else if constexpr (std::is_same_v<T, MatchExpr>) {
+            collectExpressionNames(*node.operand, uses);
+            for (const MatchBranch& branch : node.branches)
+                collectExpressionNames(*branch.result, uses);
         }
     }, expression.value);
 }
@@ -629,6 +633,8 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
             return TypeRules::commonOperandType(inferType(*node.left), inferType(*node.right));
         } else if constexpr (std::is_same_v<T, BlockExpr>) {
             return node.result ? inferType(*node.result) : ValueType::Int;
+        } else if constexpr (std::is_same_v<T, MatchExpr>) {
+            return inferType(*node.branches.front().result);
         } else {
             return TypeRules::commonOperandType(inferType(*node.thenBranch),
                                                 inferType(*node.elseBranch));
@@ -646,9 +652,10 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (expected == ValueType::Byte && node.value > 255)
                 throw CompileError(expression.location, "le littéral " +
                     std::to_string(node.value) + " dépasse l'intervalle Byte (0..255)");
-            if (expected == ValueType::Char || expected == ValueType::String)
-                return ValueType::Int;
-            return expected;
+            if (expected == ValueType::Int || expected == ValueType::Byte ||
+                expected == ValueType::Double)
+                return expected;
+            return ValueType::Int;
         } else if constexpr (std::is_same_v<T, DoubleExpr>) return ValueType::Double;
         else if constexpr (std::is_same_v<T, BoolExpr>) return ValueType::Bool;
         else if constexpr (std::is_same_v<T, CharacterExpr>) return ValueType::Char;
@@ -954,7 +961,7 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             popBorrowScope();
             symbols_.popScope();
             return expected;
-        } else {
+        } else if constexpr (std::is_same_v<T, IfExpr>) {
             checkExpression(*node.condition, ValueType::Bool);
             const auto beforeBranches = movedBoxes_;
             checkExpression(*node.thenBranch, expected);
@@ -966,6 +973,30 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 throw CompileError(expression.location,
                                    "un déplacement de Box conditionnel doit avoir lieu dans toutes les branches");
             movedBoxes_.insert(afterThen.begin(), afterThen.end());
+            return expected;
+        } else {
+            checkExpression(*node.operand, ValueType(node.type));
+            const auto beforeBranches = movedBoxes_;
+            std::optional<std::unordered_set<std::string>> mergedMoves;
+            for (MatchBranch& branch : node.branches) {
+                movedBoxes_ = beforeBranches;
+                symbols_.pushScope();
+                const EnumVariant& variant = node.type->variants[branch.variant];
+                for (std::size_t i = 0; i < branch.bindings.size(); ++i) {
+                    if (!branch.bindings[i]) continue;
+                    if (!symbols_.define(*branch.bindings[i], SemanticSymbol{
+                            variant.fields[i].type, BindingKind::Val, false, nullptr, false, {}}))
+                        throw CompileError(branch.location, "la liaison '" +
+                            *branch.bindings[i] + "' masque un identifiant existant");
+                }
+                checkExpression(*branch.result, expected);
+                symbols_.popScope();
+                if (!mergedMoves) mergedMoves = movedBoxes_;
+                else if (*mergedMoves != movedBoxes_)
+                    throw CompileError(expression.location,
+                        "un déplacement de Box dans un match doit avoir lieu dans toutes les branches");
+            }
+            movedBoxes_ = mergedMoves.value_or(beforeBranches);
             return expected;
         }
     }, expression.value);

@@ -182,6 +182,17 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                             std::to_string(item.type.enumeration->payloadOffset + field.offset) + "]",
                         valueTypeSize(field.type));
                 }
+            } else if constexpr (std::is_same_v<T, IrEnumTag>) {
+                out << "    mov eax, dword [rbp-" << valueOffset(program, item.input) << "]\n"
+                    << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
+            } else if constexpr (std::is_same_v<T, IrEnumFieldLoad>) {
+                const StructField& field =
+                    item.type.enumeration->variants[item.variant].fields[item.field];
+                emitBlockCopy(out,
+                    "[rbp-" + std::to_string(valueOffset(program, item.input)) + "+" +
+                        std::to_string(item.type.enumeration->payloadOffset + field.offset) + "]",
+                    "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]",
+                    valueTypeSize(field.type));
             } else if constexpr (std::is_same_v<T, IrFieldLoad>) {
                 const StructField& field = item.objectType.structure->fields[item.field];
                 emitBlockCopy(out, "[rbp-" + std::to_string(valueOffset(program, item.object)) + "+" + std::to_string(field.offset) + "]",

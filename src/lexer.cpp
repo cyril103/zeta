@@ -76,6 +76,9 @@ std::vector<Token> Lexer::scan() {
         if (c == '=' && peek() == '=') {
             advance(); add(TokenKind::EqualEqual, "==", start); continue;
         }
+        if (c == '=' && peek() == '>') {
+            advance(); add(TokenKind::FatArrow, "=>", start); continue;
+        }
         if (c == '!' && peek() == '=') {
             advance(); add(TokenKind::BangEqual, "!=", start); continue;
         }

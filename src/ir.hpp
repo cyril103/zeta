@@ -27,6 +27,14 @@ struct IrEnumConstruct {
     std::vector<ValueId> fields;
     ValueType type;
 };
+struct IrEnumTag { ValueId output; ValueId input; };
+struct IrEnumFieldLoad {
+    ValueId output;
+    ValueId input;
+    ValueType type;
+    std::size_t variant;
+    std::size_t field;
+};
 struct IrFieldLoad { ValueId output; ValueId object; ValueType objectType; std::size_t field; };
 struct IrFieldStore { SlotId slot; ValueId value; ValueType objectType; std::size_t field; };
 struct IrSliceConstruct { ValueId output; ValueId reference; std::size_t length; ValueType type; };
@@ -85,7 +93,7 @@ struct IrExit { ValueId value; };
 struct IrBranch { ValueId condition; bool jumpWhenTrue; std::size_t label; };
 struct IrJump { std::size_t label; };
 struct IrLabel { std::size_t label; };
-using IrInstruction = std::variant<IrConst, IrDoubleConst, IrStringConst, IrStringConcat, IrArrayConstruct, IrStructConstruct, IrEnumConstruct, IrFieldLoad, IrFieldStore, IrSliceConstruct, IrBoxConstruct, IrIndexLoad, IrIndexStore, IrAddressOf, IrDereference, IrDereferenceStore, IrLoad, IrConvert, IrUnary, IrBinary,
+using IrInstruction = std::variant<IrConst, IrDoubleConst, IrStringConst, IrStringConcat, IrArrayConstruct, IrStructConstruct, IrEnumConstruct, IrEnumTag, IrEnumFieldLoad, IrFieldLoad, IrFieldStore, IrSliceConstruct, IrBoxConstruct, IrIndexLoad, IrIndexStore, IrAddressOf, IrDereference, IrDereferenceStore, IrLoad, IrConvert, IrUnary, IrBinary,
                                    IrStore, IrCopy, IrCall, IrTailCall, IrFunctionStart, IrParameter,
                                    IrReturn, IrDrop, IrRetain, IrExit, IrBranch, IrJump, IrLabel>;
 

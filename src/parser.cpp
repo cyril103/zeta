@@ -736,6 +736,9 @@ ExprPtr Parser::postfix() {
 }
 
 ExprPtr Parser::primary() {
+    if (match(TokenKind::Match)) {
+        return matchExpression(previous().location);
+    }
     if (match(TokenKind::If)) {
         return ifExpression(previous().location);
     }
@@ -973,6 +976,104 @@ ExprPtr Parser::primary() {
         return expr;
     }
     throw CompileError(peek().location, "expression attendue");
+}
+
+ExprPtr Parser::matchExpression(SourceLocation location) {
+    consume(TokenKind::LeftParen, "'(' attendue après 'match'");
+    expressionContinuation();
+    ExprPtr operand = expression();
+    expressionContinuation();
+    consume(TokenKind::RightParen, "')' attendue après l'expression de match");
+    consume(TokenKind::LeftBrace, "'{' attendue après l'opérande de match");
+    ++blockDepth_;
+    skipSeparators();
+
+    std::shared_ptr<const EnumType> matchedType;
+    std::vector<MatchBranch> branches;
+    std::unordered_set<std::size_t> covered;
+    while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
+        const Token& typeToken = consume(TokenKind::Identifier,
+                                         "nom d'énumération attendu dans le motif");
+        const auto definition = enumerations_.find(typeToken.text);
+        if (definition == enumerations_.end())
+            throw CompileError(typeToken.location,
+                               "énumération inconnue '" + typeToken.text + "'");
+        if (matchedType == nullptr) matchedType = definition->second;
+        else if (matchedType.get() != definition->second.get())
+            throw CompileError(typeToken.location,
+                               "tous les motifs doivent appartenir à " + matchedType->name);
+
+        consume(TokenKind::Dot, "'.' attendu après le nom d'énumération");
+        const Token& variantToken = consume(TokenKind::Identifier,
+                                            "nom de variante attendu après '.'");
+        const auto variant = std::find_if(matchedType->variants.begin(),
+            matchedType->variants.end(), [&](const EnumVariant& candidate) {
+                return candidate.name == variantToken.text;
+            });
+        if (variant == matchedType->variants.end())
+            throw CompileError(variantToken.location, "variante inconnue '" +
+                variantToken.text + "' pour " + matchedType->name);
+        const std::size_t variantIndex =
+            static_cast<std::size_t>(variant - matchedType->variants.begin());
+        if (!covered.insert(variantIndex).second)
+            throw CompileError(variantToken.location,
+                               "variante '" + variant->name + "' couverte plusieurs fois");
+
+        std::vector<std::optional<std::string>> bindings;
+        std::unordered_set<std::string> bindingNames;
+        if (variant->fields.empty()) {
+            if (check(TokenKind::LeftParen))
+                throw CompileError(peek().location,
+                                   "la variante vide '" + variant->name +
+                                   "' ne prend pas de liaisons");
+        } else {
+            consume(TokenKind::LeftParen,
+                    "'(' attendue après la variante '" + variant->name + "'");
+            if (!check(TokenKind::RightParen)) {
+                do {
+                    const Token& binding = consume(TokenKind::Identifier,
+                                                   "nom de liaison ou '_' attendu");
+                    if (binding.text == "_") bindings.push_back(std::nullopt);
+                    else {
+                        if (!bindingNames.insert(binding.text).second)
+                            throw CompileError(binding.location, "liaison '" + binding.text +
+                                               "' déclarée plusieurs fois dans le motif");
+                        bindings.push_back(binding.text);
+                    }
+                } while (match(TokenKind::Comma));
+            }
+            consume(TokenKind::RightParen, "')' attendue après les liaisons du motif");
+            if (bindings.size() != variant->fields.size())
+                throw CompileError(variantToken.location, "la variante '" + variant->name +
+                    "' attend " + std::to_string(variant->fields.size()) +
+                    " liaison(s), reçu " + std::to_string(bindings.size()));
+        }
+        consume(TokenKind::FatArrow, "'=>' attendu après le motif");
+        expressionContinuation();
+        ExprPtr result = expression();
+        branches.push_back(MatchBranch{variantToken.location, variantIndex,
+                                       std::move(bindings), std::move(result)});
+        if (!check(TokenKind::RightBrace) && !match(TokenKind::Comma) && !matchSeparator())
+            throw CompileError(peek().location,
+                               "fin de ligne, ',' ou '}' attendue après la branche");
+        skipSeparators();
+    }
+    consume(TokenKind::RightBrace, "'}' attendue après les branches de match");
+    --blockDepth_;
+    if (matchedType == nullptr)
+        throw CompileError(location, "un match doit contenir au moins une branche");
+    if (covered.size() != matchedType->variants.size()) {
+        std::string missing;
+        for (std::size_t i = 0; i < matchedType->variants.size(); ++i) {
+            if (covered.contains(i)) continue;
+            if (!missing.empty()) missing += ", ";
+            missing += matchedType->name + "." + matchedType->variants[i].name;
+        }
+        throw CompileError(location, "correspondance incomplète, variante(s) manquante(s) : " +
+                                     missing);
+    }
+    return std::make_unique<Expression>(Expression{
+        location, MatchExpr{std::move(operand), matchedType, std::move(branches)}});
 }
 
 ExprPtr Parser::ifExpression(SourceLocation location) {

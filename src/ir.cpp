@@ -888,7 +888,7 @@ ValueId IrGenerator::expression(
             }
             boxScopes_.pop_back();
             return result;
-        } else {
+        } else if constexpr (std::is_same_v<T, IfExpr>) {
             const ValueId condition = expression(*node.condition, parameters);
             const ValueId output = nextValue(expressionNode.inferredType);
             const std::size_t elseLabel = nextLabel_++;
@@ -900,6 +900,45 @@ ValueId IrGenerator::expression(
             ir_.instructions.push_back(IrLabel{elseLabel});
             const ValueId elseValue = expression(*node.elseBranch, parameters);
             ir_.instructions.push_back(IrCopy{output, elseValue, expressionNode.inferredType});
+            ir_.instructions.push_back(IrLabel{endLabel});
+            return output;
+        } else {
+            const ValueId input = expression(*node.operand, parameters);
+            const ValueId tag = nextValue(ValueType::Int);
+            ir_.instructions.push_back(IrEnumTag{tag, input});
+            const ValueId output = nextValue(expressionNode.inferredType);
+            const std::size_t endLabel = nextLabel_++;
+            for (std::size_t branchIndex = 0; branchIndex < node.branches.size();
+                 ++branchIndex) {
+                const MatchBranch& branch = node.branches[branchIndex];
+                const bool last = branchIndex + 1U == node.branches.size();
+                std::size_t nextBranchLabel = 0;
+                if (!last) {
+                    nextBranchLabel = nextLabel_++;
+                    const ValueId expectedTag = nextValue(ValueType::Int);
+                    ir_.instructions.push_back(IrConst{
+                        expectedTag, static_cast<std::int32_t>(branch.variant), ValueType::Int});
+                    const ValueId matches = nextValue(ValueType::Bool);
+                    ir_.instructions.push_back(IrBinary{
+                        matches, "==", tag, expectedTag, ValueType::Bool, ValueType::Int});
+                    ir_.instructions.push_back(IrBranch{matches, false, nextBranchLabel});
+                }
+
+                auto branchParameters = parameters;
+                const EnumVariant& variant = node.type->variants[branch.variant];
+                for (std::size_t i = 0; i < branch.bindings.size(); ++i) {
+                    if (!branch.bindings[i]) continue;
+                    const ValueId field = nextValue(variant.fields[i].type);
+                    ir_.instructions.push_back(IrEnumFieldLoad{
+                        field, input, ValueType(node.type), branch.variant, i});
+                    branchParameters.insert_or_assign(*branch.bindings[i], field);
+                }
+                const ValueId branchValue = expression(*branch.result, branchParameters);
+                ir_.instructions.push_back(IrCopy{
+                    output, branchValue, expressionNode.inferredType});
+                ir_.instructions.push_back(IrJump{endLabel});
+                if (!last) ir_.instructions.push_back(IrLabel{nextBranchLabel});
+            }
             ir_.instructions.push_back(IrLabel{endLabel});
             return output;
         }
@@ -962,6 +1001,13 @@ std::string IrGenerator::print(const IrProgram& program) {
                 }
                 out << "]\n";
             }
+            else if constexpr (std::is_same_v<T, IrEnumTag>)
+                out << "  $" << item.output << " = enum_tag $" << item.input << '\n';
+            else if constexpr (std::is_same_v<T, IrEnumFieldLoad>)
+                out << "  $" << item.output << " = enum_field $" << item.input << '.'
+                    << item.type.enumeration->variants[item.variant].name << '.'
+                    << item.type.enumeration->variants[item.variant].fields[item.field].name
+                    << '\n';
             else if constexpr (std::is_same_v<T, IrFieldLoad>)
                 out << "  $" << item.output << " = field $" << item.object
                     << '.' << item.objectType.structure->fields[item.field].name << '\n';
