@@ -1,0 +1,15 @@
+pub enum State {
+    Ready
+    Failed(code: Int)
+}
+
+pub enum Outcome[T] {
+    Ok(value: T)
+    Error(code: Int)
+}
+
+pub def ready(): State = State.Ready
+
+pub def zeroOutcome(): Outcome[Int] = Outcome[Int].Ok(value: 0)
+
+pub def zero(): Int = 0
