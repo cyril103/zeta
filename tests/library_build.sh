@@ -2,6 +2,7 @@
 set -euo pipefail
 
 compiler=$1
+stdlib=$2
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
@@ -74,3 +75,16 @@ printf 'import service\ndef main(): Int = service.answer() - 42\n' \
 "$compiler" "$work/dependency-consumer/main.zeta" \
     -o "$work/dependency-consumer/app" >/dev/null
 "$work/dependency-consumer/app"
+
+# L'implémentation runtime native est fusionnée dans l'unique objet publié.
+mkdir -p "$work/native-published" "$work/native-consumer"
+"$compiler" --build-library "$stdlib/io.zeta" \
+    -o "$work/native-published" >/dev/null
+test "$(find "$work/native-published" -maxdepth 1 -type f | wc -l)" -eq 2
+cp "$work/native-published/io.zti" "$work/native-consumer/io.zti"
+cp "$work/native-published/io.o" "$work/native-consumer/io.o"
+printf 'import io\ndef main(): Int = io.print("")\n' \
+    > "$work/native-consumer/main.zeta"
+"$compiler" "$work/native-consumer/main.zeta" \
+    -o "$work/native-consumer/app" >/dev/null
+"$work/native-consumer/app"
