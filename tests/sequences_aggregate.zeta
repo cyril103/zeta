@@ -1,0 +1,36 @@
+import collections
+import sequences
+
+def main(): Int = {
+    var repeated: Vec[Int] = Vec[Int]()
+    repeated.push(7)
+    repeated.push(7)
+    repeated.push(7)
+    val repeatedEqual: Bool = sequences.allEqual(repeated.asSlice())
+    repeated.set(1, 8)
+    val changedEqual: Bool = sequences.allEqual(repeated.asSlice())
+
+    val integers: [Int; 4] = [2, 3, 4, 5]
+    val integerView: Slice[Int] = Slice(&integers)
+    val integerSum: Int = collections.unwrapOr(sequences.sum(integerView), -1)
+    val integerProduct: Int = collections.unwrapOr(sequences.product(integerView), -1)
+
+    val doubles: [Double; 3] = [1.5, 2.0, 2.5]
+    val doubleView: Slice[Double] = Slice(&doubles)
+    val doubleSum: Double = collections.unwrapOr(sequences.sum(doubleView), -1.0)
+    val doubleProduct: Double = collections.unwrapOr(sequences.product(doubleView), -1.0)
+
+    val singleton: [Char; 1] = ['z']
+    val singletonView: Slice[Char] = Slice(&singleton)
+    val singletonEqual: Bool = sequences.allEqual(singletonView)
+
+    val empty: [Int; 0] = []
+    val emptyView: Slice[Int] = Slice(&empty)
+    val emptyEqual: Bool = sequences.allEqual(emptyView)
+    val emptySum: Bool = collections.isNone(sequences.sum(emptyView))
+    val emptyProduct: Bool = collections.isNone(sequences.product(emptyView))
+
+    if (repeatedEqual && !changedEqual && integerSum == 14 && integerProduct == 120 &&
+        doubleSum == 6.0 && doubleProduct == 7.5 && singletonEqual && emptyEqual &&
+        emptySum && emptyProduct) 0 else 1
+}

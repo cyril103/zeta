@@ -44,6 +44,42 @@ pub def count[T: Equatable](values: Slice[T], expected: T): Int = {
     total
 }
 
+pub def allEqual[T: Equatable](values: Slice[T]): Bool = {
+    if (values.length < 2) true else {
+        var index: Int = 1
+        var equal: Bool = true
+        while (index < values.length && equal) do {
+            equal = values[index] == values[0]
+            index = index + 1
+        }
+        equal
+    }
+}
+
+pub def sum[T: Numeric](values: Slice[T]): Option[T] = {
+    if (values.length == 0) Option[T].None else {
+        var result: T = values[0]
+        var index: Int = 1
+        while (index < values.length) do {
+            result = result + values[index]
+            index = index + 1
+        }
+        Option[T].Some(value: result)
+    }
+}
+
+pub def product[T: Numeric](values: Slice[T]): Option[T] = {
+    if (values.length == 0) Option[T].None else {
+        var result: T = values[0]
+        var index: Int = 1
+        while (index < values.length) do {
+            result = result * values[index]
+            index = index + 1
+        }
+        Option[T].Some(value: result)
+    }
+}
+
 pub def minimum[T: Ordered](values: Slice[T]): Option[T] = {
     if (values.length == 0) Option[T].None else {
         var result: T = values[0]

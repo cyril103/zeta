@@ -383,6 +383,12 @@ if(BUILD_TESTING)
     add_test(NAME run_sequences_bounds COMMAND ${CMAKE_CURRENT_BINARY_DIR}/sequences-bounds)
     set_tests_properties(run_sequences_bounds PROPERTIES DEPENDS compile_sequences_bounds)
 
+    add_test(NAME compile_sequences_aggregate COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_aggregate.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/sequences-aggregate)
+    add_test(NAME run_sequences_aggregate COMMAND ${CMAKE_CURRENT_BINARY_DIR}/sequences-aggregate)
+    set_tests_properties(run_sequences_aggregate PROPERTIES DEPENDS compile_sequences_aggregate)
+
     add_test(NAME compile_empty_slice_option COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_zero_length.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/empty-slice-option)
