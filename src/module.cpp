@@ -41,10 +41,42 @@ std::string hexHash(std::uint64_t hash) {
     output << std::hex << std::setfill('0') << std::setw(16) << hash;
     return output.str();
 }
+
+std::vector<Program::Import> discoverImports(const std::vector<Token>& tokens) {
+    std::vector<Program::Import> imports;
+    std::size_t cursor = 0;
+    const auto skipSeparators = [&] {
+        while (cursor < tokens.size() &&
+               (tokens[cursor].kind == TokenKind::Separator ||
+                tokens[cursor].kind == TokenKind::Semicolon)) ++cursor;
+    };
+    skipSeparators();
+    while (cursor < tokens.size() && tokens[cursor].kind == TokenKind::Import) {
+        const SourceLocation location = tokens[cursor++].location;
+        if (cursor >= tokens.size() || tokens[cursor].kind != TokenKind::Identifier) break;
+        imports.push_back(Program::Import{location, tokens[cursor++].text});
+        skipSeparators();
+    }
+    return imports;
+}
+
+Parser::ImportedStructures importedStructures(
+    const std::vector<Program::Import>& imports,
+    const std::unordered_map<std::string, ModuleInterface>& interfaces) {
+    Parser::ImportedStructures result;
+    for (const Program::Import& import : imports) {
+        const auto module = interfaces.find(import.module);
+        if (module == interfaces.end()) continue;
+        for (const std::shared_ptr<const StructType>& structure : module->second.structures)
+            result.emplace(import.module + "." + structure->name, structure);
+    }
+    return result;
+}
 }
 
 ModuleGraph ModuleLoader::load(const std::filesystem::path& rootPath) {
     graph_ = ModuleGraph{};
+    loading_.clear();
     const std::filesystem::path absolute = std::filesystem::absolute(rootPath);
     sourceDirectory_ = absolute.parent_path();
 #ifdef ZETA_STDLIB_DIR
@@ -95,6 +127,8 @@ void ModuleLoader::buildDependencyGraph() {
 void ModuleLoader::loadModule(const std::string& name, const std::filesystem::path& path) {
     if (graph_.modules.contains(name)) return;
     if (!validModuleName(name)) throw std::runtime_error("nom de module invalide : " + name);
+    if (!loading_.insert(name).second)
+        throw std::runtime_error("cycle d'import détecté autour du module " + name);
 
     const std::string source = readSource(path);
     if (path.extension() == ".zti") {
@@ -106,16 +140,23 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
         objectPath.replace_extension(".o");
         if (!std::filesystem::exists(objectPath))
             throw std::runtime_error("objet précompilé manquant : " + objectPath.string());
+        std::vector<Program::Import> imports;
+        for (const std::string& import : persisted.imports)
+            imports.push_back(Program::Import{SourceLocation{}, import});
+        graph_.interfaces.emplace(name, std::move(persisted.interface));
+        graph_.interfaceFingerprints.emplace(name, persisted.fingerprint);
+        for (const Program::Import& import : imports)
+            loadModule(import.module, resolveImport(import.module));
         Program program;
         if (!persisted.genericSource.empty()) {
             Lexer lexer(persisted.genericSource);
-            Parser parser(lexer.scan());
+            Parser parser(lexer.scan(), importedStructures(imports, graph_.interfaces));
             program = parser.parse();
         }
         program.imports.clear();
-        for (const std::string& import : persisted.imports)
-            program.imports.push_back(Program::Import{SourceLocation{}, import});
-        for (const auto& [symbolName, symbol] : persisted.interface.exports) {
+        program.imports = imports;
+        ModuleInterface& storedInterface = graph_.interfaces.at(name);
+        for (const auto& [symbolName, symbol] : storedInterface.exports) {
             const auto existing = std::find_if(program.statements.begin(), program.statements.end(),
                 [&](const Statement& statement) {
                     const auto* declaration = std::get_if<Declaration>(&statement.value);
@@ -132,8 +173,6 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
         }
         graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source),
                                             true, objectPath, persisted.genericSource});
-        ModuleInterface& storedInterface = graph_.interfaces.emplace(
-            name, std::move(persisted.interface)).first->second;
         Module& storedModule = graph_.modules.at(name);
         for (Statement& statement : storedModule.program.statements) {
             auto* declaration = std::get_if<Declaration>(&statement.value);
@@ -147,19 +186,20 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
                     exported.parameterTypes.push_back(parameter.type);
             }
         }
-        graph_.interfaceFingerprints.emplace(name, persisted.fingerprint);
-        for (const Program::Import& import : storedModule.program.imports)
-            loadModule(import.module, resolveImport(import.module));
+        loading_.erase(name);
         return;
     }
     Lexer lexer(source);
-    Parser parser(lexer.scan());
-    Program program = parser.parse();
-    std::vector<Program::Import> imports = program.imports;
-    graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source),
-                                        false, {}, source});
+    std::vector<Token> tokens = lexer.scan();
+    const std::vector<Program::Import> imports = discoverImports(tokens);
     for (const Program::Import& import : imports)
         loadModule(import.module, resolveImport(import.module));
+    Parser parser(std::move(tokens), importedStructures(imports, graph_.interfaces));
+    Program program = parser.parse();
+    graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source),
+                                        false, {}, source});
+    buildInterface(name);
+    loading_.erase(name);
 }
 
 std::filesystem::path ModuleLoader::resolveImport(const std::string& name) const {
@@ -266,10 +306,17 @@ void ModuleLoader::buildFingerprints() {
 
 void ModuleLoader::buildInterfaces() {
     for (const auto& [name, module] : graph_.modules) {
-        if (graph_.interfaces.contains(name)) continue;
-        ModuleInterface interface{name, {}, {}};
-        const auto validatePublicType = [&](const auto& self, const ValueType& type,
-                                            SourceLocation location) -> void {
+        static_cast<void>(module);
+        buildInterface(name);
+    }
+}
+
+void ModuleLoader::buildInterface(const std::string& name) {
+    if (graph_.interfaces.contains(name)) return;
+    const Module& module = graph_.modules.at(name);
+    ModuleInterface interface{name, {}, {}};
+    const auto validatePublicType = [&](const auto& self, const ValueType& type,
+                                        SourceLocation location) -> void {
             if (type.kind == ValueType::Kind::Struct) {
                 if (!type.structure->publicType)
                     throw CompileError(location, "le type privé '" +
@@ -284,30 +331,29 @@ void ModuleLoader::buildInterfaces() {
                 type.kind == ValueType::Kind::Box ||
                 type.kind == ValueType::Kind::Vec)
                 self(self, *type.element, location);
-        };
-        for (const std::shared_ptr<const StructType>& structure : module.program.structures) {
-            if (!structure->publicType) continue;
-            for (const StructField& field : structure->fields)
-                validatePublicType(validatePublicType, field.type, field.location);
-            interface.structures.push_back(structure);
-        }
-        for (const Statement& statement : module.program.statements) {
-            const auto* declaration = std::get_if<Declaration>(&statement.value);
-            if (declaration == nullptr || !declaration->publicSymbol) continue;
-            std::vector<ValueType> parameterTypes;
-            validatePublicType(validatePublicType, declaration->type, declaration->location);
-            for (const Parameter& parameter : declaration->parameters) {
-                validatePublicType(validatePublicType, parameter.type, parameter.location);
-                parameterTypes.push_back(parameter.type);
-            }
-            if (!interface.exports.emplace(declaration->name,
-                    ExportedSymbol{declaration->kind, declaration->type,
-                                   declaration->callable, declaration->nativeSymbol,
-                                   std::move(parameterTypes), declaration}).second) {
-                throw CompileError(declaration->location,
-                    "symbole public '" + declaration->name + "' exporté plusieurs fois par " + name);
-            }
-        }
-        graph_.interfaces.emplace(name, std::move(interface));
+    };
+    for (const std::shared_ptr<const StructType>& structure : module.program.structures) {
+        if (!structure->publicType) continue;
+        for (const StructField& field : structure->fields)
+            validatePublicType(validatePublicType, field.type, field.location);
+        interface.structures.push_back(structure);
     }
+    for (const Statement& statement : module.program.statements) {
+        const auto* declaration = std::get_if<Declaration>(&statement.value);
+        if (declaration == nullptr || !declaration->publicSymbol) continue;
+        std::vector<ValueType> parameterTypes;
+        validatePublicType(validatePublicType, declaration->type, declaration->location);
+        for (const Parameter& parameter : declaration->parameters) {
+            validatePublicType(validatePublicType, parameter.type, parameter.location);
+            parameterTypes.push_back(parameter.type);
+        }
+        if (!interface.exports.emplace(declaration->name,
+                ExportedSymbol{declaration->kind, declaration->type,
+                               declaration->callable, declaration->nativeSymbol,
+                               std::move(parameterTypes), declaration}).second) {
+            throw CompileError(declaration->location,
+                "symbole public '" + declaration->name + "' exporté plusieurs fois par " + name);
+        }
+    }
+    graph_.interfaces.emplace(name, std::move(interface));
 }

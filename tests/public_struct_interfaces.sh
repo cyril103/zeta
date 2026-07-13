@@ -12,6 +12,7 @@ interface="$work/published.modules/types.zti"
 grep -q '^structure "Point"' "$interface"
 grep -q '^structure "Pair"' "$interface"
 grep -q 'export "origin".*"U5:Point\[0:\]"' "$interface"
+grep -q 'export "zeroPair".*"U4:Pair\[1:I\]"' "$interface"
 
 mkdir "$work/consumer"
 cp "$fixtures/main.zeta" "$work/consumer/main.zeta"

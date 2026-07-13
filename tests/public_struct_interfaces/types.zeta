@@ -10,4 +10,6 @@ pub struct Pair[T] {
 
 pub def origin(): Point = Point { x: 0, y: 0 }
 
+pub def zeroPair(): Pair[Int] = Pair[Int] { first: 0, second: 0 }
+
 pub def zero(): Int = 0

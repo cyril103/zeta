@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -56,11 +57,13 @@ private:
     void loadModule(const std::string& name, const std::filesystem::path& path);
     std::filesystem::path resolveImport(const std::string& name) const;
     bool validPrecompiledModule(const std::string& name) const;
+    void buildInterface(const std::string& name);
     void buildInterfaces();
     void buildDependencyGraph();
     void buildFingerprints();
     std::filesystem::path sourceDirectory_;
     std::filesystem::path standardLibraryDirectory_;
     ModuleGraph graph_;
+    std::unordered_set<std::string> loading_;
     bool preferPrecompiled_{true};
 };

@@ -1,3 +1,9 @@
 import types
 
-def main(): Int = types.zero()
+def main(): Int = {
+    val point: types.Point = types.Point { x: 19, y: 23 }
+    val pair: types.Pair[Int] = types.Pair[Int] { first: point.x, second: point.y }
+    val zeroPair: types.Pair[Int] = types.zeroPair()
+    val origin: types.Point = types.origin()
+    pair.first + pair.second + zeroPair.first + zeroPair.second + origin.x + origin.y - 42
+}

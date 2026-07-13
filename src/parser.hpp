@@ -9,7 +9,11 @@
 
 class Parser {
 public:
-    explicit Parser(std::vector<Token> tokens);
+    using ImportedStructures =
+        std::unordered_map<std::string, std::shared_ptr<const StructType>>;
+
+    explicit Parser(std::vector<Token> tokens,
+                    ImportedStructures importedStructures = {});
     Program parse();
 
 private:
@@ -27,9 +31,11 @@ private:
     std::shared_ptr<EnumType> instantiateEnumeration(
         const std::shared_ptr<EnumType>& enumeration, std::vector<ValueType> arguments,
         SourceLocation location);
-    std::shared_ptr<StructType> instantiateStructure(
-        const std::shared_ptr<StructType>& structure, std::vector<ValueType> arguments,
+    std::shared_ptr<const StructType> instantiateStructure(
+        const std::shared_ptr<const StructType>& structure, std::vector<ValueType> arguments,
         SourceLocation location);
+    ExprPtr structureExpression(SourceLocation location, const std::string& displayName,
+                                const std::shared_ptr<const StructType>& definition);
     void skipSeparators();
     void expressionContinuation();
     Statement statement();
@@ -60,6 +66,7 @@ private:
     bool nativeDeclaration_{false};
     std::unordered_set<std::string> activeTypeParameters_;
     std::unordered_map<std::string, std::shared_ptr<StructType>> structures_;
+    ImportedStructures importedStructures_;
     std::unordered_map<std::string, std::shared_ptr<EnumType>> enumerations_;
     std::unordered_set<std::string> importedModules_;
     bool optionShadowed_{false};
