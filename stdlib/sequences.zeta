@@ -139,6 +139,38 @@ pub def binarySearch[T: Ordered](values: Slice[T], expected: T): Option[Int] = {
     Option[Int].None
 }
 
+pub def lowerBound[T: Ordered](values: Slice[T], expected: T): Int = {
+    var low: Int = 0
+    var high: Int = values.length
+    while (low < high) do {
+        val middle: Int = low + (high - low) / 2
+        if (values[middle] < expected) {
+            low = middle + 1
+            true
+        } else {
+            high = middle
+            true
+        }
+    }
+    low
+}
+
+pub def upperBound[T: Ordered](values: Slice[T], expected: T): Int = {
+    var low: Int = 0
+    var high: Int = values.length
+    while (low < high) do {
+        val middle: Int = low + (high - low) / 2
+        if (values[middle] <= expected) {
+            low = middle + 1
+            true
+        } else {
+            high = middle
+            true
+        }
+    }
+    low
+}
+
 pub def reverse[T: Copy](values: SliceMut[T]): Int = {
     var left: Int = 0
     var right: Int = values.length - 1

@@ -1,0 +1,27 @@
+import sequences
+
+def main(): Int = {
+    var values: Vec[Int] = Vec[Int]()
+    values.push(10)
+    values.push(10)
+    values.push(20)
+    values.push(30)
+    values.push(30)
+
+    val view: Slice[Int] = values.asSlice()
+    val tensBegin: Int = sequences.lowerBound(view, 10)
+    val tensEnd: Int = sequences.upperBound(view, 10)
+    val twentyFiveBegin: Int = sequences.lowerBound(view, 25)
+    val twentyFiveEnd: Int = sequences.upperBound(view, 25)
+    val beforeAll: Int = sequences.lowerBound(view, 5)
+    val afterAll: Int = sequences.upperBound(view, 40)
+
+    val empty: [Char; 0] = []
+    val emptyView: Slice[Char] = Slice(&empty)
+    val emptyLower: Int = sequences.lowerBound(emptyView, 'a')
+    val emptyUpper: Int = sequences.upperBound(emptyView, 'a')
+
+    if (tensBegin == 0 && tensEnd == 2 && twentyFiveBegin == 3 &&
+        twentyFiveEnd == 3 && beforeAll == 0 && afterAll == 5 &&
+        emptyLower == 0 && emptyUpper == 0) 0 else 1
+}
