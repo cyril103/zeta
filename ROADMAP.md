@@ -62,6 +62,8 @@ source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
 - représentation syntaxique structurée des génériques publics, monomorphisable
   côté consommateur sans lexer ni source ;
 - stdlib précompilable avec `zeta --build-stdlib` ;
+- bibliothèques ordinaires constructibles avec `zeta --build-library` sans point
+  d'entrée ni exécutable intermédiaire ;
 - manifeste partagé vérifiant compilateur, ABI, format `.zti` et empreintes des sources ;
 - sélection alternative de la stdlib avec `--stdlib <dossier>`.
 
@@ -182,9 +184,8 @@ Travail livré :
 
 Travail restant :
 
-1. commande explicite de construction d'une bibliothèque ;
-2. installation dans un cache partagé indépendant d'un projet ;
-3. déduplication robuste des instances génériques entre consommateurs.
+1. installation dans un cache partagé indépendant d'un projet ;
+2. déduplication robuste des instances génériques entre consommateurs.
 
 ## Priorité 5 — Optimisations IR
 
@@ -208,7 +209,7 @@ Travail restant :
 - entrée standard et fichiers ;
 - débogage avec informations de lignes ;
 - autres architectures ou formats objets ;
-- mode bibliothèque et gestionnaire de paquets.
+- gestionnaire de paquets.
 
 ## Qualité continue
 
@@ -223,6 +224,5 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Ajouter une commande explicite de construction de bibliothèque qui produise un
-couple `.zti` + `.o` dans un dossier choisi, sans exiger de `main` et sans passer
-par les artefacts temporaires d'un exécutable factice.
+Installer les couples `.zti` + `.o` dans un cache partagé indépendant du projet,
+puis permettre au chargeur d'y résoudre les imports absents du dossier source.
