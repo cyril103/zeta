@@ -154,6 +154,11 @@ if(BUILD_TESTING)
     add_test(NAME reject_string_view_return COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_view_return.zeta)
     set_tests_properties(reject_string_view_return PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_string_view_search COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_view_search.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/string-view-search)
+    add_test(NAME run_string_view_search COMMAND ${CMAKE_CURRENT_BINARY_DIR}/string-view-search)
+    set_tests_properties(run_string_view_search PROPERTIES DEPENDS compile_string_view_search)
     add_test(NAME compile_string_double_conversion COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/string_double_conversion.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/string-double-conversion)

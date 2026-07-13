@@ -159,7 +159,8 @@ inline bool isMoveOnlyValueType(const ValueType& type) {
 inline bool isEquatableValueType(const ValueType& type) {
     if (type == ValueType::Int || type == ValueType::Byte ||
         type == ValueType::Double || type == ValueType::Bool ||
-        type == ValueType::Char || type == ValueType::String)
+        type == ValueType::Char || type == ValueType::String ||
+        type == ValueType::StringView)
         return true;
     if (type.kind == ValueType::Kind::Array)
         return isEquatableValueType(*type.element);

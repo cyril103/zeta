@@ -5,6 +5,7 @@ section '.text' executable
 public zeta_fn_strings__decodeAtByte
 public zeta_fn_strings__view
 public zeta_fn_strings__viewIsValid
+public zeta_fn_strings__indexOf
 
 ; Retourne {0, 0} si les bornes ne satisfont pas 0 <= début <= fin <= longueur.
 zeta_fn_strings__view:
@@ -30,6 +31,50 @@ zeta_fn_strings__viewIsValid:
     xor eax, eax
     cmp qword [rsp+8], 0
     setne al
+    ret
+
+; Recherche exacte d'une StringView dans une autre, résultat en octets ou -1.
+zeta_fn_strings__indexOf:
+    mov rsi, qword [rsp+8]
+    mov r8, qword [rsp+16]
+    mov rdi, qword [rsp+24]
+    mov r9, qword [rsp+32]
+    test rsi, rsi
+    jz .not_found
+    test rdi, rdi
+    jz .not_found
+    test r9, r9
+    jz .found_zero
+    cmp r9, r8
+    ja .not_found
+    mov r10, r8
+    sub r10, r9
+    xor eax, eax
+.candidate:
+    cmp rax, r10
+    ja .not_found
+    xor ecx, ecx
+.compare:
+    cmp rcx, r9
+    je .found
+    mov dl, byte [rsi+rax]
+    cmp dl, byte [rdi+rcx]
+    jne .next
+    inc rax
+    inc rcx
+    jmp .compare
+.next:
+    sub rax, rcx
+    inc rax
+    jmp .candidate
+.found:
+    sub rax, rcx
+    ret
+.found_zero:
+    xor eax, eax
+    ret
+.not_found:
+    mov eax, -1
     ret
 
 ; String {adresse, longueur}, puis offset Int. Retourne le point de code ou -1.

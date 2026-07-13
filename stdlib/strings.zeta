@@ -2,6 +2,8 @@
 pub native def decodeAtByte(value: String, offset: Int): Int
 pub native def view(value: String, start: Int, end: Int): StringView
 pub native def viewIsValid(value: StringView): Bool
+pub native def indexOf(haystack: StringView, needle: StringView): Int
+pub def contains(haystack: StringView, needle: StringView): Bool = indexOf(haystack, needle) >= 0
 
 enum Option[T] {
     Some(value: T)

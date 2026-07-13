@@ -1,0 +1,18 @@
+import strings
+
+def main(): Int = {
+    val text: String = "bonjour bonjour"
+    val whole: StringView = strings.view(text, 0, text.lengthBytes)
+    val bonjour: StringView = strings.view(text, 0, 7)
+    val repeated: StringView = strings.view(text, 8, 15)
+    val space: StringView = strings.view(text, 7, 8)
+    val empty: StringView = strings.view(text, 4, 4)
+    if (bonjour != repeated) 1
+    else if (bonjour == space) 2
+    else if (strings.indexOf(whole, repeated) != 0) 3
+    else if (strings.indexOf(whole, space) != 7) 4
+    else if (strings.indexOf(space, bonjour) != -1) 5
+    else if (strings.indexOf(whole, empty) != 0) 6
+    else if (!strings.contains(whole, bonjour)) 7
+    else 0
+}

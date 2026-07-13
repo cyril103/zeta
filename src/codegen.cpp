@@ -723,7 +723,8 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
                         << "], eax\n";
                     return;
                 }
-                if (comparison && item.operandType == ValueType::String) {
+                if (comparison && (item.operandType == ValueType::String ||
+                                   item.operandType == ValueType::StringView)) {
                     const std::size_t left = valueOffset(program, item.left);
                     const std::size_t right = valueOffset(program, item.right);
                     out << "    mov rcx, qword [rbp-" << left - 8U << "]\n"
