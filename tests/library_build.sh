@@ -55,3 +55,22 @@ printf 'import generic_api\ndef main(): Int = generic_api.identity[Int](0)\n' \
 "$compiler" "$work/generic-consumer/main.zeta" \
     -o "$work/generic-consumer/app" >/dev/null
 "$work/generic-consumer/app"
+
+# Les dépendances sont décrites, mais restent des paires publiées séparément.
+mkdir -p "$work/dependency-source" "$work/dependency-published" \
+    "$work/dependency-consumer"
+printf 'pub def base(): Int = 40\n' > "$work/dependency-source/base.zeta"
+printf 'import base\npub def answer(): Int = base.base() + 2\n' \
+    > "$work/dependency-source/service.zeta"
+"$compiler" --build-library "$work/dependency-source/base.zeta" \
+    -o "$work/dependency-published" >/dev/null
+"$compiler" --build-library "$work/dependency-source/service.zeta" \
+    -o "$work/dependency-published" >/dev/null
+grep -q '^import "base"$' "$work/dependency-published/service.zti"
+rm "$work/dependency-source/base.zeta" "$work/dependency-source/service.zeta"
+cp "$work/dependency-published"/* "$work/dependency-consumer/"
+printf 'import service\ndef main(): Int = service.answer() - 42\n' \
+    > "$work/dependency-consumer/main.zeta"
+"$compiler" "$work/dependency-consumer/main.zeta" \
+    -o "$work/dependency-consumer/app" >/dev/null
+"$work/dependency-consumer/app"
