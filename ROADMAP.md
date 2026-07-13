@@ -144,7 +144,8 @@ en cas d'échec d'allocation ou de dépassement de taille.
 3. appliquer les règles de déplacement aux éléments non `Copy` — terminé ;
 4. exposer des vues `Slice[T]` et `SliceMut[T]` sans copie — terminé ;
 5. fournir `push`, `pop`, `get`, `set`, `reserve` et `clear` — terminé ;
-6. tester les types primitifs, structures, `String` et `Box[T]` ;
+6. tester les types primitifs, structures, `String`, `Box[T]` et vecteurs
+   imbriqués — terminé ;
 7. intégrer le module à la stdlib précompilée.
 
 Le comportement en cas d'échec d'allocation est désormais défini avant l'ajout de
@@ -201,5 +202,5 @@ Chaque étape doit :
 
 ## Prochaine session recommandée
 
-Compléter la matrice de tests de `Vec[T]` avec structures et combinaisons
-imbriquées, prochaine étape de la priorité 3 sur les collections dynamiques.
+Intégrer l'usage de `Vec[T]` à la stdlib précompilée et finaliser la documentation,
+dernière étape de la priorité 3 sur les collections dynamiques.

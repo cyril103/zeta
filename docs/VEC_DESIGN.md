@@ -98,3 +98,6 @@ L'API prévue est complète. `get` copie uniquement un élément `Copy`, `pop`
 transfère le dernier élément après avoir réduit la longueur, et les deux rendent
 le type de base `Option[T]`. `set` détruit l'ancien élément avant de transférer le
 nouveau et conserve le code d'erreur de bornes `101`.
+
+La matrice d'exécution couvre `Byte`, `Int`, `Double`, `Bool`, `Char`, les
+structures copiables et propriétaires, `String`, `Box[T]` et `Vec[Vec[T]]`.

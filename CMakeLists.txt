@@ -106,6 +106,23 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_exit_code.sh
         ${CMAKE_CURRENT_BINARY_DIR}/vec-set-bounds 101)
     set_tests_properties(run_vec_set_bounds PROPERTIES DEPENDS compile_vec_set_bounds)
+    add_test(NAME compile_vec_primitive_matrix COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_primitive_matrix.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/vec-primitive-matrix)
+    add_test(NAME run_vec_primitive_matrix
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vec-primitive-matrix)
+    set_tests_properties(run_vec_primitive_matrix PROPERTIES
+        DEPENDS compile_vec_primitive_matrix)
+    add_test(NAME compile_vec_struct_matrix COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_struct_matrix.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/vec-struct-matrix)
+    add_test(NAME run_vec_struct_matrix COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vec-struct-matrix)
+    set_tests_properties(run_vec_struct_matrix PROPERTIES DEPENDS compile_vec_struct_matrix)
+    add_test(NAME compile_vec_nested COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_nested.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/vec-nested)
+    add_test(NAME run_vec_nested COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vec-nested)
+    set_tests_properties(run_vec_nested PROPERTIES DEPENDS compile_vec_nested)
     add_test(NAME compile_enum_declaration COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/enum_declaration.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/enum-declaration)

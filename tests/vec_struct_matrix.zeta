@@ -1,0 +1,29 @@
+struct Point {
+    x: Int
+    y: Int
+}
+
+struct Record {
+    label: String
+    value: Box[Int]
+}
+
+def main(): Int = {
+    var points: Vec[Point] = Vec[Point]()
+    points.push(Point { x: 10, y: 20 })
+    points.set(0, Point { x: 19, y: 23 })
+    val point: Option[Point] = points.get(0)
+    val sum: Int = match (point) {
+        Option[Point].Some(value) => value.x + value.y
+        Option[Point].None => 0
+    }
+
+    var records: Vec[Record] = Vec[Record]()
+    records.push(Record { label: "answer", value: Box(42) })
+    val record: Option[Record] = records.pop()
+    val ownedOk: Bool = match (record) {
+        Option[Record].Some(value) => value.label == "answer" && *value.value == 42
+        Option[Record].None => false
+    }
+    if (sum == 42 && ownedOk && records.isEmpty) 0 else 1
+}

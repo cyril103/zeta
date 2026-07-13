@@ -1,0 +1,14 @@
+def main(): Int = {
+    var inner: Vec[Int] = Vec[Int]()
+    inner.push(40)
+    inner.push(2)
+
+    var outer: Vec[Vec[Int]] = Vec[Vec[Int]]()
+    outer.push(inner)
+    val nested: Option[Vec[Int]] = outer.pop()
+    val nestedLength: Int = match (nested) {
+        Option[Vec[Int]].Some(value) => value.length
+        Option[Vec[Int]].None => 0
+    }
+    if (nestedLength == 2 && outer.isEmpty) 0 else 1
+}

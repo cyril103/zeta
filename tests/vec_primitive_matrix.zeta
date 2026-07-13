@@ -1,0 +1,37 @@
+def main(): Int = {
+    var bytes: Vec[Byte] = Vec[Byte]()
+    bytes.push(7)
+    bytes.set(0, 42)
+    val byteValue: Option[Byte] = bytes.get(0)
+
+    var doubles: Vec[Double] = Vec[Double]()
+    doubles.push(1.5)
+    doubles.push(2.5)
+    val doubleValue: Option[Double] = doubles.pop()
+
+    var bools: Vec[Bool] = Vec[Bool]()
+    bools.push(true)
+    val boolValue: Option[Bool] = bools.get(0)
+
+    var chars: Vec[Char] = Vec[Char]()
+    chars.push('🚀')
+    val charValue: Option[Char] = chars.pop()
+
+    val byteOk: Bool = match (byteValue) {
+        Option[Byte].Some(value) => value == 42
+        Option[Byte].None => false
+    }
+    val doubleOk: Bool = match (doubleValue) {
+        Option[Double].Some(value) => value == 2.5
+        Option[Double].None => false
+    }
+    val boolOk: Bool = match (boolValue) {
+        Option[Bool].Some(value) => value
+        Option[Bool].None => false
+    }
+    val charOk: Bool = match (charValue) {
+        Option[Char].Some(value) => value == '🚀'
+        Option[Char].None => false
+    }
+    if (byteOk && doubleOk && boolOk && charOk) 0 else 1
+}
