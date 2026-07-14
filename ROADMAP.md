@@ -44,7 +44,7 @@ chercher à le simplifier sans réduire sa sûreté.
 | ABI | `4` |
 | Interface `.zti` | `7` |
 | Tokens génériques | `1` |
-| Cache de modules | `12` |
+| Cache de modules | `13` |
 | Cache de démarrage | `2` |
 | Manifeste de stdlib | `1` |
 
@@ -217,14 +217,17 @@ intercepter ce type d'erreur avant FASM.
    du codegen, avec erreurs `IRV` testables directement.
 3. **Livré le 14 juillet 2026** — vérifier les frontières de fonctions, bornes et
    régions des identifiants de valeurs et slots, ainsi que les labels.
-4. Vérifier définition unique, usage après définition et portée des paramètres.
+4. **Livré le 14 juillet 2026** — vérifier les producteurs uniques, l'usage après
+   définition sur tous les chemins et le préambule ABI des paramètres. Cette
+   vérification a détecté et corrigé la double production interne de `Vec.push`.
 5. Vérifier les types de toutes les instructions, appels et retours.
 6. Vérifier branches, labels uniques et terminaisons de fonctions.
 7. Intégrer la vérification avant toute émission textuelle ou assembleur.
 8. **En cours** — les tests unitaires construisent déjà des `IrProgram`
    volontairement invalides pour `IRV001`, `IRV002`, `IRV003`, `IRV010`,
-   `IRV012`, `IRV013`, `IRV020`, `IRV030` et `IRV050`; le test d'intégration par
-   module viendra avec l'activation avant le backend.
+   `IRV011`, `IRV012`, `IRV013`, `IRV020`, `IRV022`, `IRV023`, `IRV030` et
+   `IRV050`; le test d'intégration par module viendra avec l'activation avant le
+   backend.
 9. Exécuter toute la suite et mesurer le coût de la vérification.
 
 ### Critère de sortie

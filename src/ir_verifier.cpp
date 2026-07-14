@@ -1,5 +1,7 @@
 #include "ir_verifier.hpp"
 
+#include <algorithm>
+#include <deque>
 #include <optional>
 #include <type_traits>
 #include <unordered_map>
@@ -203,6 +205,22 @@ std::optional<std::size_t> targetOf(const IrInstruction& instruction) {
 std::string instructionContext(std::size_t instruction, const std::string& region) {
     return "instruction " + std::to_string(instruction) + ", région '" + region + "'";
 }
+
+std::size_t parameterStackBytes(const ValueType& type) {
+    if (type.kind == ValueType::Kind::Struct || type.kind == ValueType::Kind::Enum)
+        return (valueTypeSize(type) + 7U) / 8U * 8U;
+    if (type == ValueType::String || type == ValueType::StringView ||
+        type.kind == ValueType::Kind::Slice)
+        return 16U;
+    return 8U;
+}
+
+bool isTerminal(const IrInstruction& instruction) {
+    return std::holds_alternative<IrJump>(instruction) ||
+        std::holds_alternative<IrReturn>(instruction) ||
+        std::holds_alternative<IrTailCall>(instruction) ||
+        std::holds_alternative<IrExit>(instruction);
+}
 }
 
 IrVerificationError::IrVerificationError(std::string code, const std::string& message)
@@ -226,11 +244,17 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
 
     std::vector<std::size_t> instructionRegions(program.instructions.size(), 0);
     std::vector<std::string> regionNames{"<init>"};
+    std::vector<std::optional<std::size_t>> regionEntries(1);
     std::unordered_set<std::string> functionNames;
     std::unordered_map<std::size_t, std::size_t> labelRegions;
+    std::unordered_map<std::size_t, std::size_t> labelInstructions;
     std::vector<std::optional<std::size_t>> valueRegions(program.valueCount);
+    std::vector<std::vector<std::size_t>> valueProducers(program.valueCount);
     std::vector<std::optional<std::size_t>> slotRegions(program.slots.size());
     std::size_t region = 0;
+    bool parameterPreamble = false;
+    std::size_t expectedParameter = 0;
+    std::size_t expectedStackOffset = 16U;
 
     for (std::size_t index = 0; index < program.instructions.size(); ++index) {
         const IrInstruction& instruction = program.instructions[index];
@@ -241,14 +265,21 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
                      " : frontière de fonction invalide '" + function->name + "'");
             region = regionNames.size();
             regionNames.push_back(function->name);
+            regionEntries.push_back(index);
+            parameterPreamble = true;
+            expectedParameter = 0;
+            expectedStackOffset = 16U;
         }
+        if (region == 0 && !regionEntries[0].has_value()) regionEntries[0] = index;
         instructionRegions[index] = region;
         const std::string context = instructionContext(index, regionNames[region]);
 
-        if (const auto* label = std::get_if<IrLabel>(&instruction))
+        if (const auto* label = std::get_if<IrLabel>(&instruction)) {
             if (!labelRegions.emplace(label->label, region).second)
                 fail("IRV050", context + " : label " +
                      std::to_string(label->label) + " dupliqué");
+            labelInstructions.emplace(label->label, index);
+        }
 
         if (const std::optional<ValueId> output = outputOf(instruction)) {
             if (*output >= program.valueCount)
@@ -258,6 +289,21 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
                 fail("IRV012", context + " : valeur $" + std::to_string(*output) +
                      " produite dans plusieurs régions");
             valueRegions[*output] = region;
+            valueProducers[*output].push_back(index);
+        }
+
+        if (const auto* parameter = std::get_if<IrParameter>(&instruction)) {
+            if (region == 0 || !parameterPreamble || parameter->index != expectedParameter ||
+                parameter->stackOffset != expectedStackOffset)
+                fail("IRV011", context + " : paramètre " +
+                     std::to_string(parameter->index) + " ou offset " +
+                     std::to_string(parameter->stackOffset) + " invalide");
+            VisitedDefinitions parameterVisited;
+            verifyType(parameter->type, context + " : type du paramètre", parameterVisited);
+            ++expectedParameter;
+            expectedStackOffset += parameterStackBytes(parameter->type);
+        } else if (!std::holds_alternative<IrFunctionStart>(instruction)) {
+            parameterPreamble = false;
         }
 
         for (const SlotId slot : slotsOf(instruction)) {
@@ -270,6 +316,21 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
                      " utilisé dans plusieurs régions");
             slotRegions[slot] = region;
         }
+    }
+
+    for (ValueId value = 0; value < valueProducers.size(); ++value) {
+        if (valueProducers[value].size() < 2) continue;
+        const bool copiesOnly = std::all_of(
+            valueProducers[value].begin(), valueProducers[value].end(),
+            [&](const std::size_t producer) {
+                return std::holds_alternative<IrCopy>(program.instructions[producer]);
+            });
+        if (!copiesOnly)
+            fail("IRV022", "valeur $" + std::to_string(value) +
+                 " produite aux instructions " +
+                 std::to_string(valueProducers[value].front()) + " et " +
+                 std::to_string(valueProducers[value][1]) +
+                 " hors fusion IrCopy");
     }
 
     for (std::size_t index = 0; index < program.instructions.size(); ++index) {
@@ -290,5 +351,79 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
                 fail("IRV050", context + " : cible label " +
                      std::to_string(*target) + " absente de la région");
         }
+    }
+
+    std::vector<std::vector<std::size_t>> successors(program.instructions.size());
+    std::vector<std::vector<std::size_t>> predecessors(program.instructions.size());
+    for (std::size_t index = 0; index < program.instructions.size(); ++index) {
+        const IrInstruction& instruction = program.instructions[index];
+        const std::size_t instructionRegion = instructionRegions[index];
+        if (const auto* jump = std::get_if<IrJump>(&instruction))
+            successors[index].push_back(labelInstructions.at(jump->label));
+        else {
+            if (const auto* branch = std::get_if<IrBranch>(&instruction))
+                successors[index].push_back(labelInstructions.at(branch->label));
+            if (!isTerminal(instruction) && index + 1 < program.instructions.size() &&
+                instructionRegions[index + 1] == instructionRegion)
+                successors[index].push_back(index + 1);
+        }
+        for (const std::size_t successor : successors[index])
+            predecessors[successor].push_back(index);
+    }
+
+    std::vector<unsigned char> reachable(program.instructions.size(), 0);
+    std::deque<std::size_t> pending;
+    for (const std::optional<std::size_t> entry : regionEntries)
+        if (entry.has_value()) pending.push_back(*entry);
+    while (!pending.empty()) {
+        const std::size_t index = pending.front();
+        pending.pop_front();
+        if (reachable[index] != 0) continue;
+        reachable[index] = 1;
+        for (const std::size_t successor : successors[index]) pending.push_back(successor);
+    }
+
+    using Definitions = std::vector<unsigned char>;
+    std::vector<Definitions> definitionsIn(
+        program.instructions.size(), Definitions(program.valueCount, 1));
+    std::vector<Definitions> definitionsOut = definitionsIn;
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (std::size_t index = 0; index < program.instructions.size(); ++index) {
+            if (reachable[index] == 0) continue;
+            Definitions nextIn(program.valueCount, 0);
+            const bool isEntry = regionEntries[instructionRegions[index]].has_value() &&
+                *regionEntries[instructionRegions[index]] == index;
+            if (!isEntry && !predecessors[index].empty()) {
+                nextIn = definitionsOut[predecessors[index].front()];
+                for (std::size_t predecessorIndex = 1;
+                     predecessorIndex < predecessors[index].size(); ++predecessorIndex) {
+                    const Definitions& incoming =
+                        definitionsOut[predecessors[index][predecessorIndex]];
+                    for (ValueId value = 0; value < program.valueCount; ++value)
+                        nextIn[value] = static_cast<unsigned char>(
+                            nextIn[value] != 0 && incoming[value] != 0);
+                }
+            }
+            Definitions nextOut = nextIn;
+            if (const std::optional<ValueId> output = outputOf(program.instructions[index]))
+                nextOut[*output] = 1;
+            if (nextIn != definitionsIn[index] || nextOut != definitionsOut[index]) {
+                definitionsIn[index] = std::move(nextIn);
+                definitionsOut[index] = std::move(nextOut);
+                changed = true;
+            }
+        }
+    }
+
+    for (std::size_t index = 0; index < program.instructions.size(); ++index) {
+        if (reachable[index] == 0) continue;
+        const std::string context = instructionContext(
+            index, regionNames[instructionRegions[index]]);
+        for (const ValueId value : readsOf(program.instructions[index]))
+            if (definitionsIn[index][value] == 0)
+                fail("IRV023", context + " : valeur $" + std::to_string(value) +
+                     " utilisée avant définition sur tous les chemins");
     }
 }

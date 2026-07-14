@@ -773,7 +773,8 @@ la réussite de cette analyse ; il ne réalise donc aucun contrôle de typage.
 Le composant indépendant `IrVerifier` protège progressivement la frontière avec
 le backend. Il contrôle déjà la cohérence des tables de types, l'absence de
 paramètres génériques résiduels, les frontières de fonctions, les identifiants de
-valeurs et de slots ainsi que la portée des labels. Son intégration systématique
+valeurs et de slots, la portée des labels, les préambules de paramètres et les
+usages avant définition sur le graphe de contrôle. Son intégration systématique
 avant l'impression et la génération assembleur reste suivie dans `ROADMAP.md`.
 
 ## Point d'entrée

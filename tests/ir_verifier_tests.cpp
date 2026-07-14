@@ -134,5 +134,93 @@ int main() {
     crossRegionLabel.instructions.push_back(IrJump{3});
     expectCode("label d'une autre région", "IRV050", crossRegionLabel);
 
+    IrProgram parameterOutsideFunction;
+    parameterOutsideFunction.valueTypes.push_back(ValueType::Int);
+    parameterOutsideFunction.valueCount = 1;
+    parameterOutsideFunction.instructions.push_back(
+        IrParameter{0, 0, 16, ValueType::Int});
+    expectCode("paramètre hors fonction", "IRV011", parameterOutsideFunction);
+
+    IrProgram parameterAfterBody;
+    parameterAfterBody.valueTypes = {ValueType::Int, ValueType::Int};
+    parameterAfterBody.valueCount = 2;
+    parameterAfterBody.instructions.push_back(IrFunctionStart{"late", false, {}});
+    parameterAfterBody.instructions.push_back(IrConst{0, 1, ValueType::Int});
+    parameterAfterBody.instructions.push_back(IrParameter{1, 0, 16, ValueType::Int});
+    expectCode("paramètre après le corps", "IRV011", parameterAfterBody);
+
+    IrProgram wrongParameterIndex;
+    wrongParameterIndex.valueTypes.push_back(ValueType::Int);
+    wrongParameterIndex.valueCount = 1;
+    wrongParameterIndex.instructions.push_back(IrFunctionStart{"index", false, {}});
+    wrongParameterIndex.instructions.push_back(IrParameter{0, 1, 16, ValueType::Int});
+    expectCode("index de paramètre invalide", "IRV011", wrongParameterIndex);
+
+    IrProgram wrongParameterOffset;
+    wrongParameterOffset.valueTypes = {ValueType::Int, ValueType::String};
+    wrongParameterOffset.valueCount = 2;
+    wrongParameterOffset.instructions.push_back(IrFunctionStart{"offset", false, {}});
+    wrongParameterOffset.instructions.push_back(IrParameter{0, 0, 16, ValueType::Int});
+    wrongParameterOffset.instructions.push_back(IrParameter{1, 1, 32, ValueType::String});
+    expectCode("offset de paramètre invalide", "IRV011", wrongParameterOffset);
+
+    IrProgram undefinedValue;
+    undefinedValue.valueTypes.push_back(ValueType::Int);
+    undefinedValue.valueCount = 1;
+    undefinedValue.instructions.push_back(IrFunctionStart{"undefined", false, {}});
+    undefinedValue.instructions.push_back(IrReturn{0, ValueType::Int});
+    expectCode("valeur sans producteur", "IRV023", undefinedValue);
+
+    IrProgram useBeforeDefinition;
+    useBeforeDefinition.valueTypes.push_back(ValueType::Int);
+    useBeforeDefinition.valueCount = 1;
+    useBeforeDefinition.instructions.push_back(IrFunctionStart{"before", false, {}});
+    useBeforeDefinition.instructions.push_back(IrReturn{0, ValueType::Int});
+    useBeforeDefinition.instructions.push_back(IrConst{0, 1, ValueType::Int});
+    expectCode("usage avant définition", "IRV023", useBeforeDefinition);
+
+    IrProgram duplicateDefinition;
+    duplicateDefinition.valueTypes.push_back(ValueType::Int);
+    duplicateDefinition.valueCount = 1;
+    duplicateDefinition.instructions.push_back(IrFunctionStart{"duplicate", false, {}});
+    duplicateDefinition.instructions.push_back(IrConst{0, 1, ValueType::Int});
+    duplicateDefinition.instructions.push_back(IrConst{0, 2, ValueType::Int});
+    expectCode("définition non Copy dupliquée", "IRV022", duplicateDefinition);
+
+    IrProgram validPhi;
+    validPhi.valueTypes = {
+        ValueType::Bool, ValueType::Int, ValueType::Int, ValueType::Int};
+    validPhi.valueCount = 4;
+    validPhi.instructions.push_back(IrFunctionStart{"phi", false, {}});
+    validPhi.instructions.push_back(IrConst{0, 1, ValueType::Bool});
+    validPhi.instructions.push_back(IrBranch{0, false, 10});
+    validPhi.instructions.push_back(IrConst{1, 11, ValueType::Int});
+    validPhi.instructions.push_back(IrCopy{3, 1, ValueType::Int});
+    validPhi.instructions.push_back(IrJump{11});
+    validPhi.instructions.push_back(IrLabel{10});
+    validPhi.instructions.push_back(IrConst{2, 22, ValueType::Int});
+    validPhi.instructions.push_back(IrCopy{3, 2, ValueType::Int});
+    validPhi.instructions.push_back(IrLabel{11});
+    validPhi.instructions.push_back(IrReturn{3, ValueType::Int});
+    expectValid("fusion conditionnelle complète", validPhi);
+
+    IrProgram incompletePhi = validPhi;
+    incompletePhi.instructions.erase(incompletePhi.instructions.begin() + 8);
+    expectCode("fusion conditionnelle incomplète", "IRV023", incompletePhi);
+
+    IrProgram validShortCircuit;
+    validShortCircuit.valueTypes = {
+        ValueType::Bool, ValueType::Bool, ValueType::Bool};
+    validShortCircuit.valueCount = 3;
+    validShortCircuit.instructions.push_back(IrFunctionStart{"short", false, {}});
+    validShortCircuit.instructions.push_back(IrConst{0, 0, ValueType::Bool});
+    validShortCircuit.instructions.push_back(IrCopy{2, 0, ValueType::Bool});
+    validShortCircuit.instructions.push_back(IrBranch{0, false, 20});
+    validShortCircuit.instructions.push_back(IrConst{1, 1, ValueType::Bool});
+    validShortCircuit.instructions.push_back(IrCopy{2, 1, ValueType::Bool});
+    validShortCircuit.instructions.push_back(IrLabel{20});
+    validShortCircuit.instructions.push_back(IrReturn{2, ValueType::Bool});
+    expectValid("court-circuit avec réécriture IrCopy", validShortCircuit);
+
     return failures == 0 ? 0 : 1;
 }

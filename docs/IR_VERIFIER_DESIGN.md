@@ -71,26 +71,29 @@ rejetée. Une évolution de l'IR pourra rendre ce propriétaire explicite.
 
 L'IR actuelle n'est pas strictement SSA. La génération des `if`, des `match` et
 des opérateurs à court-circuit réserve une sortie puis utilise plusieurs
-`IrCopy` comme pseudo-phi : le même `ValueId` est écrit dans des branches
-mutuellement exclusives.
+`IrCopy` comme valeur de fusion. Pour `if` et `match`, ces écritures appartiennent
+à des branches mutuellement exclusives. Un court-circuit initialise d'abord la
+sortie avec l'opérande gauche, puis peut la remplacer par l'opérande droit sur le
+chemin de chute.
 
 Le contrat « définition unique » signifie donc :
 
 - hors sorties de fusion écrites par `IrCopy`, une valeur a exactement un
   producteur dans sa région ;
-- une sortie de fusion peut avoir plusieurs `IrCopy`, mais au plus un est
-  rencontré sur chaque chemin d'exécution ;
+- une sortie de fusion peut avoir plusieurs `IrCopy`; une réécriture séquentielle
+  est admise uniquement pour ce support de fusion explicite ;
 - toute lecture possède exactement une définition atteignable sur tous ses
   chemins entrants ;
 - une valeur seulement définie sur certains prédécesseurs est une utilisation
   avant définition ;
-- une seconde définition atteignable sur le même chemin est une redéfinition.
+- une seconde définition hors `IrCopy`, ou un mélange de producteurs `IrCopy` et
+  non-`IrCopy`, est une redéfinition.
 
 Une analyse de données avant, par bloc de base, propage donc des ensembles
-`définitivement définies`. La fusion prend leur intersection. Un second ensemble
-de producteurs sert à distinguer le pseudo-phi valide de deux écritures
-séquentielles. À terme, une instruction `IrPhi` explicite permettra de retrouver
-une vraie propriété SSA.
+`définitivement définies`. La fusion prend leur intersection. L'inventaire des
+producteurs réserve le cas multiple à `IrCopy`. À terme, une instruction `IrPhi`
+explicite permettra de retrouver une vraie propriété SSA et de supprimer cette
+exception.
 
 ### Flot de contrôle
 

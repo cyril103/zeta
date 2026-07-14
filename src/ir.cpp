@@ -919,9 +919,10 @@ ValueId IrGenerator::expression(
                 if (const auto* moved = std::get_if<NameExpr>(&node.arguments.front()->value))
                     movedBoxes_.insert(moved->name);
             const ValueId one = nextValue(ValueType::Int);
+            const ValueId reserveOutput = nextValue(ValueType::Int);
             ir_.instructions.push_back(IrConst{one, 1, ValueType::Int});
             ir_.instructions.push_back(IrVecReserve{
-                output, found->second.slot, one, vectorType});
+                reserveOutput, found->second.slot, one, vectorType});
             ir_.instructions.push_back(IrVecPush{
                 output, found->second.slot, value, vectorType});
             return output;
