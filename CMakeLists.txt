@@ -15,6 +15,7 @@ add_executable(zeta
     src/interface.cpp
     src/semantic.cpp
     src/ir.cpp
+    src/ir_verifier.cpp
     src/codegen.cpp
 )
 target_include_directories(zeta PRIVATE src)
@@ -25,6 +26,15 @@ target_compile_options(zeta PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
 include(CTest)
 if(BUILD_TESTING)
+    add_executable(ir_verifier_tests
+        src/ast.cpp
+        src/ir_verifier.cpp
+        tests/ir_verifier_tests.cpp)
+    target_include_directories(ir_verifier_tests PRIVATE src)
+    target_compile_options(ir_verifier_tests PRIVATE
+        -Wall -Wextra -Wpedantic -Wconversion)
+    add_test(NAME ir_verifier_unit COMMAND ir_verifier_tests)
+
     add_test(NAME compile_public_struct_declaration COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_struct_declaration.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/public-struct-declaration)

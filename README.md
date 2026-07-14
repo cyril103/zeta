@@ -770,6 +770,12 @@ avec son type. Les règles communes de compatibilité sont centralisées dans
 `type_rules.hpp`. Le générateur IR n'accepte qu'un `TypedProgram` délivré après
 la réussite de cette analyse ; il ne réalise donc aucun contrôle de typage.
 
+Le composant indépendant `IrVerifier` protège progressivement la frontière avec
+le backend. Il contrôle déjà la cohérence des tables de types, l'absence de
+paramètres génériques résiduels, les frontières de fonctions, les identifiants de
+valeurs et de slots ainsi que la portée des labels. Son intégration systématique
+avant l'impression et la génération assembleur reste suivie dans `ROADMAP.md`.
+
 ## Point d'entrée
 
 Tout programme Zeta doit déclarer exactement ce point d'entrée :

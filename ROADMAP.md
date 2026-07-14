@@ -15,7 +15,7 @@ les primitives existantes sans ajouter un builtin pour chaque nouveau type.
 
 - construction CMake réussie ;
 - stdlib locale régénérée ;
-- 384 tests CTest réussis sur 384 ;
+- 385 tests CTest réussis sur 385 ;
 - exemple complet compilé, exécuté et couvert par CTest ;
 - aucun changement suivi en attente à la fin de la session ;
 - `build/`, `stdlib/precompiled/` et certains artefacts de tests sont ignorés.
@@ -213,14 +213,18 @@ intercepter ce type d'erreur avant FASM.
 
 1. **Livré le 14 juillet 2026** — écrire `docs/IR_VERIFIER_DESIGN.md`, inventorier
    les 47 variantes actuelles et définir les diagnostics `IRV`.
-2. Ajouter un composant `IrVerifier` indépendant du codegen.
-3. Vérifier les frontières de fonctions, identifiants de valeurs, slots et labels.
+2. **Livré le 14 juillet 2026** — ajouter un composant `IrVerifier` indépendant
+   du codegen, avec erreurs `IRV` testables directement.
+3. **Livré le 14 juillet 2026** — vérifier les frontières de fonctions, bornes et
+   régions des identifiants de valeurs et slots, ainsi que les labels.
 4. Vérifier définition unique, usage après définition et portée des paramètres.
 5. Vérifier les types de toutes les instructions, appels et retours.
 6. Vérifier branches, labels uniques et terminaisons de fonctions.
 7. Intégrer la vérification avant toute émission textuelle ou assembleur.
-8. Ajouter des tests unitaires construisant des `IrProgram` volontairement
-   invalides et un test d'intégration par module.
+8. **En cours** — les tests unitaires construisent déjà des `IrProgram`
+   volontairement invalides pour `IRV001`, `IRV002`, `IRV003`, `IRV010`,
+   `IRV012`, `IRV013`, `IRV020`, `IRV030` et `IRV050`; le test d'intégration par
+   module viendra avec l'activation avant le backend.
 9. Exécuter toute la suite et mesurer le coût de la vérification.
 
 ### Critère de sortie
@@ -275,7 +279,7 @@ Clarifier les gardes et branches qui ne reviennent pas :
 ### Critère de sortie
 
 Réécrire l'exemple complet avec moins d'annotations et sans valeurs factices,
-tout en conservant les mêmes sorties et les 384 tests existants.
+tout en conservant les mêmes sorties et toute la suite de tests existante.
 
 ## Priorité 2 — composabilité de `Vec` et méthodes
 
