@@ -473,8 +473,44 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-Poursuivre la priorité 2 avec `Stack[T]`. Lever d'abord les deux prérequis encore
-visibles : méthodes inhérentes sur une structure générique et accès mutable à son
-champ `Vec[T]` depuis `self: &mut Stack[T]`. Implémenter ensuite `push`, `pop` et
-`isEmpty` en Zeta, sans nouveau builtin, avec tests de propriété, d'emprunt et de
-compilation précompilée.
+Point de départ attendu : branche `master`, commit `94519b2`, arbre propre,
+stdlib régénérée et 419 tests réussis.
+
+Poursuivre la priorité 2 avec `Stack[T]`. L'API cible minimale, écrite dans la
+stdlib et non dans le compilateur, est :
+
+```zeta
+pub struct Stack[T] {
+    values: Vec[T]
+}
+
+pub def Stack.push[T](self: &mut Stack[T], value: T): Unit
+pub def Stack.pop[T](self: &mut Stack[T]): Option[T]
+pub def Stack.isEmpty[T](self: &Stack[T]): Bool
+```
+
+Ordre de travail recommandé :
+
+1. autoriser les méthodes inhérentes génériques dont les paramètres de type
+   correspondent à ceux de leur structure propriétaire, puis préserver leur
+   résolution, leur monomorphisation et leur corps dans les interfaces `.zti` ;
+2. représenter en IR la projection d'un champ `Vec[T]` depuis `&Stack[T]` ou
+   `&mut Stack[T]`, sans charger ni copier les trois mots propriétaires ;
+3. permettre à `push` et `pop` d'utiliser la projection mutable, et à `isEmpty`
+   d'utiliser la projection partagée, avec validation dédiée dans
+   `IrVerifier` et prise en charge backend ;
+4. implémenter `Stack[T]` dans la stdlib, probablement dans `collections`, sans
+   constructeur retournant la structure tant que les retours d'agrégats de plus
+   de 16 octets restent interdits ; la construction littérale suffit pour ce
+   jalon ;
+5. tester au minimum la pile vide, l'ordre LIFO, plusieurs types d'éléments, le
+   déplacement d'une valeur possédée, le rejet sur `val`, les conflits d'emprunt,
+   les contraintes de receveur et la consommation de `.zti` + `.o` sans sources ;
+6. réviser le cache de modules si l'IR ou le code généré change, régénérer la
+   stdlib, exécuter `git diff --check` puis toute la suite CTest, et documenter
+   les limites restantes avant de passer à `Queue[T]`.
+
+Critère de sortie : un programme utilisateur importe la stdlib, construit une
+`Stack[Int]`, appelle `push`, `pop` et `isEmpty` avec la syntaxe méthode, passe
+également avec la stdlib précompilée seule, et aucun builtin `Stack` n'existe dans
+le lexer, l'analyse sémantique, l'IR ou le backend.
