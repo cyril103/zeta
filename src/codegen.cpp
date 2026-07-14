@@ -1,4 +1,5 @@
 #include "codegen.hpp"
+#include "ir_verifier.hpp"
 
 #include <algorithm>
 #include <iomanip>
@@ -320,6 +321,11 @@ void emitEqualityChecks(std::ostringstream& out, const std::string& left,
 }
 
 std::string FasmCodeGenerator::generate(const IrProgram& program) {
+    IrVerifier::verify(program, IrVerificationMode::Executable);
+    return generateUnchecked(program);
+}
+
+std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
     const std::size_t frameSize = align16(slotBytes(program) + valueBytes(program));
     std::ostringstream out;
     out << std::setprecision(std::numeric_limits<double>::max_digits10);
@@ -1388,7 +1394,9 @@ std::string FasmCodeGenerator::generate(const IrProgram& program) {
 
 std::string FasmCodeGenerator::generateObject(
     const IrProgram& program, bool entryPoint, const std::string& initializer) {
-    std::string assembly = generate(program);
+    IrVerifier::verify(program, entryPoint ? IrVerificationMode::Executable
+                                          : IrVerificationMode::ModuleObject);
+    std::string assembly = generateUnchecked(program);
     const std::string executableHeader =
         "format ELF64 executable 3\nentry start\n\nsegment readable executable\n";
     assembly.replace(0, executableHeader.size(),

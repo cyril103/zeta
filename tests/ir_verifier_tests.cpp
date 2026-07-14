@@ -1,3 +1,4 @@
+#include "codegen.hpp"
 #include "ir_verifier.hpp"
 
 #include <iostream>
@@ -31,6 +32,20 @@ void expectCode(const std::string& name, const std::string& code,
     } catch (const std::exception& error) {
         std::cerr << name << " : exception non IRV : " << error.what() << '\n';
         ++failures;
+    }
+}
+
+template<typename Action>
+void expectBoundaryCode(const std::string& name, const std::string& code, Action action) {
+    try {
+        static_cast<void>(action());
+        std::cerr << name << " : aucune erreur\n";
+        ++failures;
+    } catch (const IrVerificationError& error) {
+        if (error.code() != code) {
+            std::cerr << name << " : attendu " << code << ", reçu " << error.code() << '\n';
+            ++failures;
+        }
     }
 }
 }
@@ -331,6 +346,18 @@ int main() {
     exitInModule.instructions.push_back(IrConst{0, 0, ValueType::Int});
     exitInModule.instructions.push_back(IrExit{0});
     expectCode("exit dans un objet module", "IRV054", exitInModule);
+
+    IrProgram invalidBoundary;
+    invalidBoundary.valueCount = 1;
+    expectBoundaryCode("frontière printer", "IRV001", [&] {
+        return IrGenerator::print(invalidBoundary, IrVerificationMode::ModuleObject);
+    });
+    expectBoundaryCode("frontière exécutable", "IRV001", [&] {
+        return FasmCodeGenerator::generate(invalidBoundary);
+    });
+    expectBoundaryCode("frontière objet", "IRV001", [&] {
+        return FasmCodeGenerator::generateObject(invalidBoundary, false, "invalid");
+    });
 
     return failures == 0 ? 0 : 1;
 }

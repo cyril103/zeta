@@ -494,7 +494,7 @@ int main(int argc, char** argv) {
         irPath += ".ir";
         fs::path assemblyPath = outputPath;
         assemblyPath += ".asm";
-        writeFile(irPath, IrGenerator::print(ir));
+        writeFile(irPath, IrGenerator::print(ir, IrVerificationMode::Executable));
         writeFile(assemblyPath, FasmCodeGenerator::generate(ir));
 
         fs::path cacheDirectory = outputPath;
@@ -546,7 +546,8 @@ int main(int argc, char** argv) {
             std::string objectFingerprint = fingerprint;
             for (const std::string& definition : IrGenerator::genericDefinitions(moduleIr))
                 objectFingerprint += ":generic-owner:" + definition;
-            writeFile(moduleIrPath, IrGenerator::print(moduleIr));
+            writeFile(moduleIrPath,
+                      IrGenerator::print(moduleIr, IrVerificationMode::ModuleObject));
             writeFile(moduleInterfacePath, InterfaceCodec::serialize(
                 modules.interfaces.at(moduleName),
                 modules.interfaceFingerprints.at(moduleName),

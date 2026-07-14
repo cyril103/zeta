@@ -1,4 +1,5 @@
 #include "ir.hpp"
+#include "ir_verifier.hpp"
 
 #include "diagnostic.hpp"
 #include "version.hpp"
@@ -1277,7 +1278,8 @@ ValueId IrGenerator::expression(
     }, expressionNode.value);
 }
 
-std::string IrGenerator::print(const IrProgram& program) {
+std::string IrGenerator::print(const IrProgram& program, IrVerificationMode mode) {
+    IrVerifier::verify(program, mode);
     std::ostringstream out;
     out << std::setprecision(std::numeric_limits<double>::max_digits10);
     const auto suffix = [](ValueType type) {

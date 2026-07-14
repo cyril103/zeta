@@ -227,14 +227,17 @@ intercepter ce type d'erreur avant FASM.
    le code après terminal, les terminaux autorisés par région et la possibilité
    pour chaque chemin atteignable de terminer. Cette étape a supprimé le code IR
    mort après les retours anticipés dans les blocs, boucles, `if` et `match`.
-7. **En cours** — le pipeline principal vérifie déjà l'IR fusionnée et chaque IR
-   de module avant leur émission; les points d'entrée bas niveau directs seront
-   protégés après la validation des terminaisons.
+7. **Livré le 14 juillet 2026** — intégrer le vérificateur au pipeline principal
+   et aux frontières publiques `IrGenerator::print`,
+   `FasmCodeGenerator::generate` et `generateObject`. Le mode exécutable ou objet
+   est explicite et une IR injectée directement ne peut plus atteindre le printer
+   ou le codegen sans validation.
 8. **En cours** — les tests unitaires construisent déjà des `IrProgram`
    volontairement invalides pour `IRV001`, `IRV002`, `IRV003`, `IRV010`,
    `IRV011`, `IRV012`, `IRV013`, `IRV020` à `IRV023`, `IRV030`, `IRV031`,
    `IRV040` à `IRV045` et `IRV050` à `IRV054`; le pipeline CTest exerce désormais
-   aussi la vérification intégrée par module.
+   aussi la vérification intégrée par module et l'injection d'une IR invalide aux
+   trois frontières publiques de sortie.
 9. Exécuter toute la suite et mesurer le coût de la vérification.
 
 ### Critère de sortie

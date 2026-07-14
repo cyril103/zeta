@@ -770,14 +770,13 @@ avec son type. Les règles communes de compatibilité sont centralisées dans
 `type_rules.hpp`. Le générateur IR n'accepte qu'un `TypedProgram` délivré après
 la réussite de cette analyse ; il ne réalise donc aucun contrôle de typage.
 
-Le composant indépendant `IrVerifier` protège progressivement la frontière avec
-le backend. Il contrôle déjà la cohérence des tables de types, l'absence de
+Le composant indépendant `IrVerifier` protège la frontière avec le backend. Il
+contrôle la cohérence des tables de types, l'absence de
 paramètres génériques résiduels, les frontières de fonctions, les identifiants de
 valeurs et de slots, la portée des labels, les préambules de paramètres et les
-usages avant définition sur le graphe de contrôle. Son intégration systématique
-dans le pipeline principal protège déjà l'impression et la génération assembleur;
-la couverture des points d'entrée bas niveau directs reste suivie dans
-`ROADMAP.md`.
+usages avant définition sur le graphe de contrôle. Le pipeline principal et les
+points d'entrée publics d'impression et de génération assembleur appliquent tous
+la vérification, y compris lorsqu'ils reçoivent directement un `IrProgram`.
 
 Le vérificateur contrôle également que les terminaux sont employés dans la bonne
 région, qu'aucune instruction ordinaire ne suit un terminal sans nouveau label

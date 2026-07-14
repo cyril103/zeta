@@ -28,7 +28,9 @@ include(CTest)
 if(BUILD_TESTING)
     add_executable(ir_verifier_tests
         src/ast.cpp
+        src/ir.cpp
         src/ir_verifier.cpp
+        src/codegen.cpp
         tests/ir_verifier_tests.cpp)
     target_include_directories(ir_verifier_tests PRIVATE src)
     target_compile_options(ir_verifier_tests PRIVATE

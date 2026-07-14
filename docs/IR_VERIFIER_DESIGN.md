@@ -278,10 +278,12 @@ erreurs, sans fabriquer de `SourceLocation`.
 
 L'intégration se fait aux frontières publiques de sortie, pas seulement dans
 `main` : `IrGenerator::print`, `FasmCodeGenerator::generate` et
-`generateObject` doivent être sûrs même lorsqu'un test leur fournit directement
-un `IrProgram`. Pour éviter trois vérifications d'un même programme dans le flux
-normal, l'API finale pourra exposer un résultat validé opaque ; la première
-livraison privilégie une vérification idempotente et mesurée.
+`generateObject` vérifient un `IrProgram` même lorsqu'un test le leur fournit
+directement. Le printer reçoit explicitement le mode ; `generate` applique le mode
+exécutable et `generateObject` choisit le mode à partir de son paramètre
+`entryPoint`. Pour éviter trois vérifications d'un même programme dans le flux
+normal, une API future pourra exposer un résultat validé opaque ; cette livraison
+privilégie une vérification idempotente, dont le coût doit encore être mesuré.
 
 ## Stratégie de tests
 
