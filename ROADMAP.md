@@ -220,14 +220,18 @@ intercepter ce type d'erreur avant FASM.
 4. **Livré le 14 juillet 2026** — vérifier les producteurs uniques, l'usage après
    définition sur tous les chemins et le préambule ABI des paramètres. Cette
    vérification a détecté et corrigé la double production interne de `Vec.push`.
-5. Vérifier les types de toutes les instructions, appels et retours.
+5. **Livré le 14 juillet 2026** — vérifier les types des 47 instructions, slots,
+   agrégats, conversions et opérateurs, ainsi que les signatures des appels,
+   tail calls et retours internes.
 6. Vérifier branches, labels uniques et terminaisons de fonctions.
-7. Intégrer la vérification avant toute émission textuelle ou assembleur.
+7. **En cours** — le pipeline principal vérifie déjà l'IR fusionnée et chaque IR
+   de module avant leur émission; les points d'entrée bas niveau directs seront
+   protégés après la validation des terminaisons.
 8. **En cours** — les tests unitaires construisent déjà des `IrProgram`
    volontairement invalides pour `IRV001`, `IRV002`, `IRV003`, `IRV010`,
-   `IRV011`, `IRV012`, `IRV013`, `IRV020`, `IRV022`, `IRV023`, `IRV030` et
-   `IRV050`; le test d'intégration par module viendra avec l'activation avant le
-   backend.
+   `IRV011`, `IRV012`, `IRV013`, `IRV020` à `IRV023`, `IRV030`, `IRV031`,
+   `IRV040` à `IRV045` et `IRV050`; le pipeline CTest exerce désormais aussi la
+   vérification intégrée par module.
 9. Exécuter toute la suite et mesurer le coût de la vérification.
 
 ### Critère de sortie

@@ -1,4 +1,5 @@
 #include "codegen.hpp"
+#include "ir_verifier.hpp"
 #include "diagnostic.hpp"
 #include "ir.hpp"
 #include "interface.hpp"
@@ -465,6 +466,7 @@ int main(int argc, char** argv) {
         }
         IrGenerator irGenerator;
         const IrProgram ir = irGenerator.generate(modules);
+        IrVerifier::verify(ir, IrVerificationMode::Executable);
 
         std::unordered_map<std::string, IrProgram> moduleIrs;
         std::unordered_map<std::string, std::string> claimedGenericInstances;
@@ -484,6 +486,7 @@ int main(int argc, char** argv) {
                 if (!inserted) duplicates.insert(definition);
             }
             IrGenerator::removeGenericDefinitions(moduleIr, duplicates);
+            IrVerifier::verify(moduleIr, IrVerificationMode::ModuleObject);
             moduleIrs.emplace(moduleName, std::move(moduleIr));
         }
 

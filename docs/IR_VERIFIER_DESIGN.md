@@ -163,8 +163,8 @@ pas répétés sur chaque ligne.
 | `IrDoubleConst` | — | `output : Double` | — | suite |
 | `IrStringConst` | — | `output : String` | `utf8` est un UTF-8 valide | suite |
 | `IrStringConcat` | `left`, `right : String` | `output : String` | — | suite |
-| `IrStringLength` | `string : String` | `output : Int` | — | suite |
-| `IrStringEmpty` | `string : String` | `output : Bool` | — | suite |
+| `IrStringLength` | `string : String` ou `StringView` | `output : Int` | — | suite |
+| `IrStringEmpty` | `string : String` ou `StringView` | `output : Bool` | — | suite |
 | `IrArrayConstruct` | `elements[*] : E` | `output : T` | `T == Array[E, N]` et `elements.size() == N` | suite |
 | `IrVecConstruct` | — | `output : T` | `T == Vec[E]` | suite |
 | `IrVecProperty` | `vector : Vec[E]` | `output : Int` pour `length`/`capacity`, `Bool` pour `isEmpty` | propriété dans cet ensemble fermé | suite |
@@ -196,10 +196,10 @@ passage futur à `Unit` modifiera ces lignes et les tests associés.
 | `IrIndexStore` | `array` si vue/référence, `indexes[*] : Int`, `value : E`; sinon `%slot` | — | au moins un index; descente exacte dans les tableaux imbriqués; cible mutable | suite |
 | `IrAddressOf` | `%slot : T` | `output : Reference[T]` | type référencé égal à `T` | suite |
 | `IrDereference` | `reference : Reference[T]` ou `Box[T]` | `output : T` | `type == T` | suite |
-| `IrDereferenceStore` | `reference : ReferenceMut[T]`, `value : T` | — | référence mutable obligatoire | suite |
+| `IrDereferenceStore` | `reference : ReferenceMut[T]` ou `Box[T]`, `value : T` | — | référence mutable ou propriétaire box obligatoire | suite |
 | `IrLoad` | `%slot : T` | `output : T` | `type == T` | suite |
 | `IrStore` | `value : T`, `%slot : T` | — | `type == T` | suite |
-| `IrCopy` | `input : T` | `output : T` | seule instruction autorisée comme producteur multiple de fusion | suite |
+| `IrCopy` | `input : T` | `output : T` | producteur multiple de fusion; accepte aussi `Box[T] -> Reference[T]` pour l'emprunt du contenu, les deux ayant la même représentation pointeur | suite |
 
 Matrice d'`IrIndexLoad` : sans drapeau, `arrayType == Array[E,N]` et `array` porte
 ce type ; avec `arrayIsReference`, `array` porte une référence vers

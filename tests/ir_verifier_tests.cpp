@@ -222,5 +222,78 @@ int main() {
     validShortCircuit.instructions.push_back(IrReturn{2, ValueType::Bool});
     expectValid("court-circuit avec réécriture IrCopy", validShortCircuit);
 
+    IrProgram wrongOutputType;
+    wrongOutputType.valueTypes.push_back(ValueType::Int);
+    wrongOutputType.valueCount = 1;
+    wrongOutputType.instructions.push_back(IrConst{0, 1, ValueType::Bool});
+    expectCode("type de sortie incohérent", "IRV021", wrongOutputType);
+
+    IrProgram wrongSlotType;
+    wrongSlotType.slots.push_back(IrSlot{"flag", ValueType::Bool, false});
+    wrongSlotType.valueTypes.push_back(ValueType::Int);
+    wrongSlotType.valueCount = 1;
+    wrongSlotType.instructions.push_back(IrFunctionStart{"slot", false, {}});
+    wrongSlotType.instructions.push_back(IrLoad{0, 0, ValueType::Int});
+    expectCode("type de slot incohérent", "IRV031", wrongSlotType);
+
+    IrProgram wrongOperandType;
+    wrongOperandType.valueTypes = {ValueType::Int, ValueType::String};
+    wrongOperandType.valueCount = 2;
+    wrongOperandType.instructions.push_back(IrConst{0, 1, ValueType::Int});
+    wrongOperandType.instructions.push_back(IrStringLength{1, 0});
+    expectCode("type d'opérande incohérent", "IRV040", wrongOperandType);
+
+    IrProgram unknownOperator;
+    unknownOperator.valueTypes = {ValueType::Int, ValueType::Int, ValueType::Int};
+    unknownOperator.valueCount = 3;
+    unknownOperator.instructions.push_back(IrConst{0, 1, ValueType::Int});
+    unknownOperator.instructions.push_back(IrConst{1, 2, ValueType::Int});
+    unknownOperator.instructions.push_back(
+        IrBinary{2, "%", 0, 1, ValueType::Int, ValueType::Int});
+    expectCode("opérateur inconnu", "IRV041", unknownOperator);
+
+    IrProgram invalidCallArity;
+    invalidCallArity.valueTypes = {ValueType::Int, ValueType::Int};
+    invalidCallArity.valueCount = 2;
+    invalidCallArity.instructions.push_back(IrConst{0, 1, ValueType::Int});
+    invalidCallArity.instructions.push_back(
+        IrCall{1, "external", {0}, {}, ValueType::Int});
+    expectCode("arité de types d'appel invalide", "IRV042", invalidCallArity);
+
+    IrProgram invalidInternalCall;
+    invalidInternalCall.valueTypes = {
+        ValueType::Int, ValueType::Int, ValueType::Bool, ValueType::Int};
+    invalidInternalCall.valueCount = 4;
+    invalidInternalCall.instructions.push_back(IrConst{0, 1, ValueType::Int});
+    invalidInternalCall.instructions.push_back(
+        IrCall{1, "target", {0}, {ValueType::Int}, ValueType::Int});
+    invalidInternalCall.instructions.push_back(IrFunctionStart{"target", false, {}});
+    invalidInternalCall.instructions.push_back(IrParameter{2, 0, 16, ValueType::Bool});
+    invalidInternalCall.instructions.push_back(IrConst{3, 0, ValueType::Int});
+    invalidInternalCall.instructions.push_back(IrReturn{3, ValueType::Int});
+    expectCode("signature d'appel interne invalide", "IRV043", invalidInternalCall);
+
+    IrProgram invalidAggregate;
+    const ValueType pairArray(std::make_shared<const ValueType>(ValueType::Int),
+                              std::size_t{2});
+    invalidAggregate.valueTypes = {ValueType::Int, pairArray};
+    invalidAggregate.valueCount = 2;
+    invalidAggregate.instructions.push_back(IrConst{0, 1, ValueType::Int});
+    invalidAggregate.instructions.push_back(IrArrayConstruct{1, {0}, pairArray});
+    expectCode("arité d'agrégat invalide", "IRV044", invalidAggregate);
+
+    IrProgram invalidIndexFlags;
+    const ValueType intArray(std::make_shared<const ValueType>(ValueType::Int),
+                             std::size_t{1});
+    invalidIndexFlags.valueTypes = {
+        ValueType::Int, intArray, ValueType::Int, ValueType::Int};
+    invalidIndexFlags.valueCount = 4;
+    invalidIndexFlags.instructions.push_back(IrConst{0, 7, ValueType::Int});
+    invalidIndexFlags.instructions.push_back(IrArrayConstruct{1, {0}, intArray});
+    invalidIndexFlags.instructions.push_back(IrConst{2, 0, ValueType::Int});
+    invalidIndexFlags.instructions.push_back(
+        IrIndexLoad{3, 1, 2, intArray, true, true});
+    expectCode("drapeaux d'indexation invalides", "IRV045", invalidIndexFlags);
+
     return failures == 0 ? 0 : 1;
 }

@@ -1,4 +1,5 @@
 #include "ir_verifier.hpp"
+#include "type_rules.hpp"
 
 #include <algorithm>
 #include <deque>
@@ -221,6 +222,395 @@ bool isTerminal(const IrInstruction& instruction) {
         std::holds_alternative<IrTailCall>(instruction) ||
         std::holds_alternative<IrExit>(instruction);
 }
+
+void verifyEmbeddedType(const ValueType& type, const std::string& context) {
+    VisitedDefinitions visited;
+    verifyType(type, context, visited);
+}
+
+void expectValueType(const IrProgram& program, ValueId value,
+                     const ValueType& expected, const std::string& context) {
+    if (program.valueTypes[value] != expected)
+        fail("IRV040", context + " : type de $" + std::to_string(value) +
+             " incompatible, " + typeName(program.valueTypes[value]) +
+             " au lieu de " + typeName(expected));
+}
+
+void expectOutputType(const IrProgram& program, ValueId output,
+                      const ValueType& expected, const std::string& context) {
+    if (program.valueTypes[output] != expected)
+        fail("IRV021", context + " : sortie $" + std::to_string(output) +
+             " de type " + typeName(program.valueTypes[output]) +
+             " au lieu de " + typeName(expected));
+}
+
+void expectSlotType(const IrProgram& program, SlotId slot,
+                    const ValueType& expected, const std::string& context) {
+    if (program.slots[slot].type != expected)
+        fail("IRV031", context + " : slot %" + std::to_string(slot) +
+             " de type " + typeName(program.slots[slot].type) +
+             " au lieu de " + typeName(expected));
+}
+
+bool isBuiltinOptionOf(const ValueType& option, const ValueType& element) {
+    if (option.kind != ValueType::Kind::Enum || option.enumeration == nullptr) return false;
+    const EnumType* definition = option.enumeration->genericDefinition != nullptr
+        ? option.enumeration->genericDefinition.get() : option.enumeration.get();
+    if (definition != builtinOptionType().get() || option.enumeration->typeArguments.size() != 1 ||
+        option.enumeration->typeArguments.front() != element)
+        return false;
+    const auto& variants = option.enumeration->variants;
+    const auto some = std::find_if(variants.begin(), variants.end(), [](const EnumVariant& variant) {
+        return variant.name == "Some";
+    });
+    const auto none = std::find_if(variants.begin(), variants.end(), [](const EnumVariant& variant) {
+        return variant.name == "None";
+    });
+    return some != variants.end() && some->fields.size() == 1 &&
+        some->fields.front().type == element && none != variants.end() && none->fields.empty();
+}
+
+bool canRetain(const ValueType& type) {
+    if (type == ValueType::String) return true;
+    if (type.kind == ValueType::Kind::Array) return canRetain(*type.element);
+    if (type.kind == ValueType::Kind::Struct)
+        return std::any_of(type.structure->fields.begin(), type.structure->fields.end(),
+            [](const StructField& field) { return canRetain(field.type); });
+    if (type.kind == ValueType::Kind::Enum)
+        return std::any_of(type.enumeration->variants.begin(), type.enumeration->variants.end(),
+            [](const EnumVariant& variant) {
+                return std::any_of(variant.fields.begin(), variant.fields.end(),
+                    [](const StructField& field) { return canRetain(field.type); });
+            });
+    return false;
+}
+
+void verifyInstructionTypes(const IrProgram& program, const IrInstruction& instruction,
+                            const std::string& context) {
+    std::visit([&](const auto& item) {
+        using T = std::decay_t<decltype(item)>;
+        const auto concrete = [&](const ValueType& type) {
+            verifyEmbeddedType(type, context + " : type d'instruction");
+        };
+        if constexpr (std::is_same_v<T, IrConst>) {
+            concrete(item.type);
+            if (item.type != ValueType::Int && item.type != ValueType::Byte &&
+                item.type != ValueType::Bool && item.type != ValueType::Char)
+                fail("IRV040", context + " : type de constante invalide");
+            if ((item.type == ValueType::Byte && (item.value < 0 || item.value > 255)) ||
+                (item.type == ValueType::Bool && item.value != 0 && item.value != 1) ||
+                (item.type == ValueType::Char &&
+                 (item.value < 0 || item.value > 0x10ffff ||
+                  (item.value >= 0xd800 && item.value <= 0xdfff))))
+                fail("IRV040", context + " : valeur de constante invalide");
+            expectOutputType(program, item.output, item.type, context);
+        } else if constexpr (std::is_same_v<T, IrDoubleConst>) {
+            expectOutputType(program, item.output, ValueType::Double, context);
+        } else if constexpr (std::is_same_v<T, IrStringConst>) {
+            expectOutputType(program, item.output, ValueType::String, context);
+        } else if constexpr (std::is_same_v<T, IrStringConcat>) {
+            expectValueType(program, item.left, ValueType::String, context);
+            expectValueType(program, item.right, ValueType::String, context);
+            expectOutputType(program, item.output, ValueType::String, context);
+        } else if constexpr (std::is_same_v<T, IrStringLength>) {
+            const ValueType& string = program.valueTypes[item.string];
+            if (string != ValueType::String && string != ValueType::StringView)
+                fail("IRV040", context + " : longueur appliquée hors chaîne ou vue");
+            expectOutputType(program, item.output, ValueType::Int, context);
+        } else if constexpr (std::is_same_v<T, IrStringEmpty>) {
+            const ValueType& string = program.valueTypes[item.string];
+            if (string != ValueType::String && string != ValueType::StringView)
+                fail("IRV040", context + " : isEmpty appliqué hors chaîne ou vue");
+            expectOutputType(program, item.output, ValueType::Bool, context);
+        } else if constexpr (std::is_same_v<T, IrArrayConstruct>) {
+            concrete(item.type);
+            if (item.type.kind != ValueType::Kind::Array ||
+                item.elements.size() != item.type.length)
+                fail("IRV044", context + " : construction de tableau invalide");
+            for (ValueId element : item.elements)
+                expectValueType(program, element, *item.type.element, context);
+            expectOutputType(program, item.output, item.type, context);
+        } else if constexpr (std::is_same_v<T, IrVecConstruct>) {
+            concrete(item.type);
+            if (item.type.kind != ValueType::Kind::Vec)
+                fail("IRV044", context + " : construction Vec invalide");
+            expectOutputType(program, item.output, item.type, context);
+        } else if constexpr (std::is_same_v<T, IrVecProperty>) {
+            const ValueType& vector = program.valueTypes[item.vector];
+            if (vector.kind != ValueType::Kind::Vec)
+                fail("IRV040", context + " : propriété appliquée hors Vec");
+            if (item.property == "length" || item.property == "capacity")
+                expectOutputType(program, item.output, ValueType::Int, context);
+            else if (item.property == "isEmpty")
+                expectOutputType(program, item.output, ValueType::Bool, context);
+            else fail("IRV041", context + " : propriété Vec inconnue '" + item.property + "'");
+        } else if constexpr (std::is_same_v<T, IrVecReserve> ||
+                             std::is_same_v<T, IrVecPush> ||
+                             std::is_same_v<T, IrVecClear>) {
+            concrete(item.type);
+            if (item.type.kind != ValueType::Kind::Vec)
+                fail("IRV044", context + " : opération Vec sans type Vec");
+            expectSlotType(program, item.slot, item.type, context);
+            if constexpr (std::is_same_v<T, IrVecReserve>)
+                expectValueType(program, item.additional, ValueType::Int, context);
+            if constexpr (std::is_same_v<T, IrVecPush>)
+                expectValueType(program, item.value, *item.type.element, context);
+            expectOutputType(program, item.output, ValueType::Int, context);
+        } else if constexpr (std::is_same_v<T, IrVecView>) {
+            concrete(item.type);
+            const ValueType& vector = program.slots[item.slot].type;
+            if (vector.kind != ValueType::Kind::Vec || item.type.kind != ValueType::Kind::Slice ||
+                *vector.element != *item.type.element)
+                fail("IRV040", context + " : vue Vec incompatible");
+            expectOutputType(program, item.output, item.type, context);
+        } else if constexpr (std::is_same_v<T, IrVecGet> ||
+                             std::is_same_v<T, IrVecPop>) {
+            concrete(item.optionType);
+            concrete(item.elementType);
+            const ValueType& vector = program.slots[item.slot].type;
+            if (vector.kind != ValueType::Kind::Vec || *vector.element != item.elementType ||
+                !isBuiltinOptionOf(item.optionType, item.elementType))
+                fail("IRV040", context + " : contrat get/pop de Vec invalide");
+            if constexpr (std::is_same_v<T, IrVecGet>)
+                expectValueType(program, item.index, ValueType::Int, context);
+            expectOutputType(program, item.output, item.optionType, context);
+        } else if constexpr (std::is_same_v<T, IrVecSet>) {
+            concrete(item.elementType);
+            const ValueType& vector = program.slots[item.slot].type;
+            if (vector.kind != ValueType::Kind::Vec || *vector.element != item.elementType)
+                fail("IRV040", context + " : contrat set de Vec invalide");
+            expectValueType(program, item.index, ValueType::Int, context);
+            expectValueType(program, item.value, item.elementType, context);
+            expectOutputType(program, item.output, ValueType::Int, context);
+        } else if constexpr (std::is_same_v<T, IrStructConstruct>) {
+            concrete(item.type);
+            if (item.type.kind != ValueType::Kind::Struct ||
+                item.fields.size() != item.type.structure->fields.size())
+                fail("IRV044", context + " : construction de structure invalide");
+            for (std::size_t i = 0; i < item.fields.size(); ++i)
+                expectValueType(program, item.fields[i], item.type.structure->fields[i].type, context);
+            expectOutputType(program, item.output, item.type, context);
+        } else if constexpr (std::is_same_v<T, IrEnumConstruct>) {
+            concrete(item.type);
+            if (item.type.kind != ValueType::Kind::Enum ||
+                item.variant >= item.type.enumeration->variants.size() ||
+                item.fields.size() != item.type.enumeration->variants[item.variant].fields.size())
+                fail("IRV044", context + " : construction d'enum invalide");
+            const auto& fields = item.type.enumeration->variants[item.variant].fields;
+            for (std::size_t i = 0; i < item.fields.size(); ++i)
+                expectValueType(program, item.fields[i], fields[i].type, context);
+            expectOutputType(program, item.output, item.type, context);
+        } else if constexpr (std::is_same_v<T, IrEnumTag>) {
+            if (program.valueTypes[item.input].kind != ValueType::Kind::Enum)
+                fail("IRV040", context + " : tag appliqué hors enum");
+            expectOutputType(program, item.output, ValueType::Int, context);
+        } else if constexpr (std::is_same_v<T, IrEnumFieldLoad>) {
+            concrete(item.type);
+            if (item.type.kind != ValueType::Kind::Enum ||
+                item.variant >= item.type.enumeration->variants.size() ||
+                item.field >= item.type.enumeration->variants[item.variant].fields.size())
+                fail("IRV044", context + " : champ d'enum invalide");
+            expectValueType(program, item.input, item.type, context);
+            expectOutputType(program, item.output,
+                item.type.enumeration->variants[item.variant].fields[item.field].type, context);
+        } else if constexpr (std::is_same_v<T, IrFieldLoad>) {
+            concrete(item.objectType);
+            if (item.objectType.kind != ValueType::Kind::Struct ||
+                item.field >= item.objectType.structure->fields.size())
+                fail("IRV044", context + " : champ de structure invalide");
+            expectValueType(program, item.object, item.objectType, context);
+            expectOutputType(program, item.output,
+                item.objectType.structure->fields[item.field].type, context);
+        } else if constexpr (std::is_same_v<T, IrFieldStore>) {
+            concrete(item.objectType);
+            if (item.objectType.kind != ValueType::Kind::Struct ||
+                item.field >= item.objectType.structure->fields.size())
+                fail("IRV044", context + " : stockage de champ invalide");
+            expectSlotType(program, item.slot, item.objectType, context);
+            expectValueType(program, item.value,
+                item.objectType.structure->fields[item.field].type, context);
+        } else if constexpr (std::is_same_v<T, IrSliceConstruct>) {
+            concrete(item.type);
+            const ValueType& reference = program.valueTypes[item.reference];
+            if (item.type.kind != ValueType::Kind::Slice ||
+                reference.kind != ValueType::Kind::Reference ||
+                reference.element->kind != ValueType::Kind::Array ||
+                *reference.element->element != *item.type.element ||
+                reference.mutableReference != item.type.mutableReference ||
+                reference.element->length != item.length)
+                fail("IRV040", context + " : construction de slice invalide");
+            expectOutputType(program, item.output, item.type, context);
+        } else if constexpr (std::is_same_v<T, IrSliceLength>) {
+            if (program.valueTypes[item.slice].kind != ValueType::Kind::Slice)
+                fail("IRV040", context + " : longueur appliquée hors slice");
+            expectOutputType(program, item.output, ValueType::Int, context);
+        } else if constexpr (std::is_same_v<T, IrBoxConstruct>) {
+            concrete(item.elementType);
+            expectValueType(program, item.value, item.elementType, context);
+            expectOutputType(program, item.output,
+                ValueType(ValueType::Kind::Box, std::make_shared<const ValueType>(item.elementType)),
+                context);
+        } else if constexpr (std::is_same_v<T, IrIndexLoad>) {
+            concrete(item.arrayType);
+            if (item.arrayIsReference && item.arrayIsSlice)
+                fail("IRV045", context + " : drapeaux d'indexation incompatibles");
+            const ValueType& source = program.valueTypes[item.array];
+            const ValueType* container = &item.arrayType;
+            if (item.arrayIsReference) {
+                if (source.kind != ValueType::Kind::Reference ||
+                    *source.element != item.arrayType)
+                    fail("IRV040", context + " : tableau référencé incompatible");
+            } else if (item.arrayIsSlice) {
+                if (item.arrayType.kind != ValueType::Kind::Slice || source != item.arrayType)
+                    fail("IRV040", context + " : slice indexée incompatible");
+            } else if (source != item.arrayType) {
+                fail("IRV040", context + " : tableau indexé incompatible");
+            }
+            if (container->kind != ValueType::Kind::Array &&
+                container->kind != ValueType::Kind::Slice)
+                fail("IRV044", context + " : type non indexable");
+            expectValueType(program, item.index, ValueType::Int, context);
+            expectOutputType(program, item.output, *container->element, context);
+        } else if constexpr (std::is_same_v<T, IrIndexStore>) {
+            concrete(item.arrayType);
+            if (item.arrayIsReference && item.arrayIsSlice)
+                fail("IRV045", context + " : drapeaux d'indexation incompatibles");
+            if (item.indexes.empty())
+                fail("IRV044", context + " : stockage indexé sans indice");
+            if (item.arrayIsReference) {
+                const ValueType& source = program.valueTypes[item.array];
+                if (source.kind != ValueType::Kind::Reference || !source.mutableReference ||
+                    *source.element != item.arrayType)
+                    fail("IRV040", context + " : référence indexée non mutable ou incompatible");
+            } else if (item.arrayIsSlice) {
+                const ValueType& source = program.valueTypes[item.array];
+                if (item.arrayType.kind != ValueType::Kind::Slice ||
+                    !item.arrayType.mutableReference || source != item.arrayType)
+                    fail("IRV040", context + " : slice indexée non mutable ou incompatible");
+            } else {
+                expectSlotType(program, item.slot, item.arrayType, context);
+            }
+            const ValueType* current = &item.arrayType;
+            for (ValueId index : item.indexes) {
+                expectValueType(program, index, ValueType::Int, context);
+                if (current->kind != ValueType::Kind::Array &&
+                    current->kind != ValueType::Kind::Slice)
+                    fail("IRV044", context + " : profondeur d'indexation invalide");
+                current = current->element.get();
+            }
+            expectValueType(program, item.value, *current, context);
+        } else if constexpr (std::is_same_v<T, IrAddressOf>) {
+            const ValueType& output = program.valueTypes[item.output];
+            if (output.kind != ValueType::Kind::Reference ||
+                *output.element != program.slots[item.slot].type)
+                fail("IRV040", context + " : adresse de slot incompatible");
+        } else if constexpr (std::is_same_v<T, IrDereference>) {
+            concrete(item.type);
+            const ValueType& reference = program.valueTypes[item.reference];
+            if ((reference.kind != ValueType::Kind::Reference &&
+                 reference.kind != ValueType::Kind::Box) || *reference.element != item.type)
+                fail("IRV040", context + " : déréférencement incompatible");
+            expectOutputType(program, item.output, item.type, context);
+        } else if constexpr (std::is_same_v<T, IrDereferenceStore>) {
+            concrete(item.type);
+            const ValueType& reference = program.valueTypes[item.reference];
+            const bool mutableReference = reference.kind == ValueType::Kind::Reference &&
+                reference.mutableReference && *reference.element == item.type;
+            const bool ownedBox = reference.kind == ValueType::Kind::Box &&
+                *reference.element == item.type;
+            if (!mutableReference && !ownedBox)
+                fail("IRV040", context + " : écriture par référence incompatible");
+            expectValueType(program, item.value, item.type, context);
+        } else if constexpr (std::is_same_v<T, IrLoad>) {
+            concrete(item.type);
+            expectSlotType(program, item.slot, item.type, context);
+            expectOutputType(program, item.output, item.type, context);
+        } else if constexpr (std::is_same_v<T, IrStore>) {
+            concrete(item.type);
+            expectSlotType(program, item.slot, item.type, context);
+            expectValueType(program, item.value, item.type, context);
+        } else if constexpr (std::is_same_v<T, IrCopy>) {
+            concrete(item.type);
+            const ValueType& input = program.valueTypes[item.input];
+            const bool boxBorrow = item.type.kind == ValueType::Kind::Reference &&
+                input.kind == ValueType::Kind::Box && *item.type.element == *input.element;
+            if (input != item.type && !boxBorrow)
+                fail("IRV040", context + " : copie entre types incompatibles");
+            expectOutputType(program, item.output, item.type, context);
+        } else if constexpr (std::is_same_v<T, IrConvert>) {
+            concrete(item.source);
+            concrete(item.target);
+            if (item.target.kind == ValueType::Kind::Slice ||
+                item.target.kind == ValueType::Kind::Box ||
+                !TypeRules::canExplicitlyConvert(item.source, item.target))
+                fail("IRV041", context + " : conversion non supportée");
+            expectValueType(program, item.input, item.source, context);
+            expectOutputType(program, item.output, item.target, context);
+        } else if constexpr (std::is_same_v<T, IrUnary>) {
+            concrete(item.type);
+            const bool valid = (item.op == "!" && item.type == ValueType::Bool) ||
+                ((item.op == "+" || item.op == "-") && TypeRules::isNumeric(item.type));
+            if (!valid) fail("IRV041", context + " : opérateur unaire invalide '" + item.op + "'");
+            expectValueType(program, item.operand, item.type, context);
+            expectOutputType(program, item.output, item.type, context);
+        } else if constexpr (std::is_same_v<T, IrBinary>) {
+            concrete(item.type);
+            concrete(item.operandType);
+            expectValueType(program, item.left, item.operandType, context);
+            expectValueType(program, item.right, item.operandType, context);
+            if (TypeRules::isLogical(item.op)) {
+                if (item.type != ValueType::Bool || item.operandType != ValueType::Bool)
+                    fail("IRV040", context + " : types logiques invalides");
+            } else if (TypeRules::isComparison(item.op)) {
+                const bool allowed = TypeRules::isEquality(item.op)
+                    ? isEquatableValueType(item.operandType)
+                    : TypeRules::isNumeric(item.operandType) ||
+                        item.operandType == ValueType::Char;
+                if (item.type != ValueType::Bool || !allowed)
+                    fail("IRV041", context + " : comparaison invalide");
+            } else if (item.op == "+" || item.op == "-" || item.op == "*" ||
+                       item.op == "/") {
+                if (!TypeRules::isNumeric(item.operandType) || item.type != item.operandType)
+                    fail("IRV041", context + " : opération arithmétique invalide");
+            } else fail("IRV041", context + " : opérateur binaire inconnu '" + item.op + "'");
+            expectOutputType(program, item.output, item.type, context);
+        } else if constexpr (std::is_same_v<T, IrCall>) {
+            concrete(item.returnType);
+            if (item.function.empty() || item.arguments.size() != item.argumentTypes.size())
+                fail("IRV042", context + " : appel ou arité de types invalide");
+            for (std::size_t i = 0; i < item.arguments.size(); ++i) {
+                concrete(item.argumentTypes[i]);
+                expectValueType(program, item.arguments[i], item.argumentTypes[i], context);
+            }
+            expectOutputType(program, item.output, item.returnType, context);
+        } else if constexpr (std::is_same_v<T, IrTailCall>) {
+            if (item.function.empty() || item.arguments.size() != item.argumentTypes.size())
+                fail("IRV042", context + " : tail call ou arité de types invalide");
+            for (std::size_t i = 0; i < item.arguments.size(); ++i) {
+                concrete(item.argumentTypes[i]);
+                expectValueType(program, item.arguments[i], item.argumentTypes[i], context);
+            }
+        } else if constexpr (std::is_same_v<T, IrParameter>) {
+            concrete(item.type);
+            expectOutputType(program, item.output, item.type, context);
+        } else if constexpr (std::is_same_v<T, IrReturn> ||
+                             std::is_same_v<T, IrDrop> ||
+                             std::is_same_v<T, IrRetain>) {
+            concrete(item.type);
+            expectValueType(program, item.value, item.type, context);
+            if constexpr (std::is_same_v<T, IrDrop>)
+                if (!valueTypeNeedsDrop(item.type))
+                    fail("IRV040", context + " : drop sur type sans ressource");
+            if constexpr (std::is_same_v<T, IrRetain>)
+                if (!canRetain(item.type))
+                    fail("IRV040", context + " : retain sur type non retenable");
+        } else if constexpr (std::is_same_v<T, IrExit>) {
+            expectValueType(program, item.value, ValueType::Int, context);
+        } else if constexpr (std::is_same_v<T, IrBranch>) {
+            expectValueType(program, item.condition, ValueType::Bool, context);
+        }
+    }, instruction);
+}
 }
 
 IrVerificationError::IrVerificationError(std::string code, const std::string& message)
@@ -350,6 +740,52 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
             if (found == labelRegions.end() || found->second != region)
                 fail("IRV050", context + " : cible label " +
                      std::to_string(*target) + " absente de la région");
+        }
+        verifyInstructionTypes(program, instruction, context);
+    }
+
+    struct FunctionSignature {
+        std::vector<ValueType> parameters;
+        std::optional<ValueType> returnType;
+    };
+    std::unordered_map<std::string, FunctionSignature> signatures;
+    std::string currentFunction;
+    for (std::size_t index = 0; index < program.instructions.size(); ++index) {
+        const IrInstruction& instruction = program.instructions[index];
+        if (const auto* start = std::get_if<IrFunctionStart>(&instruction)) {
+            currentFunction = start->name;
+            signatures.emplace(currentFunction, FunctionSignature{});
+        } else if (const auto* parameter = std::get_if<IrParameter>(&instruction)) {
+            signatures.at(currentFunction).parameters.push_back(parameter->type);
+        } else if (const auto* returned = std::get_if<IrReturn>(&instruction)) {
+            if (currentFunction.empty())
+                fail("IRV043", instructionContext(index, "<init>") +
+                     " : retour hors fonction");
+            std::optional<ValueType>& expected = signatures.at(currentFunction).returnType;
+            if (expected.has_value() && *expected != returned->type)
+                fail("IRV043", instructionContext(index, currentFunction) +
+                     " : types de retour incohérents");
+            expected = returned->type;
+        }
+    }
+
+    for (std::size_t index = 0; index < program.instructions.size(); ++index) {
+        const IrInstruction& instruction = program.instructions[index];
+        const std::string& regionName = regionNames[instructionRegions[index]];
+        const std::string context = instructionContext(index, regionName);
+        if (const auto* call = std::get_if<IrCall>(&instruction)) {
+            const auto found = signatures.find(call->function);
+            if (found == signatures.end()) continue;
+            if (call->argumentTypes != found->second.parameters ||
+                (found->second.returnType.has_value() &&
+                 call->returnType != *found->second.returnType))
+                fail("IRV043", context + " : signature de l'appel interne '" +
+                     call->function + "' incompatible");
+        } else if (const auto* call = std::get_if<IrTailCall>(&instruction)) {
+            const auto found = signatures.find(call->function);
+            if (regionName == "<init>" || call->function != regionName ||
+                found == signatures.end() || call->argumentTypes != found->second.parameters)
+                fail("IRV043", context + " : signature du tail call incompatible");
         }
     }
 
