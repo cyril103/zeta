@@ -29,6 +29,21 @@ std::optional<std::int64_t> constantInteger(const Expression& expression) {
     }
     return std::nullopt;
 }
+const StructType* methodOwner(const ValueType& receiver) {
+    if (receiver.kind != ValueType::Kind::Reference || receiver.element == nullptr ||
+        receiver.element->kind != ValueType::Kind::Struct)
+        return nullptr;
+    return receiver.element->structure->genericDefinition
+        ? receiver.element->structure->genericDefinition.get()
+        : receiver.element->structure.get();
+}
+std::optional<std::pair<std::string, std::string>> methodParts(const std::string& name) {
+    const std::size_t separator = name.find('.');
+    if (separator == std::string::npos || separator == 0U ||
+        separator + 1U == name.size() || name.find('.', separator + 1U) != std::string::npos)
+        return std::nullopt;
+    return std::pair{name.substr(0, separator), name.substr(separator + 1U)};
+}
 ValueType substituteType(
     const ValueType& type,
     const std::unordered_map<std::string, ValueType>& substitutions) {
@@ -209,6 +224,11 @@ TypedProgram SemanticAnalyzer::analyze(
     movedBoxes_.clear();
     insideGenericDeclaration_ = false;
     activeTypeConstraints_.clear();
+    methods_.clear();
+    localMethodOwners_.clear();
+    for (const std::shared_ptr<const StructType>& structure : program.structures)
+        localMethodOwners_.insert(structure->genericDefinition
+            ? structure->genericDefinition.get() : structure.get());
     borrowScopes_ = {{}};
     if (interfaces != nullptr) {
         for (const Program::Import& import : program.imports) {
@@ -216,9 +236,17 @@ TypedProgram SemanticAnalyzer::analyze(
             if (module == interfaces->end())
                 throw CompileError(import.location, "module inconnu '" + import.module + "'");
             for (const auto& [name, exported] : module->second.exports) {
-                symbols_.define(import.module + "." + name,
-                    SemanticSymbol{exported.type, exported.kind, exported.callable,
-                                   exported.declaration, false, exported.parameterTypes});
+                const std::string qualified = import.module + "." + name;
+                const SemanticSymbol symbol{exported.type, exported.kind, exported.callable,
+                                            exported.declaration, false,
+                                            exported.parameterTypes};
+                symbols_.define(qualified, symbol);
+                const auto parts = methodParts(name);
+                if (!parts || exported.parameterTypes.empty()) continue;
+                const StructType* owner = methodOwner(exported.parameterTypes.front());
+                if (owner == nullptr || owner->name != parts->first) continue;
+                methods_[owner].emplace(parts->second,
+                    MethodSymbol{qualified, symbol});
             }
         }
     }
@@ -431,12 +459,48 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
         if (parameter.type.kind == ValueType::Kind::Array)
             throw CompileError(parameter.location,
                                "les paramètres tableaux ne sont pas encore pris en charge");
+    const auto method = methodParts(declaration.name);
+    if (method) {
+        if (!allowRecursion || declaration.kind != BindingKind::Def ||
+            !declaration.callable || declaration.nativeSymbol)
+            throw CompileError(declaration.location,
+                               "une méthode doit être une fonction globale définie en Zeta");
+        if (!declaration.typeParameters.empty())
+            throw CompileError(declaration.location,
+                               "les méthodes génériques ne sont pas encore prises en charge");
+        if (declaration.parameters.empty() || declaration.parameters.front().name != "self")
+            throw CompileError(declaration.location,
+                               "le premier paramètre d'une méthode doit être 'self'");
+        const ValueType& receiver = declaration.parameters.front().type;
+        const StructType* owner = methodOwner(receiver);
+        if (owner == nullptr || owner->name != method->first)
+            throw CompileError(declaration.parameters.front().location,
+                               "le receveur doit être '&" + method->first +
+                               "' ou '&mut " + method->first + "'");
+        if (!localMethodOwners_.contains(owner))
+            throw CompileError(declaration.location,
+                               "une méthode doit être déclarée dans le module de son type");
+        if (!owner->typeParameters.empty())
+            throw CompileError(declaration.location,
+                               "les méthodes de structures génériques sont reportées");
+    } else if (declaration.name.find('.') != std::string::npos) {
+        throw CompileError(declaration.location, "nom de méthode invalide '" +
+                           declaration.name + "'");
+    }
     const SemanticSymbol declarationSymbol{declaration.type, declaration.kind,
                                             declaration.callable, &declaration, false, {}};
     if (declaration.callable && allowRecursion &&
         !symbols_.define(declaration.name, declarationSymbol)) {
         throw CompileError(declaration.location,
                            "l'identifiant '" + declaration.name + "' est déjà défini");
+    }
+    if (method) {
+        const StructType* owner = methodOwner(declaration.parameters.front().type);
+        if (!methods_[owner].emplace(method->second,
+                MethodSymbol{declaration.name, declarationSymbol}).second)
+            throw CompileError(declaration.location,
+                               "méthode '" + method->second + "' déjà définie pour " +
+                               method->first);
     }
     if (declaration.nativeSymbol) return;
     symbols_.pushScope();
@@ -687,6 +751,18 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
         }
         else if constexpr (std::is_same_v<T, MethodCallExpr>) {
             const ValueType object = inferType(*node.object);
+            const ValueType* ownerType = &object;
+            if (object.kind == ValueType::Kind::Reference && object.element != nullptr)
+                ownerType = object.element.get();
+            if (ownerType->kind == ValueType::Kind::Struct) {
+                const StructType* owner = ownerType->structure->genericDefinition
+                    ? ownerType->structure->genericDefinition.get()
+                    : ownerType->structure.get();
+                if (const auto methods = methods_.find(owner); methods != methods_.end())
+                    if (const auto method = methods->second.find(node.method);
+                        method != methods->second.end())
+                        return method->second.symbol.type;
+            }
             if (object.kind == ValueType::Kind::Vec &&
                 (node.method == "asSlice" || node.method == "asSliceMut"))
                 return ValueType(ValueType::Kind::Slice,
@@ -865,6 +941,86 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 "' pour " + typeName(object));
         }
         else if constexpr (std::is_same_v<T, MethodCallExpr>) {
+            const ValueType userReceiver = inferType(*node.object);
+            const ValueType* userOwnerType = &userReceiver;
+            if (userReceiver.kind == ValueType::Kind::Reference &&
+                userReceiver.element != nullptr)
+                userOwnerType = userReceiver.element.get();
+            if (userOwnerType->kind == ValueType::Kind::Struct) {
+                const StructType* owner = userOwnerType->structure->genericDefinition
+                    ? userOwnerType->structure->genericDefinition.get()
+                    : userOwnerType->structure.get();
+                const auto ownerMethods = methods_.find(owner);
+                const auto userMethod = ownerMethods == methods_.end()
+                    ? nullptr : [&]() -> const MethodSymbol* {
+                        const auto found = ownerMethods->second.find(node.method);
+                        return found == ownerMethods->second.end() ? nullptr : &found->second;
+                    }();
+                if (userMethod == nullptr)
+                    throw CompileError(expression.location, "méthode inconnue '" +
+                                       node.method + "' pour " + typeName(*userOwnerType));
+                const SemanticSymbol& methodSymbol = userMethod->symbol;
+                const std::vector<ValueType>* persistedParameters =
+                    methodSymbol.declaration == nullptr ? &methodSymbol.parameterTypes : nullptr;
+                const std::size_t parameterCount = methodSymbol.declaration != nullptr
+                    ? methodSymbol.declaration->parameters.size()
+                    : persistedParameters->size();
+                if (node.arguments.size() + 1U != parameterCount)
+                    throw CompileError(expression.location, "'" + node.method + "' attend " +
+                        std::to_string(parameterCount - 1U) + " argument(s), reçu " +
+                        std::to_string(node.arguments.size()));
+                const ValueType receiverParameter = methodSymbol.declaration != nullptr
+                    ? methodSymbol.declaration->parameters.front().type
+                    : persistedParameters->front();
+                if (userReceiver.kind == ValueType::Kind::Reference) {
+                    if (userReceiver != receiverParameter)
+                        throw CompileError(node.object->location,
+                            "receveur " + typeName(receiverParameter) + " attendu, reçu " +
+                            typeName(userReceiver));
+                    checkExpression(*node.object, receiverParameter);
+                } else {
+                    const auto* receiverName = std::get_if<NameExpr>(&node.object->value);
+                    if (receiverName == nullptr)
+                        throw CompileError(node.object->location,
+                                           "le receveur d'une méthode doit être un identifiant");
+                    const SemanticSymbol* receiverSymbol = symbols_.lookup(receiverName->name);
+                    if (receiverSymbol == nullptr)
+                        throw CompileError(node.object->location, "receveur inconnu '" +
+                                           receiverName->name + "'");
+                    if (movedBoxes_.contains(receiverName->name))
+                        throw CompileError(node.object->location, "utilisation de '" +
+                                           receiverName->name + "' après son déplacement");
+                    const bool mutableReceiver = receiverParameter.mutableReference;
+                    if (mutableReceiver &&
+                        (receiverSymbol->parameter || receiverSymbol->kind != BindingKind::Var))
+                        throw CompileError(node.object->location,
+                                           "la méthode '" + node.method +
+                                           "' exige un receveur déclaré avec 'var'");
+                    if (const auto borrowed = borrows_.find(receiverName->name);
+                        borrowed != borrows_.end() &&
+                        (borrowed->second.mutableBorrow ||
+                         (mutableReceiver && borrowed->second.shared != 0)))
+                        throw CompileError(node.object->location, "le receveur '" +
+                                           receiverName->name + "' est déjà emprunté");
+                    ExprPtr receiver = std::move(node.object);
+                    node.object = std::make_unique<Expression>(Expression{
+                        receiver->location,
+                        AddressExpr{mutableReceiver, std::move(receiver)}});
+                    checkExpression(*node.object, receiverParameter);
+                }
+                for (std::size_t i = 0; i < node.arguments.size(); ++i) {
+                    const ValueType parameterType = methodSymbol.declaration != nullptr
+                        ? methodSymbol.declaration->parameters[i + 1U].type
+                        : (*persistedParameters)[i + 1U];
+                    checkExpression(*node.arguments[i], parameterType);
+                    if (isMoveOnlyValueType(parameterType))
+                        if (const auto* moved =
+                                std::get_if<NameExpr>(&node.arguments[i]->value))
+                            movedBoxes_.insert(moved->name);
+                }
+                node.resolvedFunction = userMethod->functionName;
+                return methodSymbol.type;
+            }
             const auto* name = std::get_if<NameExpr>(&node.object->value);
             const auto* field = std::get_if<FieldExpr>(&node.object->value);
             const auto* owner = field == nullptr ? nullptr

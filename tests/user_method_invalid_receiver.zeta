@@ -1,0 +1,7 @@
+struct Counter {
+    value: Int
+}
+
+def Counter.read(value: &Counter): Int = (*value).value
+
+def main(): Int = 0

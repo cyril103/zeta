@@ -655,6 +655,30 @@ var pair: Pair[Int, Bool] = Pair[Int, Bool] { first: 42, second: true }
 pair.first = 43
 ```
 
+Une structure non générique peut déclarer des méthodes dans le même module. Le
+premier paramètre est obligatoirement `self: &Type` pour une lecture partagée ou
+`self: &mut Type` pour une mutation :
+
+```text
+struct Counter { value: Int }
+
+def Counter.read(self: &Counter): Int = (*self).value
+
+def Counter.increment(self: &mut Counter, amount: Int): Unit = {
+    *self = Counter { value: (*self).value + amount }
+}
+
+var counter = Counter { value: 40 }
+counter.increment(2)
+val answer = counter.read()
+```
+
+L'appel emprunte automatiquement l'identifiant receveur pour la durée de la
+méthode. Une méthode mutable exige donc une liaison `var` et tout conflit avec un
+emprunt actif est rejeté. Les méthodes publiques traversent les interfaces
+précompilées. Les receveurs temporaires, méthodes génériques et extensions de
+types déclarés dans un autre module restent reportés.
+
 ## Énumérations et correspondance exhaustive
 
 Une énumération est une union discriminée nominale. Ses variantes se construisent

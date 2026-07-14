@@ -1,0 +1,9 @@
+pub struct Counter {
+    value: Int
+}
+
+pub def Counter.read(self: &Counter): Int = (*self).value
+
+pub def Counter.increment(self: &mut Counter, amount: Int): Unit = {
+    *self = Counter { value: (*self).value + amount }
+}

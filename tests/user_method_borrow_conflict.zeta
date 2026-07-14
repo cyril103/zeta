@@ -1,0 +1,14 @@
+struct Counter {
+    value: Int
+}
+
+def Counter.reset(self: &mut Counter): Unit = {
+    *self = Counter { value: 0 }
+}
+
+def main(): Int = {
+    var counter = Counter { value: 42 }
+    val borrowed = &counter
+    counter.reset()
+    (*borrowed).value
+}

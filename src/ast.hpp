@@ -306,6 +306,7 @@ struct MethodCallExpr {
     std::string method;
     std::vector<ExprPtr> arguments;
     std::shared_ptr<const EnumType> optionDefinition;
+    std::string resolvedFunction;
 };
 struct IndexExpr { ExprPtr array; ExprPtr index; };
 struct AddressExpr { bool mutableBorrow; ExprPtr operand; };

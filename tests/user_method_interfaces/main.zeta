@@ -1,0 +1,7 @@
+import counters
+
+def main(): Int = {
+    var counter = counters.Counter { value: 40 }
+    counter.increment(2)
+    if (counter.read() == 42) 0 else 1
+}

@@ -694,6 +694,12 @@ Declaration Parser::declaration(BindingKind kind) {
     const Token start = previous();
     const Token& name = consume(TokenKind::Identifier,
                                 "identifiant attendu après '" + start.text + "'");
+    std::string declarationName = name.text;
+    if (kind == BindingKind::Def && match(TokenKind::Dot)) {
+        const Token& method = consume(TokenKind::Identifier,
+                                      "nom de méthode attendu après '.'");
+        declarationName += "." + method.text;
+    }
     const auto enclosingTypeParameters = activeTypeParameters_;
     bool callable = false;
     std::vector<std::string> typeParameters;
@@ -747,7 +753,7 @@ Declaration Parser::declaration(BindingKind kind) {
         if (!callable)
             throw CompileError(start.location, "une déclaration native doit être une fonction");
         activeTypeParameters_ = enclosingTypeParameters;
-        return Declaration{start.location, name.text, type, kind, publicSymbol, true,
+        return Declaration{start.location, declarationName, type, kind, publicSymbol, true,
                            callable, std::move(parameters), std::move(typeParameters),
                            std::move(typeConstraints), nullptr, false};
     }
@@ -756,7 +762,7 @@ Declaration Parser::declaration(BindingKind kind) {
                            : "'=' attendu après le type");
     ExprPtr initializer = expression();
     activeTypeParameters_ = enclosingTypeParameters;
-    return Declaration{start.location, name.text, type, kind, publicSymbol, false,
+    return Declaration{start.location, declarationName, type, kind, publicSymbol, false,
                        callable, std::move(parameters), std::move(typeParameters),
                        std::move(typeConstraints), std::move(initializer), inferLocalType};
 }
@@ -906,7 +912,7 @@ ExprPtr Parser::postfix() {
                     field.location, MethodCallExpr{
                         std::move(expr), field.text, std::move(arguments),
                         field.text == "get" || field.text == "pop"
-                            ? enumerations_.at("Option") : nullptr}});
+                            ? enumerations_.at("Option") : nullptr, {}}});
             } else {
                 expr = std::make_unique<Expression>(Expression{
                     field.location, FieldExpr{std::move(expr), field.text}});

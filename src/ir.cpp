@@ -77,7 +77,8 @@ std::string IrGenerator::genericLinkName(
     const Declaration& declaration, const std::vector<ValueType>& types) const {
     const auto origin = genericOrigins_.find(&declaration);
     std::string name = origin == genericOrigins_.end()
-        ? declaration.name : origin->second.module + "__" + declaration.name;
+        ? symbolPart(declaration.name)
+        : origin->second.module + "__" + symbolPart(declaration.name);
     for (const ValueType& type : types) name += "__" + symbolPart(typeName(type));
     return name + "__g" + genericHash(genericIdentity(declaration, types));
 }
@@ -196,7 +197,8 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
             if constexpr (std::is_same_v<T, Declaration>) {
                 if (node.kind == BindingKind::Def) {
                     symbols_.emplace(node.name,
-                                     Symbol{0, node.kind, &node, true, node.name});
+                                     Symbol{0, node.kind, &node, true,
+                                            symbolPart(node.name)});
                     if (node.callable && !node.nativeSymbol && node.typeParameters.empty())
                         functions.push_back(&node);
                 } else {
@@ -239,7 +241,8 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
     for (const Declaration* function : functions) {
         boxParameters_.clear();
         movedBoxes_.clear();
-        ir_.instructions.push_back(IrFunctionStart{function->name, false, {}});
+        ir_.instructions.push_back(IrFunctionStart{
+            symbols_.at(function->name).linkName, false, {}});
         std::unordered_map<std::string, ValueId> parameters;
         std::size_t stackOffset = 16U;
         for (std::size_t i = 0; i < function->parameters.size(); ++i) {
@@ -326,7 +329,8 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
             const auto* declaration = std::get_if<Declaration>(&statement.value);
             if (declaration == nullptr || declaration->kind != BindingKind::Def) continue;
             const std::string canonical = moduleName + "." + declaration->name;
-            const std::string linkName = moduleName + "__" + declaration->name;
+            const std::string linkName = moduleName + "__" +
+                symbolPart(declaration->name);
             symbols_.emplace(canonical,
                 Symbol{0, declaration->kind, declaration, true, linkName});
             if ((!moduleFilter_ || *moduleFilter_ == moduleName) &&
@@ -893,6 +897,34 @@ ValueId IrGenerator::expression(
                 static_cast<std::size_t>(found - fields.begin())});
             return output;
         } else if constexpr (std::is_same_v<T, MethodCallExpr>) {
+            if (!node.resolvedFunction.empty()) {
+                const auto found = symbols_.find(node.resolvedFunction);
+                if (found == symbols_.end() || found->second.declaration == nullptr)
+                    throw CompileError(expressionNode.location,
+                                       "méthode résolue introuvable '" +
+                                       node.resolvedFunction + "'");
+                const Declaration& method = *found->second.declaration;
+                std::vector<ValueId> arguments;
+                std::vector<ValueType> argumentTypes;
+                arguments.push_back(expression(*node.object, parameters));
+                argumentTypes.push_back(resolveType(method.parameters.front().type));
+                for (std::size_t i = 0; i < node.arguments.size(); ++i) {
+                    arguments.push_back(expression(*node.arguments[i], parameters));
+                    const ValueType argumentType =
+                        resolveType(method.parameters[i + 1U].type);
+                    argumentTypes.push_back(argumentType);
+                    if (isMoveOnlyValueType(argumentType))
+                        if (const auto* moved =
+                                std::get_if<NameExpr>(&node.arguments[i]->value))
+                            movedBoxes_.insert(moved->name);
+                }
+                const ValueType returnType = resolveType(method.type);
+                const ValueId output = nextValue(returnType);
+                ir_.instructions.push_back(IrCall{
+                    output, found->second.linkName, std::move(arguments),
+                    std::move(argumentTypes), returnType});
+                return output;
+            }
             const auto* name = std::get_if<NameExpr>(&node.object->value);
             const auto* field = std::get_if<FieldExpr>(&node.object->value);
             const auto* owner = field == nullptr ? nullptr

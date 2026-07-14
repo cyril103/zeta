@@ -276,6 +276,10 @@ if(BUILD_TESTING)
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_enum_interfaces.sh
             $<TARGET_FILE:zeta>
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_enum_interfaces)
+    add_test(NAME user_method_interfaces
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/user_method_interfaces.sh
+            $<TARGET_FILE:zeta>
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/user_method_interfaces)
     add_test(NAME separate_compilation_cache
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/separate_compilation_cache.sh
             $<TARGET_FILE:zeta> ${CMAKE_CURRENT_SOURCE_DIR}/tests/modules_integration)
@@ -502,6 +506,20 @@ if(BUILD_TESTING)
     add_test(NAME reject_vec_shared_reference_mutation COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_shared_reference_mutation.zeta)
     set_tests_properties(reject_vec_shared_reference_mutation PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_user_methods COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/user_methods.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/user-methods)
+    add_test(NAME run_user_methods COMMAND ${CMAKE_CURRENT_BINARY_DIR}/user-methods)
+    set_tests_properties(run_user_methods PROPERTIES DEPENDS compile_user_methods)
+    add_test(NAME reject_user_method_mutable_val COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/user_method_mutable_val.zeta)
+    set_tests_properties(reject_user_method_mutable_val PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_user_method_borrow_conflict COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/user_method_borrow_conflict.zeta)
+    set_tests_properties(reject_user_method_borrow_conflict PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_user_method_invalid_receiver COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/user_method_invalid_receiver.zeta)
+    set_tests_properties(reject_user_method_invalid_receiver PROPERTIES WILL_FAIL TRUE)
 
     add_test(
         NAME compile_block_expressions

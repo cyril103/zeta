@@ -1,0 +1,17 @@
+struct Counter {
+    value: Int
+}
+
+def Counter.read(self: &Counter): Int = (*self).value
+
+def Counter.increment(self: &mut Counter, amount: Int): Unit = {
+    *self = Counter { value: (*self).value + amount }
+}
+
+def main(): Int = {
+    var counter = Counter { value: 40 }
+    val before = counter.read()
+    counter.increment(2)
+    val after = counter.read()
+    if (before == 40 && after == 42) 0 else 1
+}

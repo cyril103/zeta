@@ -15,7 +15,7 @@ les primitives existantes sans ajouter un builtin pour chaque nouveau type.
 
 - construction CMake réussie ;
 - stdlib locale régénérée ;
-- 403 tests CTest réussis sur 403 ;
+- 409 tests CTest réussis sur 409 ;
 - exemple complet compilé, exécuté et couvert par CTest ;
 - aucun changement suivi en attente à la fin de la session ;
 - `build/`, `stdlib/precompiled/` et certains artefacts de tests sont ignorés.
@@ -42,9 +42,9 @@ chercher à le simplifier sans réduire sa sûreté.
 | --- | ---: |
 | Compilateur | `0.1.0` |
 | ABI | `5` |
-| Interface `.zti` | `8` |
+| Interface `.zti` | `9` |
 | Tokens génériques | `1` |
-| Cache de modules | `18` |
+| Cache de modules | `19` |
 | Cache de démarrage | `2` |
 | Manifeste de stdlib | `1` |
 
@@ -335,7 +335,10 @@ Objectif : permettre d'écrire une collection possédée entièrement en Zeta.
 2. **Livré le 15 juillet 2026** — permettre `push`, `set`, `reserve` et `clear`
    à travers `&mut Vec[T]`, en propageant l'adresse du propriétaire dans l'IR,
    avec validation de la cible et rejet de `&Vec[T]` ;
-3. définir des méthodes utilisateur avec receveur partagé ou mutable ;
+3. **Livré le 15 juillet 2026** — définir les méthodes de structures non
+   génériques dans leur module avec `self: &Type` ou `self: &mut Type`, emprunter
+   automatiquement le receveur à l'appel, préserver les conflits d'emprunt et
+   exporter le contrat dans les interfaces `.zti` ;
 4. définir éventuellement des méthodes d'extension pour les modules ;
 5. rendre possibles des appels ergonomiques comme `values.sort()` tout en
    conservant `SliceMut` comme mécanisme interne ;
@@ -466,7 +469,8 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-Poursuivre la priorité 2 avec les méthodes utilisateur. Définir la syntaxe et le
-contrat des receveurs partagés ou mutables, leur abaissement vers les fonctions
-existantes et leur représentation dans les interfaces, puis valider le modèle
-avec une première méthode de structure avant d'aborder les extensions de module.
+Poursuivre la priorité 2 avec les méthodes d'extension. Décider comment un module
+attache explicitement une méthode à un type importé sans collision ni recherche
+implicite globale, sérialiser cette provenance dans `.zti`, puis préparer
+`values.sort()` en adaptant une fonction de `sequences` sans dupliquer son
+implémentation.

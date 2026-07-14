@@ -1,0 +1,13 @@
+struct Counter {
+    value: Int
+}
+
+def Counter.reset(self: &mut Counter): Unit = {
+    *self = Counter { value: 0 }
+}
+
+def main(): Int = {
+    val counter = Counter { value: 42 }
+    counter.reset()
+    0
+}
