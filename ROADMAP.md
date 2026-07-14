@@ -44,7 +44,7 @@ chercher à le simplifier sans réduire sa sûreté.
 | ABI | `4` |
 | Interface `.zti` | `7` |
 | Tokens génériques | `1` |
-| Cache de modules | `13` |
+| Cache de modules | `14` |
 | Cache de démarrage | `2` |
 | Manifeste de stdlib | `1` |
 
@@ -223,15 +223,18 @@ intercepter ce type d'erreur avant FASM.
 5. **Livré le 14 juillet 2026** — vérifier les types des 47 instructions, slots,
    agrégats, conversions et opérateurs, ainsi que les signatures des appels,
    tail calls et retours internes.
-6. Vérifier branches, labels uniques et terminaisons de fonctions.
+6. **Livré le 14 juillet 2026** — vérifier les conditions et cibles de branches,
+   le code après terminal, les terminaux autorisés par région et la possibilité
+   pour chaque chemin atteignable de terminer. Cette étape a supprimé le code IR
+   mort après les retours anticipés dans les blocs, boucles, `if` et `match`.
 7. **En cours** — le pipeline principal vérifie déjà l'IR fusionnée et chaque IR
    de module avant leur émission; les points d'entrée bas niveau directs seront
    protégés après la validation des terminaisons.
 8. **En cours** — les tests unitaires construisent déjà des `IrProgram`
    volontairement invalides pour `IRV001`, `IRV002`, `IRV003`, `IRV010`,
    `IRV011`, `IRV012`, `IRV013`, `IRV020` à `IRV023`, `IRV030`, `IRV031`,
-   `IRV040` à `IRV045` et `IRV050`; le pipeline CTest exerce désormais aussi la
-   vérification intégrée par module.
+   `IRV040` à `IRV045` et `IRV050` à `IRV054`; le pipeline CTest exerce désormais
+   aussi la vérification intégrée par module.
 9. Exécuter toute la suite et mesurer le coût de la vérification.
 
 ### Critère de sortie

@@ -82,7 +82,7 @@ une modification d'une déclaration retenue.
 ## Migration
 
 Le champ textuel `generic_source` a disparu dans le format `.zti` 7 ; aucune
-double lecture ambiguë n'est autorisée. Le cache de module est à la version 13 et
+double lecture ambiguë n'est autorisée. Le cache de module est à la version 14 et
 les tests de stdlib précompilée valident le nouveau chemin.
 
 Les tests vérifient notamment :

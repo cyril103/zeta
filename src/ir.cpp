@@ -28,6 +28,15 @@ std::string symbolPart(const std::string& value) {
         result += std::isalnum(static_cast<unsigned char>(character)) ? character : '_';
     return result;
 }
+
+bool endsWithControlTerminator(const IrProgram& program) {
+    if (program.instructions.empty()) return false;
+    const IrInstruction& instruction = program.instructions.back();
+    return std::holds_alternative<IrJump>(instruction) ||
+        std::holds_alternative<IrReturn>(instruction) ||
+        std::holds_alternative<IrTailCall>(instruction) ||
+        std::holds_alternative<IrExit>(instruction);
+}
 }
 
 ValueId IrGenerator::nextValue(ValueType type) {
@@ -576,6 +585,7 @@ void IrGenerator::emitTailExpression(
     if (const auto* block = std::get_if<BlockExpr>(&expressionNode.value)) {
         std::vector<std::string> localNames;
         boxScopes_.emplace_back();
+        bool terminated = false;
         for (const StatementPtr& statement : block->statements) {
             std::visit([&](const auto& item) {
                 using T = std::decay_t<decltype(item)>;
@@ -634,6 +644,10 @@ void IrGenerator::emitTailExpression(
                     ir_.instructions.push_back(IrJump{loopLabels_.back().first});
                 }
             }, statement->value);
+            if (endsWithControlTerminator(ir_)) {
+                terminated = true;
+                break;
+            }
         }
         const bool ownsBox = std::any_of(localNames.begin(), localNames.end(), [&](const auto& name) {
             const auto symbol = symbols_.find(name);
@@ -641,12 +655,12 @@ void IrGenerator::emitTailExpression(
                 valueTypeNeedsDrop(resolveType(symbol->second.declaration->type)) &&
                 !movedBoxes_.contains(name);
         });
-        if (block->result && ownsBox) {
+        if (!terminated && block->result && ownsBox) {
             const ValueId result = expression(*block->result, parameters);
             emitBoxDrops(localNames);
             emitBoxParameterDrops();
             ir_.instructions.push_back(IrReturn{result, resolveType(function.type)});
-        } else if (block->result) {
+        } else if (!terminated && block->result) {
             emitTailExpression(*block->result, parameters, function);
         }
         for (auto name = localNames.rbegin(); name != localNames.rend(); ++name)
@@ -676,6 +690,7 @@ void IrGenerator::emitTailExpression(
         return;
     }
     const ValueId result = expression(expressionNode, parameters);
+    if (endsWithControlTerminator(ir_)) return;
     const ValueType resolvedFunctionType = resolveType(function.type);
     if (isMoveOnlyValueType(resolvedFunctionType))
         if (const auto* moved = std::get_if<NameExpr>(&expressionNode.value))
@@ -697,6 +712,7 @@ void IrGenerator::emitLoop(
 
     std::vector<std::string> localNames;
     boxScopes_.emplace_back();
+    bool terminated = false;
     for (const StatementPtr& statement : loop.body) {
         std::visit([&](const auto& item) {
             using T = std::decay_t<decltype(item)>;
@@ -755,9 +771,15 @@ void IrGenerator::emitLoop(
                 ir_.instructions.push_back(IrJump{conditionLabel});
             }
         }, statement->value);
+        if (endsWithControlTerminator(ir_)) {
+            terminated = true;
+            break;
+        }
     }
-    emitBoxDrops(boxScopes_.back());
-    ir_.instructions.push_back(IrJump{conditionLabel});
+    if (!terminated) {
+        emitBoxDrops(boxScopes_.back());
+        ir_.instructions.push_back(IrJump{conditionLabel});
+    }
     ir_.instructions.push_back(IrLabel{endLabel});
     loopLabels_.pop_back();
     for (auto name = localNames.rbegin(); name != localNames.rend(); ++name)
@@ -1072,6 +1094,7 @@ ValueId IrGenerator::expression(
         } else if constexpr (std::is_same_v<T, BlockExpr>) {
             std::vector<std::string> localNames;
             boxScopes_.emplace_back();
+            bool terminated = false;
             for (const StatementPtr& statement : node.statements) {
                 std::visit([&](const auto& item) {
                     using S = std::decay_t<decltype(item)>;
@@ -1138,10 +1161,14 @@ ValueId IrGenerator::expression(
                         ir_.instructions.push_back(IrJump{loopLabels_.back().first});
                     }
                 }, statement->value);
+                if (endsWithControlTerminator(ir_)) {
+                    terminated = true;
+                    break;
+                }
             }
-            const ValueId result = node.result ? expression(*node.result, parameters)
-                                               : nextValue(expressionNode.inferredType);
-            emitBoxDrops(localNames);
+            const ValueId result = terminated ? ValueId{0} : node.result
+                ? expression(*node.result, parameters) : nextValue(expressionNode.inferredType);
+            if (!terminated) emitBoxDrops(localNames);
             for (auto name = localNames.rbegin(); name != localNames.rend(); ++name) {
                 symbols_.erase(*name);
             }
@@ -1155,12 +1182,17 @@ ValueId IrGenerator::expression(
             const std::size_t endLabel = nextLabel_++;
             ir_.instructions.push_back(IrBranch{condition, false, elseLabel});
             const ValueId thenValue = expression(*node.thenBranch, parameters);
-            ir_.instructions.push_back(IrCopy{output, thenValue, resultType});
-            ir_.instructions.push_back(IrJump{endLabel});
+            const bool thenTerminates = endsWithControlTerminator(ir_);
+            if (!thenTerminates) {
+                ir_.instructions.push_back(IrCopy{output, thenValue, resultType});
+                ir_.instructions.push_back(IrJump{endLabel});
+            }
             ir_.instructions.push_back(IrLabel{elseLabel});
             const ValueId elseValue = expression(*node.elseBranch, parameters);
-            ir_.instructions.push_back(IrCopy{output, elseValue, resultType});
-            ir_.instructions.push_back(IrLabel{endLabel});
+            const bool elseTerminates = endsWithControlTerminator(ir_);
+            if (!elseTerminates)
+                ir_.instructions.push_back(IrCopy{output, elseValue, resultType});
+            if (!thenTerminates) ir_.instructions.push_back(IrLabel{endLabel});
             return output;
         } else {
             const ValueId input = expression(*node.operand, parameters);
@@ -1173,6 +1205,7 @@ ValueId IrGenerator::expression(
             ir_.instructions.push_back(IrEnumTag{tag, input});
             const ValueId output = nextValue(expressionNode.inferredType);
             const std::size_t endLabel = nextLabel_++;
+            bool hasContinuingBranch = false;
             for (std::size_t branchIndex = 0; branchIndex < node.branches.size();
                  ++branchIndex) {
                 const MatchBranch& branch = node.branches[branchIndex];
@@ -1215,23 +1248,30 @@ ValueId IrGenerator::expression(
                     }
                 }
                 const ValueId branchValue = expression(*branch.result, branchParameters);
-                if (const auto* returned = std::get_if<NameExpr>(&branch.result->value))
-                    if (std::find(branchOwners.begin(), branchOwners.end(), returned->name) !=
-                        branchOwners.end())
-                        movedBoxes_.insert(returned->name);
-                ir_.instructions.push_back(IrCopy{
-                    output, branchValue, resolveType(expressionNode.inferredType)});
+                const bool branchTerminates = endsWithControlTerminator(ir_);
+                if (!branchTerminates) {
+                    if (const auto* returned = std::get_if<NameExpr>(&branch.result->value))
+                        if (std::find(branchOwners.begin(), branchOwners.end(), returned->name) !=
+                            branchOwners.end())
+                            movedBoxes_.insert(returned->name);
+                    ir_.instructions.push_back(IrCopy{
+                        output, branchValue, resolveType(expressionNode.inferredType)});
+                }
                 for (const std::string& ownerName : branchOwners) {
                     const auto owner = boxParameters_.find(ownerName);
-                    if (owner != boxParameters_.end() && !movedBoxes_.contains(ownerName))
+                    if (!branchTerminates && owner != boxParameters_.end() &&
+                        !movedBoxes_.contains(ownerName))
                         ir_.instructions.push_back(IrDrop{owner->second.first, owner->second.second});
                     boxParameters_.erase(ownerName);
                     movedBoxes_.erase(ownerName);
                 }
-                ir_.instructions.push_back(IrJump{endLabel});
+                if (!branchTerminates) {
+                    ir_.instructions.push_back(IrJump{endLabel});
+                    hasContinuingBranch = true;
+                }
                 if (!last) ir_.instructions.push_back(IrLabel{nextBranchLabel});
             }
-            ir_.instructions.push_back(IrLabel{endLabel});
+            if (hasContinuingBranch) ir_.instructions.push_back(IrLabel{endLabel});
             return output;
         }
     }, expressionNode.value);

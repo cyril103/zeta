@@ -779,6 +779,11 @@ dans le pipeline principal protège déjà l'impression et la génération assem
 la couverture des points d'entrée bas niveau directs reste suivie dans
 `ROADMAP.md`.
 
+Le vérificateur contrôle également que les terminaux sont employés dans la bonne
+région, qu'aucune instruction ordinaire ne suit un terminal sans nouveau label
+et que tout chemin atteignable d'une fonction peut rejoindre un `return` ou un
+tail call.
+
 ## Point d'entrée
 
 Tout programme Zeta doit déclarer exactement ce point d'entrée :

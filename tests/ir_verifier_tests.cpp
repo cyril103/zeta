@@ -295,5 +295,42 @@ int main() {
         IrIndexLoad{3, 1, 2, intArray, true, true});
     expectCode("drapeaux d'indexation invalides", "IRV045", invalidIndexFlags);
 
+    IrProgram invalidBranchCondition;
+    invalidBranchCondition.valueTypes.push_back(ValueType::Int);
+    invalidBranchCondition.valueCount = 1;
+    invalidBranchCondition.instructions.push_back(IrConst{0, 1, ValueType::Int});
+    invalidBranchCondition.instructions.push_back(IrBranch{0, true, 30});
+    invalidBranchCondition.instructions.push_back(IrLabel{30});
+    expectCode("condition de branche invalide", "IRV051", invalidBranchCondition);
+
+    IrProgram instructionAfterReturn;
+    instructionAfterReturn.valueTypes = {ValueType::Int, ValueType::Int};
+    instructionAfterReturn.valueCount = 2;
+    instructionAfterReturn.instructions.push_back(IrFunctionStart{"after", false, {}});
+    instructionAfterReturn.instructions.push_back(IrConst{0, 0, ValueType::Int});
+    instructionAfterReturn.instructions.push_back(IrReturn{0, ValueType::Int});
+    instructionAfterReturn.instructions.push_back(IrConst{1, 1, ValueType::Int});
+    expectCode("instruction après retour", "IRV052", instructionAfterReturn);
+
+    IrProgram unterminatedFunction;
+    unterminatedFunction.valueTypes.push_back(ValueType::Int);
+    unterminatedFunction.valueCount = 1;
+    unterminatedFunction.instructions.push_back(IrFunctionStart{"open", false, {}});
+    unterminatedFunction.instructions.push_back(IrConst{0, 0, ValueType::Int});
+    expectCode("fonction sans terminaison", "IRV053", unterminatedFunction);
+
+    IrProgram infiniteFunction;
+    infiniteFunction.instructions.push_back(IrFunctionStart{"infinite", false, {}});
+    infiniteFunction.instructions.push_back(IrLabel{31});
+    infiniteFunction.instructions.push_back(IrJump{31});
+    expectCode("fonction sans chemin terminal", "IRV053", infiniteFunction);
+
+    IrProgram exitInModule;
+    exitInModule.valueTypes.push_back(ValueType::Int);
+    exitInModule.valueCount = 1;
+    exitInModule.instructions.push_back(IrConst{0, 0, ValueType::Int});
+    exitInModule.instructions.push_back(IrExit{0});
+    expectCode("exit dans un objet module", "IRV054", exitInModule);
+
     return failures == 0 ? 0 : 1;
 }

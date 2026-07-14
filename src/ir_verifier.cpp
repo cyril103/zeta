@@ -607,7 +607,8 @@ void verifyInstructionTypes(const IrProgram& program, const IrInstruction& instr
         } else if constexpr (std::is_same_v<T, IrExit>) {
             expectValueType(program, item.value, ValueType::Int, context);
         } else if constexpr (std::is_same_v<T, IrBranch>) {
-            expectValueType(program, item.condition, ValueType::Bool, context);
+            if (program.valueTypes[item.condition] != ValueType::Bool)
+                fail("IRV051", context + " : condition de branche non Bool");
         }
     }, instruction);
 }
@@ -862,4 +863,63 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
                 fail("IRV023", context + " : valeur $" + std::to_string(value) +
                      " utilisée avant définition sur tous les chemins");
     }
+
+    bool followsTerminal = false;
+    std::size_t lexicalRegion = 0;
+    for (std::size_t index = 0; index < program.instructions.size(); ++index) {
+        const IrInstruction& instruction = program.instructions[index];
+        const std::size_t instructionRegion = instructionRegions[index];
+        if (instructionRegion != lexicalRegion ||
+            std::holds_alternative<IrFunctionStart>(instruction)) {
+            lexicalRegion = instructionRegion;
+            followsTerminal = false;
+        }
+        if (std::holds_alternative<IrLabel>(instruction)) {
+            followsTerminal = false;
+            continue;
+        }
+        if (followsTerminal)
+            fail("IRV052", instructionContext(index, regionNames[instructionRegion]) +
+                 " : instruction après un terminal sans label");
+        followsTerminal = isTerminal(instruction);
+    }
+
+    std::vector<unsigned char> validTerminal(program.instructions.size(), 0);
+    for (std::size_t index = 0; index < program.instructions.size(); ++index) {
+        const IrInstruction& instruction = program.instructions[index];
+        const std::size_t instructionRegion = instructionRegions[index];
+        const std::string context = instructionContext(index, regionNames[instructionRegion]);
+        if (std::holds_alternative<IrReturn>(instruction) ||
+            std::holds_alternative<IrTailCall>(instruction)) {
+            if (instructionRegion == 0)
+                fail("IRV054", context + " : retour ou tail call hors fonction");
+            validTerminal[index] = 1;
+        } else if (std::holds_alternative<IrExit>(instruction)) {
+            if (instructionRegion != 0 || mode != IrVerificationMode::Executable)
+                fail("IRV054", context + " : exit interdit dans cette région");
+            validTerminal[index] = 1;
+        } else if (instructionRegion == 0 && mode == IrVerificationMode::ModuleObject &&
+                   reachable[index] != 0 && successors[index].empty()) {
+            validTerminal[index] = 1;
+        }
+    }
+
+    std::vector<unsigned char> canTerminate(program.instructions.size(), 0);
+    std::deque<std::size_t> terminating;
+    for (std::size_t index = 0; index < validTerminal.size(); ++index)
+        if (validTerminal[index] != 0) terminating.push_back(index);
+    while (!terminating.empty()) {
+        const std::size_t index = terminating.front();
+        terminating.pop_front();
+        if (canTerminate[index] != 0) continue;
+        canTerminate[index] = 1;
+        for (const std::size_t predecessor : predecessors[index])
+            if (instructionRegions[predecessor] == instructionRegions[index])
+                terminating.push_back(predecessor);
+    }
+    for (std::size_t index = 0; index < program.instructions.size(); ++index)
+        if (reachable[index] != 0 && canTerminate[index] == 0)
+            fail("IRV053", instructionContext(index,
+                 regionNames[instructionRegions[index]]) +
+                 " : aucun terminal valide atteignable");
 }

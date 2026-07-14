@@ -140,7 +140,7 @@ déduite du contenu.
 | `IRV045` | combinaison invalide des drapeaux d'indexation |
 | `IRV050` | label absent, dupliqué ou situé dans une autre région |
 | `IRV051` | condition de branche différente de `Bool` |
-| `IRV052` | instruction atteignable après un terminal |
+| `IRV052` | instruction ordinaire après un terminal sans nouveau label |
 | `IRV053` | chemin atteignable de fonction non terminé |
 | `IRV054` | terminal interdit dans cette région |
 
