@@ -14,7 +14,7 @@ struct StructType;
 struct EnumType;
 
 struct ValueType {
-    enum class Kind { Int, Byte, Double, Bool, Char, String, StringView, Array, Reference, Slice, Box, Vec, TypeParameter, Struct, Enum };
+    enum class Kind { Unit, Int, Byte, Double, Bool, Char, String, StringView, Array, Reference, Slice, Box, Vec, TypeParameter, Struct, Enum };
 
     Kind kind;
     std::shared_ptr<const ValueType> element;
@@ -43,6 +43,7 @@ struct ValueType {
     explicit ValueType(std::shared_ptr<const EnumType> enumType)
         : kind(Kind::Enum), enumeration(std::move(enumType)) {}
 
+    static const ValueType Unit;
     static const ValueType Int;
     static const ValueType Byte;
     static const ValueType Double;
@@ -190,6 +191,7 @@ inline bool isEquatableValueType(const ValueType& type) {
     return false;
 }
 
+inline const ValueType ValueType::Unit{ValueType::Kind::Unit};
 inline const ValueType ValueType::Int{ValueType::Kind::Int};
 inline const ValueType ValueType::Byte{ValueType::Kind::Byte};
 inline const ValueType ValueType::Double{ValueType::Kind::Double};
@@ -199,6 +201,7 @@ inline const ValueType ValueType::String{ValueType::Kind::String};
 inline const ValueType ValueType::StringView{ValueType::Kind::StringView};
 
 inline std::string typeName(ValueType type) {
+    if (type == ValueType::Unit) return "Unit";
     if (type == ValueType::Int) return "Int";
     if (type == ValueType::Byte) return "Byte";
     if (type == ValueType::Double) return "Double";
@@ -245,6 +248,7 @@ inline std::string typeName(ValueType type) {
 }
 
 inline std::size_t valueTypeSize(const ValueType& type) {
+    if (type == ValueType::Unit) return 0U;
     if (type.kind == ValueType::Kind::TypeParameter) return 0U;
     if (type == ValueType::Byte || type == ValueType::Bool) return 1U;
     if (type == ValueType::Int || type == ValueType::Char) return 4U;
@@ -259,6 +263,7 @@ inline std::size_t valueTypeSize(const ValueType& type) {
 }
 
 inline std::size_t valueTypeAlignment(const ValueType& type) {
+    if (type == ValueType::Unit) return 1U;
     if (type.kind == ValueType::Kind::TypeParameter) return 1U;
     if (type == ValueType::Byte || type == ValueType::Bool) return 1U;
     if (type == ValueType::Int || type == ValueType::Char) return 4U;

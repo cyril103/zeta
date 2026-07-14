@@ -23,6 +23,7 @@ std::size_t typeSize(ValueType type) {
     return valueTypeSize(type);
 }
 std::size_t valueSize(ValueType type) {
+    if (type == ValueType::Unit) return 0U;
     if (type.kind == ValueType::Kind::Array || isAggregateValue(type))
         return valueTypeSize(type);
     if (type.kind == ValueType::Kind::Reference || type.kind == ValueType::Kind::Box) return 8U;
@@ -345,7 +346,9 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
     for (const IrInstruction& instruction : program.instructions) {
         std::visit([&](const auto& item) {
             using T = std::decay_t<decltype(item)>;
-            if constexpr (std::is_same_v<T, IrConst>) {
+            if constexpr (std::is_same_v<T, IrUnit>) {
+                // Unit is a logical SSA value with no runtime representation.
+            } else if constexpr (std::is_same_v<T, IrConst>) {
                 out << "    mov dword [rbp-" << valueOffset(program, item.output) << "], " << item.value << '\n';
             } else if constexpr (std::is_same_v<T, IrDoubleConst>) {
                 out << "    movsd xmm0, qword [double_const_" << item.output << "]\n"
@@ -784,7 +787,9 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                 const std::string address = slot.global
                     ? "[" + globalLabel(slot) + "]"
                     : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
-                if (item.type.kind == ValueType::Kind::Array ||
+                if (item.type == ValueType::Unit) {
+                    // Unit slots contain no payload.
+                } else if (item.type.kind == ValueType::Kind::Array ||
                     isAggregateValue(item.type) ||
                     isPairValue(item.type)) {
                     emitBlockCopy(out, address,
@@ -1096,7 +1101,9 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                 const std::string address = slot.global
                     ? "[" + globalLabel(slot) + "]"
                     : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
-                if (item.type.kind == ValueType::Kind::Array ||
+                if (item.type == ValueType::Unit) {
+                    // Unit slots contain no payload.
+                } else if (item.type.kind == ValueType::Kind::Array ||
                     isAggregateValue(item.type) ||
                     isPairValue(item.type)) {
                     emitBlockCopy(out,
@@ -1122,7 +1129,9 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                         << (item.type == ValueType::Byte || item.type == ValueType::Bool ? "al\n" : "eax\n");
                 }
             } else if constexpr (std::is_same_v<T, IrCopy>) {
-                if (item.type.kind == ValueType::Kind::Array ||
+                if (item.type == ValueType::Unit) {
+                    // Unit copies only connect SSA control-flow edges.
+                } else if (item.type.kind == ValueType::Kind::Array ||
                     isAggregateValue(item.type) ||
                     isPairValue(item.type)) {
                     emitBlockCopy(out,
@@ -1149,7 +1158,9 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                 }
             } else if constexpr (std::is_same_v<T, IrCall>) {
                 for (std::size_t i = item.arguments.size(); i-- > 0;) {
-                    if (isAggregateValue(item.argumentTypes[i])) {
+                    if (item.argumentTypes[i] == ValueType::Unit) {
+                        out << "    push 0\n";
+                    } else if (isAggregateValue(item.argumentTypes[i])) {
                         const std::size_t bytes = (valueTypeSize(item.argumentTypes[i]) + 7U) / 8U * 8U;
                         out << "    sub rsp, " << bytes << '\n';
                         emitBlockCopy(out, "[rbp-" + std::to_string(valueOffset(program, item.arguments[i])) + "]",
@@ -1177,7 +1188,9 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                     argumentBytes += isAggregateValue(type)
                         ? (valueTypeSize(type) + 7U) / 8U * 8U : isPairValue(type) ? 16U : 8U;
                 if (argumentBytes != 0) out << "    add rsp, " << argumentBytes << '\n';
-                if (isAggregateValue(item.returnType)) {
+                if (item.returnType == ValueType::Unit) {
+                    // Unit-returning calls have no return register to preserve.
+                } else if (isAggregateValue(item.returnType)) {
                     const std::size_t offset = valueOffset(program, item.output);
                     out << "    mov qword [rbp-" << offset << "], rax\n";
                     if (valueTypeSize(item.returnType) > 8U)
@@ -1195,7 +1208,9 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
             } else if constexpr (std::is_same_v<T, IrTailCall>) {
                 std::size_t stackOffset = 16U;
                 for (std::size_t i = 0; i < item.arguments.size(); ++i) {
-                    if (isAggregateValue(item.argumentTypes[i])) {
+                    if (item.argumentTypes[i] == ValueType::Unit) {
+                        // Unit occupies an ABI stack slot but has no payload.
+                    } else if (isAggregateValue(item.argumentTypes[i])) {
                         emitBlockCopy(out,
                             "[rbp-" + std::to_string(valueOffset(program, item.arguments[i])) + "]",
                             "[rbp+" + std::to_string(stackOffset) + "]",
@@ -1230,7 +1245,9 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                 if (frameSize != 0) out << "    sub rsp, " << frameSize << '\n';
                 out << "zeta_fn_" << item.name << "_body:\n";
             } else if constexpr (std::is_same_v<T, IrParameter>) {
-                if (isAggregateValue(item.type)) {
+                if (item.type == ValueType::Unit) {
+                    // Unit parameters have no payload.
+                } else if (isAggregateValue(item.type)) {
                     emitBlockCopy(out, "[rbp+" + std::to_string(item.stackOffset) + "]",
                         "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]", valueTypeSize(item.type));
                 } else if (isPairValue(item.type)) {
@@ -1251,7 +1268,9 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                         << "    mov dword [rbp-" << valueOffset(program, item.output) << "], eax\n";
                 }
             } else if constexpr (std::is_same_v<T, IrReturn>) {
-                if (isAggregateValue(item.type)) {
+                if (item.type == ValueType::Unit) {
+                    // Unit returns do not define a return register.
+                } else if (isAggregateValue(item.type)) {
                     const std::size_t offset = valueOffset(program, item.value);
                     out << "    mov rax, qword [rbp-" << offset << "]\n";
                     if (valueTypeSize(item.type) > 8U)

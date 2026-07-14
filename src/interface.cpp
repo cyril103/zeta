@@ -18,6 +18,7 @@ using EnumRegistry = std::unordered_map<std::string, std::shared_ptr<EnumType>>;
 
 std::string encodeType(const ValueType& type) {
     switch (type.kind) {
+    case ValueType::Kind::Unit: return "N";
     case ValueType::Kind::Int: return "I";
     case ValueType::Kind::Byte: return "Y";
     case ValueType::Kind::Double: return "D";
@@ -60,6 +61,7 @@ ValueType decodeType(const std::string& encoded, std::size_t& cursor,
                      const EnumRegistry& enumerations) {
     if (cursor >= encoded.size()) interfaceFailure("ZTI100", "type tronqué");
     const char kind = encoded[cursor++];
+    if (kind == 'N') return ValueType::Unit;
     if (kind == 'I') return ValueType::Int;
     if (kind == 'Y') return ValueType::Byte;
     if (kind == 'D') return ValueType::Double;

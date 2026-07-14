@@ -6,6 +6,6 @@ def main(): Int = {
     val enabled: Bool = true
     val symbol: Char = '🚀'
     val message: String = "age = " + String(age) + ", byte = " + String(small) + ", actif = " + String(enabled) + ", symbole = " + String(symbol)
-    val written: Int = io.println(message)
+    io.println(message)
     if (message == "age = 18, byte = 7, actif = true, symbole = 🚀") { 0 } else { 1 }
 }

@@ -8,6 +8,14 @@
 #include <unordered_map>
 
 namespace {
+bool blockEndsWithTerminator(const BlockExpr& block) {
+    if (block.statements.empty()) return false;
+    const Statement& statement = *block.statements.back();
+    return std::holds_alternative<ReturnStatement>(statement.value) ||
+        std::holds_alternative<BreakStatement>(statement.value) ||
+        std::holds_alternative<ContinueStatement>(statement.value);
+}
+
 [[noreturn]] void mismatch(SourceLocation location, ValueType expected, ValueType actual) {
     throw CompileError(location, "type " + typeName(expected) + " attendu, reçu " +
                                      typeName(actual));
@@ -740,10 +748,16 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
                 return ValueType::Bool;
             return TypeRules::commonOperandType(inferType(*node.left), inferType(*node.right));
         } else if constexpr (std::is_same_v<T, BlockExpr>) {
-            return node.result ? inferType(*node.result) : ValueType::Int;
+            return node.result ? inferType(*node.result) : ValueType::Unit;
         } else if constexpr (std::is_same_v<T, MatchExpr>) {
             return inferType(*node.branches.front().result);
         } else {
+            if (const auto* thenBlock = std::get_if<BlockExpr>(&node.thenBranch->value);
+                thenBlock != nullptr && !thenBlock->result && blockEndsWithTerminator(*thenBlock))
+                return inferType(*node.elseBranch);
+            if (const auto* elseBlock = std::get_if<BlockExpr>(&node.elseBranch->value);
+                elseBlock != nullptr && !elseBlock->result && blockEndsWithTerminator(*elseBlock))
+                return inferType(*node.thenBranch);
             return TypeRules::commonOperandType(inferType(*node.thenBranch),
                                                 inferType(*node.elseBranch));
         }
@@ -1219,9 +1233,11 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             pushBorrowScope();
             checkStatements(node.statements, node.result.get());
             if (node.result) checkExpression(*node.result, expected);
+            else if (expected != ValueType::Unit && !blockEndsWithTerminator(node))
+                mismatch(expression.location, expected, ValueType::Unit);
             popBorrowScope();
             symbols_.popScope();
-            return expected;
+            return node.result || blockEndsWithTerminator(node) ? expected : ValueType::Unit;
         } else if constexpr (std::is_same_v<T, IfExpr>) {
             checkExpression(*node.condition, ValueType::Bool);
             const auto beforeBranches = movedBoxes_;

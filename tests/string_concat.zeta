@@ -7,6 +7,6 @@ def main(): Int = {
     val separator: String = " "
     val message: String = join(hello + separator, "Zeta")
     val copy: String = message
-    val written: Int = io.println(copy)
+    io.println(copy)
     if (message == "Bonjour Zeta") { 0 } else { 1 }
 }

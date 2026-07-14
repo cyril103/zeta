@@ -1,0 +1,5 @@
+def invalid(): Int = {
+    val value = 1
+}
+
+def main(): Int = 0

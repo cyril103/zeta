@@ -1,9 +1,9 @@
 import io
 
 def main () : Int = {
-    val empty : Int = io.print("")
-    val ascii : Int = io.print("ASCII ")
-    val unicode : Int = io.println("é🚀")
-    val last : Int = io.println("fin")
-    if (empty == 0 && ascii == 6 && unicode == 7 && last == 4) 0 else 1
+    io.print("")
+    io.print("ASCII ")
+    io.println("é🚀")
+    io.println("fin")
+    0
 }

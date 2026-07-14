@@ -15,6 +15,7 @@ enum class TokenKind {
     Pub,
     Native,
     Mut,
+    UnitType,
     IntType,
     ByteType,
     DoubleType,
@@ -88,6 +89,7 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::Pub: return "'pub'";
     case TokenKind::Native: return "'native'";
     case TokenKind::Mut: return "'mut'";
+    case TokenKind::UnitType: return "'Unit'";
     case TokenKind::IntType: return "'Int'";
     case TokenKind::ByteType: return "'Byte'";
     case TokenKind::DoubleType: return "'Double'";

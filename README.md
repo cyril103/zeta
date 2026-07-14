@@ -418,12 +418,16 @@ Le module standard `io` fournit les premières fonctions natives du runtime :
 import io
 
 def main () : Int = {
-    val greeting : Int = io.println("Bonjour Zeta 🚀")
-    val number : Int = io.printlnInt(-42)
-    val character : Int = io.printChar('é')
+    io.println("Bonjour Zeta 🚀")
+    io.printlnInt(-42)
+    io.printChar('é')
     0
 }
 ```
+
+`Unit` est le type de résultat des fonctions appelées uniquement pour leurs
+effets. Un bloc sans expression finale produit également `Unit`, ce qui permet
+par exemple `def log(value: String): Unit = io.println(value)`.
 
 L'API disponible est :
 
@@ -435,10 +439,10 @@ L'API disponible est :
 - `io.printDouble(Double)` et `io.printlnDouble(Double)` ;
 - `io.printBytes(Slice[Byte])` et `io.printlnBytes(Slice[Byte])`.
 
-Chaque fonction retourne le nombre d'octets UTF-8 écrits. Une erreur de l'appel
-système Linux `write` est retournée sous forme de valeur négative. Les écritures
-partielles sont poursuivies et une interruption `EINTR` est automatiquement
-relancée. Aucune terminaison NUL, allocation ou copie de `String` n'est requise.
+Chaque fonction retourne `Unit` : l'écriture est un effet, pas une valeur métier.
+Les écritures partielles sont poursuivies et une interruption `EINTR` est
+automatiquement relancée. Aucune terminaison NUL, allocation ou copie de `String`
+n'est requise.
 
 Un `Double` est affiché avec environ sept chiffres significatifs. La notation
 fixe est utilisée pour les exposants décimaux de `-4` à `6`, et la notation

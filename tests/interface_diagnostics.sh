@@ -30,7 +30,7 @@ rejects() {
 }
 
 prepare version
-sed -i '1s/ZTI 7/ZTI 999/' "$work/version/types.zti"
+sed -i '1s/ZTI 8/ZTI 999/' "$work/version/types.zti"
 rejects version ZTI001
 
 prepare syntax

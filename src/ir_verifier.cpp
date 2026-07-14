@@ -72,7 +72,8 @@ void verifyType(const ValueType& type, const std::string& context,
 std::optional<ValueId> outputOf(const IrInstruction& instruction) {
     return std::visit([](const auto& item) -> std::optional<ValueId> {
         using T = std::decay_t<decltype(item)>;
-        if constexpr (std::is_same_v<T, IrConst> ||
+        if constexpr (std::is_same_v<T, IrUnit> ||
+                      std::is_same_v<T, IrConst> ||
                       std::is_same_v<T, IrDoubleConst> ||
                       std::is_same_v<T, IrStringConst> ||
                       std::is_same_v<T, IrStringConcat> ||
@@ -302,7 +303,9 @@ void verifyInstructionTypes(const IrProgram& program, const IrInstruction& instr
             if (requiresTypeVerification(type))
                 verifyEmbeddedType(type, context + " : type d'instruction");
         };
-        if constexpr (std::is_same_v<T, IrConst>) {
+        if constexpr (std::is_same_v<T, IrUnit>) {
+            expectOutputType(program, item.output, ValueType::Unit, context);
+        } else if constexpr (std::is_same_v<T, IrConst>) {
             concrete(item.type);
             if (item.type != ValueType::Int && item.type != ValueType::Byte &&
                 item.type != ValueType::Bool && item.type != ValueType::Char)
@@ -628,7 +631,7 @@ IrVerificationError::IrVerificationError(std::string code, const std::string& me
     : std::runtime_error("[" + code + "] " + message), code_(std::move(code)) {}
 
 VerifiedIrProgram IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
-    static_assert(std::variant_size_v<IrInstruction> == 47,
+    static_assert(std::variant_size_v<IrInstruction> == 48,
                   "mettre à jour l'inventaire du vérificateur d'IR");
     if (program.valueCount != program.valueTypes.size())
         fail("IRV001", "valueCount=" + std::to_string(program.valueCount) +

@@ -83,6 +83,7 @@ std::string IrGenerator::genericLinkName(
 }
 
 std::string IrGenerator::genericTypeIdentity(const ValueType& type) const {
+    if (type == ValueType::Unit) return "N";
     if (type == ValueType::Int) return "I";
     if (type == ValueType::Byte) return "B";
     if (type == ValueType::Double) return "D";
@@ -663,6 +664,12 @@ void IrGenerator::emitTailExpression(
             ir_.instructions.push_back(IrReturn{result, resolveType(function.type)});
         } else if (!terminated && block->result) {
             emitTailExpression(*block->result, parameters, function);
+        } else if (!terminated) {
+            const ValueId result = nextValue(ValueType::Unit);
+            ir_.instructions.push_back(IrUnit{result});
+            emitBoxDrops(localNames);
+            emitBoxParameterDrops();
+            ir_.instructions.push_back(IrReturn{result, ValueType::Unit});
         }
         for (auto name = localNames.rbegin(); name != localNames.rend(); ++name)
             symbols_.erase(*name);
@@ -1168,7 +1175,8 @@ ValueId IrGenerator::expression(
                 }
             }
             const ValueId result = terminated ? ValueId{0} : node.result
-                ? expression(*node.result, parameters) : nextValue(expressionNode.inferredType);
+                ? expression(*node.result, parameters) : nextValue(ValueType::Unit);
+            if (!terminated && !node.result) ir_.instructions.push_back(IrUnit{result});
             if (!terminated) emitBoxDrops(localNames);
             for (auto name = localNames.rbegin(); name != localNames.rend(); ++name) {
                 symbols_.erase(*name);
@@ -1287,6 +1295,7 @@ std::string IrGenerator::print(const VerifiedIrProgram& verified) {
     std::ostringstream out;
     out << std::setprecision(std::numeric_limits<double>::max_digits10);
     const auto suffix = [](ValueType type) {
+        if (type == ValueType::Unit) return "unit";
         if (type == ValueType::Int) return "i32";
         if (type == ValueType::Byte) return "u8";
         if (type == ValueType::Double) return "f64";
@@ -1303,7 +1312,9 @@ std::string IrGenerator::print(const VerifiedIrProgram& verified) {
     for (const IrInstruction& instruction : program.instructions) {
         std::visit([&](const auto& item) {
             using T = std::decay_t<decltype(item)>;
-            if constexpr (std::is_same_v<T, IrConst>)
+            if constexpr (std::is_same_v<T, IrUnit>)
+                out << "  $" << item.output << " = unit\n";
+            else if constexpr (std::is_same_v<T, IrConst>)
                 out << "  $" << item.output << " = const." << suffix(item.type)
                     << ' ' << item.value << '\n';
             else if constexpr (std::is_same_v<T, IrDoubleConst>)

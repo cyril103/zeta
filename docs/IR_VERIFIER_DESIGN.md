@@ -163,6 +163,7 @@ pas répétés sur chaque ligne.
 
 | Instruction | Lit | Produit | Contrat supplémentaire | Contrôle |
 | --- | --- | --- | --- | --- |
+| `IrUnit` | — | `output : Unit` | aucune représentation à l'exécution | suite |
 | `IrConst` | — | `output : type` | `type` est `Int`, `Byte`, `Bool` ou `Char`; un `Bool` vaut 0 ou 1 et un `Byte` tient sur 8 bits | suite |
 | `IrDoubleConst` | — | `output : Double` | — | suite |
 | `IrStringConst` | — | `output : String` | `utf8` est un UTF-8 valide | suite |

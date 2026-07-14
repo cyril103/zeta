@@ -61,6 +61,20 @@ int main() {
     validFunction.instructions.push_back(IrReturn{0, ValueType::Int});
     expectValid("fonction structurellement valide", validFunction);
 
+    IrProgram validUnitFunction;
+    validUnitFunction.valueTypes.push_back(ValueType::Unit);
+    validUnitFunction.valueCount = 1;
+    validUnitFunction.instructions.push_back(IrFunctionStart{"effect", false, {}});
+    validUnitFunction.instructions.push_back(IrUnit{0});
+    validUnitFunction.instructions.push_back(IrReturn{0, ValueType::Unit});
+    expectValid("fonction Unit structurellement valide", validUnitFunction);
+
+    IrProgram wrongUnitOutput;
+    wrongUnitOutput.valueTypes.push_back(ValueType::Int);
+    wrongUnitOutput.valueCount = 1;
+    wrongUnitOutput.instructions.push_back(IrUnit{0});
+    expectCode("sortie Unit mal typée", "IRV021", wrongUnitOutput);
+
     IrProgram countMismatch;
     countMismatch.valueCount = 1;
     expectCode("table de valeurs incohérente", "IRV001", countMismatch);

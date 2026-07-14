@@ -36,7 +36,7 @@ mkdir "$work/invalid-generic-version"
 cp "$generic_root" "$work/invalid-generic-version/collections_module.zeta"
 cp "$work/generic-published.modules/collections.o" \
    "$work/invalid-generic-version/collections.o"
-printf 'ZTI 7\nmodule "collections"\nfingerprint invalid\ngeneric_tokens 999 1\ntoken 0 1 1 ""\nend\n' \
+printf 'ZTI 8\nmodule "collections"\nfingerprint invalid\ngeneric_tokens 999 1\ntoken 0 1 1 ""\nend\n' \
     > "$work/invalid-generic-version/collections.zti"
 if "$compiler" "$work/invalid-generic-version/collections_module.zeta" \
     -o "$work/invalid-generic-version/app" >"$work/generic-version-error" 2>&1; then
@@ -48,7 +48,7 @@ mkdir "$work/invalid-generic-end"
 cp "$generic_root" "$work/invalid-generic-end/collections_module.zeta"
 cp "$work/generic-published.modules/collections.o" \
    "$work/invalid-generic-end/collections.o"
-printf 'ZTI 7\nmodule "collections"\nfingerprint invalid\ngeneric_tokens 1 1\ntoken 0 1 1 ""\nend\n' \
+printf 'ZTI 8\nmodule "collections"\nfingerprint invalid\ngeneric_tokens 1 1\ntoken 0 1 1 ""\nend\n' \
     > "$work/invalid-generic-end/collections.zti"
 if "$compiler" "$work/invalid-generic-end/collections_module.zeta" \
     -o "$work/invalid-generic-end/app" >"$work/generic-end-error" 2>&1; then

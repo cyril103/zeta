@@ -5,6 +5,6 @@ def main(): Int = {
     val negative: String = String(-0.25)
     val zero: String = String(0.0)
     val message: String = positive + " / " + negative + " / " + zero
-    val written: Int = io.println(message)
+    io.println(message)
     if (message == "18.5 / -0.25 / 0") { 0 } else { 1 }
 }

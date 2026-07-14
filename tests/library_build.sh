@@ -83,7 +83,7 @@ mkdir -p "$work/native-published" "$work/native-consumer"
 test "$(find "$work/native-published" -maxdepth 1 -type f | wc -l)" -eq 2
 cp "$work/native-published/io.zti" "$work/native-consumer/io.zti"
 cp "$work/native-published/io.o" "$work/native-consumer/io.o"
-printf 'import io\ndef main(): Int = io.print("")\n' \
+printf 'import io\ndef main(): Int = { io.print(""); 0 }\n' \
     > "$work/native-consumer/main.zeta"
 "$compiler" "$work/native-consumer/main.zeta" \
     -o "$work/native-consumer/app" >/dev/null

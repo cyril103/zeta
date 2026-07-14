@@ -162,6 +162,7 @@ std::vector<Token> Lexer::scan() {
             if (text == "pub") kind = TokenKind::Pub;
             if (text == "native") kind = TokenKind::Native;
             if (text == "mut") kind = TokenKind::Mut;
+            if (text == "Unit") kind = TokenKind::UnitType;
             if (text == "Int") kind = TokenKind::IntType;
             if (text == "Byte") kind = TokenKind::ByteType;
             if (text == "Double") kind = TokenKind::DoubleType;

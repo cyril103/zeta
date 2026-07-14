@@ -15,6 +15,7 @@
 using ValueId = std::size_t;
 using SlotId = std::size_t;
 
+struct IrUnit { ValueId output; };
 struct IrConst { ValueId output; std::int32_t value; ValueType type; };
 struct IrDoubleConst { ValueId output; double value; };
 struct IrStringConst { ValueId output; std::string utf8; };
@@ -118,7 +119,7 @@ struct IrExit { ValueId value; };
 struct IrBranch { ValueId condition; bool jumpWhenTrue; std::size_t label; };
 struct IrJump { std::size_t label; };
 struct IrLabel { std::size_t label; };
-using IrInstruction = std::variant<IrConst, IrDoubleConst, IrStringConst, IrStringConcat, IrStringLength, IrStringEmpty, IrArrayConstruct, IrVecConstruct, IrVecProperty, IrVecReserve, IrVecPush, IrVecClear, IrVecView, IrVecGet, IrVecPop, IrVecSet, IrStructConstruct, IrEnumConstruct, IrEnumTag, IrEnumFieldLoad, IrFieldLoad, IrFieldStore, IrSliceConstruct, IrSliceLength, IrBoxConstruct, IrIndexLoad, IrIndexStore, IrAddressOf, IrDereference, IrDereferenceStore, IrLoad, IrConvert, IrUnary, IrBinary,
+using IrInstruction = std::variant<IrUnit, IrConst, IrDoubleConst, IrStringConst, IrStringConcat, IrStringLength, IrStringEmpty, IrArrayConstruct, IrVecConstruct, IrVecProperty, IrVecReserve, IrVecPush, IrVecClear, IrVecView, IrVecGet, IrVecPop, IrVecSet, IrStructConstruct, IrEnumConstruct, IrEnumTag, IrEnumFieldLoad, IrFieldLoad, IrFieldStore, IrSliceConstruct, IrSliceLength, IrBoxConstruct, IrIndexLoad, IrIndexStore, IrAddressOf, IrDereference, IrDereferenceStore, IrLoad, IrConvert, IrUnary, IrBinary,
                                    IrStore, IrCopy, IrCall, IrTailCall, IrFunctionStart, IrParameter,
                                    IrReturn, IrDrop, IrRetain, IrExit, IrBranch, IrJump, IrLabel>;
 

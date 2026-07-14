@@ -1,15 +1,15 @@
 // Entrées/sorties standard de Zeta.
-// Les fonctions renvoient le nombre d'octets écrits, ou un code système négatif.
-pub native def print (value : String) : Int
-pub native def println (value : String) : Int
-pub def printChar(value: Char): Int = print(String(value))
-pub def printInt(value: Int): Int = print(String(value))
-pub def printlnInt(value: Int): Int = println(String(value))
-pub def printByte(value: Byte): Int = print(String(value))
-pub def printlnByte(value: Byte): Int = println(String(value))
-pub def printBool(value: Bool): Int = print(String(value))
-pub def printlnBool(value: Bool): Int = println(String(value))
-pub def printDouble(value: Double): Int = print(String(value))
-pub def printlnDouble(value: Double): Int = println(String(value))
-pub native def printBytes (value : Slice[Byte]) : Int
-pub native def printlnBytes (value : Slice[Byte]) : Int
+// Les fonctions écrivent leur argument et ne produisent pas de résultat métier.
+pub native def print (value : String) : Unit
+pub native def println (value : String) : Unit
+pub def printChar(value: Char): Unit = print(String(value))
+pub def printInt(value: Int): Unit = print(String(value))
+pub def printlnInt(value: Int): Unit = println(String(value))
+pub def printByte(value: Byte): Unit = print(String(value))
+pub def printlnByte(value: Byte): Unit = println(String(value))
+pub def printBool(value: Bool): Unit = print(String(value))
+pub def printlnBool(value: Bool): Unit = println(String(value))
+pub def printDouble(value: Double): Unit = print(String(value))
+pub def printlnDouble(value: Double): Unit = println(String(value))
+pub native def printBytes (value : Slice[Byte]) : Unit
+pub native def printlnBytes (value : Slice[Byte]) : Unit

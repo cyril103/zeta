@@ -289,15 +289,22 @@ var index = 0
 
 ### 1B. Type `Unit`
 
-Objectif : permettre des fonctions et expressions sans résultat métier :
+**Livré le 15 juillet 2026.** Les fonctions et expressions sans résultat métier
+utilisent désormais `Unit` :
 
 ```zeta
 def log(value: String): Unit = io.println(value)
 ```
 
-Définir représentation ABI, compatibilité des branches, appels utilisés comme
-instructions et convention de retour. Les API mutantes pourront ensuite choisir
-`Unit` lorsque leur compteur actuel n'est pas contractuel.
+La représentation ABI est de taille nulle, les appels et retours n'utilisent pas
+de registre de résultat, les blocs sans expression finale produisent `Unit` et les
+branches `if/else` convergent sur ce type. `IrUnit`, le vérificateur structurel,
+les interfaces `.zti` et l'invalidation ABI/cache couvrent ce contrat. L'API `io`
+retourne maintenant `Unit`; ses tests d'exécution valident toujours les sorties.
+
+Les compteurs des opérations mutantes de `Vec` restent provisoirement inchangés :
+leur migration sera faite avec la composabilité de `Vec` en priorité 2 afin de ne
+pas mélanger deux contrats publics.
 
 ### 1C. Contrôle de flux
 
@@ -449,8 +456,8 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-Créer `docs/IR_VERIFIER_DESIGN.md`, inventorier chaque variante de
-`IrInstruction`, puis définir pour chacune : valeurs lues, valeur produite, slots,
-types attendus, effet de contrôle et diagnostic `IRV` associé. Aucun changement de
-codegen ne doit être réalisé avant que ce contrat soit relu et testé sur l'IR
-actuelle de `stdlib_showcase.zeta`.
+Commencer la priorité 1C par le contrat de typage du contrôle de flux : décider si
+`return`, `break` et `continue` introduisent un type interne `Never`, puis définir
+comment ce type converge avec `Unit` et les types métier dans `if/else` et
+`match`. Ajouter les tests de rejet avant d'autoriser un `if` instruction sans
+`else`.

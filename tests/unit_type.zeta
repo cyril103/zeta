@@ -1,0 +1,18 @@
+def discard(value: Int): Unit = {
+    val observed = value
+}
+
+def choose(flag: Bool): Unit = if (flag) discard(1) else discard(2)
+
+def forward(value: Int): Unit = discard(value)
+def accept(value: Unit): Unit = value
+
+def main(): Int = {
+    discard(0)
+    choose(true)
+    choose(false)
+    forward(3)
+    val ignored = discard(4)
+    accept(ignored)
+    0
+}

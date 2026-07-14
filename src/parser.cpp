@@ -216,6 +216,7 @@ ValueType Parser::consumeType(const std::string& message) {
         consume(TokenKind::RightBracket, "']' attendue après le type d'élément");
         return ValueType(ValueType::Kind::Vec, std::make_shared<ValueType>(element));
     }
+    if (match(TokenKind::UnitType)) return ValueType::Unit;
     if (match(TokenKind::IntType)) return ValueType::Int;
     if (match(TokenKind::ByteType)) return ValueType::Byte;
     if (match(TokenKind::DoubleType)) return ValueType::Double;
@@ -1282,10 +1283,29 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
             tokens_[current_ + 1].kind == TokenKind::Dot &&
             tokens_[current_ + 2].kind == TokenKind::Identifier &&
             tokens_[current_ + 3].kind == TokenKind::LeftParen;
+        bool startsCall = false;
+        if (check(TokenKind::Identifier) && current_ + 1 < tokens_.size() &&
+            tokens_[current_ + 1].kind == TokenKind::LeftParen) {
+            std::size_t cursor = current_ + 1;
+            std::size_t depth = 0;
+            do {
+                if (tokens_[cursor].kind == TokenKind::LeftParen) ++depth;
+                else if (tokens_[cursor].kind == TokenKind::RightParen) --depth;
+                ++cursor;
+            } while (cursor < tokens_.size() && depth != 0);
+            const bool separated = cursor < tokens_.size() &&
+                (tokens_[cursor].kind == TokenKind::Separator ||
+                 tokens_[cursor].kind == TokenKind::Semicolon);
+            while (cursor < tokens_.size() &&
+                   (tokens_[cursor].kind == TokenKind::Separator ||
+                    tokens_[cursor].kind == TokenKind::Semicolon)) ++cursor;
+            startsCall = separated && cursor < tokens_.size() &&
+                tokens_[cursor].kind != TokenKind::RightBrace;
+        }
         if (!startsDeclaration && !startsAssignment() && !startsDereferenceAssignment &&
-            !startsMethodCall) break;
+            !startsMethodCall && !startsCall) break;
 
-        if (startsMethodCall) {
+        if (startsMethodCall || startsCall) {
             const SourceLocation methodLocation = peek().location;
             statements.push_back(std::make_unique<Statement>(
                 ExpressionStatement{methodLocation, expression()}));
@@ -1300,17 +1320,10 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
     }
 
     if (check(TokenKind::RightBrace)) {
-        if (!statements.empty() &&
-            (std::holds_alternative<ReturnStatement>(statements.back()->value) ||
-             std::holds_alternative<BreakStatement>(statements.back()->value) ||
-             std::holds_alternative<ContinueStatement>(statements.back()->value))) {
-            consume(TokenKind::RightBrace, "'}' attendue à la fin du bloc");
-            --blockDepth_;
-            return std::make_unique<Expression>(Expression{
-                location, BlockExpr{std::move(statements), nullptr}});
-        }
-        throw CompileError(peek().location,
-                           "un bloc doit se terminer par une expression");
+        consume(TokenKind::RightBrace, "'}' attendue à la fin du bloc");
+        --blockDepth_;
+        return std::make_unique<Expression>(Expression{
+            location, BlockExpr{std::move(statements), nullptr}});
     }
     ExprPtr result = expression();
     skipSeparators();
