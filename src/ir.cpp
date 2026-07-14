@@ -906,6 +906,20 @@ ValueId IrGenerator::expression(
                 const Declaration& method = *found->second.declaration;
                 std::vector<ValueId> arguments;
                 std::vector<ValueType> argumentTypes;
+                std::string linkName = found->second.linkName;
+                auto callSubstitutions = typeSubstitutions_;
+                if (!method.typeParameters.empty()) {
+                    std::vector<ValueType> instanceTypes;
+                    for (const ValueType& type : node.typeArguments)
+                        instanceTypes.push_back(resolveType(type));
+                    registerGenericInstance(method, instanceTypes);
+                    linkName = genericLinkName(method, instanceTypes);
+                    callSubstitutions.clear();
+                    for (std::size_t i = 0; i < method.typeParameters.size(); ++i)
+                        callSubstitutions.emplace(method.typeParameters[i], instanceTypes[i]);
+                }
+                const auto outerSubstitutions = typeSubstitutions_;
+                typeSubstitutions_ = callSubstitutions;
                 arguments.push_back(expression(*node.object, parameters));
                 argumentTypes.push_back(resolveType(method.parameters.front().type));
                 for (std::size_t i = 0; i < node.arguments.size(); ++i) {
@@ -920,8 +934,9 @@ ValueId IrGenerator::expression(
                 }
                 const ValueType returnType = resolveType(method.type);
                 const ValueId output = nextValue(returnType);
+                typeSubstitutions_ = outerSubstitutions;
                 ir_.instructions.push_back(IrCall{
-                    output, found->second.linkName, std::move(arguments),
+                    output, linkName, std::move(arguments),
                     std::move(argumentTypes), returnType});
                 return output;
             }
@@ -1044,7 +1059,7 @@ ValueId IrGenerator::expression(
             const ValueId reference = expression(*node.operand, parameters);
             const ValueId output = nextValue(expressionNode.inferredType);
             ir_.instructions.push_back(IrDereference{output, reference,
-                                                     expressionNode.inferredType});
+                                                     resolveType(expressionNode.inferredType)});
             return output;
         } else if constexpr (std::is_same_v<T, NameExpr>) {
             if (const auto parameter = parameters.find(node.name);

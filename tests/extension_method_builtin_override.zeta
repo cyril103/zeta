@@ -1,0 +1,3 @@
+extend def Vec.push[T](self: &mut Vec[T], value: T): Unit = self.clear()
+
+def main(): Int = 0

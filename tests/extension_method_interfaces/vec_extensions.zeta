@@ -1,0 +1,6 @@
+pub extend def Vec.appendTwice[T](self: &mut Vec[T], first: T, second: T): Unit = {
+    self.push(first)
+    self.push(second)
+}
+
+pub extend def Vec.count[T](self: &Vec[T]): Int = (*self).length

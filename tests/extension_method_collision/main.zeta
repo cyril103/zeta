@@ -1,0 +1,4 @@
+import first
+import second
+
+def main(): Int = 0

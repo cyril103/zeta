@@ -155,6 +155,7 @@ std::vector<Token> Lexer::scan() {
             if (text == "val") kind = TokenKind::Val;
             if (text == "var") kind = TokenKind::Var;
             if (text == "def") kind = TokenKind::Def;
+            if (text == "extend") kind = TokenKind::Extend;
             if (text == "struct") kind = TokenKind::Struct;
             if (text == "enum") kind = TokenKind::Enum;
             if (text == "match") kind = TokenKind::Match;

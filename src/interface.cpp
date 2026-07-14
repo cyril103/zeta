@@ -250,6 +250,7 @@ std::string InterfaceCodec::serialize(
                << static_cast<int>(symbol.kind) << ' '
                << (symbol.callable ? 1 : 0) << ' '
                << (symbol.nativeSymbol ? 1 : 0) << ' '
+               << (symbol.extensionMethod ? 1 : 0) << ' '
                << std::quoted(encodeType(symbol.type)) << ' '
                << symbol.parameterTypes.size();
         for (const ValueType& parameter : symbol.parameterTypes)
@@ -463,9 +464,9 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
         if (word != "export")
             interfaceFailure("ZTI010", "entrée inconnue '" + word + "'");
         std::string name, returnType;
-        int kind = 0, callable = 0, native = 0;
+        int kind = 0, callable = 0, native = 0, extension = 0;
         std::size_t parameterCount = 0;
-        if (!(input >> std::quoted(name) >> kind >> callable >> native >>
+        if (!(input >> std::quoted(name) >> kind >> callable >> native >> extension >>
               std::quoted(returnType) >> parameterCount))
             interfaceFailure("ZTI010", "entrée d'export invalide");
         std::vector<ValueType> parameters;
@@ -491,7 +492,7 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
             static_cast<BindingKind>(kind),
             decodeTypeContext(returnType, structures, enumerations,
                               "export '" + name + "', type de retour"), callable != 0,
-            native != 0, std::move(parameters), nullptr}).second)
+            native != 0, std::move(parameters), nullptr, extension != 0}).second)
             interfaceFailure("ZTI010", "export dupliqué '" + name + "'");
     }
     if (!structureFieldCounts.empty() || !enumerationVariantCounts.empty())

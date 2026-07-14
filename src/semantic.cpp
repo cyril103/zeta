@@ -44,6 +44,11 @@ std::optional<std::pair<std::string, std::string>> methodParts(const std::string
         return std::nullopt;
     return std::pair{name.substr(0, separator), name.substr(separator + 1U)};
 }
+bool builtinVecMethod(const std::string& name) {
+    static const std::unordered_set<std::string> names{
+        "push", "pop", "get", "set", "reserve", "clear", "asSlice", "asSliceMut"};
+    return names.contains(name);
+}
 ValueType substituteType(
     const ValueType& type,
     const std::unordered_map<std::string, ValueType>& substitutions) {
@@ -225,6 +230,7 @@ TypedProgram SemanticAnalyzer::analyze(
     insideGenericDeclaration_ = false;
     activeTypeConstraints_.clear();
     methods_.clear();
+    vecMethods_.clear();
     localMethodOwners_.clear();
     for (const std::shared_ptr<const StructType>& structure : program.structures)
         localMethodOwners_.insert(structure->genericDefinition
@@ -243,6 +249,16 @@ TypedProgram SemanticAnalyzer::analyze(
                 symbols_.define(qualified, symbol);
                 const auto parts = methodParts(name);
                 if (!parts || exported.parameterTypes.empty()) continue;
+                if (exported.extensionMethod && parts->first == "Vec") {
+                    if (builtinVecMethod(parts->second))
+                        throw CompileError(import.location, "une extension ne peut pas remplacer "
+                                           "la méthode Vec builtin '" + parts->second + "'");
+                    if (!vecMethods_.emplace(parts->second,
+                            MethodSymbol{qualified, symbol}).second)
+                        throw CompileError(import.location, "extension Vec dupliquée '" +
+                                           parts->second + "'");
+                    continue;
+                }
                 const StructType* owner = methodOwner(exported.parameterTypes.front());
                 if (owner == nullptr || owner->name != parts->first) continue;
                 methods_[owner].emplace(parts->second,
@@ -465,24 +481,35 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
             !declaration.callable || declaration.nativeSymbol)
             throw CompileError(declaration.location,
                                "une méthode doit être une fonction globale définie en Zeta");
-        if (!declaration.typeParameters.empty())
-            throw CompileError(declaration.location,
-                               "les méthodes génériques ne sont pas encore prises en charge");
         if (declaration.parameters.empty() || declaration.parameters.front().name != "self")
             throw CompileError(declaration.location,
                                "le premier paramètre d'une méthode doit être 'self'");
         const ValueType& receiver = declaration.parameters.front().type;
-        const StructType* owner = methodOwner(receiver);
-        if (owner == nullptr || owner->name != method->first)
-            throw CompileError(declaration.parameters.front().location,
-                               "le receveur doit être '&" + method->first +
-                               "' ou '&mut " + method->first + "'");
-        if (!localMethodOwners_.contains(owner))
-            throw CompileError(declaration.location,
-                               "une méthode doit être déclarée dans le module de son type");
-        if (!owner->typeParameters.empty())
-            throw CompileError(declaration.location,
-                               "les méthodes de structures génériques sont reportées");
+        if (declaration.extensionMethod) {
+            if (method->first != "Vec" || receiver.kind != ValueType::Kind::Reference ||
+                receiver.element == nullptr || receiver.element->kind != ValueType::Kind::Vec)
+                throw CompileError(declaration.parameters.front().location,
+                    "une extension Vec exige un receveur '&Vec[T]' ou '&mut Vec[T]'");
+            if (builtinVecMethod(method->second))
+                throw CompileError(declaration.location,
+                    "une extension ne peut pas remplacer la méthode Vec builtin '" +
+                    method->second + "'");
+        } else {
+            const StructType* owner = methodOwner(receiver);
+            if (owner == nullptr || owner->name != method->first)
+                throw CompileError(declaration.parameters.front().location,
+                                   "le receveur doit être '&" + method->first +
+                                   "' ou '&mut " + method->first + "'");
+            if (!localMethodOwners_.contains(owner))
+                throw CompileError(declaration.location,
+                                   "une méthode doit être déclarée dans le module de son type");
+            if (!owner->typeParameters.empty())
+                throw CompileError(declaration.location,
+                                   "les méthodes de structures génériques sont reportées");
+            if (!declaration.typeParameters.empty())
+                throw CompileError(declaration.location,
+                                   "les méthodes génériques sont réservées aux extensions");
+        }
     } else if (declaration.name.find('.') != std::string::npos) {
         throw CompileError(declaration.location, "nom de méthode invalide '" +
                            declaration.name + "'");
@@ -495,12 +522,19 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
                            "l'identifiant '" + declaration.name + "' est déjà défini");
     }
     if (method) {
-        const StructType* owner = methodOwner(declaration.parameters.front().type);
-        if (!methods_[owner].emplace(method->second,
-                MethodSymbol{declaration.name, declarationSymbol}).second)
-            throw CompileError(declaration.location,
-                               "méthode '" + method->second + "' déjà définie pour " +
-                               method->first);
+        if (declaration.extensionMethod) {
+            if (!vecMethods_.emplace(method->second,
+                    MethodSymbol{declaration.name, declarationSymbol}).second)
+                throw CompileError(declaration.location,
+                                   "extension Vec dupliquée '" + method->second + "'");
+        } else {
+            const StructType* owner = methodOwner(declaration.parameters.front().type);
+            if (!methods_[owner].emplace(method->second,
+                    MethodSymbol{declaration.name, declarationSymbol}).second)
+                throw CompileError(declaration.location,
+                                   "méthode '" + method->second + "' déjà définie pour " +
+                                   method->first);
+        }
     }
     if (declaration.nativeSymbol) return;
     symbols_.pushScope();
@@ -763,6 +797,21 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
                         method != methods->second.end())
                         return method->second.symbol.type;
             }
+            if (ownerType->kind == ValueType::Kind::Vec) {
+                if (const auto method = vecMethods_.find(node.method);
+                    method != vecMethods_.end()) {
+                    const Declaration* declaration = method->second.symbol.declaration;
+                    if (declaration == nullptr || declaration->typeParameters.empty())
+                        return method->second.symbol.type;
+                    std::unordered_map<std::string, ValueType> substitutions;
+                    const ValueType actualReceiver(
+                        std::make_shared<ValueType>(*ownerType),
+                        declaration->parameters.front().type.mutableReference);
+                    if (inferTypeArguments(declaration->parameters.front().type,
+                                           actualReceiver, substitutions))
+                        return substituteType(declaration->type, substitutions);
+                }
+            }
             if (object.kind == ValueType::Kind::Vec &&
                 (node.method == "asSlice" || node.method == "asSliceMut"))
                 return ValueType(ValueType::Kind::Slice,
@@ -946,19 +995,24 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (userReceiver.kind == ValueType::Kind::Reference &&
                 userReceiver.element != nullptr)
                 userOwnerType = userReceiver.element.get();
+            const MethodSymbol* userMethod = nullptr;
             if (userOwnerType->kind == ValueType::Kind::Struct) {
                 const StructType* owner = userOwnerType->structure->genericDefinition
                     ? userOwnerType->structure->genericDefinition.get()
                     : userOwnerType->structure.get();
                 const auto ownerMethods = methods_.find(owner);
-                const auto userMethod = ownerMethods == methods_.end()
-                    ? nullptr : [&]() -> const MethodSymbol* {
-                        const auto found = ownerMethods->second.find(node.method);
-                        return found == ownerMethods->second.end() ? nullptr : &found->second;
-                    }();
+                if (ownerMethods != methods_.end()) {
+                    const auto found = ownerMethods->second.find(node.method);
+                    if (found != ownerMethods->second.end()) userMethod = &found->second;
+                }
                 if (userMethod == nullptr)
                     throw CompileError(expression.location, "méthode inconnue '" +
                                        node.method + "' pour " + typeName(*userOwnerType));
+            } else if (userOwnerType->kind == ValueType::Kind::Vec) {
+                const auto found = vecMethods_.find(node.method);
+                if (found != vecMethods_.end()) userMethod = &found->second;
+            }
+            if (userMethod != nullptr) {
                 const SemanticSymbol& methodSymbol = userMethod->symbol;
                 const std::vector<ValueType>* persistedParameters =
                     methodSymbol.declaration == nullptr ? &methodSymbol.parameterTypes : nullptr;
@@ -969,9 +1023,44 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                     throw CompileError(expression.location, "'" + node.method + "' attend " +
                         std::to_string(parameterCount - 1U) + " argument(s), reçu " +
                         std::to_string(node.arguments.size()));
-                const ValueType receiverParameter = methodSymbol.declaration != nullptr
+                const Declaration* generic = methodSymbol.declaration != nullptr &&
+                    !methodSymbol.declaration->typeParameters.empty()
+                    ? methodSymbol.declaration : nullptr;
+                std::unordered_map<std::string, ValueType> substitutions;
+                const ValueType declaredReceiver = methodSymbol.declaration != nullptr
                     ? methodSymbol.declaration->parameters.front().type
                     : persistedParameters->front();
+                if (generic != nullptr) {
+                    node.typeArguments.clear();
+                    const ValueType actualReceiver = userReceiver.kind == ValueType::Kind::Reference
+                        ? userReceiver
+                        : ValueType(std::make_shared<ValueType>(*userOwnerType),
+                                    declaredReceiver.mutableReference);
+                    if (!inferTypeArguments(declaredReceiver, actualReceiver, substitutions))
+                        throw CompileError(node.object->location,
+                                           "receveur incompatible pour '" + node.method + "'");
+                    for (std::size_t i = 0; i < node.arguments.size(); ++i)
+                        if (!inferTypeArguments(generic->parameters[i + 1U].type,
+                                                inferType(*node.arguments[i]), substitutions))
+                            throw CompileError(node.arguments[i]->location,
+                                "arguments incompatibles pour l'extension '" +
+                                node.method + "'");
+                    for (std::size_t i = 0; i < generic->typeParameters.size(); ++i) {
+                        const std::string& parameter = generic->typeParameters[i];
+                        const auto inferred = substitutions.find(parameter);
+                        if (inferred == substitutions.end())
+                            throw CompileError(expression.location,
+                                "impossible de déduire le paramètre de type '" + parameter + "'");
+                        if (!satisfiesConstraint(inferred->second,
+                                                 generic->typeConstraints[i]))
+                            throw CompileError(expression.location, "le type " +
+                                typeName(inferred->second) + " ne satisfait pas la contrainte " +
+                                generic->typeConstraints[i]);
+                        node.typeArguments.push_back(inferred->second);
+                    }
+                }
+                const ValueType receiverParameter = generic == nullptr
+                    ? declaredReceiver : substituteType(declaredReceiver, substitutions);
                 if (userReceiver.kind == ValueType::Kind::Reference) {
                     if (userReceiver != receiverParameter)
                         throw CompileError(node.object->location,
@@ -1012,14 +1101,17 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                     const ValueType parameterType = methodSymbol.declaration != nullptr
                         ? methodSymbol.declaration->parameters[i + 1U].type
                         : (*persistedParameters)[i + 1U];
-                    checkExpression(*node.arguments[i], parameterType);
-                    if (isMoveOnlyValueType(parameterType))
+                    const ValueType concreteParameter = generic == nullptr
+                        ? parameterType : substituteType(parameterType, substitutions);
+                    checkExpression(*node.arguments[i], concreteParameter);
+                    if (isMoveOnlyValueType(concreteParameter))
                         if (const auto* moved =
                                 std::get_if<NameExpr>(&node.arguments[i]->value))
                             movedBoxes_.insert(moved->name);
                 }
                 node.resolvedFunction = userMethod->functionName;
-                return methodSymbol.type;
+                return generic == nullptr ? methodSymbol.type
+                                          : substituteType(methodSymbol.type, substitutions);
             }
             const auto* name = std::get_if<NameExpr>(&node.object->value);
             const auto* field = std::get_if<FieldExpr>(&node.object->value);

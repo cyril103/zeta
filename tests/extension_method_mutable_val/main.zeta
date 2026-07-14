@@ -1,0 +1,7 @@
+import vec_extensions
+
+def main(): Int = {
+    val values = Vec[Int]()
+    values.append(42)
+    0
+}

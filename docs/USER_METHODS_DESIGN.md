@@ -15,8 +15,25 @@ def Counter.reset(self: &mut Counter): Unit = {
 
 Le préfixe doit désigner une structure non générique déclarée dans le même
 module. Le premier paramètre doit se nommer `self` et être exactement `&Type` ou
-`&mut Type`. Cette contrainte distingue les méthodes inhérentes des futures
-méthodes d'extension et rend la mutabilité visible dans la signature publique.
+`&mut Type`. Cette contrainte distingue les méthodes inhérentes des méthodes
+d'extension et rend la mutabilité visible dans la signature publique.
+
+## Extensions de module
+
+Le mot-clé `extend` déclare explicitement une méthode apportée par un module :
+
+```zeta
+pub extend def Vec.appendTwice[T](self: &mut Vec[T], first: T, second: T): Unit = {
+    self.push(first)
+    self.push(second)
+}
+```
+
+Le premier jalon d'extension cible `Vec[T]`, avec receveur `&Vec[T]` ou
+`&mut Vec[T]`. Les paramètres génériques sont inférés depuis le receveur et les
+arguments comme pour une fonction générique. Une extension est visible seulement
+si son module est importé. Deux imports fournissant le même nom pour `Vec`
+produisent un diagnostic d'ambiguïté au lieu d'un choix dépendant de l'ordre.
 
 ## Résolution et emprunt
 
@@ -42,13 +59,16 @@ importées utilisent le même nom de liaison déterministe.
 
 Une méthode publique reste un export de fonction avec le nom `Type.method` et son
 premier type de paramètre dans le fichier `.zti`. Le consommateur reconstruit la
-table des méthodes depuis cette signature, sans avoir besoin des sources. Le
-format d'interface passe à `9` et le cache de modules à `19`.
+table des méthodes depuis cette signature, sans avoir besoin des sources.
+L'interface marque explicitement les exports d'extension et les corps génériques
+réduits conservent le token `extend`. Le format d'interface passe à `10`, les
+tokens génériques à `2` et le cache de modules à `20`.
 
 ## Limites du premier jalon
 
-Ce jalon couvre les structures non génériques et les receveurs identifiants. Les
-méthodes d'extension, les structures génériques, les enums, les receveurs
-temporaires et la syntaxe de réemprunt seront traités séparément. Une méthode peut
-déjà utiliser toutes les opérations autorisées sur ses paramètres ; l'accès plus
-ergonomique aux champs possédés à travers `self` sera développé avec `Stack[T]`.
+Les méthodes inhérentes couvrent les structures non génériques et les extensions
+couvrent actuellement `Vec[T]`. Les extensions de types nominaux importés, les
+enums, les receveurs temporaires et la syntaxe de réemprunt seront traités
+séparément. L'étape suivante doit exposer les vues de `Vec` à travers son receveur
+référencé afin d'adapter les algorithmes de `sequences`, notamment `sort`, sans
+dupliquer leur implémentation.

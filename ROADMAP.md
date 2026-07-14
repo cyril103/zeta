@@ -15,7 +15,7 @@ les primitives existantes sans ajouter un builtin pour chaque nouveau type.
 
 - construction CMake réussie ;
 - stdlib locale régénérée ;
-- 409 tests CTest réussis sur 409 ;
+- 414 tests CTest réussis sur 414 ;
 - exemple complet compilé, exécuté et couvert par CTest ;
 - aucun changement suivi en attente à la fin de la session ;
 - `build/`, `stdlib/precompiled/` et certains artefacts de tests sont ignorés.
@@ -42,9 +42,9 @@ chercher à le simplifier sans réduire sa sûreté.
 | --- | ---: |
 | Compilateur | `0.1.0` |
 | ABI | `5` |
-| Interface `.zti` | `9` |
-| Tokens génériques | `1` |
-| Cache de modules | `19` |
+| Interface `.zti` | `10` |
+| Tokens génériques | `2` |
+| Cache de modules | `20` |
 | Cache de démarrage | `2` |
 | Manifeste de stdlib | `1` |
 
@@ -339,7 +339,10 @@ Objectif : permettre d'écrire une collection possédée entièrement en Zeta.
    génériques dans leur module avec `self: &Type` ou `self: &mut Type`, emprunter
    automatiquement le receveur à l'appel, préserver les conflits d'emprunt et
    exporter le contrat dans les interfaces `.zti` ;
-4. définir éventuellement des méthodes d'extension pour les modules ;
+4. **Livré le 15 juillet 2026** — ajouter `extend def` pour les extensions
+   génériques de `Vec[T]`, activer leur résolution uniquement par import,
+   diagnostiquer les collisions entre modules et préserver leur corps dans les
+   interfaces précompilées ;
 5. rendre possibles des appels ergonomiques comme `values.sort()` tout en
    conservant `SliceMut` comme mécanisme interne ;
 6. écrire `Stack[T]` comme validation minimale ;
@@ -469,8 +472,7 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-Poursuivre la priorité 2 avec les méthodes d'extension. Décider comment un module
-attache explicitement une méthode à un type importé sans collision ni recherche
-implicite globale, sérialiser cette provenance dans `.zti`, puis préparer
-`values.sort()` en adaptant une fonction de `sequences` sans dupliquer son
-implémentation.
+Poursuivre la priorité 2 avec `values.sort()`. Permettre à une extension recevant
+`&mut Vec[T]` de produire une `SliceMut[T]` liée au même emprunt, puis adapter
+`sequences.sort` sous forme de méthode sans dupliquer son algorithme. Couvrir le
+rejet sur `val`, les conflits de vue et la consommation de la stdlib précompilée.

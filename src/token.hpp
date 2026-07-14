@@ -8,6 +8,7 @@ enum class TokenKind {
     Val,
     Var,
     Def,
+    Extend,
     Struct,
     Enum,
     Match,
@@ -82,6 +83,7 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::Val: return "'val'";
     case TokenKind::Var: return "'var'";
     case TokenKind::Def: return "'def'";
+    case TokenKind::Extend: return "'extend'";
     case TokenKind::Struct: return "'struct'";
     case TokenKind::Enum: return "'enum'";
     case TokenKind::Match: return "'match'";

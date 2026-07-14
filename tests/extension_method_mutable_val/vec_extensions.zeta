@@ -1,0 +1,1 @@
+pub extend def Vec.append[T](self: &mut Vec[T], value: T): Unit = self.push(value)

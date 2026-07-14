@@ -62,5 +62,6 @@ private:
     std::unordered_map<std::string, std::string> activeTypeConstraints_;
     std::unordered_map<const StructType*,
         std::unordered_map<std::string, MethodSymbol>> methods_;
+    std::unordered_map<std::string, MethodSymbol> vecMethods_;
     std::unordered_set<const StructType*> localMethodOwners_;
 };

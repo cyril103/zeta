@@ -1,0 +1,5 @@
+def main(): Int = {
+    var values = Vec[Int]()
+    values.appendTwice(20, 22)
+    0
+}

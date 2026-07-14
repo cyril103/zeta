@@ -69,6 +69,7 @@ private:
     std::size_t blockDepth_{0};
     bool publicDeclaration_{false};
     bool nativeDeclaration_{false};
+    bool extensionDeclaration_{false};
     std::unordered_set<std::string> activeTypeParameters_;
     std::unordered_map<std::string, std::shared_ptr<StructType>> structures_;
     ImportedStructures importedStructures_;

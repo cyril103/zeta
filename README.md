@@ -676,8 +676,21 @@ val answer = counter.read()
 L'appel emprunte automatiquement l'identifiant receveur pour la durée de la
 méthode. Une méthode mutable exige donc une liaison `var` et tout conflit avec un
 emprunt actif est rejeté. Les méthodes publiques traversent les interfaces
-précompilées. Les receveurs temporaires, méthodes génériques et extensions de
-types déclarés dans un autre module restent reportés.
+précompilées.
+
+Un module peut également publier des extensions génériques de `Vec[T]` avec une
+déclaration explicite :
+
+```text
+pub extend def Vec.append[T](self: &mut Vec[T], value: T): Unit = {
+    self.push(value)
+}
+```
+
+L'extension n'entre dans la résolution qu'après import de son module. Deux
+modules importés qui proposent le même nom d'extension sont rejetés comme
+ambigus. Les receveurs temporaires, extensions de types nominaux importés et
+méthodes inhérentes de structures génériques restent reportés.
 
 ## Énumérations et correspondance exhaustive
 

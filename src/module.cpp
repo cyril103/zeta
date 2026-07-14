@@ -240,7 +240,7 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
                                                symbol.parameterTypes[i]});
             program.statements.emplace_back(Declaration{SourceLocation{}, symbolName,
                 symbol.type, symbol.kind, true, true, symbol.callable,
-                std::move(parameters), {}, {}, nullptr});
+                std::move(parameters), {}, {}, nullptr, false, symbol.extensionMethod});
         }
         graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source),
                                             true, objectPath, persisted.genericTokens});
@@ -468,7 +468,8 @@ void ModuleLoader::buildInterface(const std::string& name) {
         if (!interface.exports.emplace(declaration->name,
                 ExportedSymbol{declaration->kind, declaration->type,
                                declaration->callable, declaration->nativeSymbol,
-                               std::move(parameterTypes), declaration}).second) {
+                               std::move(parameterTypes), declaration,
+                               declaration->extensionMethod}).second) {
             throw CompileError(declaration->location,
                 "symbole public '" + declaration->name + "' exporté plusieurs fois par " + name);
         }

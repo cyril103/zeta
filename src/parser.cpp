@@ -607,10 +607,18 @@ Statement Parser::statement() {
             throw CompileError(previous().location,
                                "'pub' est autorisé uniquement au niveau global");
         publicDeclaration_ = true;
-        if (!check(TokenKind::Native) && !check(TokenKind::Val) &&
+        if (!check(TokenKind::Native) && !check(TokenKind::Extend) && !check(TokenKind::Val) &&
             !check(TokenKind::Var) && !check(TokenKind::Def))
             throw CompileError(peek().location,
                                "'val', 'var' ou 'def' attendu après 'pub'");
+    }
+    if (match(TokenKind::Extend)) {
+        if (blockDepth_ != 0)
+            throw CompileError(previous().location,
+                               "'extend' est autorisé uniquement au niveau global");
+        extensionDeclaration_ = true;
+        consume(TokenKind::Def, "'def' attendu après 'extend'");
+        return declaration(BindingKind::Def);
     }
     if (match(TokenKind::Native)) {
         if (blockDepth_ != 0)
@@ -664,6 +672,7 @@ std::vector<StatementPtr> Parser::loopBody() {
     skipSeparators();
     while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
         const bool startsStatement = check(TokenKind::Pub) || check(TokenKind::Native) ||
+            check(TokenKind::Extend) ||
             check(TokenKind::Val) || check(TokenKind::Var) ||
             check(TokenKind::Def) || check(TokenKind::While) || check(TokenKind::Return) ||
             check(TokenKind::Break) || check(TokenKind::Continue) ||
@@ -692,8 +701,10 @@ std::vector<StatementPtr> Parser::loopBody() {
 
 Declaration Parser::declaration(BindingKind kind) {
     const Token start = previous();
-    const Token& name = consume(TokenKind::Identifier,
-                                "identifiant attendu après '" + start.text + "'");
+    const Token& name = extensionDeclaration_ && check(TokenKind::VecType)
+        ? consume(TokenKind::VecType, "'Vec' attendu après 'extend def'")
+        : consume(TokenKind::Identifier,
+                  "identifiant attendu après '" + start.text + "'");
     std::string declarationName = name.text;
     if (kind == BindingKind::Def && match(TokenKind::Dot)) {
         const Token& method = consume(TokenKind::Identifier,
@@ -747,15 +758,17 @@ Declaration Parser::declaration(BindingKind kind) {
     }
     const bool publicSymbol = publicDeclaration_;
     const bool nativeSymbol = nativeDeclaration_;
+    const bool extensionMethod = extensionDeclaration_;
     publicDeclaration_ = false;
     nativeDeclaration_ = false;
+    extensionDeclaration_ = false;
     if (nativeSymbol) {
         if (!callable)
             throw CompileError(start.location, "une déclaration native doit être une fonction");
         activeTypeParameters_ = enclosingTypeParameters;
         return Declaration{start.location, declarationName, type, kind, publicSymbol, true,
                            callable, std::move(parameters), std::move(typeParameters),
-                           std::move(typeConstraints), nullptr, false};
+                           std::move(typeConstraints), nullptr, false, extensionMethod};
     }
     consume(TokenKind::Equal,
             inferLocalType ? "'=' attendu après l'identifiant"
@@ -764,7 +777,8 @@ Declaration Parser::declaration(BindingKind kind) {
     activeTypeParameters_ = enclosingTypeParameters;
     return Declaration{start.location, declarationName, type, kind, publicSymbol, false,
                        callable, std::move(parameters), std::move(typeParameters),
-                       std::move(typeConstraints), std::move(initializer), inferLocalType};
+                       std::move(typeConstraints), std::move(initializer), inferLocalType,
+                       extensionMethod};
 }
 
 std::string Parser::qualifiedName() {
@@ -912,7 +926,7 @@ ExprPtr Parser::postfix() {
                     field.location, MethodCallExpr{
                         std::move(expr), field.text, std::move(arguments),
                         field.text == "get" || field.text == "pop"
-                            ? enumerations_.at("Option") : nullptr, {}}});
+                            ? enumerations_.at("Option") : nullptr, {}, {}}});
             } else {
                 expr = std::make_unique<Expression>(Expression{
                     field.location, FieldExpr{std::move(expr), field.text}});
@@ -1282,6 +1296,7 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
 
     while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
         const bool startsDeclaration = check(TokenKind::Val) || check(TokenKind::Var) ||
+                                       check(TokenKind::Extend) ||
                                        check(TokenKind::Def) || check(TokenKind::While) ||
                                        check(TokenKind::Return) || check(TokenKind::Break) ||
                                        check(TokenKind::Continue);

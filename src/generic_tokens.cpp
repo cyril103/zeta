@@ -18,14 +18,20 @@ std::string declarationName(const std::vector<Token>& tokens,
     std::size_t cursor = begin;
     while (cursor < end &&
            (tokens[cursor].kind == TokenKind::Pub ||
-            tokens[cursor].kind == TokenKind::Native)) ++cursor;
+            tokens[cursor].kind == TokenKind::Native ||
+            tokens[cursor].kind == TokenKind::Extend)) ++cursor;
     if (cursor >= end) return {};
     const TokenKind declaration = tokens[cursor++].kind;
     if (declaration != TokenKind::Val && declaration != TokenKind::Var &&
         declaration != TokenKind::Def && declaration != TokenKind::Struct &&
         declaration != TokenKind::Enum) return {};
-    if (cursor >= end || tokens[cursor].kind != TokenKind::Identifier) return {};
-    return tokens[cursor].text;
+    if (cursor >= end || (tokens[cursor].kind != TokenKind::Identifier &&
+                          tokens[cursor].kind != TokenKind::VecType)) return {};
+    std::string name = tokens[cursor++].text;
+    if (cursor + 1U < end && tokens[cursor].kind == TokenKind::Dot &&
+        tokens[cursor + 1U].kind == TokenKind::Identifier)
+        name += "." + tokens[cursor + 1U].text;
+    return name;
 }
 
 TopLevelRange makeRange(const std::vector<Token>& tokens,

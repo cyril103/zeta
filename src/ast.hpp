@@ -307,6 +307,7 @@ struct MethodCallExpr {
     std::vector<ExprPtr> arguments;
     std::shared_ptr<const EnumType> optionDefinition;
     std::string resolvedFunction;
+    std::vector<ValueType> typeArguments;
 };
 struct IndexExpr { ExprPtr array; ExprPtr index; };
 struct AddressExpr { bool mutableBorrow; ExprPtr operand; };
@@ -363,6 +364,7 @@ struct Declaration {
     std::vector<std::string> typeConstraints;
     ExprPtr initializer;
     bool inferTypeFromInitializer{false};
+    bool extensionMethod{false};
 };
 
 struct Assignment {

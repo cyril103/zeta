@@ -1,0 +1,11 @@
+import vec_extensions
+
+def main(): Int = {
+    var values = Vec[Int]()
+    values.appendTwice(20, 22)
+    val second = values.get(1)
+    match (second) {
+        Option[Int].Some(value) => if (values.count() == 2 && value == 22) 0 else 1
+        Option[Int].None => 2
+    }
+}

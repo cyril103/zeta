@@ -280,6 +280,10 @@ if(BUILD_TESTING)
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/user_method_interfaces.sh
             $<TARGET_FILE:zeta>
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/user_method_interfaces)
+    add_test(NAME extension_method_interfaces
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/extension_method_interfaces.sh
+            $<TARGET_FILE:zeta>
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/extension_method_interfaces)
     add_test(NAME separate_compilation_cache
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/separate_compilation_cache.sh
             $<TARGET_FILE:zeta> ${CMAKE_CURRENT_SOURCE_DIR}/tests/modules_integration)
@@ -520,6 +524,18 @@ if(BUILD_TESTING)
     add_test(NAME reject_user_method_invalid_receiver COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/user_method_invalid_receiver.zeta)
     set_tests_properties(reject_user_method_invalid_receiver PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_extension_method_without_import COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/extension_method_without_import.zeta)
+    set_tests_properties(reject_extension_method_without_import PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_extension_method_mutable_val COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/extension_method_mutable_val/main.zeta)
+    set_tests_properties(reject_extension_method_mutable_val PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_extension_method_collision COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/extension_method_collision/main.zeta)
+    set_tests_properties(reject_extension_method_collision PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_extension_method_builtin_override COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/extension_method_builtin_override.zeta)
+    set_tests_properties(reject_extension_method_builtin_override PROPERTIES WILL_FAIL TRUE)
 
     add_test(
         NAME compile_block_expressions

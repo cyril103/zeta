@@ -18,6 +18,7 @@ struct ExportedSymbol {
     bool nativeSymbol;
     std::vector<ValueType> parameterTypes;
     const Declaration* declaration;
+    bool extensionMethod{false};
 };
 
 struct ModuleInterface {
