@@ -189,7 +189,7 @@ void collectExpressionNames(const Expression& expression,
         } else if constexpr (std::is_same_v<T, IfExpr>) {
             collectExpressionNames(*node.condition, uses);
             collectExpressionNames(*node.thenBranch, uses);
-            collectExpressionNames(*node.elseBranch, uses);
+            if (node.elseBranch) collectExpressionNames(*node.elseBranch, uses);
         } else if constexpr (std::is_same_v<T, MatchExpr>) {
             collectExpressionNames(*node.operand, uses);
             for (const MatchBranch& branch : node.branches)
@@ -288,6 +288,9 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
             throw CompileError(declaration.location,
                                "un tableau vide exige une annotation de type");
         declaration.type = inferType(*declaration.initializer);
+        if (declaration.type == ValueType::Never)
+            throw CompileError(declaration.location,
+                               "une liaison ne peut pas avoir le type interne Never");
         if (containsTypeParameter(declaration.type))
             throw CompileError(declaration.location,
                                "l'initialiseur ne permet pas d'inférer un type concret");
@@ -748,18 +751,21 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
                 return ValueType::Bool;
             return TypeRules::commonOperandType(inferType(*node.left), inferType(*node.right));
         } else if constexpr (std::is_same_v<T, BlockExpr>) {
-            return node.result ? inferType(*node.result) : ValueType::Unit;
+            return node.result ? inferType(*node.result) :
+                blockEndsWithTerminator(node) ? ValueType::Never : ValueType::Unit;
         } else if constexpr (std::is_same_v<T, MatchExpr>) {
-            return inferType(*node.branches.front().result);
+            for (const MatchBranch& branch : node.branches) {
+                const ValueType branchType = inferType(*branch.result);
+                if (branchType != ValueType::Never) return branchType;
+            }
+            return ValueType::Never;
         } else {
-            if (const auto* thenBlock = std::get_if<BlockExpr>(&node.thenBranch->value);
-                thenBlock != nullptr && !thenBlock->result && blockEndsWithTerminator(*thenBlock))
-                return inferType(*node.elseBranch);
-            if (const auto* elseBlock = std::get_if<BlockExpr>(&node.elseBranch->value);
-                elseBlock != nullptr && !elseBlock->result && blockEndsWithTerminator(*elseBlock))
-                return inferType(*node.thenBranch);
-            return TypeRules::commonOperandType(inferType(*node.thenBranch),
-                                                inferType(*node.elseBranch));
+            if (!node.elseBranch) return ValueType::Unit;
+            const ValueType thenType = inferType(*node.thenBranch);
+            const ValueType elseType = inferType(*node.elseBranch);
+            if (thenType == ValueType::Never) return elseType;
+            if (elseType == ValueType::Never) return thenType;
+            return TypeRules::commonOperandType(thenType, elseType);
         }
     }, expression.value);
 }
@@ -1237,10 +1243,20 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 mismatch(expression.location, expected, ValueType::Unit);
             popBorrowScope();
             symbols_.popScope();
-            return node.result || blockEndsWithTerminator(node) ? expected : ValueType::Unit;
+            return node.result ? expected :
+                blockEndsWithTerminator(node) ? ValueType::Never : ValueType::Unit;
         } else if constexpr (std::is_same_v<T, IfExpr>) {
             checkExpression(*node.condition, ValueType::Bool);
             const auto beforeBranches = movedBoxes_;
+            if (!node.elseBranch) {
+                if (expected != ValueType::Unit)
+                    mismatch(expression.location, expected, ValueType::Unit);
+                checkExpression(*node.thenBranch, ValueType::Unit);
+                if (movedBoxes_ != beforeBranches)
+                    throw CompileError(expression.location,
+                        "un déplacement conditionnel doit avoir lieu dans toutes les branches");
+                return ValueType::Unit;
+            }
             checkExpression(*node.thenBranch, expected);
             const auto afterThen = movedBoxes_;
             movedBoxes_ = beforeBranches;
@@ -1281,7 +1297,8 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
         }
     }, expression.value);
 
-    if (actual != expected) mismatch(expression.location, expected, actual);
+    if (actual != expected && actual != ValueType::Never)
+        mismatch(expression.location, expected, actual);
     expression.inferredType = actual;
     expression.typed = true;
     return actual;

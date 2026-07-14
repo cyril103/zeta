@@ -1,0 +1,6 @@
+def invalid(flag: Bool): Int = {
+    val impossible = if (flag) { return 1 } else { return 2 }
+    0
+}
+
+def main(): Int = invalid(true)

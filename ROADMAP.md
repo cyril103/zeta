@@ -102,13 +102,10 @@ Les autres acquis particulièrement utiles sont :
 L'exemple est compréhensible, mais trop cérémonieux :
 
 - chaque variable locale exige une annotation de type ;
-- l'absence de `Unit` force les mutations à retourner un compteur ou un booléen ;
 - `sequences.sort(values.asSliceMut())` expose trop de mécanique pour un usage
   courant ;
 - `collections.unwrapOr` et `strings.unwrapOr` dupliquent une API qui appartient
   conceptuellement à `Option[T]` ;
-- `if` est toujours une expression, ce qui rend certaines gardes suivies de
-  déclarations locales maladroites ;
 - tous les parcours utilisent une boucle `while` et un indice manuel ;
 - les offsets UTF-8 en octets sont corrects mais trop bas niveau pour l'usage
   quotidien ;
@@ -131,7 +128,8 @@ plus avancée que la surface utilisateur.
 
 - `val`, `var`, `def`, fonctions globales et récursives, retours et appels
   terminaux ;
-- blocs expressions, `if/else`, `while ... do`, `break`, `continue` ;
+- blocs expressions, gardes `if`, `if/else`, `while ... do`, `break`, `continue` ;
+- `Unit` public pour les effets et `Never` interne pour les chemins terminés ;
 - types primitifs, conversions explicites et opérations typées ;
 - tableaux fixes et imbriqués avec bornes contrôlées ;
 - références, emprunts mutables, `Slice[T]` et `SliceMut[T]` ;
@@ -308,16 +306,24 @@ pas mélanger deux contrats publics.
 
 ### 1C. Contrôle de flux
 
-Clarifier les gardes et branches qui ne reviennent pas :
+**Livré le 15 juillet 2026.** Le contrôle de flux distingue désormais :
 
-- soit autoriser un `if` instruction sans `else` ;
-- soit introduire un type interne `Never` pour `return`, `break` et `continue` ;
-- conserver `if/else` comme expression typée lorsque sa valeur est utilisée.
+- `if` sans `else`, instruction de type `Unit` ;
+- `return`, `break` et `continue`, dont les blocs terminés ont le type interne
+  `Never` ;
+- `if/else`, qui reste une expression typée et fait converger `Never` vers la
+  branche atteignable.
+
+Les gardes refusent les déplacements de valeurs possédées qui ne seraient pas
+effectués sur tous les chemins. Les tests couvrent retours précoces, `break`,
+`continue`, convergence avec une valeur et rejet d'un `if` sans `else` lorsqu'un
+résultat métier est attendu.
 
 ### Critère de sortie
 
-Réécrire l'exemple complet avec moins d'annotations et sans valeurs factices,
-tout en conservant les mêmes sorties et toute la suite de tests existante.
+**Atteint le 15 juillet 2026.** L'exemple complet utilise l'inférence locale et
+les appels `Unit` sans valeurs factices, conserve ses sorties et passe avec toute
+la suite de tests.
 
 ## Priorité 2 — composabilité de `Vec` et méthodes
 
@@ -456,8 +462,7 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-Commencer la priorité 1C par le contrat de typage du contrôle de flux : décider si
-`return`, `break` et `continue` introduisent un type interne `Never`, puis définir
-comment ce type converge avec `Unit` et les types métier dans `if/else` et
-`match`. Ajouter les tests de rejet avant d'autoriser un `if` instruction sans
-`else`.
+Commencer la priorité 2 par la mutation sûre d'un `Vec[T]` stocké dans un champ de
+structure. Définir d'abord la forme d'emprunt du receveur et les règles d'aliasing,
+puis couvrir `push`, `set`, `reserve` et `clear` sans ajouter de builtin `Stack` ou
+`Queue`.

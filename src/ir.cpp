@@ -83,6 +83,7 @@ std::string IrGenerator::genericLinkName(
 }
 
 std::string IrGenerator::genericTypeIdentity(const ValueType& type) const {
+    if (type == ValueType::Never) return "X";
     if (type == ValueType::Unit) return "N";
     if (type == ValueType::Int) return "I";
     if (type == ValueType::Byte) return "B";
@@ -688,7 +689,8 @@ void IrGenerator::emitTailExpression(
                                               std::move(argumentTypes)});
         return;
     }
-    if (const auto* conditional = std::get_if<IfExpr>(&expressionNode.value)) {
+    if (const auto* conditional = std::get_if<IfExpr>(&expressionNode.value);
+        conditional != nullptr && conditional->elseBranch) {
         const ValueId condition = expression(*conditional->condition, parameters);
         const std::size_t elseLabel = nextLabel_++;
         ir_.instructions.push_back(IrBranch{condition, false, elseLabel});
@@ -1185,6 +1187,15 @@ ValueId IrGenerator::expression(
             return result;
         } else if constexpr (std::is_same_v<T, IfExpr>) {
             const ValueId condition = expression(*node.condition, parameters);
+            if (!node.elseBranch) {
+                const ValueId output = nextValue(ValueType::Unit);
+                ir_.instructions.push_back(IrUnit{output});
+                const std::size_t endLabel = nextLabel_++;
+                ir_.instructions.push_back(IrBranch{condition, false, endLabel});
+                expression(*node.thenBranch, parameters);
+                ir_.instructions.push_back(IrLabel{endLabel});
+                return output;
+            }
             const ValueId output = nextValue(expressionNode.inferredType);
             const ValueType resultType = resolveType(expressionNode.inferredType);
             const std::size_t elseLabel = nextLabel_++;
@@ -1295,6 +1306,7 @@ std::string IrGenerator::print(const VerifiedIrProgram& verified) {
     std::ostringstream out;
     out << std::setprecision(std::numeric_limits<double>::max_digits10);
     const auto suffix = [](ValueType type) {
+        if (type == ValueType::Never) return "never";
         if (type == ValueType::Unit) return "unit";
         if (type == ValueType::Int) return "i32";
         if (type == ValueType::Byte) return "u8";

@@ -1,0 +1,7 @@
+def consume(value: Box[Int]): Unit = {}
+
+def main(): Int = {
+    val owned = Box(1)
+    if (true) { consume(owned) }
+    0
+}

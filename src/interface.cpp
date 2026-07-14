@@ -18,6 +18,8 @@ using EnumRegistry = std::unordered_map<std::string, std::shared_ptr<EnumType>>;
 
 std::string encodeType(const ValueType& type) {
     switch (type.kind) {
+    case ValueType::Kind::Never:
+        interfaceFailure("ZTI100", "le type interne Never ne peut pas être exporté");
     case ValueType::Kind::Unit: return "N";
     case ValueType::Kind::Int: return "I";
     case ValueType::Kind::Byte: return "Y";

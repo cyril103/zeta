@@ -473,6 +473,12 @@ if(BUILD_TESTING)
     add_test(NAME reject_unit_missing_value COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/unit_missing_value.zeta)
     set_tests_properties(reject_unit_missing_value PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_guard_conditional_move COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/guard_conditional_move.zeta)
+    set_tests_properties(reject_guard_conditional_move PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_never_binding COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/never_binding.zeta)
+    set_tests_properties(reject_never_binding PROPERTIES WILL_FAIL TRUE)
 
     add_test(
         NAME compile_block_expressions

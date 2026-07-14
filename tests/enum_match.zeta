@@ -10,9 +10,20 @@ def decode(resultat: Resultat): Int = match (resultat) {
     Resultat.Absent => -1
 }
 
+def decodeWithEarlyReturn(resultat: Resultat): Int = {
+    val decoded = match (resultat) {
+        Resultat.Absent => { return -1 }
+        Resultat.Valeur(value) => value
+        Resultat.Erreur(code, detail) => Int(code) + detail
+    }
+    decoded
+}
+
 def main(): Int = {
     val valeur: Int = decode(Resultat.Valeur(value: 42))
     val erreur: Int = decode(Resultat.Erreur(code: 2, detail: 5))
     val absent: Int = decode(Resultat.Absent)
-    if (valeur == 42 && erreur == 7 && absent == -1) 0 else 1
+    val early = decodeWithEarlyReturn(Resultat.Absent)
+    val retained = decodeWithEarlyReturn(Resultat.Valeur(value: 9))
+    if (valeur == 42 && erreur == 7 && absent == -1 && early == -1 && retained == 9) 0 else 1
 }

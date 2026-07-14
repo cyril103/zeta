@@ -7,7 +7,10 @@ def implicite (x : Int) : Int = x + 2
 def positif (x : Int) : Int = {
     if (x < 0) {
         return 0
-    } else x
+    }
+    x
 }
 
-def main () : Int = if (explicite(4) == 5 && implicite(4) == 6 && positif(-2) == 0 && positif(3) == 3) 0 else 1
+def convergence (x : Int) : Int = if (x < 0) { return 0 } else x
+
+def main () : Int = if (explicite(4) == 5 && implicite(4) == 6 && positif(-2) == 0 && positif(3) == 3 && convergence(-2) == 0 && convergence(3) == 3) 0 else 1

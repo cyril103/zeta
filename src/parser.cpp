@@ -1252,8 +1252,13 @@ ExprPtr Parser::ifExpression(SourceLocation location) {
     expressionContinuation();
     consume(TokenKind::RightParen, "')' attendue après le prédicat");
     ExprPtr thenBranch = expression();
+    const std::size_t beforeSeparators = current_;
     skipSeparators();
-    consume(TokenKind::Else, "'else' obligatoire après la première branche");
+    if (!match(TokenKind::Else)) {
+        current_ = beforeSeparators;
+        return std::make_unique<Expression>(Expression{
+            location, IfExpr{std::move(condition), std::move(thenBranch), nullptr}});
+    }
     ExprPtr elseBranch;
     if (match(TokenKind::If))
         elseBranch = ifExpression(previous().location);
@@ -1283,6 +1288,31 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
             tokens_[current_ + 1].kind == TokenKind::Dot &&
             tokens_[current_ + 2].kind == TokenKind::Identifier &&
             tokens_[current_ + 3].kind == TokenKind::LeftParen;
+        bool startsGuard = false;
+        if (check(TokenKind::If)) {
+            std::size_t cursor = current_ + 1;
+            std::size_t parens = 0;
+            if (cursor < tokens_.size() && tokens_[cursor].kind == TokenKind::LeftParen) {
+                do {
+                    if (tokens_[cursor].kind == TokenKind::LeftParen) ++parens;
+                    else if (tokens_[cursor].kind == TokenKind::RightParen) --parens;
+                    ++cursor;
+                } while (cursor < tokens_.size() && parens != 0);
+                if (cursor < tokens_.size() && tokens_[cursor].kind == TokenKind::LeftBrace) {
+                    std::size_t braces = 0;
+                    do {
+                        if (tokens_[cursor].kind == TokenKind::LeftBrace) ++braces;
+                        else if (tokens_[cursor].kind == TokenKind::RightBrace) --braces;
+                        ++cursor;
+                    } while (cursor < tokens_.size() && braces != 0);
+                    while (cursor < tokens_.size() &&
+                           (tokens_[cursor].kind == TokenKind::Separator ||
+                            tokens_[cursor].kind == TokenKind::Semicolon)) ++cursor;
+                    startsGuard = cursor >= tokens_.size() ||
+                        tokens_[cursor].kind != TokenKind::Else;
+                }
+            }
+        }
         bool startsCall = false;
         if (check(TokenKind::Identifier) && current_ + 1 < tokens_.size() &&
             tokens_[current_ + 1].kind == TokenKind::LeftParen) {
@@ -1303,9 +1333,9 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
                 tokens_[cursor].kind != TokenKind::RightBrace;
         }
         if (!startsDeclaration && !startsAssignment() && !startsDereferenceAssignment &&
-            !startsMethodCall && !startsCall) break;
+            !startsMethodCall && !startsCall && !startsGuard) break;
 
-        if (startsMethodCall || startsCall) {
+        if (startsMethodCall || startsCall || startsGuard) {
             const SourceLocation methodLocation = peek().location;
             statements.push_back(std::make_unique<Statement>(
                 ExpressionStatement{methodLocation, expression()}));

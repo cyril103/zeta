@@ -23,6 +23,7 @@ std::size_t typeSize(ValueType type) {
     return valueTypeSize(type);
 }
 std::size_t valueSize(ValueType type) {
+    if (type == ValueType::Never) return 0U;
     if (type == ValueType::Unit) return 0U;
     if (type.kind == ValueType::Kind::Array || isAggregateValue(type))
         return valueTypeSize(type);

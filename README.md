@@ -238,12 +238,25 @@ pour quitter une branche avant la fin :
 
 ```text
 def positif (x : Int) : Int = {
-    if (x < 0) { return 0 } else x
+    if (x < 0) { return 0 }
+    x
 }
 ```
 
 `return` reste optionnel : sans lui, la dernière expression du corps fournit la
-valeur comme auparavant. La valeur retournée doit respecter le type déclaré.
+valeur comme auparavant. La valeur retournée doit respecter le type déclaré. Le
+compilateur représente en interne les chemins terminés par `return`, `break` ou
+`continue` avec `Never`, qui converge avec le type de la branche encore
+atteignable sans devenir un type écrivable dans le code source.
+
+Un `if` sans `else` est autorisé comme instruction et produit `Unit`. Lorsqu'une
+valeur est attendue, `else` reste obligatoire et les deux branches doivent
+converger vers le même type :
+
+```text
+if (ready) { io.println("prêt") }
+val status = if (ready) 1 else 0
+```
 
 Les boucles acceptent `break` pour quitter immédiatement la boucle courante et
 `continue` pour reprendre à l'évaluation de son prédicat. Dans des boucles
