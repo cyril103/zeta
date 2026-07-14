@@ -7,6 +7,20 @@
 
 enum class IrVerificationMode { Executable, ModuleObject };
 
+class VerifiedIrProgram {
+public:
+    const IrProgram& program() const noexcept { return *program_; }
+    IrVerificationMode mode() const noexcept { return mode_; }
+
+private:
+    friend class IrVerifier;
+    VerifiedIrProgram(const IrProgram& program, IrVerificationMode mode)
+        : program_(&program), mode_(mode) {}
+
+    const IrProgram* program_;
+    IrVerificationMode mode_;
+};
+
 class IrVerificationError : public std::runtime_error {
 public:
     IrVerificationError(std::string code, const std::string& message);
@@ -19,5 +33,6 @@ private:
 
 class IrVerifier {
 public:
-    static void verify(const IrProgram& program, IrVerificationMode mode);
+    static VerifiedIrProgram verify(const IrProgram& program, IrVerificationMode mode);
+    static VerifiedIrProgram verify(const IrProgram&& program, IrVerificationMode mode) = delete;
 };

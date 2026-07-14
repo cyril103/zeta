@@ -321,8 +321,13 @@ void emitEqualityChecks(std::ostringstream& out, const std::string& left,
 }
 
 std::string FasmCodeGenerator::generate(const IrProgram& program) {
-    IrVerifier::verify(program, IrVerificationMode::Executable);
-    return generateUnchecked(program);
+    return generate(IrVerifier::verify(program, IrVerificationMode::Executable));
+}
+
+std::string FasmCodeGenerator::generate(const VerifiedIrProgram& verified) {
+    if (verified.mode() != IrVerificationMode::Executable)
+        throw IrVerificationError("IRV004", "mode objet fourni au codegen exécutable");
+    return generateUnchecked(verified.program());
 }
 
 std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
@@ -1394,8 +1399,19 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
 
 std::string FasmCodeGenerator::generateObject(
     const IrProgram& program, bool entryPoint, const std::string& initializer) {
-    IrVerifier::verify(program, entryPoint ? IrVerificationMode::Executable
-                                          : IrVerificationMode::ModuleObject);
+    return generateObject(IrVerifier::verify(
+        program, entryPoint ? IrVerificationMode::Executable
+                            : IrVerificationMode::ModuleObject),
+        entryPoint, initializer);
+}
+
+std::string FasmCodeGenerator::generateObject(
+    const VerifiedIrProgram& verified, bool entryPoint, const std::string& initializer) {
+    const IrVerificationMode expected = entryPoint ? IrVerificationMode::Executable
+                                                   : IrVerificationMode::ModuleObject;
+    if (verified.mode() != expected)
+        throw IrVerificationError("IRV004", "mode de vérification incompatible avec l'objet");
+    const IrProgram& program = verified.program();
     std::string assembly = generateUnchecked(program);
     const std::string executableHeader =
         "format ELF64 executable 3\nentry start\n\nsegment readable executable\n";

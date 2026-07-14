@@ -466,7 +466,8 @@ int main(int argc, char** argv) {
         }
         IrGenerator irGenerator;
         const IrProgram ir = irGenerator.generate(modules);
-        IrVerifier::verify(ir, IrVerificationMode::Executable);
+        const VerifiedIrProgram verifiedIr =
+            IrVerifier::verify(ir, IrVerificationMode::Executable);
 
         std::unordered_map<std::string, IrProgram> moduleIrs;
         std::unordered_map<std::string, std::string> claimedGenericInstances;
@@ -486,7 +487,6 @@ int main(int argc, char** argv) {
                 if (!inserted) duplicates.insert(definition);
             }
             IrGenerator::removeGenericDefinitions(moduleIr, duplicates);
-            IrVerifier::verify(moduleIr, IrVerificationMode::ModuleObject);
             moduleIrs.emplace(moduleName, std::move(moduleIr));
         }
 
@@ -494,8 +494,8 @@ int main(int argc, char** argv) {
         irPath += ".ir";
         fs::path assemblyPath = outputPath;
         assemblyPath += ".asm";
-        writeFile(irPath, IrGenerator::print(ir, IrVerificationMode::Executable));
-        writeFile(assemblyPath, FasmCodeGenerator::generate(ir));
+        writeFile(irPath, IrGenerator::print(verifiedIr));
+        writeFile(assemblyPath, FasmCodeGenerator::generate(verifiedIr));
 
         fs::path cacheDirectory = outputPath;
         cacheDirectory += ".cache";
@@ -534,6 +534,8 @@ int main(int argc, char** argv) {
                 continue;
             }
             const IrProgram& moduleIr = moduleIrs.at(moduleName);
+            const VerifiedIrProgram verifiedModuleIr =
+                IrVerifier::verify(moduleIr, IrVerificationMode::ModuleObject);
             const fs::path moduleIrPath = moduleDirectory / (moduleName + ".ir");
             const fs::path moduleInterfacePath = moduleDirectory / (moduleName + ".zti");
             const fs::path moduleAssembly = moduleDirectory / (moduleName + ".asm");
@@ -546,8 +548,7 @@ int main(int argc, char** argv) {
             std::string objectFingerprint = fingerprint;
             for (const std::string& definition : IrGenerator::genericDefinitions(moduleIr))
                 objectFingerprint += ":generic-owner:" + definition;
-            writeFile(moduleIrPath,
-                      IrGenerator::print(moduleIr, IrVerificationMode::ModuleObject));
+            writeFile(moduleIrPath, IrGenerator::print(verifiedModuleIr));
             writeFile(moduleInterfacePath, InterfaceCodec::serialize(
                 modules.interfaces.at(moduleName),
                 modules.interfaceFingerprints.at(moduleName),
@@ -556,7 +557,8 @@ int main(int argc, char** argv) {
             if (!fs::exists(cachedModuleObject) ||
                 readOptionalFile(moduleStamp) != objectFingerprint) {
                 writeFile(moduleAssembly,
-                    FasmCodeGenerator::generateObject(moduleIr, false, moduleName));
+                    FasmCodeGenerator::generateObject(
+                        verifiedModuleIr, false, moduleName));
                 runFasm(moduleAssembly, cachedModuleObject);
                 weakenGenericSymbols(cachedModuleObject, moduleIr);
                 writeFile(moduleStamp, objectFingerprint);

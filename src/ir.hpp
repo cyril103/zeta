@@ -132,6 +132,7 @@ struct IrProgram {
 };
 
 enum class IrVerificationMode;
+class VerifiedIrProgram;
 
 class IrGenerator {
 public:
@@ -144,6 +145,7 @@ public:
     static void removeGenericDefinitions(IrProgram& program,
                                          const std::unordered_set<std::string>& names);
     static std::string print(const IrProgram& program, IrVerificationMode mode);
+    static std::string print(const VerifiedIrProgram& program);
 
 private:
     struct GenericInstance {

@@ -238,7 +238,14 @@ intercepter ce type d'erreur avant FASM.
    `IRV050` à `IRV054`. Le pipeline CTest exerce aussi la vérification intégrée
    par module et l'injection d'une IR invalide aux trois frontières publiques de
    sortie.
-9. Exécuter toute la suite et mesurer le coût de la vérification.
+9. **Livré le 14 juillet 2026** — exécuter toute la suite et mesurer le coût sur
+   cinq échantillons alternés de vingt compilations propres du showcase en
+   Release, épinglées à un CPU. Sur Intel Core i5-10300H sous WSL2 avec GCC 15.2,
+   la médiane est de 35,30 ms avec vérification contre 33,09 ms sans, soit
+   +6,67 %. Un résultat validé opaque réutilisé par les sorties, des bitsets de
+   définitions et des tables précalculées ont réduit le coût initial.
+10. **En cours** — ramener le surcoût médian sous la cible de 5 % ; il reste
+    environ 0,55 ms à gagner par compilation sur la machine de référence.
 
 ### Critère de sortie
 

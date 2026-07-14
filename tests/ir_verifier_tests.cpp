@@ -400,6 +400,12 @@ int main() {
     expectBoundaryCode("frontière objet", "IRV001", [&] {
         return FasmCodeGenerator::generateObject(invalidBoundary, false, "invalid");
     });
+    const IrProgram emptyModule;
+    const VerifiedIrProgram verifiedModule =
+        IrVerifier::verify(emptyModule, IrVerificationMode::ModuleObject);
+    expectBoundaryCode("mode validé incompatible", "IRV004", [&] {
+        return FasmCodeGenerator::generate(verifiedModule);
+    });
 
     return failures == 0 ? 0 : 1;
 }

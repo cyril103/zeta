@@ -285,9 +285,9 @@ L'intégration se fait aux frontières publiques de sortie, pas seulement dans
 `generateObject` vérifient un `IrProgram` même lorsqu'un test le leur fournit
 directement. Le printer reçoit explicitement le mode ; `generate` applique le mode
 exécutable et `generateObject` choisit le mode à partir de son paramètre
-`entryPoint`. Pour éviter trois vérifications d'un même programme dans le flux
-normal, une API future pourra exposer un résultat validé opaque ; cette livraison
-privilégie une vérification idempotente, dont le coût doit encore être mesuré.
+`entryPoint`. `IrVerifier::verify` retourne un `VerifiedIrProgram` opaque que le
+flux normal réutilise ensuite pour le printer et le codegen. Les surcharges qui
+reçoivent une IR brute restent sûres et construisent elles-mêmes ce résultat.
 
 ## Stratégie de tests
 
@@ -309,10 +309,17 @@ La validation globale exécute le vérificateur sur :
 - chaque IR de module produite pendant ce build en mode objet ;
 - les fixtures génériques et interfaces précompilées existantes.
 
-Le coût est mesuré sur cinq compilations propres de l'exemple, avec et sans
-vérification. La roadmap considère acceptable un surcoût médian inférieur à 5 %
-du temps de compilation total et publie les deux médianes avec la machine de
-mesure.
+Le coût est mesuré avec cinq échantillons alternés par configuration, chaque
+échantillon agrégeant vingt compilations propres du showcase et étant ramené au
+temps par compilation. Cette agrégation limite le bruit d'ordonnancement sur une
+commande Release très courte. La cible reste un surcoût médian inférieur à 5 %.
+
+Mesure du 14 juillet 2026 : GCC 15.2.0 en Release, Linux WSL2
+6.18.33.2, Intel Core i5-10300H (4 cœurs, 8 threads), processus épinglés au CPU 0.
+La médiane est de 35,30 ms avec vérification contre 33,09 ms sans vérification,
+soit +6,67 %. Le résultat validé opaque, les bitsets de définitions et les tables
+de lectures/sorties précalculées ont supprimé les validations et allocations
+redondantes, mais il reste 0,55 ms à gagner pour atteindre la cible de 5 %.
 
 ## Conditions d'évolution
 

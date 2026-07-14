@@ -1279,7 +1279,11 @@ ValueId IrGenerator::expression(
 }
 
 std::string IrGenerator::print(const IrProgram& program, IrVerificationMode mode) {
-    IrVerifier::verify(program, mode);
+    return print(IrVerifier::verify(program, mode));
+}
+
+std::string IrGenerator::print(const VerifiedIrProgram& verified) {
+    const IrProgram& program = verified.program();
     std::ostringstream out;
     out << std::setprecision(std::numeric_limits<double>::max_digits10);
     const auto suffix = [](ValueType type) {

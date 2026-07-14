@@ -2,6 +2,7 @@
 #include "type_rules.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <deque>
 #include <optional>
 #include <type_traits>
@@ -617,10 +618,9 @@ void verifyInstructionTypes(const IrProgram& program, const IrInstruction& instr
 IrVerificationError::IrVerificationError(std::string code, const std::string& message)
     : std::runtime_error("[" + code + "] " + message), code_(std::move(code)) {}
 
-void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
+VerifiedIrProgram IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
     static_assert(std::variant_size_v<IrInstruction> == 47,
                   "mettre à jour l'inventaire du vérificateur d'IR");
-    static_cast<void>(mode);
     if (program.valueCount != program.valueTypes.size())
         fail("IRV001", "valueCount=" + std::to_string(program.valueCount) +
              " mais valueTypes.size()=" + std::to_string(program.valueTypes.size()));
@@ -657,6 +657,10 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
     std::vector<std::optional<std::size_t>> valueRegions(program.valueCount);
     std::vector<std::vector<std::size_t>> valueProducers(program.valueCount);
     std::vector<std::optional<std::size_t>> slotRegions(program.slots.size());
+    std::vector<std::optional<ValueId>> instructionOutputs;
+    instructionOutputs.reserve(program.instructions.size());
+    for (const IrInstruction& instruction : program.instructions)
+        instructionOutputs.push_back(outputOf(instruction));
     std::size_t region = 0;
     bool parameterPreamble = false;
     std::size_t expectedParameter = 0;
@@ -687,7 +691,7 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
             labelInstructions.emplace(label->label, index);
         }
 
-        if (const std::optional<ValueId> output = outputOf(instruction)) {
+        if (const std::optional<ValueId> output = instructionOutputs[index]) {
             if (*output >= program.valueCount)
                 fail("IRV020", context + " : sortie $" + std::to_string(*output) +
                      " hors limites");
@@ -739,11 +743,15 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
                  " hors fusion IrCopy");
     }
 
+    std::vector<std::vector<ValueId>> instructionReads;
+    instructionReads.reserve(program.instructions.size());
+    for (const IrInstruction& instruction : program.instructions)
+        instructionReads.push_back(readsOf(instruction));
     for (std::size_t index = 0; index < program.instructions.size(); ++index) {
         const IrInstruction& instruction = program.instructions[index];
         region = instructionRegions[index];
         const std::string context = instructionContext(index, regionNames[region]);
-        for (const ValueId value : readsOf(instruction)) {
+        for (const ValueId value : instructionReads[index]) {
             if (value >= program.valueCount)
                 fail("IRV020", context + " : lecture de $" + std::to_string(value) +
                      " hors limites");
@@ -835,9 +843,11 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
         for (const std::size_t successor : successors[index]) pending.push_back(successor);
     }
 
+    std::vector<std::size_t> traversalMarks(program.instructions.size(), 0);
+    std::size_t traversal = 0;
     const auto reachesForward = [&](std::size_t from, std::size_t target,
                                     std::optional<std::size_t> blocked) {
-        std::vector<unsigned char> visitedInstructions(program.instructions.size(), 0);
+        ++traversal;
         std::deque<std::size_t> work;
         for (const std::size_t successor : successors[from])
             if (successor > from) work.push_back(successor);
@@ -846,13 +856,17 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
             work.pop_front();
             if (blocked.has_value() && index == *blocked) continue;
             if (index == target) return true;
-            if (visitedInstructions[index] != 0) continue;
-            visitedInstructions[index] = 1;
+            if (traversalMarks[index] == traversal) continue;
+            traversalMarks[index] = traversal;
             for (const std::size_t successor : successors[index])
                 if (successor > index) work.push_back(successor);
         }
         return false;
     };
+    std::vector<std::vector<std::size_t>> valueReaders(program.valueCount);
+    for (std::size_t index = 0; index < instructionReads.size(); ++index)
+        for (const ValueId value : instructionReads[index])
+            valueReaders[value].push_back(index);
     for (ValueId value = 0; value < valueProducers.size(); ++value) {
         const std::vector<std::size_t>& producers = valueProducers[value];
         if (producers.size() < 2) continue;
@@ -863,9 +877,7 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
         const auto verifyExclusiveOrder = [&](std::size_t first, std::size_t second) {
             if (!reachesForward(first, second, std::nullopt)) return;
             bool hasBypass = false;
-            for (std::size_t index = 0; index < program.instructions.size(); ++index) {
-                const std::vector<ValueId> reads = readsOf(program.instructions[index]);
-                if (std::find(reads.begin(), reads.end(), value) == reads.end()) continue;
+            for (const std::size_t index : valueReaders[value]) {
                 if (reachesForward(second, index, std::nullopt) &&
                     reachesForward(first, index, second)) {
                     hasBypass = true;
@@ -883,16 +895,18 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
             }
     }
 
-    using Definitions = std::vector<unsigned char>;
+    using Definitions = std::vector<std::uint64_t>;
+    const std::size_t definitionWords = (program.valueCount + 63U) / 64U;
+    const Definitions allDefinitions(definitionWords, ~std::uint64_t{0});
     std::vector<Definitions> definitionsIn(
-        program.instructions.size(), Definitions(program.valueCount, 1));
+        program.instructions.size(), allDefinitions);
     std::vector<Definitions> definitionsOut = definitionsIn;
     bool changed = true;
     while (changed) {
         changed = false;
         for (std::size_t index = 0; index < program.instructions.size(); ++index) {
             if (reachable[index] == 0) continue;
-            Definitions nextIn(program.valueCount, 0);
+            Definitions nextIn(definitionWords, 0);
             const bool isEntry = regionEntries[instructionRegions[index]].has_value() &&
                 *regionEntries[instructionRegions[index]] == index;
             if (!isEntry && !predecessors[index].empty()) {
@@ -901,14 +915,13 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
                      predecessorIndex < predecessors[index].size(); ++predecessorIndex) {
                     const Definitions& incoming =
                         definitionsOut[predecessors[index][predecessorIndex]];
-                    for (ValueId value = 0; value < program.valueCount; ++value)
-                        nextIn[value] = static_cast<unsigned char>(
-                            nextIn[value] != 0 && incoming[value] != 0);
+                    for (std::size_t word = 0; word < definitionWords; ++word)
+                        nextIn[word] &= incoming[word];
                 }
             }
             Definitions nextOut = nextIn;
-            if (const std::optional<ValueId> output = outputOf(program.instructions[index]))
-                nextOut[*output] = 1;
+            if (const std::optional<ValueId> output = instructionOutputs[index])
+                nextOut[*output / 64U] |= std::uint64_t{1} << (*output % 64U);
             if (nextIn != definitionsIn[index] || nextOut != definitionsOut[index]) {
                 definitionsIn[index] = std::move(nextIn);
                 definitionsOut[index] = std::move(nextOut);
@@ -921,8 +934,9 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
         if (reachable[index] == 0) continue;
         const std::string context = instructionContext(
             index, regionNames[instructionRegions[index]]);
-        for (const ValueId value : readsOf(program.instructions[index]))
-            if (definitionsIn[index][value] == 0)
+        for (const ValueId value : instructionReads[index])
+            if ((definitionsIn[index][value / 64U] &
+                 (std::uint64_t{1} << (value % 64U))) == 0)
                 fail("IRV023", context + " : valeur $" + std::to_string(value) +
                      " utilisée avant définition sur tous les chemins");
     }
@@ -985,4 +999,5 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
             fail("IRV053", instructionContext(index,
                  regionNames[instructionRegions[index]]) +
                  " : aucun terminal valide atteignable");
+    return VerifiedIrProgram(program, mode);
 }
