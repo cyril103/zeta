@@ -1,0 +1,5 @@
+def main(): Int = {
+    val boxed = Box(42)
+    val moved = boxed
+    if (*boxed == *moved) 0 else 1
+}

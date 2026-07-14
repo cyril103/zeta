@@ -351,6 +351,7 @@ struct Declaration {
     std::vector<std::string> typeParameters;
     std::vector<std::string> typeConstraints;
     ExprPtr initializer;
+    bool inferTypeFromInitializer{false};
 };
 
 struct Assignment {

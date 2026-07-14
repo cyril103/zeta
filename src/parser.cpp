@@ -731,8 +731,13 @@ Declaration Parser::declaration(BindingKind kind) {
         }
         consume(TokenKind::RightParen, "')' attendue après les paramètres");
     }
-    consume(TokenKind::Colon, "':' attendu après l'identifiant");
-    const ValueType type = consumeType("type attendu");
+    const bool inferLocalType = kind != BindingKind::Def && blockDepth_ != 0 &&
+        !check(TokenKind::Colon);
+    ValueType type = ValueType::Int;
+    if (!inferLocalType) {
+        consume(TokenKind::Colon, "':' attendu après l'identifiant");
+        type = consumeType("type attendu");
+    }
     const bool publicSymbol = publicDeclaration_;
     const bool nativeSymbol = nativeDeclaration_;
     publicDeclaration_ = false;
@@ -743,14 +748,16 @@ Declaration Parser::declaration(BindingKind kind) {
         activeTypeParameters_ = enclosingTypeParameters;
         return Declaration{start.location, name.text, type, kind, publicSymbol, true,
                            callable, std::move(parameters), std::move(typeParameters),
-                           std::move(typeConstraints), nullptr};
+                           std::move(typeConstraints), nullptr, false};
     }
-    consume(TokenKind::Equal, "'=' attendu après le type");
+    consume(TokenKind::Equal,
+            inferLocalType ? "'=' attendu après l'identifiant"
+                           : "'=' attendu après le type");
     ExprPtr initializer = expression();
     activeTypeParameters_ = enclosingTypeParameters;
     return Declaration{start.location, name.text, type, kind, publicSymbol, false,
                        callable, std::move(parameters), std::move(typeParameters),
-                       std::move(typeConstraints), std::move(initializer)};
+                       std::move(typeConstraints), std::move(initializer), inferLocalType};
 }
 
 std::string Parser::qualifiedName() {

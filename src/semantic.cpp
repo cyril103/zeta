@@ -3,6 +3,7 @@
 #include "diagnostic.hpp"
 #include "type_rules.hpp"
 
+#include <algorithm>
 #include <type_traits>
 #include <unordered_map>
 
@@ -82,6 +83,20 @@ bool inferTypeArguments(
         return true;
     }
     return pattern == actual;
+}
+bool containsTypeParameter(const ValueType& type) {
+    using Kind = ValueType::Kind;
+    if (type.kind == Kind::TypeParameter) return true;
+    if (type.kind == Kind::Array || type.kind == Kind::Reference ||
+        type.kind == Kind::Slice || type.kind == Kind::Box || type.kind == Kind::Vec)
+        return containsTypeParameter(*type.element);
+    if (type.kind == Kind::Struct)
+        return std::any_of(type.structure->typeArguments.begin(),
+                           type.structure->typeArguments.end(), containsTypeParameter);
+    if (type.kind == Kind::Enum)
+        return std::any_of(type.enumeration->typeArguments.begin(),
+                           type.enumeration->typeArguments.end(), containsTypeParameter);
+    return false;
 }
 bool isCopyType(const ValueType& type) {
     return isCopyValueType(type);
@@ -255,6 +270,20 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
             throw CompileError(declaration.location,
                                "contrainte générique inconnue '" +
                                declaration.typeConstraints[i] + "'");
+    if (declaration.inferTypeFromInitializer) {
+        if (allowRecursion || declaration.callable || declaration.publicSymbol ||
+            declaration.nativeSymbol || declaration.initializer == nullptr)
+            throw CompileError(declaration.location,
+                               "l'inférence de type est réservée aux variables locales");
+        if (const auto* array = std::get_if<ArrayExpr>(&declaration.initializer->value);
+            array != nullptr && array->elements.empty())
+            throw CompileError(declaration.location,
+                               "un tableau vide exige une annotation de type");
+        declaration.type = inferType(*declaration.initializer);
+        if (containsTypeParameter(declaration.type))
+            throw CompileError(declaration.location,
+                               "l'initialiseur ne permet pas d'inférer un type concret");
+    }
     if (declaration.type.kind == ValueType::Kind::Reference) {
         if (declaration.callable)
             throw CompileError(declaration.location,
@@ -693,6 +722,16 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
             return substitutions.size() == declaration->typeParameters.size()
                 ? substituteType(declaration->type, substitutions) : symbol->type;
         } else if constexpr (std::is_same_v<T, ConversionExpr>) {
+            const ValueType source = inferType(*node.operand);
+            if (node.target.kind == ValueType::Kind::Slice &&
+                source.kind == ValueType::Kind::Reference &&
+                source.element->kind == ValueType::Kind::Array)
+                return ValueType(ValueType::Kind::Slice,
+                    std::make_shared<ValueType>(*source.element->element),
+                    node.target.mutableReference);
+            if (node.target.kind == ValueType::Kind::Box)
+                return ValueType(ValueType::Kind::Box,
+                                 std::make_shared<ValueType>(source));
             return node.target;
         } else if constexpr (std::is_same_v<T, UnaryExpr>) {
             return node.op == "!" ? ValueType::Bool : inferType(*node.operand);

@@ -1,0 +1,6 @@
+def cannotInfer[T, U](value: T): T = value
+
+def main(): Int = {
+    val value = cannotInfer(42)
+    value
+}

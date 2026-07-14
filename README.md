@@ -6,9 +6,17 @@ des définitions paresseuses. Ses syntaxes de déclaration actuelles sont :
 ```text
 val identifiant : Int = expression
 var identifiant : Int = expression
+val local = expression
+var locale = expression
 def identifiant : Int = expression
 def fonction(parametre : Int, autre : Int) : Int = expression
 ```
+
+L'annotation reste obligatoire au niveau global, dans les paramètres et pour le
+type de retour d'une fonction. Une `val` ou `var` locale peut l'omettre lorsque
+son initialiseur détermine un type concret. Les tableaux vides et les appels
+génériques insuffisamment contraints exigent une annotation explicite. Cette
+inférence ne change ni les conversions ni les règles de déplacement.
 
 `Int` est un entier signé sur 32 bits. `Byte` est un entier non signé sur 8 bits,
 compris entre `0` et `255` :

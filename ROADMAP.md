@@ -264,6 +264,9 @@ comportement ni affaiblir le typage.
 
 ### 1A. Inférence des variables locales
 
+**Statut : livrée le 15 juillet 2026.** Le showcase ne conserve que l'annotation
+nécessaire pour imposer le type `[Byte; 4]` de son tableau de littéraux entiers.
+
 Syntaxe cible :
 
 ```zeta
@@ -273,12 +276,16 @@ var index = 0
 
 Étapes :
 
-1. rendre l'annotation locale optionnelle tout en la conservant aux signatures et
-   déclarations publiques ;
-2. inférer depuis l'initialiseur après résolution générique ;
-3. refuser une inférence ambiguë ou sans type concret ;
-4. couvrir `Option`, structures, enums, slices et types possédés ;
-5. vérifier que l'inférence ne change pas les règles de déplacement.
+1. **Livré le 15 juillet 2026** — rendre l'annotation locale optionnelle tout en
+   la conservant aux signatures et déclarations globales ou publiques.
+2. **Livré le 15 juillet 2026** — inférer depuis l'initialiseur après résolution
+   générique, y compris les conversions `Slice` et `Box` déduites de leur opérande.
+3. **Livré le 15 juillet 2026** — refuser les tableaux vides et les types
+   génériques qui ne deviennent pas concrets.
+4. **Livré le 15 juillet 2026** — couvrir `Option`, structures, enums, slices et
+   types possédés dans le test d'intégration dédié.
+5. **Livré le 15 juillet 2026** — vérifier qu'une annotation omise ne permet pas
+   de contourner les règles de déplacement des valeurs possédées.
 
 ### 1B. Type `Unit`
 

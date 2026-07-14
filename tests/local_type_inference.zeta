@@ -1,0 +1,26 @@
+struct Point {
+    x: Int
+    y: Int
+}
+
+enum MaybeInt {
+    Some(value: Int)
+    None
+}
+
+def identity[T](value: T): T = value
+
+def main(): Int = {
+    val number = identity(40)
+    var total = number
+    total = total + 2
+
+    val point = Point { x: total, y: 1 }
+    val option = MaybeInt.Some(value: point.x)
+    val values = [10, 20, 12]
+    val view = Slice(&values)
+    val first = view[0]
+    val boxed = Box(first + 32)
+
+    if (option == MaybeInt.Some(value: 42) && *boxed == 42) 0 else 1
+}

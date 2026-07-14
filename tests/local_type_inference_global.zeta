@@ -1,0 +1,3 @@
+val answer = 42
+
+def main(): Int = answer

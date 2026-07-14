@@ -774,6 +774,27 @@ if(BUILD_TESTING)
     set_tests_properties(run_generic_type_inference PROPERTIES
         DEPENDS compile_generic_type_inference)
 
+    add_test(NAME compile_local_type_inference COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/local_type_inference.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/local-type-inference)
+    add_test(NAME run_local_type_inference
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/local-type-inference)
+    set_tests_properties(run_local_type_inference PROPERTIES
+        DEPENDS compile_local_type_inference)
+    add_test(NAME reject_local_type_inference_global COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/local_type_inference_global.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/invalid-local-type-inference-global)
+    set_tests_properties(reject_local_type_inference_global PROPERTIES WILL_FAIL TRUE)
+    foreach(inference_error
+            local_type_inference_empty_array
+            local_type_inference_unresolved_generic
+            local_type_inference_owned_move)
+        add_test(NAME reject_${inference_error} COMMAND zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/${inference_error}.zeta
+            -o ${CMAKE_CURRENT_BINARY_DIR}/invalid-${inference_error})
+        set_tests_properties(reject_${inference_error} PROPERTIES WILL_FAIL TRUE)
+    endforeach()
+
     add_test(NAME compile_generic_constraints COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_constraints.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/generic-constraints)
