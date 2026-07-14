@@ -1,0 +1,5 @@
+def invalid(values: &Vec[Int]): Unit = {
+    values.push(1)
+}
+
+def main(): Int = 0

@@ -173,13 +173,13 @@ pas répétés sur chaque ligne.
 | `IrArrayConstruct` | `elements[*] : E` | `output : T` | `T == Array[E, N]` et `elements.size() == N` | suite |
 | `IrVecConstruct` | — | `output : T` | `T == Vec[E]` | suite |
 | `IrVecProperty` | `vector : Vec[E]` | `output : Int` pour `length`/`capacity`, `Bool` pour `isEmpty` | propriété dans cet ensemble fermé | suite |
-| `IrVecReserve` | `additional : Int`, `%slot[.field] : T` | `output : Int` | `T == Vec[E]`; le champ optionnel doit désigner exactement `T` dans une structure | suite |
-| `IrVecPush` | `value : E`, `%slot[.field] : T` | `output : Int` | même contrat de cible que `IrVecReserve` | suite |
-| `IrVecClear` | `%slot[.field] : T` | `output : Int` | même contrat de cible que `IrVecReserve` | suite |
+| `IrVecReserve` | `additional : Int`, cible `%slot[.field] : T` ou `$reference : &mut T` | `output : Int` | `T == Vec[E]`; slot et référence sont exclusifs, le champ doit désigner exactement `T` | suite |
+| `IrVecPush` | `value : E`, même cible mutable | `output : Int` | même contrat de cible que `IrVecReserve` | suite |
+| `IrVecClear` | même cible mutable | `output : Int` | même contrat de cible que `IrVecReserve` | suite |
 | `IrVecView` | `%slot : Vec[E]` | `output : T` | `T == Slice[E]` ou `SliceMut[E]` | suite |
 | `IrVecGet` | `index : Int`, `%slot : Vec[E]` | `output : Option[E]` | `elementType == E`, `optionType` est l'instance builtin exacte | suite |
 | `IrVecPop` | `%slot : Vec[E]` | `output : Option[E]` | mêmes contraintes de type que `IrVecGet` | suite |
-| `IrVecSet` | `index : Int`, `value : E`, `%slot[.field] : Vec[E]` | `output : Int` | même contrat de cible optionnelle | suite |
+| `IrVecSet` | `index : Int`, `value : E`, cible `%slot[.field] : Vec[E]` ou `$reference : &mut Vec[E]` | `output : Int` | même contrat de cible mutable exclusive | suite |
 
 Les retours `Int` des opérations mutantes sont le contrat provisoire actuel ; le
 passage futur à `Unit` modifiera ces lignes et les tests associés.

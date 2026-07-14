@@ -11,11 +11,11 @@ les primitives existantes sans ajouter un builtin pour chaque nouveau type.
 
 ## Snapshot vérifié
 
-État validé le 14 juillet 2026 sur la branche `master` :
+État validé le 15 juillet 2026 sur la branche `master` :
 
 - construction CMake réussie ;
 - stdlib locale régénérée ;
-- 385 tests CTest réussis sur 385 ;
+- 403 tests CTest réussis sur 403 ;
 - exemple complet compilé, exécuté et couvert par CTest ;
 - aucun changement suivi en attente à la fin de la session ;
 - `build/`, `stdlib/precompiled/` et certains artefacts de tests sont ignorés.
@@ -41,10 +41,10 @@ chercher à le simplifier sans réduire sa sûreté.
 | Contrat | Version |
 | --- | ---: |
 | Compilateur | `0.1.0` |
-| ABI | `4` |
-| Interface `.zti` | `7` |
+| ABI | `5` |
+| Interface `.zti` | `8` |
 | Tokens génériques | `1` |
-| Cache de modules | `14` |
+| Cache de modules | `18` |
 | Cache de démarrage | `2` |
 | Manifeste de stdlib | `1` |
 
@@ -332,7 +332,9 @@ Objectif : permettre d'écrire une collection possédée entièrement en Zeta.
 1. **Livré le 15 juillet 2026** — autoriser `push`, `set`, `reserve` et `clear`
    directement sur un champ `Vec[T]` d'une structure `var`, sans copie du
    propriétaire et avec rejet des liaisons immuables, empruntées ou déplacées ;
-2. permettre le passage et l'utilisation de `&mut Vec[T]` ;
+2. **Livré le 15 juillet 2026** — permettre `push`, `set`, `reserve` et `clear`
+   à travers `&mut Vec[T]`, en propageant l'adresse du propriétaire dans l'IR,
+   avec validation de la cible et rejet de `&Vec[T]` ;
 3. définir des méthodes utilisateur avec receveur partagé ou mutable ;
 4. définir éventuellement des méthodes d'extension pour les modules ;
 5. rendre possibles des appels ergonomiques comme `values.sort()` tout en
@@ -464,7 +466,7 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-Poursuivre la priorité 2 avec `&mut Vec[T]`. Définir les opérations autorisées sur
-un receveur emprunté, propager son adresse dans l'IR sans copier le propriétaire,
-et couvrir les conflits entre vue `SliceMut`, croissance, déplacement et appels
-imbriqués.
+Poursuivre la priorité 2 avec les méthodes utilisateur. Définir la syntaxe et le
+contrat des receveurs partagés ou mutables, leur abaissement vers les fonctions
+existantes et leur représentation dans les interfaces, puis valider le modèle
+avec une première méthode de structure avant d'aborder les extensions de module.

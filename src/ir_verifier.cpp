@@ -125,14 +125,29 @@ std::vector<ValueId> readsOf(const IrInstruction& instruction) {
             return item.elements;
         else if constexpr (std::is_same_v<T, IrVecProperty>)
             return {item.vector};
-        else if constexpr (std::is_same_v<T, IrVecReserve>)
-            return {item.additional};
-        else if constexpr (std::is_same_v<T, IrVecPush>)
-            return {item.value};
+        else if constexpr (std::is_same_v<T, IrVecReserve>) {
+            std::vector<ValueId> reads;
+            if (item.target.reference) reads.push_back(*item.target.reference);
+            reads.push_back(item.additional);
+            return reads;
+        } else if constexpr (std::is_same_v<T, IrVecPush>) {
+            std::vector<ValueId> reads;
+            if (item.target.reference) reads.push_back(*item.target.reference);
+            reads.push_back(item.value);
+            return reads;
+        } else if constexpr (std::is_same_v<T, IrVecClear>) {
+            if (item.target.reference) return {*item.target.reference};
+            return {};
+        }
         else if constexpr (std::is_same_v<T, IrVecGet>)
             return {item.index};
-        else if constexpr (std::is_same_v<T, IrVecSet>)
-            return {item.index, item.value};
+        else if constexpr (std::is_same_v<T, IrVecSet>) {
+            std::vector<ValueId> reads;
+            if (item.target.reference) reads.push_back(*item.target.reference);
+            reads.push_back(item.index);
+            reads.push_back(item.value);
+            return reads;
+        }
         else if constexpr (std::is_same_v<T, IrStructConstruct> ||
                            std::is_same_v<T, IrEnumConstruct>)
             return item.fields;
@@ -191,10 +206,11 @@ std::vector<SlotId> slotsOf(const IrInstruction& instruction) {
         if constexpr (std::is_same_v<T, IrVecReserve> ||
                       std::is_same_v<T, IrVecPush> ||
                       std::is_same_v<T, IrVecClear> ||
-                      std::is_same_v<T, IrVecView> ||
+                      std::is_same_v<T, IrVecSet>) {
+            if (item.target.slot) return {*item.target.slot};
+        } else if constexpr (std::is_same_v<T, IrVecView> ||
                       std::is_same_v<T, IrVecGet> ||
                       std::is_same_v<T, IrVecPop> ||
-                      std::is_same_v<T, IrVecSet> ||
                       std::is_same_v<T, IrFieldStore> ||
                       std::is_same_v<T, IrAddressOf> ||
                       std::is_same_v<T, IrLoad> ||
@@ -262,19 +278,28 @@ void expectSlotType(const IrProgram& program, SlotId slot,
              " au lieu de " + typeName(expected));
 }
 
-void expectVecTargetType(const IrProgram& program, SlotId slot,
-                         std::optional<std::size_t> field,
+void expectVecTargetType(const IrProgram& program, const IrVecMutationTarget& target,
                          const ValueType& expected, const std::string& context) {
-    if (!field) {
-        expectSlotType(program, slot, expected, context);
+    if (target.reference) {
+        if (target.slot || target.field)
+            fail("IRV040", context + " : cible de mutation Vec ambiguë");
+        expectValueType(program, *target.reference,
+            ValueType(std::make_shared<ValueType>(expected), true), context);
         return;
     }
-    const ValueType& owner = program.slots[slot].type;
-    if (owner.kind != ValueType::Kind::Struct || *field >= owner.structure->fields.size())
+    if (!target.slot)
+        fail("IRV040", context + " : cible de mutation Vec absente");
+    if (!target.field) {
+        expectSlotType(program, *target.slot, expected, context);
+        return;
+    }
+    const ValueType& owner = program.slots[*target.slot].type;
+    if (owner.kind != ValueType::Kind::Struct ||
+        *target.field >= owner.structure->fields.size())
         fail("IRV031", context + " : cible de champ Vec invalide");
-    if (owner.structure->fields[*field].type != expected)
+    if (owner.structure->fields[*target.field].type != expected)
         fail("IRV031", context + " : champ cible de type " +
-            typeName(owner.structure->fields[*field].type) + " au lieu de " +
+            typeName(owner.structure->fields[*target.field].type) + " au lieu de " +
             typeName(expected));
 }
 
@@ -379,7 +404,7 @@ void verifyInstructionTypes(const IrProgram& program, const IrInstruction& instr
             concrete(item.type);
             if (item.type.kind != ValueType::Kind::Vec)
                 fail("IRV044", context + " : opération Vec sans type Vec");
-            expectVecTargetType(program, item.slot, item.field, item.type, context);
+            expectVecTargetType(program, item.target, item.type, context);
             if constexpr (std::is_same_v<T, IrVecReserve>)
                 expectValueType(program, item.additional, ValueType::Int, context);
             if constexpr (std::is_same_v<T, IrVecPush>)
@@ -407,7 +432,7 @@ void verifyInstructionTypes(const IrProgram& program, const IrInstruction& instr
             concrete(item.elementType);
             const ValueType vector(ValueType::Kind::Vec,
                 std::make_shared<ValueType>(item.elementType));
-            expectVecTargetType(program, item.slot, item.field, vector, context);
+            expectVecTargetType(program, item.target, vector, context);
             expectValueType(program, item.index, ValueType::Int, context);
             expectValueType(program, item.value, item.elementType, context);
             expectOutputType(program, item.output, ValueType::Int, context);

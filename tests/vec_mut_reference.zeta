@@ -1,0 +1,24 @@
+def fill(values: &mut Vec[Int]): Unit = {
+    values.reserve(8)
+    values.push(10)
+    values.push(20)
+    values.set(1, 32)
+}
+
+def release(values: &mut Vec[Box[Int]]): Unit = {
+    values.push(Box(42))
+    values.clear()
+}
+
+def main(): Int = {
+    var values = Vec[Int]()
+    fill(&mut values)
+    val length = values.length
+    val capacity = values.capacity
+
+    var owned = Vec[Box[Int]]()
+    release(&mut owned)
+
+    values.clear()
+    if (length == 2 && capacity >= 8 && values.isEmpty && owned.isEmpty) 0 else 1
+}

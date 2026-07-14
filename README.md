@@ -721,6 +721,21 @@ bag.values.push(42)
 La mutation est refusée si la structure est une liaison `val`, a été déplacée ou
 possède encore un emprunt actif.
 
+Une fonction peut également modifier le propriétaire de l'appelant à travers
+`&mut Vec[T]` avec ces quatre opérations :
+
+```zeta
+def appendAnswer(values: &mut Vec[Int]): Unit = {
+    values.reserve(1)
+    values.push(42)
+}
+
+var values = Vec[Int]()
+appendAnswer(&mut values)
+```
+
+Une référence partagée `&Vec[T]` ne donne pas accès aux mutations.
+
 `asSlice()` et `asSliceMut()` créent des vues sans allocation. Les emprunts
 empêchent toute croissance ou mutation concurrente jusqu'à leur dernière
 utilisation. Un échec d'allocation ou un dépassement de capacité termine le

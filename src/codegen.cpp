@@ -74,6 +74,21 @@ std::string vecSlotAddress(const IrProgram& program, SlotId slotId,
         address = displacedAddress(address, slot.type.structure->fields[*field].offset);
     return address;
 }
+std::string vecMutationAddress(const IrProgram& program,
+                               const IrVecMutationTarget& target) {
+    if (target.reference) return "[rbx]";
+    return vecSlotAddress(program, *target.slot, target.field);
+}
+void emitVecMutationTargetSetup(std::ostringstream& out, const IrProgram& program,
+                                const IrVecMutationTarget& target) {
+    if (!target.reference) return;
+    out << "    push rbx\n"
+        << "    mov rbx, qword [rbp-" << valueOffset(program, *target.reference) << "]\n";
+}
+void emitVecMutationTargetCleanup(std::ostringstream& out,
+                                  const IrVecMutationTarget& target) {
+    if (target.reference) out << "    pop rbx\n";
+}
 void emitBlockCopy(std::ostringstream& out, const std::string& source,
                    const std::string& target, std::size_t bytes) {
     std::size_t offset = 0;
@@ -441,12 +456,13 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
             } else if constexpr (std::is_same_v<T, IrVecReserve>) {
                 const std::size_t id = resourceSequence++;
                 const std::size_t output = valueOffset(program, item.output);
-                const std::string address = vecSlotAddress(program, item.slot, item.field);
+                const std::string address = vecMutationAddress(program, item.target);
                 const std::size_t elementSize = valueTypeSize(*item.type.element);
                 const std::string capacityReady = "ir_vec_capacity_ready_" + std::to_string(id);
                 const std::string requestedReady = "ir_vec_requested_ready_" + std::to_string(id);
                 const std::string oldReleased = "ir_vec_old_released_" + std::to_string(id);
                 const std::string done = "ir_vec_reserve_done_" + std::to_string(id);
+                emitVecMutationTargetSetup(out, program, item.target);
                 out << "    push r12\n"
                     << "    push r13\n"
                     << "    push r14\n"
@@ -509,9 +525,11 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                     << "    pop r14\n"
                     << "    pop r13\n"
                     << "    pop r12\n";
+                emitVecMutationTargetCleanup(out, item.target);
             } else if constexpr (std::is_same_v<T, IrVecPush>) {
-                const std::string address = vecSlotAddress(program, item.slot, item.field);
+                const std::string address = vecMutationAddress(program, item.target);
                 const std::size_t elementSize = valueTypeSize(*item.type.element);
+                emitVecMutationTargetSetup(out, program, item.target);
                 out << "    mov rdi, qword " << address << "\n"
                     << "    mov rax, qword " << displacedAddress(address, 8U) << "\n"
                     << "    imul rax, " << elementSize << "\n"
@@ -521,11 +539,13 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                     "[rdi]", elementSize);
                 out << "    inc qword " << displacedAddress(address, 8U) << "\n"
                     << "    mov dword [rbp-" << valueOffset(program, item.output) << "], 0\n";
+                emitVecMutationTargetCleanup(out, item.target);
             } else if constexpr (std::is_same_v<T, IrVecClear>) {
                 const std::size_t id = resourceSequence++;
-                const std::string address = vecSlotAddress(program, item.slot, item.field);
+                const std::string address = vecMutationAddress(program, item.target);
                 const std::string loop = "ir_vec_clear_loop_" + std::to_string(id);
                 const std::string done = "ir_vec_clear_done_" + std::to_string(id);
+                emitVecMutationTargetSetup(out, program, item.target);
                 if (valueTypeNeedsDrop(*item.type.element)) {
                     out << "    push r12\n"
                         << "    push r13\n"
@@ -549,6 +569,7 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                 }
                 out << "    mov qword " << displacedAddress(address, 8U) << ", 0\n"
                     << "    mov dword [rbp-" << valueOffset(program, item.output) << "], 0\n";
+                emitVecMutationTargetCleanup(out, item.target);
             } else if constexpr (std::is_same_v<T, IrVecView>) {
                 const IrSlot& slot = program.slots[item.slot];
                 const std::string address = slot.global
@@ -633,7 +654,8 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                     << done << ":\n";
             } else if constexpr (std::is_same_v<T, IrVecSet>) {
                 const std::size_t id = resourceSequence++;
-                const std::string address = vecSlotAddress(program, item.slot, item.field);
+                const std::string address = vecMutationAddress(program, item.target);
+                emitVecMutationTargetSetup(out, program, item.target);
                 out << "    push r12\n"
                     << "    movsxd rax, dword [rbp-" << valueOffset(program, item.index) << "]\n"
                     << "    test rax, rax\n"
@@ -651,6 +673,7 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                     "[r12]", valueTypeSize(item.elementType));
                 out << "    mov dword [rbp-" << valueOffset(program, item.output) << "], 0\n"
                     << "    pop r12\n";
+                emitVecMutationTargetCleanup(out, item.target);
             } else if constexpr (std::is_same_v<T, IrStructConstruct>) {
                 const std::size_t output = valueOffset(program, item.output);
                 for (std::size_t i = 0; i < item.fields.size(); ++i) {

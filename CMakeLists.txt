@@ -492,6 +492,16 @@ if(BUILD_TESTING)
     add_test(NAME reject_vec_struct_field_borrowed COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_struct_field_borrowed.zeta)
     set_tests_properties(reject_vec_struct_field_borrowed PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_vec_mut_reference COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_mut_reference.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/vec-mut-reference)
+    add_test(NAME run_vec_mut_reference
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vec-mut-reference)
+    set_tests_properties(run_vec_mut_reference PROPERTIES
+        DEPENDS compile_vec_mut_reference)
+    add_test(NAME reject_vec_shared_reference_mutation COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_shared_reference_mutation.zeta)
+    set_tests_properties(reject_vec_shared_reference_mutation PROPERTIES WILL_FAIL TRUE)
 
     add_test(
         NAME compile_block_expressions

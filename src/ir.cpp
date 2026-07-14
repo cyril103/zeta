@@ -898,8 +898,11 @@ ValueId IrGenerator::expression(
             const auto* owner = field == nullptr ? nullptr
                 : std::get_if<NameExpr>(&field->object->value);
             const std::string receiverName = name != nullptr ? name->name : owner->name;
+            const ValueType receiverType = resolveType(node.object->inferredType);
+            const bool throughReference = receiverType.kind == ValueType::Kind::Reference;
+            const ValueType vectorType = throughReference ? *receiverType.element : receiverType;
             const auto found = symbols_.find(receiverName);
-            if (found == symbols_.end())
+            if (found == symbols_.end() && !throughReference)
                 throw CompileError(expressionNode.location, "Vec inconnu '" + receiverName + "'");
             std::optional<std::size_t> fieldIndex;
             if (field != nullptr) {
@@ -908,7 +911,13 @@ ValueId IrGenerator::expression(
                     [&](const StructField& candidate) { return candidate.name == field->field; });
                 fieldIndex = static_cast<std::size_t>(selected - fields.begin());
             }
-            const ValueType vectorType = resolveType(node.object->inferredType);
+            IrVecMutationTarget mutationTarget;
+            if (throughReference)
+                mutationTarget.reference = expression(*node.object, parameters);
+            else {
+                mutationTarget.slot = found->second.slot;
+                mutationTarget.field = fieldIndex;
+            }
             if (node.method == "get") {
                 const ValueId index = expression(*node.arguments.front(), parameters);
                 const ValueId output = nextValue(resolveType(expressionNode.inferredType));
@@ -934,7 +943,7 @@ ValueId IrGenerator::expression(
                         movedBoxes_.insert(moved->name);
                 const ValueId output = nextValue(ValueType::Int);
                 ir_.instructions.push_back(IrVecSet{
-                    output, found->second.slot, index, value, *vectorType.element, fieldIndex});
+                    output, mutationTarget, index, value, *vectorType.element});
                 return output;
             }
             if (node.method == "asSlice" || node.method == "asSliceMut") {
@@ -946,13 +955,13 @@ ValueId IrGenerator::expression(
             const ValueId output = nextValue(ValueType::Int);
             if (node.method == "clear") {
                 ir_.instructions.push_back(IrVecClear{
-                    output, found->second.slot, vectorType, fieldIndex});
+                    output, mutationTarget, vectorType});
                 return output;
             }
             if (node.method == "reserve") {
                 const ValueId additional = expression(*node.arguments.front(), parameters);
                 ir_.instructions.push_back(IrVecReserve{
-                    output, found->second.slot, additional, vectorType, fieldIndex});
+                    output, mutationTarget, additional, vectorType});
                 return output;
             }
             const ValueId value = expression(*node.arguments.front(), parameters);
@@ -966,9 +975,9 @@ ValueId IrGenerator::expression(
             const ValueId reserveOutput = nextValue(ValueType::Int);
             ir_.instructions.push_back(IrConst{one, 1, ValueType::Int});
             ir_.instructions.push_back(IrVecReserve{
-                reserveOutput, found->second.slot, one, vectorType, fieldIndex});
+                reserveOutput, mutationTarget, one, vectorType});
             ir_.instructions.push_back(IrVecPush{
-                output, found->second.slot, value, vectorType, fieldIndex});
+                output, mutationTarget, value, vectorType});
             return output;
         } else if constexpr (std::is_same_v<T, IndexExpr>) {
             const ValueId array = expression(*node.array, parameters);
@@ -1327,6 +1336,14 @@ std::string IrGenerator::print(const VerifiedIrProgram& verified) {
         if (type == ValueType::Char) return "u32";
         return "string";
     };
+    const auto vecTarget = [&](const IrVecMutationTarget& target) {
+        if (target.reference) return "$" + std::to_string(*target.reference);
+        std::string printed = "%" + program.slots[*target.slot].name;
+        if (target.field)
+            printed += "." +
+                program.slots[*target.slot].type.structure->fields[*target.field].name;
+        return printed;
+    };
     out << "module {\n";
     for (std::size_t i = 0; i < program.slots.size(); ++i) {
         out << "  %" << program.slots[i].name << " = "
@@ -1367,14 +1384,14 @@ std::string IrGenerator::print(const VerifiedIrProgram& verified) {
                 out << "  $" << item.output << " = vec_" << item.property
                     << " $" << item.vector << '\n';
             else if constexpr (std::is_same_v<T, IrVecReserve>)
-                out << "  $" << item.output << " = vec_reserve %"
-                    << program.slots[item.slot].name << ", $" << item.additional << '\n';
+                out << "  $" << item.output << " = vec_reserve "
+                    << vecTarget(item.target) << ", $" << item.additional << '\n';
             else if constexpr (std::is_same_v<T, IrVecPush>)
-                out << "  $" << item.output << " = vec_push %"
-                    << program.slots[item.slot].name << ", $" << item.value << '\n';
+                out << "  $" << item.output << " = vec_push "
+                    << vecTarget(item.target) << ", $" << item.value << '\n';
             else if constexpr (std::is_same_v<T, IrVecClear>)
-                out << "  $" << item.output << " = vec_clear %"
-                    << program.slots[item.slot].name << '\n';
+                out << "  $" << item.output << " = vec_clear "
+                    << vecTarget(item.target) << '\n';
             else if constexpr (std::is_same_v<T, IrVecView>)
                 out << "  $" << item.output << " = vec_view %"
                     << program.slots[item.slot].name << " as " << typeName(item.type) << '\n';
@@ -1385,8 +1402,8 @@ std::string IrGenerator::print(const VerifiedIrProgram& verified) {
                 out << "  $" << item.output << " = vec_pop %"
                     << program.slots[item.slot].name << '\n';
             else if constexpr (std::is_same_v<T, IrVecSet>)
-                out << "  $" << item.output << " = vec_set %"
-                    << program.slots[item.slot].name << ", $" << item.index
+                out << "  $" << item.output << " = vec_set "
+                    << vecTarget(item.target) << ", $" << item.index
                     << ", $" << item.value << '\n';
             else if constexpr (std::is_same_v<T, IrStructConstruct>) {
                 out << "  $" << item.output << " = struct " << typeName(item.type) << " [";

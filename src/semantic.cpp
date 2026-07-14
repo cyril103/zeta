@@ -871,7 +871,11 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 : std::get_if<NameExpr>(&field->object->value);
             const SemanticSymbol* symbol = name != nullptr ? symbols_.lookup(name->name)
                 : owner != nullptr ? symbols_.lookup(owner->name) : nullptr;
-            ValueType vectorType = symbol == nullptr ? ValueType::Int : symbol->type;
+            const ValueType receiverType = symbol == nullptr ? ValueType::Int : symbol->type;
+            const bool referenceReceiver = receiverType.kind == ValueType::Kind::Reference &&
+                receiverType.element != nullptr &&
+                receiverType.element->kind == ValueType::Kind::Vec;
+            ValueType vectorType = referenceReceiver ? *receiverType.element : receiverType;
             const bool fieldReceiver = field != nullptr;
             if (fieldReceiver && symbol != nullptr &&
                 symbol->type.kind == ValueType::Kind::Struct) {
@@ -884,18 +888,24 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (symbol == nullptr || vectorType.kind != ValueType::Kind::Vec)
                 throw CompileError(node.object->location,
                                    "la méthode '" + node.method + "' exige un Vec");
+            if (referenceReceiver && !receiverType.mutableReference)
+                throw CompileError(node.object->location,
+                                   "la mutation exige une référence '&mut Vec'");
             const std::string& receiverName = name != nullptr ? name->name : owner->name;
-            if (fieldReceiver && node.method != "reserve" && node.method != "push" &&
+            if ((fieldReceiver || referenceReceiver) &&
+                node.method != "reserve" && node.method != "push" &&
                 node.method != "clear" && node.method != "set")
                 throw CompileError(node.object->location,
                     "la méthode '" + node.method +
-                    "' n'est pas encore disponible sur un champ Vec");
+                    "' n'est pas encore disponible sur ce receveur Vec");
             if (fieldReceiver)
                 checkExpression(*node.object, vectorType);
             else {
-                node.object->inferredType = vectorType;
+                node.object->inferredType = receiverType;
                 node.object->typed = true;
             }
+            const bool mutableReceiver = referenceReceiver ||
+                (!symbol->parameter && symbol->kind == BindingKind::Var);
             if (node.method == "asSlice" || node.method == "asSliceMut") {
                 if (!node.arguments.empty())
                     throw CompileError(expression.location, "'" + node.method +
@@ -932,7 +942,7 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                     {*vectorType.element}, expression.location));
             }
             if (node.method == "pop" || node.method == "set") {
-                if (symbol->parameter || symbol->kind != BindingKind::Var)
+                if (!mutableReceiver)
                     throw CompileError(node.object->location,
                                        "'" + node.method +
                                        "' exige un Vec déclaré avec 'var'");
@@ -966,7 +976,7 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 node.method != "clear")
                 throw CompileError(expression.location,
                                    "méthode Vec inconnue '" + node.method + "'");
-            if (symbol->parameter || symbol->kind != BindingKind::Var)
+            if (!mutableReceiver)
                 throw CompileError(node.object->location,
                                    "'" + node.method + "' exige un Vec déclaré avec 'var'");
             if (const auto borrowed = borrows_.find(receiverName);

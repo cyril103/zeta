@@ -25,20 +25,22 @@ struct IrStringEmpty { ValueId output; ValueId string; };
 struct IrArrayConstruct { ValueId output; std::vector<ValueId> elements; ValueType type; };
 struct IrVecConstruct { ValueId output; ValueType type; };
 struct IrVecProperty { ValueId output; ValueId vector; std::string property; };
+struct IrVecMutationTarget {
+    std::optional<SlotId> slot;
+    std::optional<ValueId> reference;
+    std::optional<std::size_t> field;
+};
 struct IrVecReserve {
     ValueId output;
-    SlotId slot;
+    IrVecMutationTarget target;
     ValueId additional;
     ValueType type;
-    std::optional<std::size_t> field;
 };
 struct IrVecPush {
-    ValueId output; SlotId slot; ValueId value; ValueType type;
-    std::optional<std::size_t> field;
+    ValueId output; IrVecMutationTarget target; ValueId value; ValueType type;
 };
 struct IrVecClear {
-    ValueId output; SlotId slot; ValueType type;
-    std::optional<std::size_t> field;
+    ValueId output; IrVecMutationTarget target; ValueType type;
 };
 struct IrVecView { ValueId output; SlotId slot; ValueType type; };
 struct IrVecGet {
@@ -46,8 +48,8 @@ struct IrVecGet {
 };
 struct IrVecPop { ValueId output; SlotId slot; ValueType optionType; ValueType elementType; };
 struct IrVecSet {
-    ValueId output; SlotId slot; ValueId index; ValueId value; ValueType elementType;
-    std::optional<std::size_t> field;
+    ValueId output; IrVecMutationTarget target; ValueId index; ValueId value;
+    ValueType elementType;
 };
 struct IrStructConstruct { ValueId output; std::vector<ValueId> fields; ValueType type; };
 struct IrEnumConstruct {

@@ -83,12 +83,35 @@ int main() {
     validVecField.valueTypes = {ValueType::Int, ValueType::Int};
     validVecField.valueCount = 2;
     validVecField.instructions.push_back(IrConst{0, 4, ValueType::Int});
-    validVecField.instructions.push_back(IrVecReserve{1, 0, 0, intVector, 0});
+    validVecField.instructions.push_back(IrVecReserve{
+        1, IrVecMutationTarget{0, std::nullopt, 0}, 0, intVector});
     expectValid("mutation Vec sur champ valide", validVecField);
 
     IrProgram invalidVecField = validVecField;
-    invalidVecField.instructions.back() = IrVecReserve{1, 0, 0, intVector, 1};
+    invalidVecField.instructions.back() = IrVecReserve{
+        1, IrVecMutationTarget{0, std::nullopt, 1}, 0, intVector};
     expectCode("champ Vec hors limites", "IRV031", invalidVecField);
+
+    const ValueType mutableVecReference(
+        std::make_shared<ValueType>(intVector), true);
+    IrProgram validVecReference;
+    validVecReference.valueTypes = {mutableVecReference, ValueType::Int, ValueType::Int};
+    validVecReference.valueCount = 3;
+    validVecReference.instructions.push_back(
+        IrFunctionStart{"mutate_vec", false, {}});
+    validVecReference.instructions.push_back(
+        IrParameter{0, 0, 16, mutableVecReference});
+    validVecReference.instructions.push_back(IrConst{1, 4, ValueType::Int});
+    validVecReference.instructions.push_back(IrVecReserve{
+        2, IrVecMutationTarget{std::nullopt, 0, std::nullopt}, 1, intVector});
+    validVecReference.instructions.push_back(IrReturn{2, ValueType::Int});
+    expectValid("mutation Vec par référence mutable", validVecReference);
+
+    IrProgram ambiguousVecReference = validVecReference;
+    ambiguousVecReference.slots.push_back(IrSlot{"values", intVector, true});
+    ambiguousVecReference.instructions[3] = IrVecReserve{
+        2, IrVecMutationTarget{0, 0, std::nullopt}, 1, intVector};
+    expectCode("cible Vec ambiguë", "IRV040", ambiguousVecReference);
 
     IrProgram wrongUnitOutput;
     wrongUnitOutput.valueTypes.push_back(ValueType::Int);

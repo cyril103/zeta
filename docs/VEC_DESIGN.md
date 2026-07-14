@@ -48,8 +48,17 @@ champ est modifié en place : l'IR conserve le slot propriétaire et l'indice du
 champ, puis le backend ajoute son offset à l'adresse du slot. Aucune copie
 temporaire du `Vec` n'est créée. Un emprunt partagé ou mutable du propriétaire,
 son déplacement préalable, ou une liaison `val` interdit la mutation. `get`,
-`pop`, `asSlice` et `asSliceMut` sur un champ restent reportés au jalon
-`&mut Vec[T]`.
+`pop`, `asSlice` et `asSliceMut` sur un champ restent reportés.
+
+Les mêmes mutations sont disponibles à travers un receveur `&mut Vec[T]`. Un
+appel comme `values.push(value)` dans une fonction recevant
+`values: &mut Vec[T]` modifie le propriétaire de l'appelant sans copier ses trois
+mots. L'IR porte alors la valeur adresse de la référence plutôt qu'un slot et le
+backend conserve cette adresse pendant toute l'opération, y compris pendant les
+appels système de croissance. Une référence partagée `&Vec[T]` ne permet aucune
+mutation. `get`, `pop`, `asSlice` et `asSliceMut` à travers une référence restent
+reportés afin de définir leur contrat d'emprunt avec les futures méthodes
+utilisateur.
 
 ## Allocation et croissance
 
