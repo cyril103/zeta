@@ -893,10 +893,21 @@ ValueId IrGenerator::expression(
                 static_cast<std::size_t>(found - fields.begin())});
             return output;
         } else if constexpr (std::is_same_v<T, MethodCallExpr>) {
-            const auto& name = std::get<NameExpr>(node.object->value);
-            const auto found = symbols_.find(name.name);
+            const auto* name = std::get_if<NameExpr>(&node.object->value);
+            const auto* field = std::get_if<FieldExpr>(&node.object->value);
+            const auto* owner = field == nullptr ? nullptr
+                : std::get_if<NameExpr>(&field->object->value);
+            const std::string receiverName = name != nullptr ? name->name : owner->name;
+            const auto found = symbols_.find(receiverName);
             if (found == symbols_.end())
-                throw CompileError(expressionNode.location, "Vec inconnu '" + name.name + "'");
+                throw CompileError(expressionNode.location, "Vec inconnu '" + receiverName + "'");
+            std::optional<std::size_t> fieldIndex;
+            if (field != nullptr) {
+                const auto& fields = found->second.declaration->type.structure->fields;
+                const auto selected = std::find_if(fields.begin(), fields.end(),
+                    [&](const StructField& candidate) { return candidate.name == field->field; });
+                fieldIndex = static_cast<std::size_t>(selected - fields.begin());
+            }
             const ValueType vectorType = resolveType(node.object->inferredType);
             if (node.method == "get") {
                 const ValueId index = expression(*node.arguments.front(), parameters);
@@ -923,7 +934,7 @@ ValueId IrGenerator::expression(
                         movedBoxes_.insert(moved->name);
                 const ValueId output = nextValue(ValueType::Int);
                 ir_.instructions.push_back(IrVecSet{
-                    output, found->second.slot, index, value, *vectorType.element});
+                    output, found->second.slot, index, value, *vectorType.element, fieldIndex});
                 return output;
             }
             if (node.method == "asSlice" || node.method == "asSliceMut") {
@@ -934,13 +945,14 @@ ValueId IrGenerator::expression(
             }
             const ValueId output = nextValue(ValueType::Int);
             if (node.method == "clear") {
-                ir_.instructions.push_back(IrVecClear{output, found->second.slot, vectorType});
+                ir_.instructions.push_back(IrVecClear{
+                    output, found->second.slot, vectorType, fieldIndex});
                 return output;
             }
             if (node.method == "reserve") {
                 const ValueId additional = expression(*node.arguments.front(), parameters);
                 ir_.instructions.push_back(IrVecReserve{
-                    output, found->second.slot, additional, vectorType});
+                    output, found->second.slot, additional, vectorType, fieldIndex});
                 return output;
             }
             const ValueId value = expression(*node.arguments.front(), parameters);
@@ -954,9 +966,9 @@ ValueId IrGenerator::expression(
             const ValueId reserveOutput = nextValue(ValueType::Int);
             ir_.instructions.push_back(IrConst{one, 1, ValueType::Int});
             ir_.instructions.push_back(IrVecReserve{
-                reserveOutput, found->second.slot, one, vectorType});
+                reserveOutput, found->second.slot, one, vectorType, fieldIndex});
             ir_.instructions.push_back(IrVecPush{
-                output, found->second.slot, value, vectorType});
+                output, found->second.slot, value, vectorType, fieldIndex});
             return output;
         } else if constexpr (std::is_same_v<T, IndexExpr>) {
             const ValueId array = expression(*node.array, parameters);

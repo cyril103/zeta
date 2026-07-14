@@ -1283,11 +1283,19 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
             current_ + 2 < tokens_.size() &&
             tokens_[current_ + 1].kind == TokenKind::Identifier &&
             tokens_[current_ + 2].kind == TokenKind::Equal;
-        const bool startsMethodCall = check(TokenKind::Identifier) &&
-            current_ + 3 < tokens_.size() &&
-            tokens_[current_ + 1].kind == TokenKind::Dot &&
-            tokens_[current_ + 2].kind == TokenKind::Identifier &&
-            tokens_[current_ + 3].kind == TokenKind::LeftParen;
+        bool startsMethodCall = false;
+        if (check(TokenKind::Identifier)) {
+            std::size_t cursor = current_ + 1;
+            bool dotted = false;
+            while (cursor + 1 < tokens_.size() &&
+                   tokens_[cursor].kind == TokenKind::Dot &&
+                   tokens_[cursor + 1].kind == TokenKind::Identifier) {
+                dotted = true;
+                cursor += 2;
+            }
+            startsMethodCall = dotted && cursor < tokens_.size() &&
+                tokens_[cursor].kind == TokenKind::LeftParen;
+        }
         bool startsGuard = false;
         if (check(TokenKind::If)) {
             std::size_t cursor = current_ + 1;

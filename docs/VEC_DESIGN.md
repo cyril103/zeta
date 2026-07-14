@@ -42,6 +42,15 @@ valeur, détruit l'ancienne et termine le processus avec le code `101` si l'indi
 est hors limites. Les méthodes sont abaissées directement en IR et ne sont donc
 pas soumises à la limite ABI de 16 octets des retours de fonctions ordinaires.
 
+Ces quatre mutations acceptent aussi un champ direct de structure, par exemple
+`bag.values.push(value)`, si la structure propriétaire est liée avec `var`. Le
+champ est modifié en place : l'IR conserve le slot propriétaire et l'indice du
+champ, puis le backend ajoute son offset à l'adresse du slot. Aucune copie
+temporaire du `Vec` n'est créée. Un emprunt partagé ou mutable du propriétaire,
+son déplacement préalable, ou une liaison `val` interdit la mutation. `get`,
+`pop`, `asSlice` et `asSliceMut` sur un champ restent reportés au jalon
+`&mut Vec[T]`.
+
 ## Allocation et croissance
 
 Un vecteur vide n'alloue rien. `reserve(additional)` garantit une capacité d'au

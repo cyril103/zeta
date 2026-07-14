@@ -479,6 +479,19 @@ if(BUILD_TESTING)
     add_test(NAME reject_never_binding COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/never_binding.zeta)
     set_tests_properties(reject_never_binding PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_vec_struct_field_mutation COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_struct_field_mutation.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/vec-struct-field-mutation)
+    add_test(NAME run_vec_struct_field_mutation
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vec-struct-field-mutation)
+    set_tests_properties(run_vec_struct_field_mutation PROPERTIES
+        DEPENDS compile_vec_struct_field_mutation)
+    add_test(NAME reject_vec_struct_field_immutable COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_struct_field_immutable.zeta)
+    set_tests_properties(reject_vec_struct_field_immutable PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_vec_struct_field_borrowed COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_struct_field_borrowed.zeta)
+    set_tests_properties(reject_vec_struct_field_borrowed PROPERTIES WILL_FAIL TRUE)
 
     add_test(
         NAME compile_block_expressions

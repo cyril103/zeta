@@ -709,6 +709,18 @@ Un vecteur est toujours déplacé et jamais copié. Il fournit `push`, `pop`,
 et `isEmpty`. `get` et `pop` retournent `Option[T]` ; `get` exige que `T` soit
 `Copy`, tandis que `pop` transfère la valeur.
 
+Un champ `Vec[T]` d'une structure liée avec `var` peut être modifié directement
+avec `push`, `set`, `reserve` et `clear` :
+
+```zeta
+struct Bag { values: Vec[Int] }
+var bag = Bag { values: Vec[Int]() }
+bag.values.push(42)
+```
+
+La mutation est refusée si la structure est une liaison `val`, a été déplacée ou
+possède encore un emprunt actif.
+
 `asSlice()` et `asSliceMut()` créent des vues sans allocation. Les emprunts
 empêchent toute croissance ou mutation concurrente jusqu'à leur dernière
 utilisation. Un échec d'allocation ou un dépassement de capacité termine le

@@ -30,9 +30,16 @@ struct IrVecReserve {
     SlotId slot;
     ValueId additional;
     ValueType type;
+    std::optional<std::size_t> field;
 };
-struct IrVecPush { ValueId output; SlotId slot; ValueId value; ValueType type; };
-struct IrVecClear { ValueId output; SlotId slot; ValueType type; };
+struct IrVecPush {
+    ValueId output; SlotId slot; ValueId value; ValueType type;
+    std::optional<std::size_t> field;
+};
+struct IrVecClear {
+    ValueId output; SlotId slot; ValueType type;
+    std::optional<std::size_t> field;
+};
 struct IrVecView { ValueId output; SlotId slot; ValueType type; };
 struct IrVecGet {
     ValueId output; SlotId slot; ValueId index; ValueType optionType; ValueType elementType;
@@ -40,6 +47,7 @@ struct IrVecGet {
 struct IrVecPop { ValueId output; SlotId slot; ValueType optionType; ValueType elementType; };
 struct IrVecSet {
     ValueId output; SlotId slot; ValueId index; ValueId value; ValueType elementType;
+    std::optional<std::size_t> field;
 };
 struct IrStructConstruct { ValueId output; std::vector<ValueId> fields; ValueType type; };
 struct IrEnumConstruct {

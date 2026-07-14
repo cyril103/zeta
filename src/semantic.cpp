@@ -866,13 +866,36 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
         }
         else if constexpr (std::is_same_v<T, MethodCallExpr>) {
             const auto* name = std::get_if<NameExpr>(&node.object->value);
-            if (name == nullptr)
-                throw CompileError(node.object->location,
-                                   "une méthode mutante de Vec exige un identifiant");
-            const SemanticSymbol* symbol = symbols_.lookup(name->name);
-            if (symbol == nullptr || symbol->type.kind != ValueType::Kind::Vec)
+            const auto* field = std::get_if<FieldExpr>(&node.object->value);
+            const auto* owner = field == nullptr ? nullptr
+                : std::get_if<NameExpr>(&field->object->value);
+            const SemanticSymbol* symbol = name != nullptr ? symbols_.lookup(name->name)
+                : owner != nullptr ? symbols_.lookup(owner->name) : nullptr;
+            ValueType vectorType = symbol == nullptr ? ValueType::Int : symbol->type;
+            const bool fieldReceiver = field != nullptr;
+            if (fieldReceiver && symbol != nullptr &&
+                symbol->type.kind == ValueType::Kind::Struct) {
+                const auto found = std::find_if(symbol->type.structure->fields.begin(),
+                    symbol->type.structure->fields.end(), [&](const StructField& candidate) {
+                        return candidate.name == field->field;
+                    });
+                if (found != symbol->type.structure->fields.end()) vectorType = found->type;
+            }
+            if (symbol == nullptr || vectorType.kind != ValueType::Kind::Vec)
                 throw CompileError(node.object->location,
                                    "la méthode '" + node.method + "' exige un Vec");
+            const std::string& receiverName = name != nullptr ? name->name : owner->name;
+            if (fieldReceiver && node.method != "reserve" && node.method != "push" &&
+                node.method != "clear" && node.method != "set")
+                throw CompileError(node.object->location,
+                    "la méthode '" + node.method +
+                    "' n'est pas encore disponible sur un champ Vec");
+            if (fieldReceiver)
+                checkExpression(*node.object, vectorType);
+            else {
+                node.object->inferredType = vectorType;
+                node.object->typed = true;
+            }
             if (node.method == "asSlice" || node.method == "asSliceMut") {
                 if (!node.arguments.empty())
                     throw CompileError(expression.location, "'" + node.method +
@@ -881,50 +904,46 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                     (symbol->parameter || symbol->kind != BindingKind::Var))
                     throw CompileError(node.object->location,
                                        "'asSliceMut' exige un Vec déclaré avec 'var'");
-                if (movedBoxes_.contains(name->name))
+                if (movedBoxes_.contains(receiverName))
                     throw CompileError(node.object->location,
-                                       "utilisation de '" + name->name +
+                                       "utilisation de '" + receiverName +
                                        "' après son déplacement");
-                node.object->inferredType = symbol->type;
-                node.object->typed = true;
                 return ValueType(ValueType::Kind::Slice,
-                    std::make_shared<ValueType>(*symbol->type.element),
+                    std::make_shared<ValueType>(*vectorType.element),
                     node.method == "asSliceMut");
             }
             if (node.method == "get") {
                 if (node.arguments.size() != 1U)
                     throw CompileError(expression.location,
                                        "'get' attend 1 argument");
-                if (!isCopyValueType(*symbol->type.element))
+                if (!isCopyValueType(*vectorType.element))
                     throw CompileError(expression.location,
                                        "'get' exige un type d'élément Copy");
-                if (movedBoxes_.contains(name->name))
+                if (movedBoxes_.contains(receiverName))
                     throw CompileError(node.object->location,
-                                       "utilisation de '" + name->name +
+                                       "utilisation de '" + receiverName +
                                        "' après son déplacement");
-                if (const auto borrowed = borrows_.find(name->name);
+                if (const auto borrowed = borrows_.find(receiverName);
                     borrowed != borrows_.end() && borrowed->second.mutableBorrow)
                     throw CompileError(node.object->location,
-                                       "le Vec '" + name->name + "' possède un emprunt mutable");
+                                       "le Vec '" + receiverName + "' possède un emprunt mutable");
                 checkExpression(*node.arguments.front(), ValueType::Int);
-                node.object->inferredType = symbol->type;
-                node.object->typed = true;
                 return ValueType(instantiateEnumType(node.optionDefinition,
-                    {*symbol->type.element}, expression.location));
+                    {*vectorType.element}, expression.location));
             }
             if (node.method == "pop" || node.method == "set") {
                 if (symbol->parameter || symbol->kind != BindingKind::Var)
                     throw CompileError(node.object->location,
                                        "'" + node.method +
                                        "' exige un Vec déclaré avec 'var'");
-                if (const auto borrowed = borrows_.find(name->name);
+                if (const auto borrowed = borrows_.find(receiverName);
                     borrowed != borrows_.end() &&
                     (borrowed->second.mutableBorrow || borrowed->second.shared != 0))
                     throw CompileError(node.object->location,
-                                       "le Vec '" + name->name + "' est emprunté");
-                if (movedBoxes_.contains(name->name))
+                                       "le Vec '" + receiverName + "' est emprunté");
+                if (movedBoxes_.contains(receiverName))
                     throw CompileError(node.object->location,
-                                       "utilisation de '" + name->name +
+                                       "utilisation de '" + receiverName +
                                        "' après son déplacement");
                 const std::size_t expectedArguments = node.method == "pop" ? 0U : 2U;
                 if (node.arguments.size() != expectedArguments)
@@ -933,17 +952,15 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                         std::to_string(node.arguments.size()));
                 if (node.method == "set") {
                     checkExpression(*node.arguments[0], ValueType::Int);
-                    checkExpression(*node.arguments[1], *symbol->type.element);
-                    if (isMoveOnlyValueType(*symbol->type.element))
+                    checkExpression(*node.arguments[1], *vectorType.element);
+                    if (isMoveOnlyValueType(*vectorType.element))
                         if (const auto* moved =
                                 std::get_if<NameExpr>(&node.arguments[1]->value))
                             movedBoxes_.insert(moved->name);
                 }
-                node.object->inferredType = symbol->type;
-                node.object->typed = true;
                 if (node.method == "set") return ValueType::Int;
                 return ValueType(instantiateEnumType(node.optionDefinition,
-                    {*symbol->type.element}, expression.location));
+                    {*vectorType.element}, expression.location));
             }
             if (node.method != "reserve" && node.method != "push" &&
                 node.method != "clear")
@@ -952,14 +969,14 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (symbol->parameter || symbol->kind != BindingKind::Var)
                 throw CompileError(node.object->location,
                                    "'" + node.method + "' exige un Vec déclaré avec 'var'");
-            if (const auto borrowed = borrows_.find(name->name);
+            if (const auto borrowed = borrows_.find(receiverName);
                 borrowed != borrows_.end() &&
                 (borrowed->second.mutableBorrow || borrowed->second.shared != 0))
                 throw CompileError(node.object->location,
-                                   "le Vec '" + name->name + "' est emprunté");
-            if (movedBoxes_.contains(name->name))
+                                   "le Vec '" + receiverName + "' est emprunté");
+            if (movedBoxes_.contains(receiverName))
                 throw CompileError(node.object->location,
-                                   "utilisation de '" + name->name +
+                                   "utilisation de '" + receiverName +
                                    "' après son déplacement");
             const std::size_t expectedArguments = node.method == "clear" ? 0U : 1U;
             if (node.arguments.size() != expectedArguments)
@@ -969,14 +986,12 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (node.method == "reserve")
                 checkExpression(*node.arguments.front(), ValueType::Int);
             else if (node.method == "push") {
-                checkExpression(*node.arguments.front(), *symbol->type.element);
-                if (isMoveOnlyValueType(*symbol->type.element))
+                checkExpression(*node.arguments.front(), *vectorType.element);
+                if (isMoveOnlyValueType(*vectorType.element))
                     if (const auto* moved =
                             std::get_if<NameExpr>(&node.arguments.front()->value))
                         movedBoxes_.insert(moved->name);
             }
-            node.object->inferredType = symbol->type;
-            node.object->typed = true;
             return ValueType::Int;
         }
         else if constexpr (std::is_same_v<T, IndexExpr>) {

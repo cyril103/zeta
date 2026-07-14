@@ -64,6 +64,16 @@ std::string displacedAddress(const std::string& address, std::size_t displacemen
     if (displacement == 0) return address;
     return address.substr(0, address.size() - 1) + "+" + std::to_string(displacement) + "]";
 }
+std::string vecSlotAddress(const IrProgram& program, SlotId slotId,
+                           std::optional<std::size_t> field) {
+    const IrSlot& slot = program.slots[slotId];
+    std::string address = slot.global
+        ? "[" + globalLabel(slot) + "]"
+        : "[rbp-" + std::to_string(slotOffset(program, slotId)) + "]";
+    if (field)
+        address = displacedAddress(address, slot.type.structure->fields[*field].offset);
+    return address;
+}
 void emitBlockCopy(std::ostringstream& out, const std::string& source,
                    const std::string& target, std::size_t bytes) {
     std::size_t offset = 0;
@@ -431,10 +441,7 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
             } else if constexpr (std::is_same_v<T, IrVecReserve>) {
                 const std::size_t id = resourceSequence++;
                 const std::size_t output = valueOffset(program, item.output);
-                const IrSlot& slot = program.slots[item.slot];
-                const std::string address = slot.global
-                    ? "[" + globalLabel(slot) + "]"
-                    : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
+                const std::string address = vecSlotAddress(program, item.slot, item.field);
                 const std::size_t elementSize = valueTypeSize(*item.type.element);
                 const std::string capacityReady = "ir_vec_capacity_ready_" + std::to_string(id);
                 const std::string requestedReady = "ir_vec_requested_ready_" + std::to_string(id);
@@ -503,10 +510,7 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                     << "    pop r13\n"
                     << "    pop r12\n";
             } else if constexpr (std::is_same_v<T, IrVecPush>) {
-                const IrSlot& slot = program.slots[item.slot];
-                const std::string address = slot.global
-                    ? "[" + globalLabel(slot) + "]"
-                    : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
+                const std::string address = vecSlotAddress(program, item.slot, item.field);
                 const std::size_t elementSize = valueTypeSize(*item.type.element);
                 out << "    mov rdi, qword " << address << "\n"
                     << "    mov rax, qword " << displacedAddress(address, 8U) << "\n"
@@ -519,10 +523,7 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                     << "    mov dword [rbp-" << valueOffset(program, item.output) << "], 0\n";
             } else if constexpr (std::is_same_v<T, IrVecClear>) {
                 const std::size_t id = resourceSequence++;
-                const IrSlot& slot = program.slots[item.slot];
-                const std::string address = slot.global
-                    ? "[" + globalLabel(slot) + "]"
-                    : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
+                const std::string address = vecSlotAddress(program, item.slot, item.field);
                 const std::string loop = "ir_vec_clear_loop_" + std::to_string(id);
                 const std::string done = "ir_vec_clear_done_" + std::to_string(id);
                 if (valueTypeNeedsDrop(*item.type.element)) {
@@ -632,10 +633,7 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                     << done << ":\n";
             } else if constexpr (std::is_same_v<T, IrVecSet>) {
                 const std::size_t id = resourceSequence++;
-                const IrSlot& slot = program.slots[item.slot];
-                const std::string address = slot.global
-                    ? "[" + globalLabel(slot) + "]"
-                    : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
+                const std::string address = vecSlotAddress(program, item.slot, item.field);
                 out << "    push r12\n"
                     << "    movsxd rax, dword [rbp-" << valueOffset(program, item.index) << "]\n"
                     << "    test rax, rax\n"

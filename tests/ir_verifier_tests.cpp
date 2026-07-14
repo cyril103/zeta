@@ -69,6 +69,27 @@ int main() {
     validUnitFunction.instructions.push_back(IrReturn{0, ValueType::Unit});
     expectValid("fonction Unit structurellement valide", validUnitFunction);
 
+    const ValueType intVector(ValueType::Kind::Vec,
+        std::make_shared<ValueType>(ValueType::Int));
+    auto vecOwnerDefinition = std::make_shared<StructType>();
+    vecOwnerDefinition->name = "VecOwner";
+    vecOwnerDefinition->fields.push_back(StructField{{}, "values", intVector, 0});
+    vecOwnerDefinition->size = 24;
+    vecOwnerDefinition->alignment = 8;
+    const ValueType vecOwner(vecOwnerDefinition);
+
+    IrProgram validVecField;
+    validVecField.slots.push_back(IrSlot{"owner", vecOwner, true});
+    validVecField.valueTypes = {ValueType::Int, ValueType::Int};
+    validVecField.valueCount = 2;
+    validVecField.instructions.push_back(IrConst{0, 4, ValueType::Int});
+    validVecField.instructions.push_back(IrVecReserve{1, 0, 0, intVector, 0});
+    expectValid("mutation Vec sur champ valide", validVecField);
+
+    IrProgram invalidVecField = validVecField;
+    invalidVecField.instructions.back() = IrVecReserve{1, 0, 0, intVector, 1};
+    expectCode("champ Vec hors limites", "IRV031", invalidVecField);
+
     IrProgram wrongUnitOutput;
     wrongUnitOutput.valueTypes.push_back(ValueType::Int);
     wrongUnitOutput.valueCount = 1;

@@ -329,7 +329,9 @@ la suite de tests.
 
 Objectif : permettre d'écrire une collection possédée entièrement en Zeta.
 
-1. autoriser la mutation sûre d'un `Vec[T]` stocké dans un champ ;
+1. **Livré le 15 juillet 2026** — autoriser `push`, `set`, `reserve` et `clear`
+   directement sur un champ `Vec[T]` d'une structure `var`, sans copie du
+   propriétaire et avec rejet des liaisons immuables, empruntées ou déplacées ;
 2. permettre le passage et l'utilisation de `&mut Vec[T]` ;
 3. définir des méthodes utilisateur avec receveur partagé ou mutable ;
 4. définir éventuellement des méthodes d'extension pour les modules ;
@@ -462,7 +464,7 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-Commencer la priorité 2 par la mutation sûre d'un `Vec[T]` stocké dans un champ de
-structure. Définir d'abord la forme d'emprunt du receveur et les règles d'aliasing,
-puis couvrir `push`, `set`, `reserve` et `clear` sans ajouter de builtin `Stack` ou
-`Queue`.
+Poursuivre la priorité 2 avec `&mut Vec[T]`. Définir les opérations autorisées sur
+un receveur emprunté, propager son adresse dans l'IR sans copier le propriétaire,
+et couvrir les conflits entre vue `SliceMut`, croissance, déplacement et appels
+imbriqués.

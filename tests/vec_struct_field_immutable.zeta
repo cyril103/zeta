@@ -1,0 +1,9 @@
+struct Bag {
+    values: Vec[Int]
+}
+
+def main(): Int = {
+    val bag = Bag { values: Vec[Int]() }
+    bag.values.push(1)
+    0
+}

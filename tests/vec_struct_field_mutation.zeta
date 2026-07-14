@@ -1,0 +1,23 @@
+struct Bag {
+    values: Vec[Int]
+    marker: Int
+}
+
+struct OwnedBag {
+    values: Vec[Box[Int]]
+}
+
+def main(): Int = {
+    var bag = Bag { values: Vec[Int](), marker: 42 }
+    bag.values.reserve(8)
+    bag.values.push(10)
+    bag.values.push(20)
+    bag.values.set(1, 32)
+    val length = bag.values.length
+    val capacity = bag.values.capacity
+    bag.values.clear()
+    var owned = OwnedBag { values: Vec[Box[Int]]() }
+    owned.values.push(Box(7))
+    owned.values.clear()
+    if (length == 2 && capacity >= 8 && bag.values.isEmpty && bag.marker == 42) 0 else 1
+}

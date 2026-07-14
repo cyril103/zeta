@@ -262,6 +262,22 @@ void expectSlotType(const IrProgram& program, SlotId slot,
              " au lieu de " + typeName(expected));
 }
 
+void expectVecTargetType(const IrProgram& program, SlotId slot,
+                         std::optional<std::size_t> field,
+                         const ValueType& expected, const std::string& context) {
+    if (!field) {
+        expectSlotType(program, slot, expected, context);
+        return;
+    }
+    const ValueType& owner = program.slots[slot].type;
+    if (owner.kind != ValueType::Kind::Struct || *field >= owner.structure->fields.size())
+        fail("IRV031", context + " : cible de champ Vec invalide");
+    if (owner.structure->fields[*field].type != expected)
+        fail("IRV031", context + " : champ cible de type " +
+            typeName(owner.structure->fields[*field].type) + " au lieu de " +
+            typeName(expected));
+}
+
 bool isBuiltinOptionOf(const ValueType& option, const ValueType& element) {
     if (option.kind != ValueType::Kind::Enum || option.enumeration == nullptr) return false;
     const EnumType* definition = option.enumeration->genericDefinition != nullptr
@@ -363,7 +379,7 @@ void verifyInstructionTypes(const IrProgram& program, const IrInstruction& instr
             concrete(item.type);
             if (item.type.kind != ValueType::Kind::Vec)
                 fail("IRV044", context + " : opération Vec sans type Vec");
-            expectSlotType(program, item.slot, item.type, context);
+            expectVecTargetType(program, item.slot, item.field, item.type, context);
             if constexpr (std::is_same_v<T, IrVecReserve>)
                 expectValueType(program, item.additional, ValueType::Int, context);
             if constexpr (std::is_same_v<T, IrVecPush>)
@@ -389,9 +405,9 @@ void verifyInstructionTypes(const IrProgram& program, const IrInstruction& instr
             expectOutputType(program, item.output, item.optionType, context);
         } else if constexpr (std::is_same_v<T, IrVecSet>) {
             concrete(item.elementType);
-            const ValueType& vector = program.slots[item.slot].type;
-            if (vector.kind != ValueType::Kind::Vec || *vector.element != item.elementType)
-                fail("IRV040", context + " : contrat set de Vec invalide");
+            const ValueType vector(ValueType::Kind::Vec,
+                std::make_shared<ValueType>(item.elementType));
+            expectVecTargetType(program, item.slot, item.field, vector, context);
             expectValueType(program, item.index, ValueType::Int, context);
             expectValueType(program, item.value, item.elementType, context);
             expectOutputType(program, item.output, ValueType::Int, context);

@@ -1,0 +1,11 @@
+struct Bag {
+    values: Vec[Int]
+    marker: Int
+}
+
+def main(): Int = {
+    var bag = Bag { values: Vec[Int](), marker: 0 }
+    val shared = &bag
+    bag.values.push(1)
+    (*shared).marker
+}
