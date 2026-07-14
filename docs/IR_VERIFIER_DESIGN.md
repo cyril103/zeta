@@ -314,12 +314,13 @@ Le coût est mesuré avec cinq échantillons alternés par configuration, chaque
 temps par compilation. Cette agrégation limite le bruit d'ordonnancement sur une
 commande Release très courte. La cible reste un surcoût médian inférieur à 5 %.
 
-Mesure du 14 juillet 2026 : GCC 15.2.0 en Release, Linux WSL2
+Mesure finale du 15 juillet 2026 : GCC 15.2.0 en Release, Linux WSL2
 6.18.33.2, Intel Core i5-10300H (4 cœurs, 8 threads), processus épinglés au CPU 0.
-La médiane est de 35,30 ms avec vérification contre 33,09 ms sans vérification,
-soit +6,67 %. Le résultat validé opaque, les bitsets de définitions et les tables
-de lectures/sorties précalculées ont supprimé les validations et allocations
-redondantes, mais il reste 0,55 ms à gagner pour atteindre la cible de 5 %.
+La médiane est de 34,38 ms avec vérification contre 32,83 ms sans vérification,
+soit +4,70 %. Le résultat validé opaque, les bitsets et buffers de définitions
+réutilisés, les diagnostics paresseux et la table plate des lectures/sorties ont
+supprimé les validations et allocations redondantes. La cible inférieure à 5 %
+est donc atteinte sur la machine de référence.
 
 ## Conditions d'évolution
 

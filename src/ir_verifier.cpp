@@ -18,6 +18,14 @@ struct VisitedDefinitions {
     std::unordered_set<const EnumType*> enumerations;
 };
 
+bool requiresTypeVerification(const ValueType& type) {
+    using Kind = ValueType::Kind;
+    return type.kind == Kind::Array || type.kind == Kind::Reference ||
+        type.kind == Kind::Slice || type.kind == Kind::Box || type.kind == Kind::Vec ||
+        type.kind == Kind::TypeParameter || type.kind == Kind::Struct ||
+        type.kind == Kind::Enum;
+}
+
 [[noreturn]] void fail(const std::string& code, const std::string& message) {
     throw IrVerificationError(code, message);
 }
@@ -291,7 +299,8 @@ void verifyInstructionTypes(const IrProgram& program, const IrInstruction& instr
     std::visit([&](const auto& item) {
         using T = std::decay_t<decltype(item)>;
         const auto concrete = [&](const ValueType& type) {
-            verifyEmbeddedType(type, context + " : type d'instruction");
+            if (requiresTypeVerification(type))
+                verifyEmbeddedType(type, context + " : type d'instruction");
         };
         if constexpr (std::is_same_v<T, IrConst>) {
             concrete(item.type);
@@ -627,11 +636,13 @@ VerifiedIrProgram IrVerifier::verify(const IrProgram& program, IrVerificationMod
 
     VisitedDefinitions visited;
     for (std::size_t index = 0; index < program.valueTypes.size(); ++index)
-        verifyType(program.valueTypes[index],
-                   "type de la valeur $" + std::to_string(index), visited);
+        if (requiresTypeVerification(program.valueTypes[index]))
+            verifyType(program.valueTypes[index],
+                       "type de la valeur $" + std::to_string(index), visited);
     for (std::size_t index = 0; index < program.slots.size(); ++index)
-        verifyType(program.slots[index].type,
-                   "type du slot %" + std::to_string(index), visited);
+        if (requiresTypeVerification(program.slots[index].type))
+            verifyType(program.slots[index].type,
+                       "type du slot %" + std::to_string(index), visited);
 
     for (std::size_t index = 0; index < program.slots.size(); ++index)
         if (program.slots[index].external && !program.slots[index].global)
@@ -682,21 +693,21 @@ VerifiedIrProgram IrVerifier::verify(const IrProgram& program, IrVerificationMod
         }
         if (region == 0 && !regionEntries[0].has_value()) regionEntries[0] = index;
         instructionRegions[index] = region;
-        const std::string context = instructionContext(index, regionNames[region]);
+        const auto context = [&] { return instructionContext(index, regionNames[region]); };
 
         if (const auto* label = std::get_if<IrLabel>(&instruction)) {
             if (!labelRegions.emplace(label->label, region).second)
-                fail("IRV050", context + " : label " +
+                fail("IRV050", context() + " : label " +
                      std::to_string(label->label) + " dupliqué");
             labelInstructions.emplace(label->label, index);
         }
 
         if (const std::optional<ValueId> output = instructionOutputs[index]) {
             if (*output >= program.valueCount)
-                fail("IRV020", context + " : sortie $" + std::to_string(*output) +
+                fail("IRV020", context() + " : sortie $" + std::to_string(*output) +
                      " hors limites");
             if (valueRegions[*output].has_value() && *valueRegions[*output] != region)
-                fail("IRV012", context + " : valeur $" + std::to_string(*output) +
+                fail("IRV012", context() + " : valeur $" + std::to_string(*output) +
                      " produite dans plusieurs régions");
             valueRegions[*output] = region;
             valueProducers[*output].push_back(index);
@@ -705,11 +716,14 @@ VerifiedIrProgram IrVerifier::verify(const IrProgram& program, IrVerificationMod
         if (const auto* parameter = std::get_if<IrParameter>(&instruction)) {
             if (region == 0 || !parameterPreamble || parameter->index != expectedParameter ||
                 parameter->stackOffset != expectedStackOffset)
-                fail("IRV011", context + " : paramètre " +
+                fail("IRV011", context() + " : paramètre " +
                      std::to_string(parameter->index) + " ou offset " +
                      std::to_string(parameter->stackOffset) + " invalide");
-            VisitedDefinitions parameterVisited;
-            verifyType(parameter->type, context + " : type du paramètre", parameterVisited);
+            if (requiresTypeVerification(parameter->type)) {
+                VisitedDefinitions parameterVisited;
+                verifyType(parameter->type, context() + " : type du paramètre",
+                           parameterVisited);
+            }
             ++expectedParameter;
             expectedStackOffset += parameterStackBytes(parameter->type);
         } else if (!std::holds_alternative<IrFunctionStart>(instruction)) {
@@ -718,11 +732,11 @@ VerifiedIrProgram IrVerifier::verify(const IrProgram& program, IrVerificationMod
 
         for (const SlotId slot : slotsOf(instruction)) {
             if (slot >= program.slots.size())
-                fail("IRV030", context + " : slot %" + std::to_string(slot) +
+                fail("IRV030", context() + " : slot %" + std::to_string(slot) +
                      " hors limites");
             if (program.slots[slot].global) continue;
             if (slotRegions[slot].has_value() && *slotRegions[slot] != region)
-                fail("IRV013", context + " : slot local %" + std::to_string(slot) +
+                fail("IRV013", context() + " : slot local %" + std::to_string(slot) +
                      " utilisé dans plusieurs régions");
             slotRegions[slot] = region;
         }
@@ -743,29 +757,43 @@ VerifiedIrProgram IrVerifier::verify(const IrProgram& program, IrVerificationMod
                  " hors fusion IrCopy");
     }
 
-    std::vector<std::vector<ValueId>> instructionReads;
+    std::vector<ValueId> instructionReads;
     instructionReads.reserve(program.instructions.size());
-    for (const IrInstruction& instruction : program.instructions)
-        instructionReads.push_back(readsOf(instruction));
+    std::vector<std::size_t> instructionReadOffsets;
+    instructionReadOffsets.reserve(program.instructions.size() + 1U);
+    for (const IrInstruction& instruction : program.instructions) {
+        instructionReadOffsets.push_back(instructionReads.size());
+        const std::vector<ValueId> reads = readsOf(instruction);
+        instructionReads.insert(instructionReads.end(), reads.begin(), reads.end());
+    }
+    instructionReadOffsets.push_back(instructionReads.size());
+    static const std::string noContext;
     for (std::size_t index = 0; index < program.instructions.size(); ++index) {
         const IrInstruction& instruction = program.instructions[index];
         region = instructionRegions[index];
-        const std::string context = instructionContext(index, regionNames[region]);
-        for (const ValueId value : instructionReads[index]) {
+        const auto context = [&] { return instructionContext(index, regionNames[region]); };
+        for (std::size_t read = instructionReadOffsets[index];
+             read < instructionReadOffsets[index + 1U]; ++read) {
+            const ValueId value = instructionReads[read];
             if (value >= program.valueCount)
-                fail("IRV020", context + " : lecture de $" + std::to_string(value) +
+                fail("IRV020", context() + " : lecture de $" + std::to_string(value) +
                      " hors limites");
             if (valueRegions[value].has_value() && *valueRegions[value] != region)
-                fail("IRV012", context + " : lecture de $" + std::to_string(value) +
+                fail("IRV012", context() + " : lecture de $" + std::to_string(value) +
                      " depuis une autre région");
         }
         if (const std::optional<std::size_t> target = targetOf(instruction)) {
             const auto found = labelRegions.find(*target);
             if (found == labelRegions.end() || found->second != region)
-                fail("IRV050", context + " : cible label " +
+                fail("IRV050", context() + " : cible label " +
                      std::to_string(*target) + " absente de la région");
         }
-        verifyInstructionTypes(program, instruction, context);
+        try {
+            verifyInstructionTypes(program, instruction, noContext);
+        } catch (const IrVerificationError&) {
+            verifyInstructionTypes(program, instruction, context());
+            throw;
+        }
     }
 
     struct FunctionSignature {
@@ -864,9 +892,10 @@ VerifiedIrProgram IrVerifier::verify(const IrProgram& program, IrVerificationMod
         return false;
     };
     std::vector<std::vector<std::size_t>> valueReaders(program.valueCount);
-    for (std::size_t index = 0; index < instructionReads.size(); ++index)
-        for (const ValueId value : instructionReads[index])
-            valueReaders[value].push_back(index);
+    for (std::size_t index = 0; index < program.instructions.size(); ++index)
+        for (std::size_t read = instructionReadOffsets[index];
+             read < instructionReadOffsets[index + 1U]; ++read)
+            valueReaders[instructionReads[read]].push_back(index);
     for (ValueId value = 0; value < valueProducers.size(); ++value) {
         const std::vector<std::size_t>& producers = valueProducers[value];
         if (producers.size() < 2) continue;
@@ -901,12 +930,14 @@ VerifiedIrProgram IrVerifier::verify(const IrProgram& program, IrVerificationMod
     std::vector<Definitions> definitionsIn(
         program.instructions.size(), allDefinitions);
     std::vector<Definitions> definitionsOut = definitionsIn;
+    Definitions nextIn(definitionWords, 0);
+    Definitions nextOut(definitionWords, 0);
     bool changed = true;
     while (changed) {
         changed = false;
         for (std::size_t index = 0; index < program.instructions.size(); ++index) {
             if (reachable[index] == 0) continue;
-            Definitions nextIn(definitionWords, 0);
+            std::fill(nextIn.begin(), nextIn.end(), 0);
             const bool isEntry = regionEntries[instructionRegions[index]].has_value() &&
                 *regionEntries[instructionRegions[index]] == index;
             if (!isEntry && !predecessors[index].empty()) {
@@ -919,12 +950,12 @@ VerifiedIrProgram IrVerifier::verify(const IrProgram& program, IrVerificationMod
                         nextIn[word] &= incoming[word];
                 }
             }
-            Definitions nextOut = nextIn;
+            nextOut = nextIn;
             if (const std::optional<ValueId> output = instructionOutputs[index])
                 nextOut[*output / 64U] |= std::uint64_t{1} << (*output % 64U);
             if (nextIn != definitionsIn[index] || nextOut != definitionsOut[index]) {
-                definitionsIn[index] = std::move(nextIn);
-                definitionsOut[index] = std::move(nextOut);
+                definitionsIn[index] = nextIn;
+                definitionsOut[index] = nextOut;
                 changed = true;
             }
         }
@@ -932,13 +963,16 @@ VerifiedIrProgram IrVerifier::verify(const IrProgram& program, IrVerificationMod
 
     for (std::size_t index = 0; index < program.instructions.size(); ++index) {
         if (reachable[index] == 0) continue;
-        const std::string context = instructionContext(
-            index, regionNames[instructionRegions[index]]);
-        for (const ValueId value : instructionReads[index])
+        for (std::size_t read = instructionReadOffsets[index];
+             read < instructionReadOffsets[index + 1U]; ++read) {
+            const ValueId value = instructionReads[read];
             if ((definitionsIn[index][value / 64U] &
                  (std::uint64_t{1} << (value % 64U))) == 0)
-                fail("IRV023", context + " : valeur $" + std::to_string(value) +
+                fail("IRV023", instructionContext(
+                         index, regionNames[instructionRegions[index]]) +
+                     " : valeur $" + std::to_string(value) +
                      " utilisée avant définition sur tous les chemins");
+        }
     }
 
     bool followsTerminal = false;

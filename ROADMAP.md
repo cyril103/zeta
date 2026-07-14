@@ -205,6 +205,8 @@ implémentation correcte de référence, pas la cible finale de performance.
 
 ## Priorité 0 — vérificateur structurel d'IR
 
+**Statut : terminée le 15 juillet 2026.**
+
 La prochaine session doit commencer ici. Une variable locale générique non
 substituée a déjà atteint le backend et corrompu la pile. Un vérificateur doit
 intercepter ce type d'erreur avant FASM.
@@ -244,8 +246,10 @@ intercepter ce type d'erreur avant FASM.
    la médiane est de 35,30 ms avec vérification contre 33,09 ms sans, soit
    +6,67 %. Un résultat validé opaque réutilisé par les sorties, des bitsets de
    définitions et des tables précalculées ont réduit le coût initial.
-10. **En cours** — ramener le surcoût médian sous la cible de 5 % ; il reste
-    environ 0,55 ms à gagner par compilation sur la machine de référence.
+10. **Livré le 15 juillet 2026** — ramener le surcoût médian sous la cible de 5 %.
+    La construction paresseuse des diagnostics, la réutilisation des buffers de
+    définitions et la table plate des lectures donnent 34,38 ms avec vérification
+    contre 32,83 ms sans sur le même protocole, soit +4,70 %.
 
 ### Critère de sortie
 
