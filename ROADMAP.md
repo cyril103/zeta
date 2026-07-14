@@ -211,7 +211,8 @@ intercepter ce type d'erreur avant FASM.
 
 ### Étapes committables
 
-1. Écrire `docs/IR_VERIFIER_DESIGN.md` et définir les diagnostics `IRV`.
+1. **Livré le 14 juillet 2026** — écrire `docs/IR_VERIFIER_DESIGN.md`, inventorier
+   les 47 variantes actuelles et définir les diagnostics `IRV`.
 2. Ajouter un composant `IrVerifier` indépendant du codegen.
 3. Vérifier les frontières de fonctions, identifiants de valeurs, slots et labels.
 4. Vérifier définition unique, usage après définition et portée des paramètres.
