@@ -176,7 +176,7 @@ pas répétés sur chaque ligne.
 | `IrVecReserve` | `additional : Int`, cible `%slot[.field] : T` ou `$reference : &mut T` | `output : Int` | `T == Vec[E]`; slot et référence sont exclusifs, le champ doit désigner exactement `T` | suite |
 | `IrVecPush` | `value : E`, même cible mutable | `output : Int` | même contrat de cible que `IrVecReserve` | suite |
 | `IrVecClear` | même cible mutable | `output : Int` | même contrat de cible que `IrVecReserve` | suite |
-| `IrVecView` | `%slot : Vec[E]` | `output : T` | `T == Slice[E]` ou `SliceMut[E]` | suite |
+| `IrVecView` | cible `%slot : Vec[E]`, `$reference : &Vec[E]` ou `$reference : &mut Vec[E]` | `output : T` | `T == Slice[E]` ou `SliceMut[E]`; une sortie mutable exige une cible mutable | suite |
 | `IrVecGet` | `index : Int`, `%slot : Vec[E]` | `output : Option[E]` | `elementType == E`, `optionType` est l'instance builtin exacte | suite |
 | `IrVecPop` | `%slot : Vec[E]` | `output : Option[E]` | mêmes contraintes de type que `IrVecGet` | suite |
 | `IrVecSet` | `index : Int`, `value : E`, cible `%slot[.field] : Vec[E]` ou `$reference : &mut Vec[E]` | `output : Int` | même contrat de cible mutable exclusive | suite |

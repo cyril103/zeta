@@ -62,13 +62,13 @@ premier type de paramètre dans le fichier `.zti`. Le consommateur reconstruit l
 table des méthodes depuis cette signature, sans avoir besoin des sources.
 L'interface marque explicitement les exports d'extension et les corps génériques
 réduits conservent le token `extend`. Le format d'interface passe à `10`, les
-tokens génériques à `2` et le cache de modules à `20`.
+tokens génériques à `2` et le cache de modules à `21`.
 
 ## Limites du premier jalon
 
 Les méthodes inhérentes couvrent les structures non génériques et les extensions
 couvrent actuellement `Vec[T]`. Les extensions de types nominaux importés, les
-enums, les receveurs temporaires et la syntaxe de réemprunt seront traités
-séparément. L'étape suivante doit exposer les vues de `Vec` à travers son receveur
-référencé afin d'adapter les algorithmes de `sequences`, notamment `sort`, sans
-dupliquer leur implémentation.
+enums, les receveurs temporaires et la syntaxe générale de réemprunt seront
+traités séparément. Une extension `&Vec[T]` peut toutefois créer une `Slice[T]`,
+et une extension `&mut Vec[T]` une `SliceMut[T]` : `sequences` utilise ce chemin
+pour exposer `values.sort()` sans dupliquer son algorithme.

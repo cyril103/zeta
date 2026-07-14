@@ -1,0 +1,6 @@
+import sequences
+
+def main(): Int = {
+    val values = Vec[Int]()
+    values.sort()
+}

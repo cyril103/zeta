@@ -792,7 +792,7 @@ val minimum: Option[Int] = sequences.minimum(values.asSlice())
 val maximum: Option[Int] = sequences.maximum(values.asSlice())
 val swaps: Int = sequences.reverse(values.asSliceMut())
 val sorted: Bool = sequences.isSorted(values.asSlice())
-val sortSwaps: Int = sequences.sort(values.asSliceMut())
+val sortSwaps: Int = values.sort()
 val sortedPosition: Option[Int] = sequences.binarySearch(values.asSlice(), 20)
 val firstInsertion: Int = sequences.lowerBound(values.asSlice(), 20)
 val lastInsertion: Int = sequences.upperBound(values.asSlice(), 20)
@@ -807,6 +807,10 @@ Les comparaisons comprennent aussi `equals`, `startsWith` et `endsWith`.
 `None` pour une séquence vide. Les mutations `reverse`, `fill` et `swap` exigent
 `Copy` ; `swap` renvoie `false` pour un indice invalide. Les mêmes fonctions
 acceptent les slices issues de tableaux.
+
+L'import de `sequences` apporte aussi l'extension `values.sort()`. Elle emprunte
+temporairement le `Vec` en mutable et délègue au même algorithme sur `SliceMut` ;
+une liaison `val` ou une vue encore active interdit donc l'appel.
 
 ## Expressions sur plusieurs lignes
 

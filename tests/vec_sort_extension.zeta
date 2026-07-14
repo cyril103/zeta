@@ -1,0 +1,18 @@
+import sequences
+
+def first(values: &Vec[Int]): Int = {
+    val view: Slice[Int] = values.asSlice()
+    view[0]
+}
+
+def main(): Int = {
+    var values = Vec[Int]()
+    values.push(30)
+    values.push(10)
+    values.push(20)
+
+    val swaps = values.sort()
+    val view: Slice[Int] = values.asSlice()
+    if (swaps == 2 && first(&values) == 10 &&
+        view[0] == 10 && view[1] == 20 && view[2] == 30) 0 else 1
+}

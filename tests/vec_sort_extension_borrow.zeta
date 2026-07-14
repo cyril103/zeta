@@ -1,0 +1,10 @@
+import sequences
+
+def main(): Int = {
+    var values = Vec[Int]()
+    values.push(2)
+    values.push(1)
+    val view: Slice[Int] = values.asSlice()
+    values.sort()
+    view[0]
+}

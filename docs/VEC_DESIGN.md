@@ -56,9 +56,10 @@ appel comme `values.push(value)` dans une fonction recevant
 mots. L'IR porte alors la valeur adresse de la référence plutôt qu'un slot et le
 backend conserve cette adresse pendant toute l'opération, y compris pendant les
 appels système de croissance. Une référence partagée `&Vec[T]` ne permet aucune
-mutation. `get`, `pop`, `asSlice` et `asSliceMut` à travers une référence restent
-reportés afin de définir leur contrat d'emprunt avec les futures méthodes
-utilisateur.
+mutation. Une référence partagée ou mutable peut produire `asSlice()`, tandis que
+seule `&mut Vec[T]` peut produire `asSliceMut()`. Ces vues conservent l'adresse et
+la longueur du propriétaire sans copier ses trois mots. `get` et `pop` à travers
+une référence restent reportés.
 
 ## Allocation et croissance
 
@@ -89,7 +90,8 @@ que le vecteur ne la détruise plus.
 ## Vues empruntées
 
 `asSlice()` produit `{adresse, longueur}` sous la forme `Slice[T]` et
-`asSliceMut()` sous la forme `SliceMut[T]`, sans allocation ni copie. Les règles
+`asSliceMut()` sous la forme `SliceMut[T]`, sans allocation ni copie, depuis un
+propriétaire direct ou une référence compatible. Les règles
 lexicales existantes des emprunts s'appliquent : aucun déplacement, changement de
 taille ou accès mutable concurrent du vecteur n'est permis pendant la vie de la
 vue. Une slice ne participe jamais à la libération du bloc.

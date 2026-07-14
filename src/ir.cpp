@@ -450,6 +450,21 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
     for (std::size_t instanceIndex = 0; instanceIndex < genericInstances_.size(); ++instanceIndex) {
         const GenericInstance instance = genericInstances_[instanceIndex];
         const Declaration& function = *instance.declaration;
+        std::vector<std::string> aliases;
+        if (const auto origin = genericOrigins_.find(&function);
+            origin != genericOrigins_.end()) {
+            const Module& module = graph.modules.at(origin->second.module);
+            for (const Statement& statement : module.program.statements) {
+                const auto* declaration = std::get_if<Declaration>(&statement.value);
+                if (declaration == nullptr) continue;
+                const auto canonical = symbols_.find(origin->second.module + "." +
+                                                     declaration->name);
+                if (canonical != symbols_.end()) {
+                    symbols_.insert_or_assign(declaration->name, canonical->second);
+                    aliases.push_back(declaration->name);
+                }
+            }
+        }
         typeSubstitutions_.clear();
         for (std::size_t i = 0; i < function.typeParameters.size(); ++i)
             typeSubstitutions_.emplace(function.typeParameters[i], instance.types[i]);
@@ -474,6 +489,7 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
                     parameterType.kind == ValueType::Kind::Slice ? 16U : 8U;
         }
         emitTailExpression(*function.initializer, parameters, function);
+        for (const std::string& alias : aliases) symbols_.erase(alias);
     }
     typeSubstitutions_.clear();
     return std::move(ir_);
@@ -996,7 +1012,7 @@ ValueId IrGenerator::expression(
             if (node.method == "asSlice" || node.method == "asSliceMut") {
                 const ValueId output = nextValue(resolveType(expressionNode.inferredType));
                 ir_.instructions.push_back(IrVecView{
-                    output, found->second.slot, resolveType(expressionNode.inferredType)});
+                    output, mutationTarget, resolveType(expressionNode.inferredType)});
                 return output;
             }
             const ValueId output = nextValue(ValueType::Int);
@@ -1440,8 +1456,8 @@ std::string IrGenerator::print(const VerifiedIrProgram& verified) {
                 out << "  $" << item.output << " = vec_clear "
                     << vecTarget(item.target) << '\n';
             else if constexpr (std::is_same_v<T, IrVecView>)
-                out << "  $" << item.output << " = vec_view %"
-                    << program.slots[item.slot].name << " as " << typeName(item.type) << '\n';
+                out << "  $" << item.output << " = vec_view "
+                    << vecTarget(item.target) << " as " << typeName(item.type) << '\n';
             else if constexpr (std::is_same_v<T, IrVecGet>)
                 out << "  $" << item.output << " = vec_get %"
                     << program.slots[item.slot].name << ", $" << item.index << '\n';

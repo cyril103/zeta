@@ -571,15 +571,14 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                     << "    mov dword [rbp-" << valueOffset(program, item.output) << "], 0\n";
                 emitVecMutationTargetCleanup(out, item.target);
             } else if constexpr (std::is_same_v<T, IrVecView>) {
-                const IrSlot& slot = program.slots[item.slot];
-                const std::string address = slot.global
-                    ? "[" + globalLabel(slot) + "]"
-                    : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
+                const std::string address = vecMutationAddress(program, item.target);
                 const std::size_t output = valueOffset(program, item.output);
+                emitVecMutationTargetSetup(out, program, item.target);
                 out << "    mov rax, qword " << address << "\n"
                     << "    mov qword [rbp-" << output << "], rax\n"
                     << "    mov rax, qword " << displacedAddress(address, 8U) << "\n"
                     << "    mov qword [rbp-" << output - 8U << "], rax\n";
+                emitVecMutationTargetCleanup(out, item.target);
             } else if constexpr (std::is_same_v<T, IrVecGet>) {
                 const std::size_t id = resourceSequence++;
                 const IrSlot& slot = program.slots[item.slot];

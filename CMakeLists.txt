@@ -261,6 +261,7 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_compare.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_mutate.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_ordered.zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_sort_extension.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_bounds.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_aggregate.zeta)
     add_test(NAME persisted_module_interfaces
@@ -398,6 +399,21 @@ if(BUILD_TESTING)
         -o ${CMAKE_CURRENT_BINARY_DIR}/sequences-ordered)
     add_test(NAME run_sequences_ordered COMMAND ${CMAKE_CURRENT_BINARY_DIR}/sequences-ordered)
     set_tests_properties(run_sequences_ordered PROPERTIES DEPENDS compile_sequences_ordered)
+
+    add_test(NAME compile_vec_sort_extension COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_sort_extension.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/vec-sort-extension)
+    add_test(NAME run_vec_sort_extension COMMAND ${CMAKE_CURRENT_BINARY_DIR}/vec-sort-extension)
+    set_tests_properties(run_vec_sort_extension PROPERTIES DEPENDS compile_vec_sort_extension)
+    add_test(NAME reject_vec_sort_extension_val COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_sort_extension_val.zeta)
+    set_tests_properties(reject_vec_sort_extension_val PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_vec_sort_extension_constraint COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_sort_extension_constraint.zeta)
+    set_tests_properties(reject_vec_sort_extension_constraint PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_vec_sort_extension_borrow COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_sort_extension_borrow.zeta)
+    set_tests_properties(reject_vec_sort_extension_borrow PROPERTIES WILL_FAIL TRUE)
 
     add_test(NAME compile_sequences_bounds COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_bounds.zeta

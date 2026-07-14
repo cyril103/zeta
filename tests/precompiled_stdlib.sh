@@ -11,8 +11,9 @@ sequences_program=$7
 sequences_compare_program=$8
 sequences_mutate_program=$9
 sequences_ordered_program=${10}
-sequences_bounds_program=${11}
-sequences_aggregate_program=${12}
+vec_sort_extension_program=${11}
+sequences_bounds_program=${12}
+sequences_aggregate_program=${13}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 mkdir "$work/stdlib"
@@ -50,6 +51,8 @@ mv "$work/stdlib"/*.zeta "$work/sources/"
 "$work/sequences-mutate-app"
 "$compiler" "$sequences_ordered_program" -o "$work/sequences-ordered-app" --stdlib "$work/stdlib" >/dev/null
 "$work/sequences-ordered-app"
+"$compiler" "$vec_sort_extension_program" -o "$work/vec-sort-extension-app" --stdlib "$work/stdlib" >/dev/null
+"$work/vec-sort-extension-app"
 "$compiler" "$sequences_bounds_program" -o "$work/sequences-bounds-app" --stdlib "$work/stdlib" >/dev/null
 "$work/sequences-bounds-app"
 "$compiler" "$sequences_aggregate_program" -o "$work/sequences-aggregate-app" --stdlib "$work/stdlib" >/dev/null

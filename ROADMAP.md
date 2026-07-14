@@ -15,7 +15,7 @@ les primitives existantes sans ajouter un builtin pour chaque nouveau type.
 
 - construction CMake réussie ;
 - stdlib locale régénérée ;
-- 414 tests CTest réussis sur 414 ;
+- 419 tests CTest réussis sur 419 ;
 - exemple complet compilé, exécuté et couvert par CTest ;
 - aucun changement suivi en attente à la fin de la session ;
 - `build/`, `stdlib/precompiled/` et certains artefacts de tests sont ignorés.
@@ -44,7 +44,7 @@ chercher à le simplifier sans réduire sa sûreté.
 | ABI | `5` |
 | Interface `.zti` | `10` |
 | Tokens génériques | `2` |
-| Cache de modules | `20` |
+| Cache de modules | `21` |
 | Cache de démarrage | `2` |
 | Manifeste de stdlib | `1` |
 
@@ -102,8 +102,8 @@ Les autres acquis particulièrement utiles sont :
 L'exemple est compréhensible, mais trop cérémonieux :
 
 - chaque variable locale exige une annotation de type ;
-- `sequences.sort(values.asSliceMut())` expose trop de mécanique pour un usage
-  courant ;
+- les algorithmes mutateurs autres que `sort` exposent encore `SliceMut` pour un
+  usage courant ;
 - `collections.unwrapOr` et `strings.unwrapOr` dupliquent une API qui appartient
   conceptuellement à `Option[T]` ;
 - tous les parcours utilisent une boucle `while` et un indice manuel ;
@@ -343,8 +343,9 @@ Objectif : permettre d'écrire une collection possédée entièrement en Zeta.
    génériques de `Vec[T]`, activer leur résolution uniquement par import,
    diagnostiquer les collisions entre modules et préserver leur corps dans les
    interfaces précompilées ;
-5. rendre possibles des appels ergonomiques comme `values.sort()` tout en
-   conservant `SliceMut` comme mécanisme interne ;
+5. **Livré le 15 juillet 2026** — rendre `values.sort()` disponible par une
+   extension de `sequences`, produire les vues depuis `&Vec[T]` et `&mut Vec[T]`,
+   puis déléguer au tri sur `SliceMut` sans dupliquer son algorithme ;
 6. écrire `Stack[T]` comme validation minimale ;
 7. écrire `Queue[T]` comme critère de sortie réel.
 
@@ -472,7 +473,8 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-Poursuivre la priorité 2 avec `values.sort()`. Permettre à une extension recevant
-`&mut Vec[T]` de produire une `SliceMut[T]` liée au même emprunt, puis adapter
-`sequences.sort` sous forme de méthode sans dupliquer son algorithme. Couvrir le
-rejet sur `val`, les conflits de vue et la consommation de la stdlib précompilée.
+Poursuivre la priorité 2 avec `Stack[T]`. Lever d'abord les deux prérequis encore
+visibles : méthodes inhérentes sur une structure générique et accès mutable à son
+champ `Vec[T]` depuis `self: &mut Stack[T]`. Implémenter ensuite `push`, `pop` et
+`isEmpty` en Zeta, sans nouveau builtin, avec tests de propriété, d'emprunt et de
+compilation précompilée.

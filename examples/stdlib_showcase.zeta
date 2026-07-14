@@ -30,7 +30,7 @@ def main(): Int = {
     io.println("Nombre de 2 : " + String(occurrences))
     io.println("Indice absent détecté : " + String(missing))
 
-    val swaps = sequences.sort(scores.asSliceMut())
+    val swaps = scores.sort()
     val sorted = scores.asSlice()
     val sortedOk = sequences.isSorted(sorted)
     val positionEight = collections.unwrapOr(

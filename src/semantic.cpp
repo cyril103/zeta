@@ -1136,30 +1136,33 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (symbol == nullptr || vectorType.kind != ValueType::Kind::Vec)
                 throw CompileError(node.object->location,
                                    "la méthode '" + node.method + "' exige un Vec");
-            if (referenceReceiver && !receiverType.mutableReference)
-                throw CompileError(node.object->location,
-                                   "la mutation exige une référence '&mut Vec'");
             const std::string& receiverName = name != nullptr ? name->name : owner->name;
-            if ((fieldReceiver || referenceReceiver) &&
-                node.method != "reserve" && node.method != "push" &&
-                node.method != "clear" && node.method != "set")
+            const bool mutationMethod = node.method == "reserve" || node.method == "push" ||
+                node.method == "clear" || node.method == "set";
+            const bool viewMethod = node.method == "asSlice" || node.method == "asSliceMut";
+            if ((fieldReceiver && !mutationMethod) ||
+                (referenceReceiver && !mutationMethod && !viewMethod))
                 throw CompileError(node.object->location,
                     "la méthode '" + node.method +
                     "' n'est pas encore disponible sur ce receveur Vec");
+            if (referenceReceiver && !receiverType.mutableReference &&
+                node.method != "asSlice")
+                throw CompileError(node.object->location,
+                                   "la mutation exige une référence '&mut Vec'");
             if (fieldReceiver)
                 checkExpression(*node.object, vectorType);
             else {
                 node.object->inferredType = receiverType;
                 node.object->typed = true;
             }
-            const bool mutableReceiver = referenceReceiver ||
+            const bool mutableReceiver =
+                (referenceReceiver && receiverType.mutableReference) ||
                 (!symbol->parameter && symbol->kind == BindingKind::Var);
             if (node.method == "asSlice" || node.method == "asSliceMut") {
                 if (!node.arguments.empty())
                     throw CompileError(expression.location, "'" + node.method +
                         "' n'attend aucun argument");
-                if (node.method == "asSliceMut" &&
-                    (symbol->parameter || symbol->kind != BindingKind::Var))
+                if (node.method == "asSliceMut" && !mutableReceiver)
                     throw CompileError(node.object->location,
                                        "'asSliceMut' exige un Vec déclaré avec 'var'");
                 if (movedBoxes_.contains(receiverName))
@@ -1377,7 +1380,12 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 for (std::size_t i = 0; i < generic->typeParameters.size(); ++i) {
                     const ValueType& type = substitutions.at(generic->typeParameters[i]);
                     const std::string& constraint = generic->typeConstraints[i];
-                    if (!satisfiesConstraint(type, constraint))
+                    const auto activeConstraint = type.kind == ValueType::Kind::TypeParameter
+                        ? activeTypeConstraints_.find(type.typeParameter)
+                        : activeTypeConstraints_.end();
+                    const bool propagatedConstraint = activeConstraint !=
+                        activeTypeConstraints_.end() && activeConstraint->second == constraint;
+                    if (!satisfiesConstraint(type, constraint) && !propagatedConstraint)
                         throw CompileError(expression.location,
                                            "le type " + typeName(type) +
                                            " ne satisfait pas la contrainte " + constraint);

@@ -42,7 +42,7 @@ struct IrVecPush {
 struct IrVecClear {
     ValueId output; IrVecMutationTarget target; ValueType type;
 };
-struct IrVecView { ValueId output; SlotId slot; ValueType type; };
+struct IrVecView { ValueId output; IrVecMutationTarget target; ValueType type; };
 struct IrVecGet {
     ValueId output; SlotId slot; ValueId index; ValueType optionType; ValueType elementType;
 };

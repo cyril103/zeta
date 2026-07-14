@@ -138,6 +138,9 @@ std::vector<ValueId> readsOf(const IrInstruction& instruction) {
         } else if constexpr (std::is_same_v<T, IrVecClear>) {
             if (item.target.reference) return {*item.target.reference};
             return {};
+        } else if constexpr (std::is_same_v<T, IrVecView>) {
+            if (item.target.reference) return {*item.target.reference};
+            return {};
         }
         else if constexpr (std::is_same_v<T, IrVecGet>)
             return {item.index};
@@ -208,8 +211,9 @@ std::vector<SlotId> slotsOf(const IrInstruction& instruction) {
                       std::is_same_v<T, IrVecClear> ||
                       std::is_same_v<T, IrVecSet>) {
             if (item.target.slot) return {*item.target.slot};
-        } else if constexpr (std::is_same_v<T, IrVecView> ||
-                      std::is_same_v<T, IrVecGet> ||
+        } else if constexpr (std::is_same_v<T, IrVecView>) {
+            if (item.target.slot) return {*item.target.slot};
+        } else if constexpr (std::is_same_v<T, IrVecGet> ||
                       std::is_same_v<T, IrVecPop> ||
                       std::is_same_v<T, IrFieldStore> ||
                       std::is_same_v<T, IrAddressOf> ||
@@ -412,10 +416,21 @@ void verifyInstructionTypes(const IrProgram& program, const IrInstruction& instr
             expectOutputType(program, item.output, ValueType::Int, context);
         } else if constexpr (std::is_same_v<T, IrVecView>) {
             concrete(item.type);
-            const ValueType& vector = program.slots[item.slot].type;
-            if (vector.kind != ValueType::Kind::Vec || item.type.kind != ValueType::Kind::Slice ||
-                *vector.element != *item.type.element)
+            if (item.type.kind != ValueType::Kind::Slice)
                 fail("IRV040", context + " : vue Vec incompatible");
+            const ValueType vector(ValueType::Kind::Vec,
+                std::make_shared<ValueType>(*item.type.element));
+            if (item.target.reference) {
+                if (item.target.slot || item.target.field)
+                    fail("IRV040", context + " : cible de vue Vec ambiguë");
+                const ValueType& reference = program.valueTypes[*item.target.reference];
+                if (reference.kind != ValueType::Kind::Reference ||
+                    reference.element == nullptr || *reference.element != vector ||
+                    (item.type.mutableReference && !reference.mutableReference))
+                    fail("IRV040", context + " : référence de vue Vec incompatible");
+            } else {
+                expectVecTargetType(program, item.target, vector, context);
+            }
             expectOutputType(program, item.output, item.type, context);
         } else if constexpr (std::is_same_v<T, IrVecGet> ||
                              std::is_same_v<T, IrVecPop>) {

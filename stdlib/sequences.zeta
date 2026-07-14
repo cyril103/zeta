@@ -256,3 +256,5 @@ pub def sort[T: Ordered](values: SliceMut[T]): Int = {
     }
     swaps
 }
+
+pub extend def Vec.sort[T: Ordered](self: &mut Vec[T]): Int = sort[T](self.asSliceMut())
