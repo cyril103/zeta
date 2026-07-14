@@ -95,6 +95,10 @@ producteurs réserve le cas multiple à `IrCopy`. À terme, une instruction `IrP
 explicite permettra de retrouver une vraie propriété SSA et de supprimer cette
 exception.
 
+L'exclusivité des producteurs `IrCopy` est contrôlée sur les chemins avant du
+graphe structuré. Une arête de retour de boucle ouvre une nouvelle itération et
+peut donc réexécuter légitimement une même fusion.
+
 ### Flot de contrôle
 
 Un bloc de base commence à l'entrée d'une région, à un `IrLabel`, ou après une
@@ -131,7 +135,7 @@ déduite du contenu.
 | `IRV024` | pseudo-phi `IrCopy` incomplet ou non exclusif |
 | `IRV030` | `SlotId` hors limites |
 | `IRV031` | type d'instruction différent du type du slot |
-| `IRV032` | opération de slot appliquée à une catégorie de slot incompatible |
+| `IRV032` | catégorie de slot incohérente, notamment `external` sans `global` |
 | `IRV040` | type d'opérande incompatible |
 | `IRV041` | opérateur, propriété ou conversion inconnue |
 | `IRV042` | arité ou liste de types d'un appel incohérente |
@@ -293,11 +297,13 @@ flot couvrent : label étranger, branche sans définition sur un prédécesseur,
 pseudo-phi valide, pseudo-phi redéfini sur un même chemin, instruction après
 terminal et fonction avec chute implicite.
 
-Un test d'intégration compile un module et vérifie qu'une IR valide passe avant le
-printer et FASM. Un hook de test injecte ensuite une corruption déterministe dans
-l'IR du module afin d'observer `IRV` avant la création du fichier assembleur.
+Les tests d'intégration compilent modules, génériques et showcase avec la
+vérification active. Des tests de frontière injectent aussi une corruption
+déterministe directement dans `IrGenerator::print`,
+`FasmCodeGenerator::generate` et `generateObject`, afin d'observer `IRV` avant
+que ces API puissent produire leur sortie textuelle.
 
-Avant activation globale, le vérificateur est exécuté sur :
+La validation globale exécute le vérificateur sur :
 
 - l'IR de `examples/stdlib_showcase.zeta` en mode exécutable ;
 - chaque IR de module produite pendant ce build en mode objet ;

@@ -89,6 +89,15 @@ int main() {
         false});
     expectCode("paramètre générique imbriqué", "IRV003", nestedTypeParameter);
 
+    IrProgram mismatchedExitValue;
+    mismatchedExitValue.valueTypes = {ValueType::Int, ValueType::Int};
+    mismatchedExitValue.valueCount = 2;
+    mismatchedExitValue.exitValue = 1;
+    mismatchedExitValue.instructions.push_back(IrConst{0, 0, ValueType::Int});
+    mismatchedExitValue.instructions.push_back(IrConst{1, 1, ValueType::Int});
+    mismatchedExitValue.instructions.push_back(IrExit{0});
+    expectCode("métadonnée exitValue incohérente", "IRV004", mismatchedExitValue);
+
     IrProgram invalidFunction;
     invalidFunction.instructions.push_back(IrFunctionStart{"", false, {}});
     expectCode("nom de fonction vide", "IRV010", invalidFunction);
@@ -237,6 +246,34 @@ int main() {
     validShortCircuit.instructions.push_back(IrReturn{2, ValueType::Bool});
     expectValid("court-circuit avec réécriture IrCopy", validShortCircuit);
 
+    IrProgram validLoopPhi;
+    validLoopPhi.valueTypes = {
+        ValueType::Bool, ValueType::Int, ValueType::Int, ValueType::Int};
+    validLoopPhi.valueCount = 4;
+    validLoopPhi.instructions.push_back(IrFunctionStart{"loop_phi", false, {}});
+    validLoopPhi.instructions.push_back(IrLabel{21});
+    validLoopPhi.instructions.push_back(IrConst{0, 0, ValueType::Bool});
+    validLoopPhi.instructions.push_back(IrBranch{0, false, 22});
+    validLoopPhi.instructions.push_back(IrConst{1, 1, ValueType::Int});
+    validLoopPhi.instructions.push_back(IrCopy{3, 1, ValueType::Int});
+    validLoopPhi.instructions.push_back(IrJump{21});
+    validLoopPhi.instructions.push_back(IrLabel{22});
+    validLoopPhi.instructions.push_back(IrConst{2, 2, ValueType::Int});
+    validLoopPhi.instructions.push_back(IrCopy{3, 2, ValueType::Int});
+    validLoopPhi.instructions.push_back(IrReturn{3, ValueType::Int});
+    expectValid("pseudo-phi réécrit après une arête de boucle", validLoopPhi);
+
+    IrProgram nonExclusivePhi;
+    nonExclusivePhi.valueTypes = {ValueType::Int, ValueType::Int, ValueType::Int};
+    nonExclusivePhi.valueCount = 3;
+    nonExclusivePhi.instructions.push_back(IrFunctionStart{"non_exclusive", false, {}});
+    nonExclusivePhi.instructions.push_back(IrConst{0, 1, ValueType::Int});
+    nonExclusivePhi.instructions.push_back(IrConst{1, 2, ValueType::Int});
+    nonExclusivePhi.instructions.push_back(IrCopy{2, 0, ValueType::Int});
+    nonExclusivePhi.instructions.push_back(IrCopy{2, 1, ValueType::Int});
+    nonExclusivePhi.instructions.push_back(IrReturn{2, ValueType::Int});
+    expectCode("pseudo-phi non exclusif", "IRV024", nonExclusivePhi);
+
     IrProgram wrongOutputType;
     wrongOutputType.valueTypes.push_back(ValueType::Int);
     wrongOutputType.valueCount = 1;
@@ -250,6 +287,11 @@ int main() {
     wrongSlotType.instructions.push_back(IrFunctionStart{"slot", false, {}});
     wrongSlotType.instructions.push_back(IrLoad{0, 0, ValueType::Int});
     expectCode("type de slot incohérent", "IRV031", wrongSlotType);
+
+    IrProgram invalidExternalSlot;
+    invalidExternalSlot.slots.push_back(
+        IrSlot{"external_local", ValueType::Int, false, true});
+    expectCode("slot externe non global", "IRV032", invalidExternalSlot);
 
     IrProgram wrongOperandType;
     wrongOperandType.valueTypes = {ValueType::Int, ValueType::String};

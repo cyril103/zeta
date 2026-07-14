@@ -633,6 +633,21 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
         verifyType(program.slots[index].type,
                    "type du slot %" + std::to_string(index), visited);
 
+    for (std::size_t index = 0; index < program.slots.size(); ++index)
+        if (program.slots[index].external && !program.slots[index].global)
+            fail("IRV032", "slot %" + std::to_string(index) +
+                 " : un slot externe doit être global");
+
+    for (const IrInstruction& instruction : program.instructions) {
+        const auto* exit = std::get_if<IrExit>(&instruction);
+        if (exit == nullptr) continue;
+        if (exit->value >= program.valueCount) continue;
+        if (program.exitValue >= program.valueCount ||
+            program.valueTypes[program.exitValue] != ValueType::Int ||
+            exit->value != program.exitValue)
+            fail("IRV004", "exitValue ne concorde pas avec l'opérande Int de IrExit");
+    }
+
     std::vector<std::size_t> instructionRegions(program.instructions.size(), 0);
     std::vector<std::string> regionNames{"<init>"};
     std::vector<std::optional<std::size_t>> regionEntries(1);
@@ -818,6 +833,54 @@ void IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
         if (reachable[index] != 0) continue;
         reachable[index] = 1;
         for (const std::size_t successor : successors[index]) pending.push_back(successor);
+    }
+
+    const auto reachesForward = [&](std::size_t from, std::size_t target,
+                                    std::optional<std::size_t> blocked) {
+        std::vector<unsigned char> visitedInstructions(program.instructions.size(), 0);
+        std::deque<std::size_t> work;
+        for (const std::size_t successor : successors[from])
+            if (successor > from) work.push_back(successor);
+        while (!work.empty()) {
+            const std::size_t index = work.front();
+            work.pop_front();
+            if (blocked.has_value() && index == *blocked) continue;
+            if (index == target) return true;
+            if (visitedInstructions[index] != 0) continue;
+            visitedInstructions[index] = 1;
+            for (const std::size_t successor : successors[index])
+                if (successor > index) work.push_back(successor);
+        }
+        return false;
+    };
+    for (ValueId value = 0; value < valueProducers.size(); ++value) {
+        const std::vector<std::size_t>& producers = valueProducers[value];
+        if (producers.size() < 2) continue;
+        for (const std::size_t producer : producers)
+            if (reachable[producer] == 0)
+                fail("IRV024", "pseudo-phi $" + std::to_string(value) +
+                     " produit sur un chemin inatteignable");
+        const auto verifyExclusiveOrder = [&](std::size_t first, std::size_t second) {
+            if (!reachesForward(first, second, std::nullopt)) return;
+            bool hasBypass = false;
+            for (std::size_t index = 0; index < program.instructions.size(); ++index) {
+                const std::vector<ValueId> reads = readsOf(program.instructions[index]);
+                if (std::find(reads.begin(), reads.end(), value) == reads.end()) continue;
+                if (reachesForward(second, index, std::nullopt) &&
+                    reachesForward(first, index, second)) {
+                    hasBypass = true;
+                    break;
+                }
+            }
+            if (!hasBypass)
+                    fail("IRV024", "pseudo-phi $" + std::to_string(value) +
+                         " réécrit sans chemin exclusif");
+        };
+        for (std::size_t left = 0; left < producers.size(); ++left)
+            for (std::size_t right = left + 1; right < producers.size(); ++right) {
+                verifyExclusiveOrder(producers[left], producers[right]);
+                verifyExclusiveOrder(producers[right], producers[left]);
+            }
     }
 
     using Definitions = std::vector<unsigned char>;

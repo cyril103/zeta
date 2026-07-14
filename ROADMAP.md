@@ -232,12 +232,12 @@ intercepter ce type d'erreur avant FASM.
    `FasmCodeGenerator::generate` et `generateObject`. Le mode exécutable ou objet
    est explicite et une IR injectée directement ne peut plus atteindre le printer
    ou le codegen sans validation.
-8. **En cours** — les tests unitaires construisent déjà des `IrProgram`
-   volontairement invalides pour `IRV001`, `IRV002`, `IRV003`, `IRV010`,
-   `IRV011`, `IRV012`, `IRV013`, `IRV020` à `IRV023`, `IRV030`, `IRV031`,
-   `IRV040` à `IRV045` et `IRV050` à `IRV054`; le pipeline CTest exerce désormais
-   aussi la vérification intégrée par module et l'injection d'une IR invalide aux
-   trois frontières publiques de sortie.
+8. **Livré le 14 juillet 2026** — couvrir directement chaque famille de diagnostic
+   avec des `IrProgram` volontairement invalides : `IRV001` à `IRV004`, `IRV010`
+   à `IRV013`, `IRV020` à `IRV024`, `IRV030` à `IRV032`, `IRV040` à `IRV045` et
+   `IRV050` à `IRV054`. Le pipeline CTest exerce aussi la vérification intégrée
+   par module et l'injection d'une IR invalide aux trois frontières publiques de
+   sortie.
 9. Exécuter toute la suite et mesurer le coût de la vérification.
 
 ### Critère de sortie
