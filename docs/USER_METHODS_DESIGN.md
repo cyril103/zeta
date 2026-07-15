@@ -13,10 +13,12 @@ def Counter.reset(self: &mut Counter): Unit = {
 }
 ```
 
-Le préfixe doit désigner une structure non générique déclarée dans le même
-module. Le premier paramètre doit se nommer `self` et être exactement `&Type` ou
-`&mut Type`. Cette contrainte distingue les méthodes inhérentes des méthodes
-d'extension et rend la mutabilité visible dans la signature publique.
+Le préfixe doit désigner une structure déclarée dans le même module. Le premier
+paramètre doit se nommer `self` et être exactement `&Type` ou `&mut Type`. Pour
+une structure générique, la méthode reprend exactement les paramètres du type,
+dans le même ordre, et son receveur les conserve. Cette contrainte distingue les
+méthodes inhérentes des méthodes d'extension et rend la mutabilité visible dans
+la signature publique.
 
 ## Extensions de module
 
@@ -66,9 +68,15 @@ tokens génériques à `2` et le cache de modules à `21`.
 
 ## Limites du premier jalon
 
-Les méthodes inhérentes couvrent les structures non génériques et les extensions
-couvrent actuellement `Vec[T]`. Les extensions de types nominaux importés, les
-enums, les receveurs temporaires et la syntaxe générale de réemprunt seront
-traités séparément. Une extension `&Vec[T]` peut toutefois créer une `Slice[T]`,
+Les méthodes inhérentes couvrent les structures ordinaires et génériques, et les
+extensions couvrent actuellement `Vec[T]`. Les extensions de types nominaux
+importés, les enums, les receveurs temporaires et la syntaxe générale de
+réemprunt seront traités séparément. Une extension `&Vec[T]` peut créer une `Slice[T]`,
 et une extension `&mut Vec[T]` une `SliceMut[T]` : `sequences` utilise ce chemin
 pour exposer `values.sort()` sans dupliquer son algorithme.
+
+Une méthode de structure générique peut aussi projeter un champ `Vec[T]` depuis
+`(*self)`. L'IR conserve alors la référence du propriétaire, son type concret et
+l'indice du champ. Le backend ajoute l'offset du champ à l'adresse reçue ; aucune
+valeur `Vec` intermédiaire n'est chargée. `collections.Stack[T]` valide ce chemin
+pour les propriétés, `push` et `pop`, y compris depuis une interface précompilée.

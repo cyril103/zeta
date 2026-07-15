@@ -15,7 +15,7 @@ les primitives existantes sans ajouter un builtin pour chaque nouveau type.
 
 - construction CMake réussie ;
 - stdlib locale régénérée ;
-- 419 tests CTest réussis sur 419 ;
+- 424 tests CTest réussis sur 424 ;
 - exemple complet compilé, exécuté et couvert par CTest ;
 - aucun changement suivi en attente à la fin de la session ;
 - `build/`, `stdlib/precompiled/` et certains artefacts de tests sont ignorés.
@@ -44,7 +44,7 @@ chercher à le simplifier sans réduire sa sûreté.
 | ABI | `5` |
 | Interface `.zti` | `10` |
 | Tokens génériques | `2` |
-| Cache de modules | `21` |
+| Cache de modules | `22` |
 | Cache de démarrage | `2` |
 | Manifeste de stdlib | `1` |
 
@@ -300,9 +300,8 @@ branches `if/else` convergent sur ce type. `IrUnit`, le vérificateur structurel
 les interfaces `.zti` et l'invalidation ABI/cache couvrent ce contrat. L'API `io`
 retourne maintenant `Unit`; ses tests d'exécution valident toujours les sorties.
 
-Les compteurs des opérations mutantes de `Vec` restent provisoirement inchangés :
-leur migration sera faite avec la composabilité de `Vec` en priorité 2 afin de ne
-pas mélanger deux contrats publics.
+Les opérations mutantes de `Vec` ont été migrées vers `Unit` avec `Stack[T]` en
+priorité 2.
 
 ### 1C. Contrôle de flux
 
@@ -346,7 +345,9 @@ Objectif : permettre d'écrire une collection possédée entièrement en Zeta.
 5. **Livré le 15 juillet 2026** — rendre `values.sort()` disponible par une
    extension de `sequences`, produire les vues depuis `&Vec[T]` et `&mut Vec[T]`,
    puis déléguer au tri sur `SliceMut` sans dupliquer son algorithme ;
-6. écrire `Stack[T]` comme validation minimale ;
+6. **Livré le 15 juillet 2026** — écrire `Stack[T]` comme validation minimale,
+   avec méthodes inhérentes génériques, projection directe de son champ `Vec[T]`,
+   opérations mutantes `Unit` et consommation précompilée sans sources ;
 7. écrire `Queue[T]` comme critère de sortie réel.
 
 Le compilateur ne doit pas recevoir un nouveau builtin `Stack` ou `Queue`. Le but
@@ -473,11 +474,8 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-Point de départ attendu : branche `master`, commit `94519b2`, arbre propre,
-stdlib régénérée et 419 tests réussis.
-
-Poursuivre la priorité 2 avec `Stack[T]`. L'API cible minimale, écrite dans la
-stdlib et non dans le compilateur, est :
+Poursuivre la priorité 2 avec `Queue[T]`, écrite dans la stdlib et non dans le
+compilateur. `Stack[T]` a validé l'API suivante :
 
 ```zeta
 pub struct Stack[T] {
@@ -489,28 +487,18 @@ pub def Stack.pop[T](self: &mut Stack[T]): Option[T]
 pub def Stack.isEmpty[T](self: &Stack[T]): Bool
 ```
 
-Ordre de travail recommandé :
+Ordre de travail recommandé pour la file :
 
-1. autoriser les méthodes inhérentes génériques dont les paramètres de type
-   correspondent à ceux de leur structure propriétaire, puis préserver leur
-   résolution, leur monomorphisation et leur corps dans les interfaces `.zti` ;
-2. représenter en IR la projection d'un champ `Vec[T]` depuis `&Stack[T]` ou
-   `&mut Stack[T]`, sans charger ni copier les trois mots propriétaires ;
-3. permettre à `push` et `pop` d'utiliser la projection mutable, et à `isEmpty`
-   d'utiliser la projection partagée, avec validation dédiée dans
-   `IrVerifier` et prise en charge backend ;
-4. implémenter `Stack[T]` dans la stdlib, probablement dans `collections`, sans
-   constructeur retournant la structure tant que les retours d'agrégats de plus
-   de 16 octets restent interdits ; la construction littérale suffit pour ce
-   jalon ;
-5. tester au minimum la pile vide, l'ordre LIFO, plusieurs types d'éléments, le
-   déplacement d'une valeur possédée, le rejet sur `val`, les conflits d'emprunt,
-   les contraintes de receveur et la consommation de `.zti` + `.o` sans sources ;
-6. réviser le cache de modules si l'IR ou le code généré change, régénérer la
-   stdlib, exécuter `git diff --check` puis toute la suite CTest, et documenter
-   les limites restantes avant de passer à `Queue[T]`.
+1. choisir une représentation qui n'impose pas un décalage `O(n)` à chaque
+   retrait, probablement un `Vec[T]` accompagné d'un index de tête ;
+2. définir `push`, `pop` et `isEmpty` avec les mêmes contrats de propriété que la
+   pile, puis préciser le traitement des cases déjà consommées ;
+3. préserver la destruction exacte des éléments possédés et éviter toute copie
+   implicite lors d'une éventuelle compaction ;
+4. couvrir FIFO, file vide, plusieurs types, valeurs possédées, rejets d'emprunt
+   et consommation `.zti` + `.o` sans sources ;
+5. n'ajouter aucun builtin `Queue` au compilateur.
 
-Critère de sortie : un programme utilisateur importe la stdlib, construit une
-`Stack[Int]`, appelle `push`, `pop` et `isEmpty` avec la syntaxe méthode, passe
-également avec la stdlib précompilée seule, et aucun builtin `Stack` n'existe dans
-le lexer, l'analyse sémantique, l'IR ou le backend.
+La limite à garder visible est le retour ABI des agrégats de plus de 16 octets :
+`Stack[T]` se construit encore par littéral, et `Queue[T]` devra probablement
+faire de même pour ce jalon.

@@ -1,0 +1,34 @@
+import collections
+
+def main(): Int = {
+    var numbers = collections.Stack[Int] { values: Vec[Int]() }
+    val initiallyEmpty = numbers.isEmpty()
+    numbers.push(10)
+    numbers.push(20)
+    val last = numbers.pop()
+    val first = numbers.pop()
+    val missing = numbers.pop()
+    val lastValue = match (last) {
+        Option[Int].Some(value) => value
+        Option[Int].None => 0
+    }
+    val firstValue = match (first) {
+        Option[Int].Some(value) => value
+        Option[Int].None => 0
+    }
+    val missingIsNone = match (missing) {
+        Option[Int].Some(_) => false
+        Option[Int].None => true
+    }
+
+    var owned = collections.Stack[Box[Int]] { values: Vec[Box[Int]]() }
+    owned.push(Box(42))
+    val moved = owned.pop()
+    val movedValue = match (moved) {
+        Option[Box[Int]].Some(value) => *value
+        Option[Box[Int]].None => 0
+    }
+
+    if (initiallyEmpty && lastValue == 20 && firstValue == 10 &&
+        missingIsNone && numbers.isEmpty() && movedValue == 42 && owned.isEmpty()) 0 else 1
+}

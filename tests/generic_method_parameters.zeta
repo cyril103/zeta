@@ -1,0 +1,7 @@
+struct Container[T] {
+    values: Vec[T]
+}
+
+def Container.invalid[T, U](self: &Container[T]): Bool = (*self).values.isEmpty
+
+def main(): Int = 0

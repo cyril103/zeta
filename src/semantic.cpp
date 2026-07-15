@@ -69,6 +69,14 @@ ValueType substituteType(
     if (type.kind == ValueType::Kind::Vec)
         return ValueType(ValueType::Kind::Vec,
             std::make_shared<ValueType>(substituteType(*type.element, substitutions)));
+    if (type.kind == ValueType::Kind::Struct &&
+        !type.structure->typeArguments.empty()) {
+        std::vector<ValueType> arguments;
+        for (const ValueType& argument : type.structure->typeArguments)
+            arguments.push_back(substituteType(argument, substitutions));
+        return ValueType(instantiateStructType(type.structure, std::move(arguments),
+                                               type.structure->location));
+    }
     if (type.kind == ValueType::Kind::Enum &&
         !type.enumeration->typeArguments.empty()) {
         std::vector<ValueType> arguments;
@@ -107,6 +115,15 @@ bool inferTypeArguments(
         for (std::size_t i = 0; i < pattern.enumeration->typeArguments.size(); ++i)
             if (!inferTypeArguments(pattern.enumeration->typeArguments[i],
                                     actual.enumeration->typeArguments[i], substitutions))
+                return false;
+        return true;
+    }
+    if (pattern.kind == ValueType::Kind::Struct &&
+        pattern.structure->genericDefinition && actual.structure->genericDefinition ==
+            pattern.structure->genericDefinition) {
+        for (std::size_t i = 0; i < pattern.structure->typeArguments.size(); ++i)
+            if (!inferTypeArguments(pattern.structure->typeArguments[i],
+                                    actual.structure->typeArguments[i], substitutions))
                 return false;
         return true;
     }
@@ -503,12 +520,27 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
             if (!localMethodOwners_.contains(owner))
                 throw CompileError(declaration.location,
                                    "une méthode doit être déclarée dans le module de son type");
-            if (!owner->typeParameters.empty())
+            if (declaration.typeParameters != owner->typeParameters)
                 throw CompileError(declaration.location,
-                                   "les méthodes de structures génériques sont reportées");
-            if (!declaration.typeParameters.empty())
-                throw CompileError(declaration.location,
-                                   "les méthodes génériques sont réservées aux extensions");
+                    owner->typeParameters.empty()
+                        ? "une méthode de structure non générique ne prend pas de paramètre de type"
+                        : "les paramètres de type d'une méthode doivent correspondre à ceux de " +
+                              owner->name);
+            if (!owner->typeParameters.empty()) {
+                const ValueType& concreteOwner = *receiver.element;
+                if (concreteOwner.structure->typeArguments.size() !=
+                    owner->typeParameters.size())
+                    throw CompileError(declaration.parameters.front().location,
+                                       "receveur générique incomplet pour " + owner->name);
+                for (std::size_t i = 0; i < owner->typeParameters.size(); ++i) {
+                    const ValueType& argument = concreteOwner.structure->typeArguments[i];
+                    if (argument.kind != ValueType::Kind::TypeParameter ||
+                        argument.typeParameter != owner->typeParameters[i])
+                        throw CompileError(declaration.parameters.front().location,
+                            "le receveur doit conserver les paramètres de type de " +
+                                owner->name + " dans leur ordre");
+                }
+            }
         }
     } else if (declaration.name.find('.') != std::string::npos) {
         throw CompileError(declaration.location, "nom de méthode invalide '" +
@@ -794,8 +826,19 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
                     : ownerType->structure.get();
                 if (const auto methods = methods_.find(owner); methods != methods_.end())
                     if (const auto method = methods->second.find(node.method);
-                        method != methods->second.end())
-                        return method->second.symbol.type;
+                        method != methods->second.end()) {
+                        const Declaration* declaration = method->second.symbol.declaration;
+                        if (declaration == nullptr || declaration->typeParameters.empty())
+                            return method->second.symbol.type;
+                        std::unordered_map<std::string, ValueType> substitutions;
+                        const ValueType actualReceiver = object.kind == ValueType::Kind::Reference
+                            ? object
+                            : ValueType(std::make_shared<ValueType>(*ownerType),
+                                declaration->parameters.front().type.mutableReference);
+                        if (inferTypeArguments(declaration->parameters.front().type,
+                                               actualReceiver, substitutions))
+                            return substituteType(declaration->type, substitutions);
+                    }
             }
             if (ownerType->kind == ValueType::Kind::Vec) {
                 if (const auto method = vecMethods_.find(node.method);
@@ -812,16 +855,20 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
                         return substituteType(declaration->type, substitutions);
                 }
             }
-            if (object.kind == ValueType::Kind::Vec &&
+            if (ownerType->kind == ValueType::Kind::Vec &&
                 (node.method == "asSlice" || node.method == "asSliceMut"))
                 return ValueType(ValueType::Kind::Slice,
-                    std::make_shared<ValueType>(*object.element),
+                    std::make_shared<ValueType>(*ownerType->element),
                     node.method == "asSliceMut");
-            if (object.kind == ValueType::Kind::Vec &&
+            if (ownerType->kind == ValueType::Kind::Vec &&
                 (node.method == "get" || node.method == "pop") &&
                 node.optionDefinition != nullptr)
                 return ValueType(instantiateEnumType(node.optionDefinition,
-                    {*object.element}, expression.location));
+                    {*ownerType->element}, expression.location));
+            if (ownerType->kind == ValueType::Kind::Vec &&
+                (node.method == "push" || node.method == "set" ||
+                 node.method == "reserve" || node.method == "clear"))
+                return ValueType::Unit;
             return ValueType::Int;
         }
         else if constexpr (std::is_same_v<T, IndexExpr>) {
@@ -1115,48 +1162,44 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             }
             const auto* name = std::get_if<NameExpr>(&node.object->value);
             const auto* field = std::get_if<FieldExpr>(&node.object->value);
-            const auto* owner = field == nullptr ? nullptr
+            const auto* dereference = std::get_if<DereferenceExpr>(&node.object->value);
+            const auto* directReference = dereference == nullptr ? nullptr
+                : std::get_if<NameExpr>(&dereference->operand->value);
+            const auto* directOwner = field == nullptr ? nullptr
                 : std::get_if<NameExpr>(&field->object->value);
-            const SemanticSymbol* symbol = name != nullptr ? symbols_.lookup(name->name)
-                : owner != nullptr ? symbols_.lookup(owner->name) : nullptr;
-            const ValueType receiverType = symbol == nullptr ? ValueType::Int : symbol->type;
-            const bool referenceReceiver = receiverType.kind == ValueType::Kind::Reference &&
-                receiverType.element != nullptr &&
-                receiverType.element->kind == ValueType::Kind::Vec;
-            ValueType vectorType = referenceReceiver ? *receiverType.element : receiverType;
-            const bool fieldReceiver = field != nullptr;
-            if (fieldReceiver && symbol != nullptr &&
-                symbol->type.kind == ValueType::Kind::Struct) {
-                const auto found = std::find_if(symbol->type.structure->fields.begin(),
-                    symbol->type.structure->fields.end(), [&](const StructField& candidate) {
-                        return candidate.name == field->field;
-                    });
-                if (found != symbol->type.structure->fields.end()) vectorType = found->type;
-            }
+            const auto* ownerDereference = field == nullptr ? nullptr
+                : std::get_if<DereferenceExpr>(&field->object->value);
+            const auto* projectedReference = ownerDereference == nullptr ? nullptr
+                : std::get_if<NameExpr>(&ownerDereference->operand->value);
+            const NameExpr* receiver = name != nullptr ? name
+                : directOwner != nullptr ? directOwner
+                : directReference != nullptr ? directReference : projectedReference;
+            const SemanticSymbol* symbol = receiver == nullptr
+                ? nullptr : symbols_.lookup(receiver->name);
+            const ValueType vectorType = userReceiver.kind == ValueType::Kind::Reference &&
+                userReceiver.element != nullptr ? *userReceiver.element : userReceiver;
             if (symbol == nullptr || vectorType.kind != ValueType::Kind::Vec)
                 throw CompileError(node.object->location,
                                    "la méthode '" + node.method + "' exige un Vec");
-            const std::string& receiverName = name != nullptr ? name->name : owner->name;
+            const std::string& receiverName = receiver->name;
+            const bool referenceReceiver = userReceiver.kind == ValueType::Kind::Reference;
+            const bool projectedReceiver = projectedReference != nullptr;
             const bool mutationMethod = node.method == "reserve" || node.method == "push" ||
-                node.method == "clear" || node.method == "set";
-            const bool viewMethod = node.method == "asSlice" || node.method == "asSliceMut";
-            if ((fieldReceiver && !mutationMethod) ||
-                (referenceReceiver && !mutationMethod && !viewMethod))
-                throw CompileError(node.object->location,
-                    "la méthode '" + node.method +
-                    "' n'est pas encore disponible sur ce receveur Vec");
-            if (referenceReceiver && !receiverType.mutableReference &&
-                node.method != "asSlice")
+                node.method == "clear" || node.method == "set" || node.method == "pop" ||
+                node.method == "asSliceMut";
+            const bool referencedReceiver = referenceReceiver || directReference != nullptr ||
+                projectedReceiver;
+            if (referencedReceiver && mutationMethod && !symbol->type.mutableReference)
                 throw CompileError(node.object->location,
                                    "la mutation exige une référence '&mut Vec'");
-            if (fieldReceiver)
-                checkExpression(*node.object, vectorType);
-            else {
-                node.object->inferredType = receiverType;
+            if (name != nullptr) {
+                node.object->inferredType = userReceiver;
                 node.object->typed = true;
+            } else {
+                checkExpression(*node.object, vectorType);
             }
             const bool mutableReceiver =
-                (referenceReceiver && receiverType.mutableReference) ||
+                (referencedReceiver && symbol->type.mutableReference) ||
                 (!symbol->parameter && symbol->kind == BindingKind::Var);
             if (node.method == "asSlice" || node.method == "asSliceMut") {
                 if (!node.arguments.empty())
@@ -1219,7 +1262,7 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                                 std::get_if<NameExpr>(&node.arguments[1]->value))
                             movedBoxes_.insert(moved->name);
                 }
-                if (node.method == "set") return ValueType::Int;
+                if (node.method == "set") return ValueType::Unit;
                 return ValueType(instantiateEnumType(node.optionDefinition,
                     {*vectorType.element}, expression.location));
             }
@@ -1253,7 +1296,7 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                             std::get_if<NameExpr>(&node.arguments.front()->value))
                         movedBoxes_.insert(moved->name);
             }
-            return ValueType::Int;
+            return ValueType::Unit;
         }
         else if constexpr (std::is_same_v<T, IndexExpr>) {
             const ValueType operandType = inferType(*node.array);

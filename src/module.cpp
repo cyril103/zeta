@@ -227,6 +227,17 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
         program.imports.clear();
         program.imports = imports;
         ModuleInterface& storedInterface = graph_.interfaces.at(name);
+        if (!program.structures.empty()) {
+            storedInterface.structures.clear();
+            for (const auto& structure : program.structures)
+                if (structure->publicType) storedInterface.structures.push_back(structure);
+        }
+        if (!program.enumerations.empty()) {
+            storedInterface.enumerations.clear();
+            for (const auto& enumeration : program.enumerations)
+                if (enumeration->publicType)
+                    storedInterface.enumerations.push_back(enumeration);
+        }
         for (const auto& [symbolName, symbol] : storedInterface.exports) {
             const auto existing = std::find_if(program.statements.begin(), program.statements.end(),
                 [&](const Statement& statement) {

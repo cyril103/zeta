@@ -17,3 +17,17 @@ pub def unwrapOr[T: Copy](option: Option[T], fallback: T): T = match (option) {
     Option[T].Some(value) => value
     Option[T].None => fallback
 }
+
+// Collection LIFO possédée, construite à partir de Vec sans support builtin dédié.
+
+pub struct Stack[T] {
+    values: Vec[T]
+}
+
+pub def Stack.push[T](self: &mut Stack[T], value: T): Unit = {
+    (*self).values.push(value)
+}
+
+pub def Stack.pop[T](self: &mut Stack[T]): Option[T] = (*self).values.pop()
+
+pub def Stack.isEmpty[T](self: &Stack[T]): Bool = (*self).values.isEmpty

@@ -41,14 +41,14 @@ values.asSliceMut()
 valeur, détruit l'ancienne et termine le processus avec le code `101` si l'indice
 est hors limites. Les méthodes sont abaissées directement en IR et ne sont donc
 pas soumises à la limite ABI de 16 octets des retours de fonctions ordinaires.
+`push`, `set`, `reserve` et `clear` produisent `Unit`.
 
 Ces quatre mutations acceptent aussi un champ direct de structure, par exemple
 `bag.values.push(value)`, si la structure propriétaire est liée avec `var`. Le
 champ est modifié en place : l'IR conserve le slot propriétaire et l'indice du
 champ, puis le backend ajoute son offset à l'adresse du slot. Aucune copie
 temporaire du `Vec` n'est créée. Un emprunt partagé ou mutable du propriétaire,
-son déplacement préalable, ou une liaison `val` interdit la mutation. `get`,
-`pop`, `asSlice` et `asSliceMut` sur un champ restent reportés.
+son déplacement préalable, ou une liaison `val` interdit la mutation.
 
 Les mêmes mutations sont disponibles à travers un receveur `&mut Vec[T]`. Un
 appel comme `values.push(value)` dans une fonction recevant
@@ -58,8 +58,10 @@ backend conserve cette adresse pendant toute l'opération, y compris pendant les
 appels système de croissance. Une référence partagée `&Vec[T]` ne permet aucune
 mutation. Une référence partagée ou mutable peut produire `asSlice()`, tandis que
 seule `&mut Vec[T]` peut produire `asSliceMut()`. Ces vues conservent l'adresse et
-la longueur du propriétaire sans copier ses trois mots. `get` et `pop` à travers
-une référence restent reportés.
+la longueur du propriétaire sans copier ses trois mots. Les mêmes cibles IR
+peuvent projeter un champ depuis une référence de structure : la lecture et `get`
+acceptent une référence partagée, tandis que `pop` et les mutations exigent une
+référence mutable. `Stack[T]` s'appuie sur ce contrat.
 
 ## Allocation et croissance
 

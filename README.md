@@ -655,7 +655,8 @@ var pair: Pair[Int, Bool] = Pair[Int, Bool] { first: 42, second: true }
 pair.first = 43
 ```
 
-Une structure non générique peut déclarer des méthodes dans le même module. Le
+Une structure peut déclarer des méthodes dans le même module. Pour une structure
+générique, la méthode reprend exactement les paramètres du type propriétaire. Le
 premier paramètre est obligatoirement `self: &Type` pour une lecture partagée ou
 `self: &mut Type` pour une mutation :
 
@@ -690,7 +691,7 @@ pub extend def Vec.append[T](self: &mut Vec[T], value: T): Unit = {
 L'extension n'entre dans la résolution qu'après import de son module. Deux
 modules importés qui proposent le même nom d'extension sont rejetés comme
 ambigus. Les receveurs temporaires, extensions de types nominaux importés et
-méthodes inhérentes de structures génériques restent reportés.
+réemprunts implicites restent reportés.
 
 ## Énumérations et correspondance exhaustive
 
@@ -745,6 +746,7 @@ Un vecteur est toujours déplacé et jamais copié. Il fournit `push`, `pop`,
 `get`, `set`, `reserve`, `clear`, ainsi que les propriétés `length`, `capacity`
 et `isEmpty`. `get` et `pop` retournent `Option[T]` ; `get` exige que `T` soit
 `Copy`, tandis que `pop` transfère la valeur.
+Les opérations mutantes `push`, `set`, `reserve` et `clear` produisent `Unit`.
 
 Un champ `Vec[T]` d'une structure liée avec `var` peut être modifié directement
 avec `push`, `set`, `reserve` et `clear` :
@@ -772,6 +774,21 @@ appendAnswer(&mut values)
 ```
 
 Une référence partagée `&Vec[T]` ne donne pas accès aux mutations.
+
+Le module `collections` démontre cette composabilité avec une pile générique
+écrite entièrement en Zeta :
+
+```zeta
+import collections
+
+var stack = collections.Stack[Int] { values: Vec[Int]() }
+stack.push(42)
+val value = stack.pop()
+val empty = stack.isEmpty()
+```
+
+`Stack[T]` n'est pas un builtin. Ses méthodes projettent son champ `Vec[T]`
+directement à travers `&Stack[T]` ou `&mut Stack[T]`, sans copier le propriétaire.
 
 `asSlice()` et `asSliceMut()` créent des vues sans allocation. Les emprunts
 empêchent toute croissance ou mutation concurrente jusqu'à leur dernière

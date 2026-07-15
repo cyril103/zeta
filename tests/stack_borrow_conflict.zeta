@@ -1,0 +1,8 @@
+import collections
+
+def main(): Int = {
+    var values = collections.Stack[Int] { values: Vec[Int]() }
+    val borrowed = &mut values
+    values.push(1)
+    (*borrowed).values.length
+}

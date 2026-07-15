@@ -76,7 +76,15 @@ std::string vecSlotAddress(const IrProgram& program, SlotId slotId,
 }
 std::string vecMutationAddress(const IrProgram& program,
                                const IrVecMutationTarget& target) {
-    if (target.reference) return "[rbx]";
+    if (target.value)
+        return "[rbp-" + std::to_string(valueOffset(program, *target.value)) + "]";
+    if (target.reference) {
+        std::string address = "[rbx]";
+        if (target.field)
+            address = displacedAddress(address,
+                target.ownerType->structure->fields[*target.field].offset);
+        return address;
+    }
     return vecSlotAddress(program, *target.slot, target.field);
 }
 void emitVecMutationTargetSetup(std::ostringstream& out, const IrProgram& program,
@@ -442,20 +450,21 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                     << "    mov qword [rbp-" << output - 8U << "], 0\n"
                     << "    mov qword [rbp-" << output - 16U << "], 0\n";
             } else if constexpr (std::is_same_v<T, IrVecProperty>) {
-                const std::size_t vector = valueOffset(program, item.vector);
+                const std::string address = vecMutationAddress(program, item.target);
                 const std::size_t output = valueOffset(program, item.output);
+                emitVecMutationTargetSetup(out, program, item.target);
                 if (item.property == "length")
-                    out << "    mov eax, dword [rbp-" << vector - 8U << "]\n";
+                    out << "    mov eax, dword " << displacedAddress(address, 8U) << "\n";
                 else if (item.property == "capacity")
-                    out << "    mov eax, dword [rbp-" << vector - 16U << "]\n";
+                    out << "    mov eax, dword " << displacedAddress(address, 16U) << "\n";
                 else
-                    out << "    cmp qword [rbp-" << vector - 8U << "], 0\n"
+                    out << "    cmp qword " << displacedAddress(address, 8U) << ", 0\n"
                         << "    sete al\n"
                         << "    movzx eax, al\n";
                 out << "    mov dword [rbp-" << output << "], eax\n";
+                emitVecMutationTargetCleanup(out, item.target);
             } else if constexpr (std::is_same_v<T, IrVecReserve>) {
                 const std::size_t id = resourceSequence++;
-                const std::size_t output = valueOffset(program, item.output);
                 const std::string address = vecMutationAddress(program, item.target);
                 const std::size_t elementSize = valueTypeSize(*item.type.element);
                 const std::string capacityReady = "ir_vec_capacity_ready_" + std::to_string(id);
@@ -520,7 +529,6 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                     << "    mov qword " << address << ", r12\n"
                     << "    mov qword " << displacedAddress(address, 16U) << ", r15\n"
                     << done << ":\n"
-                    << "    mov dword [rbp-" << output << "], 0\n"
                     << "    pop r15\n"
                     << "    pop r14\n"
                     << "    pop r13\n"
@@ -537,8 +545,7 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                 emitBlockCopy(out,
                     "[rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
                     "[rdi]", elementSize);
-                out << "    inc qword " << displacedAddress(address, 8U) << "\n"
-                    << "    mov dword [rbp-" << valueOffset(program, item.output) << "], 0\n";
+                out << "    inc qword " << displacedAddress(address, 8U) << "\n";
                 emitVecMutationTargetCleanup(out, item.target);
             } else if constexpr (std::is_same_v<T, IrVecClear>) {
                 const std::size_t id = resourceSequence++;
@@ -567,8 +574,7 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                         << "    pop r13\n"
                         << "    pop r12\n";
                 }
-                out << "    mov qword " << displacedAddress(address, 8U) << ", 0\n"
-                    << "    mov dword [rbp-" << valueOffset(program, item.output) << "], 0\n";
+                out << "    mov qword " << displacedAddress(address, 8U) << ", 0\n";
                 emitVecMutationTargetCleanup(out, item.target);
             } else if constexpr (std::is_same_v<T, IrVecView>) {
                 const std::string address = vecMutationAddress(program, item.target);
@@ -581,10 +587,7 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                 emitVecMutationTargetCleanup(out, item.target);
             } else if constexpr (std::is_same_v<T, IrVecGet>) {
                 const std::size_t id = resourceSequence++;
-                const IrSlot& slot = program.slots[item.slot];
-                const std::string address = slot.global
-                    ? "[" + globalLabel(slot) + "]"
-                    : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
+                const std::string address = vecMutationAddress(program, item.target);
                 const std::size_t output = valueOffset(program, item.output);
                 const auto& variants = item.optionType.enumeration->variants;
                 const std::size_t some = static_cast<std::size_t>(std::find_if(
@@ -597,6 +600,7 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                     }) - variants.begin());
                 const std::string absent = "ir_vec_get_none_" + std::to_string(id);
                 const std::string done = "ir_vec_get_done_" + std::to_string(id);
+                emitVecMutationTargetSetup(out, program, item.target);
                 out << "    movsxd rax, dword [rbp-" << valueOffset(program, item.index) << "]\n"
                     << "    test rax, rax\n"
                     << "    js " << absent << "\n"
@@ -616,12 +620,10 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                     << absent << ":\n"
                     << "    mov dword [rbp-" << output << "], " << none << "\n"
                     << done << ":\n";
+                emitVecMutationTargetCleanup(out, item.target);
             } else if constexpr (std::is_same_v<T, IrVecPop>) {
                 const std::size_t id = resourceSequence++;
-                const IrSlot& slot = program.slots[item.slot];
-                const std::string address = slot.global
-                    ? "[" + globalLabel(slot) + "]"
-                    : "[rbp-" + std::to_string(slotOffset(program, item.slot)) + "]";
+                const std::string address = vecMutationAddress(program, item.target);
                 const std::size_t output = valueOffset(program, item.output);
                 const auto& variants = item.optionType.enumeration->variants;
                 const std::size_t some = static_cast<std::size_t>(std::find_if(
@@ -634,6 +636,7 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                     }) - variants.begin());
                 const std::string absent = "ir_vec_pop_none_" + std::to_string(id);
                 const std::string done = "ir_vec_pop_done_" + std::to_string(id);
+                emitVecMutationTargetSetup(out, program, item.target);
                 out << "    mov rax, qword " << displacedAddress(address, 8U) << "\n"
                     << "    test rax, rax\n"
                     << "    jz " << absent << "\n"
@@ -651,6 +654,7 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                     << absent << ":\n"
                     << "    mov dword [rbp-" << output << "], " << none << "\n"
                     << done << ":\n";
+                emitVecMutationTargetCleanup(out, item.target);
             } else if constexpr (std::is_same_v<T, IrVecSet>) {
                 const std::size_t id = resourceSequence++;
                 const std::string address = vecMutationAddress(program, item.target);
@@ -670,8 +674,7 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                 emitBlockCopy(out,
                     "[rbp-" + std::to_string(valueOffset(program, item.value)) + "]",
                     "[r12]", valueTypeSize(item.elementType));
-                out << "    mov dword [rbp-" << valueOffset(program, item.output) << "], 0\n"
-                    << "    pop r12\n";
+                out << "    pop r12\n";
                 emitVecMutationTargetCleanup(out, item.target);
             } else if constexpr (std::is_same_v<T, IrStructConstruct>) {
                 const std::size_t output = valueOffset(program, item.output);

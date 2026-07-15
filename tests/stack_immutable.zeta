@@ -1,0 +1,7 @@
+import collections
+
+def main(): Int = {
+    val values = collections.Stack[Int] { values: Vec[Int]() }
+    values.push(1)
+    0
+}

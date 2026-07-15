@@ -80,22 +80,22 @@ int main() {
 
     IrProgram validVecField;
     validVecField.slots.push_back(IrSlot{"owner", vecOwner, true});
-    validVecField.valueTypes = {ValueType::Int, ValueType::Int};
+    validVecField.valueTypes = {ValueType::Int, ValueType::Unit};
     validVecField.valueCount = 2;
     validVecField.instructions.push_back(IrConst{0, 4, ValueType::Int});
     validVecField.instructions.push_back(IrVecReserve{
-        1, IrVecMutationTarget{0, std::nullopt, 0}, 0, intVector});
+        1, IrVecMutationTarget{0, std::nullopt, 0, std::nullopt, std::nullopt}, 0, intVector});
     expectValid("mutation Vec sur champ valide", validVecField);
 
     IrProgram invalidVecField = validVecField;
     invalidVecField.instructions.back() = IrVecReserve{
-        1, IrVecMutationTarget{0, std::nullopt, 1}, 0, intVector};
+        1, IrVecMutationTarget{0, std::nullopt, 1, std::nullopt, std::nullopt}, 0, intVector};
     expectCode("champ Vec hors limites", "IRV031", invalidVecField);
 
     const ValueType mutableVecReference(
         std::make_shared<ValueType>(intVector), true);
     IrProgram validVecReference;
-    validVecReference.valueTypes = {mutableVecReference, ValueType::Int, ValueType::Int};
+    validVecReference.valueTypes = {mutableVecReference, ValueType::Int, ValueType::Unit};
     validVecReference.valueCount = 3;
     validVecReference.instructions.push_back(
         IrFunctionStart{"mutate_vec", false, {}});
@@ -103,15 +103,43 @@ int main() {
         IrParameter{0, 0, 16, mutableVecReference});
     validVecReference.instructions.push_back(IrConst{1, 4, ValueType::Int});
     validVecReference.instructions.push_back(IrVecReserve{
-        2, IrVecMutationTarget{std::nullopt, 0, std::nullopt}, 1, intVector});
-    validVecReference.instructions.push_back(IrReturn{2, ValueType::Int});
+        2, IrVecMutationTarget{std::nullopt, 0, std::nullopt, std::nullopt, std::nullopt}, 1, intVector});
+    validVecReference.instructions.push_back(IrReturn{2, ValueType::Unit});
     expectValid("mutation Vec par référence mutable", validVecReference);
 
     IrProgram ambiguousVecReference = validVecReference;
     ambiguousVecReference.slots.push_back(IrSlot{"values", intVector, true});
     ambiguousVecReference.instructions[3] = IrVecReserve{
-        2, IrVecMutationTarget{0, 0, std::nullopt}, 1, intVector};
+        2, IrVecMutationTarget{0, 0, std::nullopt, std::nullopt, std::nullopt}, 1, intVector};
     expectCode("cible Vec ambiguë", "IRV040", ambiguousVecReference);
+
+    const ValueType sharedOwnerReference(std::make_shared<ValueType>(vecOwner), false);
+    IrProgram validVecProjection;
+    validVecProjection.valueTypes = {sharedOwnerReference, ValueType::Bool};
+    validVecProjection.valueCount = 2;
+    validVecProjection.instructions.push_back(
+        IrFunctionStart{"read_vec_projection", false, {}});
+    validVecProjection.instructions.push_back(
+        IrParameter{0, 0, 16, sharedOwnerReference});
+    validVecProjection.instructions.push_back(IrVecProperty{1,
+        IrVecMutationTarget{std::nullopt, 0, 0, vecOwner, std::nullopt}, intVector, "isEmpty"});
+    validVecProjection.instructions.push_back(IrReturn{1, ValueType::Bool});
+    expectValid("projection Vec partagée par référence", validVecProjection);
+
+    IrProgram invalidMutableProjection;
+    invalidMutableProjection.valueTypes = {
+        sharedOwnerReference, ValueType::Int, ValueType::Unit};
+    invalidMutableProjection.valueCount = 3;
+    invalidMutableProjection.instructions.push_back(
+        IrFunctionStart{"mutate_shared_vec_projection", false, {}});
+    invalidMutableProjection.instructions.push_back(
+        IrParameter{0, 0, 16, sharedOwnerReference});
+    invalidMutableProjection.instructions.push_back(IrConst{1, 1, ValueType::Int});
+    invalidMutableProjection.instructions.push_back(IrVecReserve{2,
+        IrVecMutationTarget{std::nullopt, 0, 0, vecOwner, std::nullopt}, 1, intVector});
+    invalidMutableProjection.instructions.push_back(IrReturn{2, ValueType::Unit});
+    expectCode("mutation d'une projection Vec partagée", "IRV040",
+               invalidMutableProjection);
 
     IrProgram wrongUnitOutput;
     wrongUnitOutput.valueTypes.push_back(ValueType::Int);

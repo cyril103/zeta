@@ -24,11 +24,15 @@ struct IrStringLength { ValueId output; ValueId string; };
 struct IrStringEmpty { ValueId output; ValueId string; };
 struct IrArrayConstruct { ValueId output; std::vector<ValueId> elements; ValueType type; };
 struct IrVecConstruct { ValueId output; ValueType type; };
-struct IrVecProperty { ValueId output; ValueId vector; std::string property; };
 struct IrVecMutationTarget {
     std::optional<SlotId> slot;
     std::optional<ValueId> reference;
     std::optional<std::size_t> field;
+    std::optional<ValueType> ownerType;
+    std::optional<ValueId> value;
+};
+struct IrVecProperty {
+    ValueId output; IrVecMutationTarget target; ValueType type; std::string property;
 };
 struct IrVecReserve {
     ValueId output;
@@ -44,9 +48,12 @@ struct IrVecClear {
 };
 struct IrVecView { ValueId output; IrVecMutationTarget target; ValueType type; };
 struct IrVecGet {
-    ValueId output; SlotId slot; ValueId index; ValueType optionType; ValueType elementType;
+    ValueId output; IrVecMutationTarget target; ValueId index; ValueType optionType;
+    ValueType elementType;
 };
-struct IrVecPop { ValueId output; SlotId slot; ValueType optionType; ValueType elementType; };
+struct IrVecPop {
+    ValueId output; IrVecMutationTarget target; ValueType optionType; ValueType elementType;
+};
 struct IrVecSet {
     ValueId output; IrVecMutationTarget target; ValueId index; ValueId value;
     ValueType elementType;
@@ -189,6 +196,9 @@ private:
     ValueId expression(const Expression& expression);
     ValueId expression(const Expression& expression,
                        const std::unordered_map<std::string, ValueId>& parameters);
+    IrVecMutationTarget vecTarget(
+        const Expression& expression,
+        const std::unordered_map<std::string, ValueId>& parameters);
     void emitTailExpression(const Expression& expression,
                             const std::unordered_map<std::string, ValueId>& parameters,
                             const Declaration& function);

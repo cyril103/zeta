@@ -172,17 +172,14 @@ pas répétés sur chaque ligne.
 | `IrStringEmpty` | `string : String` ou `StringView` | `output : Bool` | — | suite |
 | `IrArrayConstruct` | `elements[*] : E` | `output : T` | `T == Array[E, N]` et `elements.size() == N` | suite |
 | `IrVecConstruct` | — | `output : T` | `T == Vec[E]` | suite |
-| `IrVecProperty` | `vector : Vec[E]` | `output : Int` pour `length`/`capacity`, `Bool` pour `isEmpty` | propriété dans cet ensemble fermé | suite |
-| `IrVecReserve` | `additional : Int`, cible `%slot[.field] : T` ou `$reference : &mut T` | `output : Int` | `T == Vec[E]`; slot et référence sont exclusifs, le champ doit désigner exactement `T` | suite |
-| `IrVecPush` | `value : E`, même cible mutable | `output : Int` | même contrat de cible que `IrVecReserve` | suite |
-| `IrVecClear` | même cible mutable | `output : Int` | même contrat de cible que `IrVecReserve` | suite |
-| `IrVecView` | cible `%slot : Vec[E]`, `$reference : &Vec[E]` ou `$reference : &mut Vec[E]` | `output : T` | `T == Slice[E]` ou `SliceMut[E]`; une sortie mutable exige une cible mutable | suite |
-| `IrVecGet` | `index : Int`, `%slot : Vec[E]` | `output : Option[E]` | `elementType == E`, `optionType` est l'instance builtin exacte | suite |
-| `IrVecPop` | `%slot : Vec[E]` | `output : Option[E]` | mêmes contraintes de type que `IrVecGet` | suite |
-| `IrVecSet` | `index : Int`, `value : E`, cible `%slot[.field] : Vec[E]` ou `$reference : &mut Vec[E]` | `output : Int` | même contrat de cible mutable exclusive | suite |
-
-Les retours `Int` des opérations mutantes sont le contrat provisoire actuel ; le
-passage futur à `Unit` modifiera ces lignes et les tests associés.
+| `IrVecProperty` | cible Vec partagée | `output : Int` pour `length`/`capacity`, `Bool` pour `isEmpty` | propriété dans cet ensemble fermé | suite |
+| `IrVecReserve` | `additional : Int`, cible `%slot[.field]`, `$reference : &mut Vec[E]` ou `$owner.field : &mut Struct` | `output : Unit` | cible exclusive et champ exactement `Vec[E]` | suite |
+| `IrVecPush` | `value : E`, même cible mutable | `output : Unit` | même contrat de cible que `IrVecReserve` | suite |
+| `IrVecClear` | même cible mutable | `output : Unit` | même contrat de cible que `IrVecReserve` | suite |
+| `IrVecView` | cible Vec directe ou projetée depuis une référence de structure | `output : T` | `T == Slice[E]` ou `SliceMut[E]`; une sortie mutable exige une cible mutable | suite |
+| `IrVecGet` | `index : Int`, cible Vec partagée directe ou projetée | `output : Option[E]` | `elementType == E`, `optionType` est l'instance builtin exacte | suite |
+| `IrVecPop` | cible Vec mutable directe ou projetée | `output : Option[E]` | mêmes contraintes de type que `IrVecGet` | suite |
+| `IrVecSet` | `index : Int`, `value : E`, cible Vec mutable directe ou projetée | `output : Unit` | même contrat de cible mutable exclusive | suite |
 
 ### Agrégats, vues et accès mémoire
 

@@ -62,6 +62,14 @@ ValueType IrGenerator::resolveType(const ValueType& type) const {
     if (type.kind == ValueType::Kind::Vec)
         return ValueType(ValueType::Kind::Vec,
                          std::make_shared<ValueType>(resolveType(*type.element)));
+    if (type.kind == ValueType::Kind::Struct &&
+        !type.structure->typeArguments.empty()) {
+        std::vector<ValueType> arguments;
+        for (const ValueType& argument : type.structure->typeArguments)
+            arguments.push_back(resolveType(argument));
+        return ValueType(instantiateStructType(type.structure, std::move(arguments),
+                                               type.structure->location));
+    }
     if (type.kind == ValueType::Kind::Enum &&
         !type.enumeration->typeArguments.empty()) {
         std::vector<ValueType> arguments;
@@ -822,6 +830,47 @@ ValueId IrGenerator::expression(const Expression& expressionNode) {
     return expression(expressionNode, noParameters);
 }
 
+IrVecMutationTarget IrGenerator::vecTarget(
+    const Expression& expressionNode,
+    const std::unordered_map<std::string, ValueId>& parameters) {
+    if (expressionNode.inferredType.kind == ValueType::Kind::Reference &&
+        expressionNode.inferredType.element != nullptr &&
+        expressionNode.inferredType.element->kind == ValueType::Kind::Vec)
+        return IrVecMutationTarget{{}, expression(expressionNode, parameters), {}, {}, {}};
+    if (const auto* name = std::get_if<NameExpr>(&expressionNode.value)) {
+        if (const auto parameter = parameters.find(name->name); parameter != parameters.end())
+            return IrVecMutationTarget{{}, {}, {}, {}, parameter->second};
+        const auto found = symbols_.find(name->name);
+        if (found == symbols_.end())
+            throw CompileError(expressionNode.location, "cible Vec inconnue '" + name->name + "'");
+        return IrVecMutationTarget{found->second.slot, {}, {}, {}, {}};
+    }
+    if (const auto* dereference = std::get_if<DereferenceExpr>(&expressionNode.value))
+        return IrVecMutationTarget{{}, expression(*dereference->operand, parameters), {}, {}, {}};
+    const auto* field = std::get_if<FieldExpr>(&expressionNode.value);
+    if (field == nullptr)
+        throw CompileError(expressionNode.location, "cible Vec non adressable");
+    const ValueType ownerType = resolveType(field->object->inferredType);
+    const auto selected = std::find_if(ownerType.structure->fields.begin(),
+        ownerType.structure->fields.end(), [&](const StructField& candidate) {
+            return candidate.name == field->field;
+        });
+    const std::size_t fieldIndex = static_cast<std::size_t>(
+        selected - ownerType.structure->fields.begin());
+    if (const auto* owner = std::get_if<NameExpr>(&field->object->value)) {
+        const auto found = symbols_.find(owner->name);
+        if (found == symbols_.end())
+            throw CompileError(expressionNode.location, "propriétaire Vec inconnu '" +
+                                                       owner->name + "'");
+        return IrVecMutationTarget{found->second.slot, {}, fieldIndex, {}, {}};
+    }
+    const auto* dereference = std::get_if<DereferenceExpr>(&field->object->value);
+    if (dereference == nullptr)
+        throw CompileError(expressionNode.location, "projection Vec non adressable");
+    return IrVecMutationTarget{{}, expression(*dereference->operand, parameters), fieldIndex,
+                               ownerType, {}};
+}
+
 ValueId IrGenerator::expression(
     const Expression& expressionNode,
     const std::unordered_map<std::string, ValueId>& parameters) {
@@ -886,6 +935,13 @@ ValueId IrGenerator::expression(
                 output, node.variant, std::move(fields), resolveType(expressionNode.inferredType)});
             return output;
         } else if constexpr (std::is_same_v<T, FieldExpr>) {
+            if (node.object->inferredType.kind == ValueType::Kind::Vec) {
+                const ValueId output = nextValue(expressionNode.inferredType);
+                ir_.instructions.push_back(IrVecProperty{output,
+                    vecTarget(*node.object, parameters),
+                    resolveType(node.object->inferredType), node.field});
+                return output;
+            }
             const ValueId object = expression(*node.object, parameters);
             if (node.object->inferredType == ValueType::String ||
                 node.object->inferredType == ValueType::StringView) {
@@ -899,11 +955,6 @@ ValueId IrGenerator::expression(
             if (node.object->inferredType.kind == ValueType::Kind::Slice) {
                 const ValueId output = nextValue(ValueType::Int);
                 ir_.instructions.push_back(IrSliceLength{output, object});
-                return output;
-            }
-            if (node.object->inferredType.kind == ValueType::Kind::Vec) {
-                const ValueId output = nextValue(expressionNode.inferredType);
-                ir_.instructions.push_back(IrVecProperty{output, object, node.field});
                 return output;
             }
             const auto& fields = node.object->inferredType.structure->fields;
@@ -956,41 +1007,20 @@ ValueId IrGenerator::expression(
                     std::move(argumentTypes), returnType});
                 return output;
             }
-            const auto* name = std::get_if<NameExpr>(&node.object->value);
-            const auto* field = std::get_if<FieldExpr>(&node.object->value);
-            const auto* owner = field == nullptr ? nullptr
-                : std::get_if<NameExpr>(&field->object->value);
-            const std::string receiverName = name != nullptr ? name->name : owner->name;
             const ValueType receiverType = resolveType(node.object->inferredType);
-            const bool throughReference = receiverType.kind == ValueType::Kind::Reference;
-            const ValueType vectorType = throughReference ? *receiverType.element : receiverType;
-            const auto found = symbols_.find(receiverName);
-            if (found == symbols_.end() && !throughReference)
-                throw CompileError(expressionNode.location, "Vec inconnu '" + receiverName + "'");
-            std::optional<std::size_t> fieldIndex;
-            if (field != nullptr) {
-                const auto& fields = found->second.declaration->type.structure->fields;
-                const auto selected = std::find_if(fields.begin(), fields.end(),
-                    [&](const StructField& candidate) { return candidate.name == field->field; });
-                fieldIndex = static_cast<std::size_t>(selected - fields.begin());
-            }
-            IrVecMutationTarget mutationTarget;
-            if (throughReference)
-                mutationTarget.reference = expression(*node.object, parameters);
-            else {
-                mutationTarget.slot = found->second.slot;
-                mutationTarget.field = fieldIndex;
-            }
+            const ValueType vectorType = receiverType.kind == ValueType::Kind::Reference
+                ? *receiverType.element : receiverType;
+            const IrVecMutationTarget mutationTarget = vecTarget(*node.object, parameters);
             if (node.method == "get") {
                 const ValueId index = expression(*node.arguments.front(), parameters);
                 const ValueId output = nextValue(resolveType(expressionNode.inferredType));
-                ir_.instructions.push_back(IrVecGet{output, found->second.slot, index,
+                ir_.instructions.push_back(IrVecGet{output, mutationTarget, index,
                     resolveType(expressionNode.inferredType), *vectorType.element});
                 return output;
             }
             if (node.method == "pop") {
                 const ValueId output = nextValue(resolveType(expressionNode.inferredType));
-                ir_.instructions.push_back(IrVecPop{output, found->second.slot,
+                ir_.instructions.push_back(IrVecPop{output, mutationTarget,
                     resolveType(expressionNode.inferredType), *vectorType.element});
                 return output;
             }
@@ -1004,7 +1034,7 @@ ValueId IrGenerator::expression(
                 if (isMoveOnlyValueType(*vectorType.element))
                     if (const auto* moved = std::get_if<NameExpr>(&node.arguments[1]->value))
                         movedBoxes_.insert(moved->name);
-                const ValueId output = nextValue(ValueType::Int);
+                const ValueId output = nextValue(ValueType::Unit);
                 ir_.instructions.push_back(IrVecSet{
                     output, mutationTarget, index, value, *vectorType.element});
                 return output;
@@ -1015,7 +1045,7 @@ ValueId IrGenerator::expression(
                     output, mutationTarget, resolveType(expressionNode.inferredType)});
                 return output;
             }
-            const ValueId output = nextValue(ValueType::Int);
+            const ValueId output = nextValue(ValueType::Unit);
             if (node.method == "clear") {
                 ir_.instructions.push_back(IrVecClear{
                     output, mutationTarget, vectorType});
@@ -1035,7 +1065,7 @@ ValueId IrGenerator::expression(
                 if (const auto* moved = std::get_if<NameExpr>(&node.arguments.front()->value))
                     movedBoxes_.insert(moved->name);
             const ValueId one = nextValue(ValueType::Int);
-            const ValueId reserveOutput = nextValue(ValueType::Int);
+            const ValueId reserveOutput = nextValue(ValueType::Unit);
             ir_.instructions.push_back(IrConst{one, 1, ValueType::Int});
             ir_.instructions.push_back(IrVecReserve{
                 reserveOutput, mutationTarget, one, vectorType});
@@ -1400,7 +1430,13 @@ std::string IrGenerator::print(const VerifiedIrProgram& verified) {
         return "string";
     };
     const auto vecTarget = [&](const IrVecMutationTarget& target) {
-        if (target.reference) return "$" + std::to_string(*target.reference);
+        if (target.value) return "$" + std::to_string(*target.value);
+        if (target.reference) {
+            std::string printed = "$" + std::to_string(*target.reference);
+            if (target.field)
+                printed += "." + target.ownerType->structure->fields[*target.field].name;
+            return printed;
+        }
         std::string printed = "%" + program.slots[*target.slot].name;
         if (target.field)
             printed += "." +
@@ -1445,7 +1481,7 @@ std::string IrGenerator::print(const VerifiedIrProgram& verified) {
                 out << "  $" << item.output << " = vec " << typeName(item.type) << " []\n";
             else if constexpr (std::is_same_v<T, IrVecProperty>)
                 out << "  $" << item.output << " = vec_" << item.property
-                    << " $" << item.vector << '\n';
+                    << ' ' << vecTarget(item.target) << '\n';
             else if constexpr (std::is_same_v<T, IrVecReserve>)
                 out << "  $" << item.output << " = vec_reserve "
                     << vecTarget(item.target) << ", $" << item.additional << '\n';
@@ -1459,11 +1495,11 @@ std::string IrGenerator::print(const VerifiedIrProgram& verified) {
                 out << "  $" << item.output << " = vec_view "
                     << vecTarget(item.target) << " as " << typeName(item.type) << '\n';
             else if constexpr (std::is_same_v<T, IrVecGet>)
-                out << "  $" << item.output << " = vec_get %"
-                    << program.slots[item.slot].name << ", $" << item.index << '\n';
+                out << "  $" << item.output << " = vec_get "
+                    << vecTarget(item.target) << ", $" << item.index << '\n';
             else if constexpr (std::is_same_v<T, IrVecPop>)
-                out << "  $" << item.output << " = vec_pop %"
-                    << program.slots[item.slot].name << '\n';
+                out << "  $" << item.output << " = vec_pop "
+                    << vecTarget(item.target) << '\n';
             else if constexpr (std::is_same_v<T, IrVecSet>)
                 out << "  $" << item.output << " = vec_set "
                     << vecTarget(item.target) << ", $" << item.index
