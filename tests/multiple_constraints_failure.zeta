@@ -1,0 +1,6 @@
+def duplicate[T: Copy + Equatable](value: T): T = value
+
+def main(): Int = {
+    val value = duplicate(Box(42))
+    *value
+}

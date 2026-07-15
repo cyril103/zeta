@@ -646,6 +646,17 @@ def copyValue[T : Copy] (value : T) : T = value
 
 `Copy` exclut notamment `Box[T]`, `Numeric` couvre `Byte`, `Int` et `Double`,
 `Ordered` ajoute `Char`, et `Equatable` couvre les types primitifs comparables.
+Plusieurs capacités se combinent avec `+` :
+
+```text
+def same[T: Equatable + Copy](left: T, right: T): Bool = left == right
+```
+
+Le compilateur trie leur représentation pour garantir une identité stable,
+refuse les doublons et vérifie chaque capacité, y compris lorsqu'une fonction
+générique en appelle une autre. `Copy`, `Numeric`, `Ordered` et `Equatable` sont
+des capacités cumulables ; aucune paire n'est actuellement incompatible. Le
+contrat canonique traverse les interfaces précompilées.
 
 Les structures, y compris génériques, utilisent des champs nommés :
 

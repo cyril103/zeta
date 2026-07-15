@@ -1,0 +1,1 @@
+pub def same[T: Equatable + Copy](left: T, right: T): Bool = left == right

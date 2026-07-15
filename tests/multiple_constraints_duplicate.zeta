@@ -1,0 +1,2 @@
+def invalid[T: Copy + Equatable + Copy](value: T): T = value
+def main(): Int = 0

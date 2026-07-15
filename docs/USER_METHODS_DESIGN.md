@@ -63,8 +63,9 @@ Une méthode publique reste un export de fonction avec le nom `Type.method` et s
 premier type de paramètre dans le fichier `.zti`. Le consommateur reconstruit la
 table des méthodes depuis cette signature, sans avoir besoin des sources.
 L'interface marque explicitement les exports d'extension et les corps génériques
-réduits conservent le token `extend`. Le format d'interface passe à `10`, les
-tokens génériques à `2` et le cache de modules à `21`.
+réduits conservent le token `extend`. Après l'ajout des contraintes multiples,
+les versions courantes sont `11` pour l'interface, `3` pour les tokens génériques
+et `24` pour le cache de modules.
 
 ## Limites du premier jalon
 

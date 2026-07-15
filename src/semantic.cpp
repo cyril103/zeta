@@ -146,8 +146,23 @@ bool containsTypeParameter(const ValueType& type) {
 bool isCopyType(const ValueType& type) {
     return isCopyValueType(type);
 }
-bool satisfiesConstraint(const ValueType& type, const std::string& constraint) {
-    if (constraint.empty()) return true;
+std::vector<std::string_view> constraintNames(const std::string& constraints) {
+    std::vector<std::string_view> names;
+    std::size_t begin = 0;
+    while (begin < constraints.size()) {
+        const std::size_t end = constraints.find('+', begin);
+        names.emplace_back(constraints.data() + begin,
+            (end == std::string::npos ? constraints.size() : end) - begin);
+        if (end == std::string::npos) break;
+        begin = end + 1U;
+    }
+    return names;
+}
+bool hasConstraint(const std::string& constraints, std::string_view expected) {
+    const auto names = constraintNames(constraints);
+    return std::find(names.begin(), names.end(), expected) != names.end();
+}
+bool satisfiesSingleConstraint(const ValueType& type, std::string_view constraint) {
     if (constraint == "Copy") return isCopyType(type);
     if (constraint == "Numeric") return TypeRules::isNumeric(type);
     if (constraint == "Ordered")
@@ -155,6 +170,18 @@ bool satisfiesConstraint(const ValueType& type, const std::string& constraint) {
     if (constraint == "Equatable")
         return isEquatableValueType(type);
     return false;
+}
+bool satisfiesConstraint(const ValueType& type, const std::string& constraints) {
+    const auto names = constraintNames(constraints);
+    return std::all_of(names.begin(), names.end(), [&](std::string_view constraint) {
+        return satisfiesSingleConstraint(type, constraint);
+    });
+}
+bool constraintsInclude(const std::string& available, const std::string& required) {
+    const auto names = constraintNames(required);
+    return std::all_of(names.begin(), names.end(), [&](std::string_view constraint) {
+        return hasConstraint(available, constraint);
+    });
 }
 
 void collectExpressionNames(const Expression& expression,
@@ -335,10 +362,12 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
     static const std::unordered_set<std::string> knownConstraints{
         "", "Copy", "Numeric", "Ordered", "Equatable"};
     for (std::size_t i = 0; i < declaration.typeConstraints.size(); ++i)
-        if (!knownConstraints.contains(declaration.typeConstraints[i]))
-            throw CompileError(declaration.location,
-                               "contrainte générique inconnue '" +
-                               declaration.typeConstraints[i] + "'");
+        for (const std::string_view constraint :
+             constraintNames(declaration.typeConstraints[i]))
+            if (!knownConstraints.contains(std::string(constraint)))
+                throw CompileError(declaration.location,
+                                   "contrainte générique inconnue '" +
+                                   std::string(constraint) + "'");
     if (declaration.inferTypeFromInitializer) {
         if (allowRecursion || declaration.callable || declaration.publicSymbol ||
             declaration.nativeSymbol || declaration.initializer == nullptr)
@@ -1430,7 +1459,8 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                         ? activeTypeConstraints_.find(type.typeParameter)
                         : activeTypeConstraints_.end();
                     const bool propagatedConstraint = activeConstraint !=
-                        activeTypeConstraints_.end() && activeConstraint->second == constraint;
+                        activeTypeConstraints_.end() &&
+                        constraintsInclude(activeConstraint->second, constraint);
                     if (!satisfiesConstraint(type, constraint) && !propagatedConstraint)
                         throw CompileError(expression.location,
                                            "le type " + typeName(type) +
@@ -1498,7 +1528,7 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 return ValueType::Bool;
             }
             const bool genericNumeric = expected.kind == ValueType::Kind::TypeParameter &&
-                activeTypeConstraints_[expected.typeParameter] == "Numeric";
+                hasConstraint(activeTypeConstraints_[expected.typeParameter], "Numeric");
             if (!TypeRules::isNumeric(expected) && !genericNumeric)
                 throw CompileError(expression.location,
                                    "les opérateurs arithmétiques ne s'appliquent pas à Bool");
@@ -1516,9 +1546,11 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 if (operands.kind == ValueType::Kind::TypeParameter) {
                     const std::string& constraint = activeTypeConstraints_[operands.typeParameter];
                     const bool allowed = TypeRules::isOrdering(node.op)
-                        ? constraint == "Ordered"
-                        : constraint == "Equatable" || constraint == "Ordered" ||
-                          constraint == "Numeric";
+                        ? hasConstraint(constraint, "Ordered") ||
+                          hasConstraint(constraint, "Numeric")
+                        : hasConstraint(constraint, "Equatable") ||
+                          hasConstraint(constraint, "Ordered") ||
+                          hasConstraint(constraint, "Numeric");
                     if (!allowed)
                         throw CompileError(expression.location,
                                            "l'opérateur '" + node.op +
@@ -1549,7 +1581,7 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 return ValueType::Bool;
             }
             const bool genericNumeric = expected.kind == ValueType::Kind::TypeParameter &&
-                activeTypeConstraints_[expected.typeParameter] == "Numeric";
+                hasConstraint(activeTypeConstraints_[expected.typeParameter], "Numeric");
             if (expected == ValueType::String && node.op == "+") {
                 checkExpression(*node.left, ValueType::String);
                 checkExpression(*node.right, ValueType::String);

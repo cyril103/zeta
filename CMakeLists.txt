@@ -915,6 +915,26 @@ if(BUILD_TESTING)
         -o ${CMAKE_CURRENT_BINARY_DIR}/generic-constraints)
     add_test(NAME run_generic_constraints COMMAND ${CMAKE_CURRENT_BINARY_DIR}/generic-constraints)
     set_tests_properties(run_generic_constraints PROPERTIES DEPENDS compile_generic_constraints)
+    add_test(NAME compile_multiple_constraints COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/multiple_constraints.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/multiple-constraints)
+    add_test(NAME run_multiple_constraints
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/multiple-constraints)
+    set_tests_properties(run_multiple_constraints PROPERTIES
+        DEPENDS compile_multiple_constraints)
+    foreach(constraint_error
+            multiple_constraints_duplicate
+            multiple_constraints_unknown
+            multiple_constraints_propagation
+            multiple_constraints_failure)
+        add_test(NAME reject_${constraint_error} COMMAND zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/${constraint_error}.zeta)
+        set_tests_properties(reject_${constraint_error} PROPERTIES WILL_FAIL TRUE)
+    endforeach()
+    add_test(NAME multiple_constraints_interfaces
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/multiple_constraints_interfaces.sh
+            $<TARGET_FILE:zeta>
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/multiple_constraints_interfaces)
 
     add_test(NAME compile_box_content_borrow COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/box_content_borrow.zeta

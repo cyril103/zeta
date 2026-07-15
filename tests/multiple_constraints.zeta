@@ -1,0 +1,11 @@
+def same[T: Equatable + Copy](left: T, right: T): Bool = left == right
+
+def forwarded[T: Copy + Equatable](left: T, right: T): Bool = same(left, right)
+
+def doubled[T: Copy + Numeric](value: T): T = value + value
+
+def main(): Int = {
+    val integer = doubled(21)
+    val floating = doubled(2.5)
+    if (forwarded(integer, 42) && floating == 5.0) 0 else 1
+}

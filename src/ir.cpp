@@ -144,6 +144,9 @@ std::string IrGenerator::genericIdentity(
     if (origin != genericOrigins_.end())
         identity += origin->second.interfaceFingerprint + ";module=" + origin->second.module;
     identity += ";function=" + declaration.name;
+    for (std::size_t i = 0; i < declaration.typeParameters.size(); ++i)
+        identity += ";constraint=" + declaration.typeParameters[i] + ":" +
+            declaration.typeConstraints[i];
     for (const ValueType& type : types) identity += ";type=" + genericTypeIdentity(type);
     return identity;
 }

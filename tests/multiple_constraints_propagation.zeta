@@ -1,0 +1,3 @@
+def required[T: Copy + Equatable](left: T, right: T): Bool = left == right
+def insufficient[T: Copy](left: T, right: T): Bool = required(left, right)
+def main(): Int = 0

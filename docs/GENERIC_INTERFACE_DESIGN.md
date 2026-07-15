@@ -47,7 +47,7 @@ l'interface ; elle ne doit jamais produire silencieusement un bloc incomplet.
 Une interface qui exporte au moins un générique contient un bloc :
 
 ```text
-generic_tokens 2 <nombre>
+generic_tokens 3 <nombre>
 token <genre> <ligne> <colonne> "<texte>"
 ...
 ```

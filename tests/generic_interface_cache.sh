@@ -8,7 +8,7 @@ trap 'rm -rf "$work"' EXIT
 cp "$fixtures"/*.zeta "$work"/
 
 "$compiler" "$work/main.zeta" -o "$work/app" >/dev/null
-grep -q '^generic_tokens 2 ' "$work/app.modules/api.zti"
+grep -q '^generic_tokens 3 ' "$work/app.modules/api.zti"
 grep -q '"Helper"' "$work/app.modules/api.zti"
 if grep -q '"UnusedRecord"\|"unusedFunction"' "$work/app.modules/api.zti"; then
     exit 1

@@ -15,7 +15,7 @@ les primitives existantes sans ajouter un builtin pour chaque nouveau type.
 
 - construction CMake réussie ;
 - stdlib locale régénérée ;
-- 428 tests CTest réussis sur 428 ;
+- 435 tests CTest réussis sur 435 ;
 - exemple complet compilé, exécuté et couvert par CTest ;
 - aucun changement suivi en attente à la fin de la session ;
 - `build/`, `stdlib/precompiled/` et certains artefacts de tests sont ignorés.
@@ -42,9 +42,9 @@ chercher à le simplifier sans réduire sa sûreté.
 | --- | ---: |
 | Compilateur | `0.1.0` |
 | ABI | `5` |
-| Interface `.zti` | `10` |
-| Tokens génériques | `2` |
-| Cache de modules | `23` |
+| Interface `.zti` | `11` |
+| Tokens génériques | `3` |
+| Cache de modules | `24` |
 | Cache de démarrage | `2` |
 | Manifeste de stdlib | `1` |
 
@@ -363,15 +363,19 @@ et ne possèdent aucun traitement nominal dans le compilateur.
 
 ### Contraintes multiples
 
+**Livré le 15 juillet 2026.** Les listes avec `+` sont triées et sérialisées sous
+une forme canonique. Les doublons et noms inconnus sont rejetés ; chaque capacité
+est vérifiée sur les types concrets et la propagation entre fonctions génériques
+exige un sur-ensemble. Les contraintes intégrées étant toutes positives, aucune
+paire n'est actuellement incompatible. Le contrat participe aux empreintes et
+identités génériques, passe dans `.zti` et fonctionne sans sources avec les
+versions interface `11`, tokens `3` et cache `24`.
+
 Syntaxe cible indicative :
 
 ```zeta
 def replaceAll[T: Equatable + Copy](values: SliceMut[T], old: T, next: T): Int
 ```
-
-Étapes : parser une liste canonique, diagnostiquer doublons et contraintes
-incompatibles, sérialiser dans `.zti`, intégrer à l'identité générique et tester la
-compilation sans sources.
 
 ### API commune d'Option
 
@@ -480,18 +484,11 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-Commencer la priorité 3 par les contraintes génériques multiples. La syntaxe
-cible reste :
-
-```zeta
-def replaceAll[T: Equatable + Copy](values: SliceMut[T], old: T, next: T): Int
-```
-
-Ordre recommandé : parser `+`, canonicaliser l'ensemble, rejeter doublons et
-contraintes inconnues, appliquer toutes les contraintes lors de l'inférence,
-réviser les tokens génériques et `.zti`, puis couvrir la compilation sans sources.
-Les incompatibilités sémantiques éventuelles entre contraintes doivent être
-définies explicitement avant d'introduire les traits utilisateur.
+Poursuivre la priorité 3 avec l'API commune d'`Option[T]`. Préférer un module
+standard `option` tant que les méthodes inhérentes d'enums ne sont pas prises en
+charge. Migrer `isNone` et `unwrapOr` hors de `collections` et `strings`, couvrir
+les types `Copy`, documenter la transition puis valider la stdlib précompilée sans
+sources. Ne pas introduire une troisième implémentation temporaire.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

@@ -726,9 +726,23 @@ Declaration Parser::declaration(BindingKind kind) {
                                    "paramètre de type '" + parameter.text + "' déclaré plusieurs fois");
             typeParameters.push_back(parameter.text);
             std::string constraint;
-            if (match(TokenKind::Colon))
-                constraint = consume(TokenKind::Identifier,
-                                     "nom de contrainte attendu après ':'").text;
+            if (match(TokenKind::Colon)) {
+                std::vector<std::string> constraints;
+                do {
+                    const Token& item = consume(TokenKind::Identifier,
+                        "nom de contrainte attendu après ':' ou '+'");
+                    if (std::find(constraints.begin(), constraints.end(), item.text) !=
+                        constraints.end())
+                        throw CompileError(item.location, "contrainte générique dupliquée '" +
+                                                          item.text + "'");
+                    constraints.push_back(item.text);
+                } while (match(TokenKind::Plus));
+                std::sort(constraints.begin(), constraints.end());
+                for (std::size_t i = 0; i < constraints.size(); ++i) {
+                    if (i != 0) constraint += '+';
+                    constraint += constraints[i];
+                }
+            }
             typeConstraints.push_back(std::move(constraint));
         } while (match(TokenKind::Comma));
         consume(TokenKind::RightBracket, "']' attendue après les paramètres de type");
