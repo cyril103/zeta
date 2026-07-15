@@ -149,6 +149,7 @@ ModuleGraph ModuleLoader::load(const std::filesystem::path& rootPath) {
         throw std::runtime_error("nom de module invalide : " + graph_.root);
     loadModule(graph_.root, absolute);
     buildInterfaces();
+    validateTraitCoherence();
     buildDependencyGraph();
     buildFingerprints();
     return std::move(graph_);
@@ -221,7 +222,7 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
         if (!persisted.genericTokens.empty()) {
             Parser parser(persisted.genericTokens,
                           importedStructures(imports, graph_.interfaces),
-                          importedEnumerations(imports, graph_.interfaces));
+                          importedEnumerations(imports, graph_.interfaces), name);
             program = parser.parse();
         }
         program.imports.clear();
@@ -238,6 +239,11 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
                 if (enumeration->publicType)
                     storedInterface.enumerations.push_back(enumeration);
         }
+        if (program.traits.empty()) {
+            for (const std::string& trait : storedInterface.traits)
+                program.traits.push_back(TraitDeclaration{{}, trait, true});
+        }
+        program.traitImplementations = storedInterface.traitImplementations;
         for (const auto& [symbolName, symbol] : storedInterface.exports) {
             const auto existing = std::find_if(program.statements.begin(), program.statements.end(),
                 [&](const Statement& statement) {
@@ -278,7 +284,7 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
     for (const Program::Import& import : imports)
         loadModule(import.module, resolveImport(import.module));
     Parser parser(std::move(tokens), importedStructures(imports, graph_.interfaces),
-                  importedEnumerations(imports, graph_.interfaces));
+                  importedEnumerations(imports, graph_.interfaces), name);
     Program program = parser.parse();
     graph_.modules.emplace(name, Module{name, path, std::move(program), hashText(source),
                                         false, {}, {}});
@@ -398,6 +404,12 @@ void ModuleLoader::buildFingerprints() {
             }
             exports.push_back(std::move(signature));
         }
+        for (const std::string& trait : graph_.interfaces.at(name).traits)
+            exports.push_back("trait:" + trait);
+        for (const TraitImplementation& implementation :
+             graph_.interfaces.at(name).traitImplementations)
+            exports.push_back("impl:" + implementation.trait + ":" +
+                              typeName(implementation.type));
         std::sort(exports.begin(), exports.end());
         for (const std::string& signature : exports)
             interfaceHash = hashText(signature, interfaceHash);
@@ -424,10 +436,46 @@ void ModuleLoader::buildInterfaces() {
     }
 }
 
+void ModuleLoader::validateTraitCoherence() const {
+    std::vector<std::pair<std::string, ValueType>> implementations;
+    for (const auto& [moduleName, interface] : graph_.interfaces) {
+        for (const TraitImplementation& implementation : interface.traitImplementations) {
+            const bool ownsTrait = std::find(interface.traits.begin(), interface.traits.end(),
+                                             implementation.trait) != interface.traits.end();
+            const bool ownsType =
+                (implementation.type.kind == ValueType::Kind::Struct &&
+                 std::any_of(interface.structures.begin(), interface.structures.end(),
+                     [&](const std::shared_ptr<const StructType>& structure) {
+                         return implementation.type.structure == structure ||
+                             implementation.type.structure->genericDefinition == structure;
+                     })) ||
+                (implementation.type.kind == ValueType::Kind::Enum &&
+                 std::any_of(interface.enumerations.begin(), interface.enumerations.end(),
+                     [&](const std::shared_ptr<const EnumType>& enumeration) {
+                         return implementation.type.enumeration == enumeration ||
+                             implementation.type.enumeration->genericDefinition == enumeration;
+                     }));
+            if (!ownsTrait && !ownsType)
+                throw std::runtime_error("[ZTI400] module '" + moduleName +
+                    "' : implémentation orpheline du trait '" + implementation.trait +
+                    "' pour " + typeName(implementation.type));
+            const bool duplicate = std::any_of(implementations.begin(), implementations.end(),
+                [&](const auto& existing) {
+                    return existing.first == implementation.trait &&
+                           existing.second == implementation.type;
+                });
+            if (duplicate)
+                throw std::runtime_error("[ZTI400] implémentation globale dupliquée du trait '" +
+                    implementation.trait + "' pour " + typeName(implementation.type));
+            implementations.emplace_back(implementation.trait, implementation.type);
+        }
+    }
+}
+
 void ModuleLoader::buildInterface(const std::string& name) {
     if (graph_.interfaces.contains(name)) return;
     const Module& module = graph_.modules.at(name);
-    ModuleInterface interface{name, {}, {}, {}};
+    ModuleInterface interface{name, {}, {}, {}, {}, {}};
     const auto validatePublicType = [&](const auto& self, const ValueType& type,
                                         SourceLocation location) -> void {
             if (type.kind == ValueType::Kind::Struct) {
@@ -467,9 +515,63 @@ void ModuleLoader::buildInterface(const std::string& name) {
                 validatePublicType(validatePublicType, field.type, field.location);
         interface.enumerations.push_back(enumeration);
     }
+    for (const TraitDeclaration& trait : module.program.traits)
+        if (trait.publicTrait) interface.traits.push_back(trait.name);
+    std::unordered_set<std::string> visibleTraits(interface.traits.begin(),
+                                                   interface.traits.end());
+    for (const Program::Import& import : module.program.imports) {
+        const auto imported = graph_.interfaces.find(import.module);
+        if (imported == graph_.interfaces.end()) continue;
+        visibleTraits.insert(imported->second.traits.begin(), imported->second.traits.end());
+    }
+    const auto isPublicType = [&](const auto& self, const ValueType& type) -> bool {
+        if (type.kind == ValueType::Kind::Struct) {
+            if (!type.structure->publicType) return false;
+            return std::all_of(type.structure->typeArguments.begin(),
+                type.structure->typeArguments.end(),
+                [&](const ValueType& argument) { return self(self, argument); });
+        }
+        if (type.kind == ValueType::Kind::Enum) {
+            if (!type.enumeration->publicType) return false;
+            return std::all_of(type.enumeration->typeArguments.begin(),
+                type.enumeration->typeArguments.end(),
+                [&](const ValueType& argument) { return self(self, argument); });
+        }
+        if (type.kind == ValueType::Kind::Array ||
+            type.kind == ValueType::Kind::Reference ||
+            type.kind == ValueType::Kind::Slice ||
+            type.kind == ValueType::Kind::Box ||
+            type.kind == ValueType::Kind::Vec)
+            return self(self, *type.element);
+        return type.kind != ValueType::Kind::TypeParameter;
+    };
+    for (const TraitImplementation& implementation : module.program.traitImplementations) {
+        if (!visibleTraits.contains(implementation.trait) ||
+            !isPublicType(isPublicType, implementation.type)) continue;
+        validatePublicType(validatePublicType, implementation.type,
+                           implementation.location);
+        interface.traitImplementations.push_back(implementation);
+    }
     for (const Statement& statement : module.program.statements) {
         const auto* declaration = std::get_if<Declaration>(&statement.value);
         if (declaration == nullptr || !declaration->publicSymbol) continue;
+        static const std::unordered_set<std::string> builtinConstraints{
+            "Copy", "Numeric", "Ordered", "Equatable"};
+        for (const std::string& constraints : declaration->typeConstraints) {
+            std::size_t begin = 0;
+            while (begin < constraints.size()) {
+                const std::size_t end = constraints.find('+', begin);
+                const std::string constraint = constraints.substr(begin,
+                    (end == std::string::npos ? constraints.size() : end) - begin);
+                if (!builtinConstraints.contains(constraint) &&
+                    !visibleTraits.contains(constraint))
+                    throw CompileError(declaration->location,
+                        "le trait privé '" + constraint +
+                        "' fuit dans l'interface publique de " + name);
+                if (end == std::string::npos) break;
+                begin = end + 1U;
+            }
+        }
         std::vector<ValueType> parameterTypes;
         validatePublicType(validatePublicType, declaration->type, declaration->location);
         for (const Parameter& parameter : declaration->parameters) {

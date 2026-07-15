@@ -162,21 +162,6 @@ bool hasConstraint(const std::string& constraints, std::string_view expected) {
     const auto names = constraintNames(constraints);
     return std::find(names.begin(), names.end(), expected) != names.end();
 }
-bool satisfiesSingleConstraint(const ValueType& type, std::string_view constraint) {
-    if (constraint == "Copy") return isCopyType(type);
-    if (constraint == "Numeric") return TypeRules::isNumeric(type);
-    if (constraint == "Ordered")
-        return TypeRules::isNumeric(type) || type == ValueType::Char;
-    if (constraint == "Equatable")
-        return isEquatableValueType(type);
-    return false;
-}
-bool satisfiesConstraint(const ValueType& type, const std::string& constraints) {
-    const auto names = constraintNames(constraints);
-    return std::all_of(names.begin(), names.end(), [&](std::string_view constraint) {
-        return satisfiesSingleConstraint(type, constraint);
-    });
-}
 bool constraintsInclude(const std::string& available, const std::string& required) {
     const auto names = constraintNames(required);
     return std::all_of(names.begin(), names.end(), [&](std::string_view constraint) {
@@ -263,6 +248,27 @@ void collectExpressionNames(const Expression& expression,
 }
 }
 
+bool SemanticAnalyzer::satisfiesSingleConstraint(
+    const ValueType& type, std::string_view constraint) const {
+    if (constraint == "Copy") return isCopyType(type);
+    if (constraint == "Numeric") return TypeRules::isNumeric(type);
+    if (constraint == "Ordered")
+        return TypeRules::isNumeric(type) || type == ValueType::Char;
+    if (constraint == "Equatable") return isEquatableValueType(type);
+    return std::any_of(traitImplementations_.begin(), traitImplementations_.end(),
+        [&](const TraitImplementation& implementation) {
+            return implementation.trait == constraint && implementation.type == type;
+        });
+}
+
+bool SemanticAnalyzer::satisfiesConstraint(
+    const ValueType& type, const std::string& constraints) const {
+    const auto names = constraintNames(constraints);
+    return std::all_of(names.begin(), names.end(), [&](std::string_view constraint) {
+        return satisfiesSingleConstraint(type, constraint);
+    });
+}
+
 TypedProgram SemanticAnalyzer::analyze(
     Program& program,
     const std::unordered_map<std::string, ModuleInterface>* interfaces,
@@ -276,6 +282,14 @@ TypedProgram SemanticAnalyzer::analyze(
     methods_.clear();
     vecMethods_.clear();
     localMethodOwners_.clear();
+    knownTraits_.clear();
+    traitImplementations_.clear();
+    std::unordered_set<std::string> localTraits;
+    for (const TraitDeclaration& trait : program.traits) {
+        if (!localTraits.insert(trait.name).second)
+            throw CompileError(trait.location, "trait dupliqué '" + trait.name + "'");
+        knownTraits_.insert(trait.name);
+    }
     for (const std::shared_ptr<const StructType>& structure : program.structures)
         localMethodOwners_.insert(structure->genericDefinition
             ? structure->genericDefinition.get() : structure.get());
@@ -285,6 +299,11 @@ TypedProgram SemanticAnalyzer::analyze(
             const auto module = interfaces->find(import.module);
             if (module == interfaces->end())
                 throw CompileError(import.location, "module inconnu '" + import.module + "'");
+            for (const std::string& trait : module->second.traits)
+                knownTraits_.insert(trait);
+            for (const TraitImplementation& implementation :
+                 module->second.traitImplementations)
+                traitImplementations_.push_back(implementation);
             for (const auto& [name, exported] : module->second.exports) {
                 const std::string qualified = import.module + "." + name;
                 const SemanticSymbol symbol{exported.type, exported.kind, exported.callable,
@@ -309,6 +328,40 @@ TypedProgram SemanticAnalyzer::analyze(
                     MethodSymbol{qualified, symbol});
             }
         }
+    }
+    const auto ownsType = [&](const ValueType& type) {
+        if (type.kind == ValueType::Kind::Struct)
+            return std::any_of(program.structures.begin(), program.structures.end(),
+                [&](const std::shared_ptr<const StructType>& structure) {
+                    return type.structure == structure ||
+                        type.structure->genericDefinition == structure;
+                });
+        if (type.kind == ValueType::Kind::Enum)
+            return std::any_of(program.enumerations.begin(), program.enumerations.end(),
+                [&](const std::shared_ptr<const EnumType>& enumeration) {
+                    return type.enumeration == enumeration ||
+                        type.enumeration->genericDefinition == enumeration;
+                });
+        return false;
+    };
+    for (const TraitImplementation& implementation : program.traitImplementations) {
+        if (!knownTraits_.contains(implementation.trait))
+            throw CompileError(implementation.location,
+                               "trait inconnu '" + implementation.trait + "'");
+        if (!localTraits.contains(implementation.trait) && !ownsType(implementation.type))
+            throw CompileError(implementation.location,
+                "implémentation orpheline interdite pour le trait '" +
+                implementation.trait + "' et le type " + typeName(implementation.type));
+        const bool duplicate = std::any_of(traitImplementations_.begin(),
+            traitImplementations_.end(), [&](const TraitImplementation& existing) {
+                return existing.trait == implementation.trait &&
+                       existing.type == implementation.type;
+            });
+        if (duplicate)
+            throw CompileError(implementation.location,
+                "implémentation dupliquée du trait '" + implementation.trait +
+                "' pour " + typeName(implementation.type));
+        traitImplementations_.push_back(implementation);
     }
     for (Statement& statement : program.statements) checkStatement(statement, true);
 
@@ -359,12 +412,13 @@ void SemanticAnalyzer::checkStatement(Statement& statement, bool global) {
 }
 
 void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecursion) {
-    static const std::unordered_set<std::string> knownConstraints{
+    static const std::unordered_set<std::string> builtinConstraints{
         "", "Copy", "Numeric", "Ordered", "Equatable"};
     for (std::size_t i = 0; i < declaration.typeConstraints.size(); ++i)
         for (const std::string_view constraint :
              constraintNames(declaration.typeConstraints[i]))
-            if (!knownConstraints.contains(std::string(constraint)))
+            if (!builtinConstraints.contains(std::string(constraint)) &&
+                !knownTraits_.contains(std::string(constraint)))
                 throw CompileError(declaration.location,
                                    "contrainte générique inconnue '" +
                                    std::string(constraint) + "'");

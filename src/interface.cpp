@@ -238,6 +238,21 @@ std::string InterfaceCodec::serialize(
                        << field.offset << ' ' << std::quoted(encodeType(field.type)) << '\n';
         }
     }
+    std::vector<std::string> traits = interface.traits;
+    std::sort(traits.begin(), traits.end());
+    for (const std::string& trait : traits)
+        output << "trait " << std::quoted(trait) << '\n';
+    std::vector<const TraitImplementation*> implementations;
+    for (const TraitImplementation& implementation : interface.traitImplementations)
+        implementations.push_back(&implementation);
+    std::sort(implementations.begin(), implementations.end(),
+        [](const TraitImplementation* left, const TraitImplementation* right) {
+            if (left->trait != right->trait) return left->trait < right->trait;
+            return typeName(left->type) < typeName(right->type);
+        });
+    for (const TraitImplementation* implementation : implementations)
+        output << "implementation " << std::quoted(implementation->trait) << ' '
+               << std::quoted(encodeType(implementation->type)) << '\n';
     std::vector<std::string> names;
     for (const auto& [name, symbol] : interface.exports) {
         static_cast<void>(symbol);
@@ -459,6 +474,33 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
                 enumeration->variants.push_back(std::move(variant));
             }
             enumerationVariantCounts.erase(name);
+            continue;
+        }
+        if (word == "trait") {
+            std::string name;
+            if (!(input >> std::quoted(name)) || name.empty() ||
+                std::find(result.interface.traits.begin(), result.interface.traits.end(), name) !=
+                    result.interface.traits.end())
+                interfaceFailure("ZTI400", "déclaration de trait invalide ou dupliquée");
+            result.interface.traits.push_back(std::move(name));
+            continue;
+        }
+        if (word == "implementation") {
+            std::string trait, encodedType;
+            if (!(input >> std::quoted(trait) >> std::quoted(encodedType)) || trait.empty())
+                interfaceFailure("ZTI400", "implémentation de trait invalide");
+            ValueType type = decodeTypeContext(encodedType, structures, enumerations,
+                                               "implémentation du trait '" + trait + "'");
+            const bool duplicate = std::any_of(result.interface.traitImplementations.begin(),
+                result.interface.traitImplementations.end(),
+                [&](const TraitImplementation& implementation) {
+                    return implementation.trait == trait && implementation.type == type;
+                });
+            if (duplicate)
+                interfaceFailure("ZTI400", "implémentation dupliquée du trait '" + trait +
+                                           "' pour " + typeName(type));
+            result.interface.traitImplementations.push_back(
+                TraitImplementation{{}, std::move(trait), std::move(type)});
             continue;
         }
         if (word != "export")

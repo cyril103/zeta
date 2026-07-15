@@ -1,0 +1,7 @@
+trait Answer {}
+
+impl Answer for Int {}
+
+def keep[T: Answer](value: T): T = value
+
+def main(): Int = if (keep(Byte(42)) == Byte(42)) 0 else 1

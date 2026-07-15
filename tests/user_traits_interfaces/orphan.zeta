@@ -1,0 +1,5 @@
+import capabilities
+
+impl capabilities.Answer for Int {}
+
+def main(): Int = 0

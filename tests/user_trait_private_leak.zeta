@@ -1,0 +1,5 @@
+trait Internal {}
+
+pub def keep[T: Internal](value: T): T = value
+
+def main(): Int = 0

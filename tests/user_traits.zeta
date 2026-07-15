@@ -1,0 +1,18 @@
+trait Answer {}
+
+impl Answer for Int {}
+
+struct Wrapped {
+    value: Int
+}
+
+impl Answer for Wrapped {}
+
+def keep[T: Answer + Copy](value: T): T = value
+
+def forward[T: Answer + Copy](value: T): T = keep(value)
+
+def main(): Int = {
+    val wrapped = forward(Wrapped { value: 7 })
+    if (forward(42) == 42 && wrapped.value == 7) 0 else 1
+}

@@ -1,0 +1,7 @@
+import capabilities
+
+pub struct Token {
+    value: Int
+}
+
+impl capabilities.Answer for Token {}

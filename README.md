@@ -658,6 +658,23 @@ générique en appelle une autre. `Copy`, `Numeric`, `Ordered` et `Equatable` so
 des capacités cumulables ; aucune paire n'est actuellement incompatible. Le
 contrat canonique traverse les interfaces précompilées.
 
+Les traits utilisateur ajoutent des capacités nominales statiques :
+
+```text
+pub trait Serializable {}
+
+impl Serializable for Int {}
+
+def keep[T: Serializable + Copy](value: T): T = value
+```
+
+Une implémentation est cohérente lorsque son module possède le trait ou le type.
+Les implémentations orphelines et dupliquées sont rejetées. Les traits traversent
+les interfaces `.zti` et restent vérifiés lors de la monomorphisation sans
+sources. Ce premier contrat est un marqueur sans état : les méthodes requises,
+méthodes par défaut, objets de traits et la distribution dynamique ne sont pas
+encore pris en charge.
+
 Les structures, y compris génériques, utilisent des champs nommés :
 
 ```text

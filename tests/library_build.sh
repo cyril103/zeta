@@ -47,7 +47,7 @@ printf 'pub def identity[T](value: T): T = value\n' \
     > "$work/generic-source/generic_api.zeta"
 "$compiler" --build-library "$work/generic-source/generic_api.zeta" \
     -o "$work/generic-published" >/dev/null
-grep -q '^generic_tokens 3 ' "$work/generic-published/generic_api.zti"
+grep -q '^generic_tokens 4 ' "$work/generic-published/generic_api.zti"
 rm "$work/generic-source/generic_api.zeta"
 cp "$work/generic-published/generic_api.zti" "$work/generic-consumer/generic_api.zti"
 cp "$work/generic-published/generic_api.o" "$work/generic-consumer/generic_api.o"

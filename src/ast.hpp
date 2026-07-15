@@ -399,6 +399,18 @@ struct ReturnStatement { SourceLocation location; ExprPtr value; };
 struct BreakStatement { SourceLocation location; };
 struct ContinueStatement { SourceLocation location; };
 
+struct TraitDeclaration {
+    SourceLocation location;
+    std::string name;
+    bool publicTrait{false};
+};
+
+struct TraitImplementation {
+    SourceLocation location;
+    std::string trait;
+    ValueType type;
+};
+
 struct Statement {
     std::variant<Declaration, Assignment, IndexAssignment, FieldAssignment, DereferenceAssignment, WhileStatement, ExpressionStatement, ReturnStatement,
                  BreakStatement, ContinueStatement> value;
@@ -423,5 +435,7 @@ struct Program {
     std::vector<Import> imports;
     std::vector<std::shared_ptr<const StructType>> structures;
     std::vector<std::shared_ptr<const EnumType>> enumerations;
+    std::vector<TraitDeclaration> traits;
+    std::vector<TraitImplementation> traitImplementations;
     std::vector<Statement> statements;
 };

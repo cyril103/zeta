@@ -1,0 +1,6 @@
+trait Answer {}
+
+impl Answer for Int {}
+impl Answer for Int {}
+
+def main(): Int = 0

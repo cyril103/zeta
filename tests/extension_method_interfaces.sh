@@ -12,7 +12,7 @@ trap 'rm -rf "$work"' EXIT
 interface="$work/published.modules/vec_extensions.zti"
 grep -q '^export "Vec.appendTwice" 2 1 0 1 ' "$interface"
 grep -q '^export "Vec.count" 2 1 0 1 ' "$interface"
-grep -q '^generic_tokens 3 ' "$interface"
+grep -q '^generic_tokens 4 ' "$interface"
 
 mkdir "$work/consumer"
 cp "$fixtures/main.zeta" "$work/consumer/main.zeta"

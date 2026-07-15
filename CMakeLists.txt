@@ -288,6 +288,10 @@ if(BUILD_TESTING)
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/extension_method_interfaces.sh
             $<TARGET_FILE:zeta>
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/extension_method_interfaces)
+    add_test(NAME user_traits_interfaces
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/user_traits_interfaces.sh
+            $<TARGET_FILE:zeta>
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/user_traits_interfaces)
     add_test(NAME separate_compilation_cache
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/separate_compilation_cache.sh
             $<TARGET_FILE:zeta> ${CMAKE_CURRENT_SOURCE_DIR}/tests/modules_integration)
@@ -932,6 +936,19 @@ if(BUILD_TESTING)
         COMMAND ${CMAKE_CURRENT_BINARY_DIR}/multiple-constraints)
     set_tests_properties(run_multiple_constraints PROPERTIES
         DEPENDS compile_multiple_constraints)
+    add_test(NAME compile_user_traits COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/user_traits.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/user-traits)
+    add_test(NAME run_user_traits COMMAND ${CMAKE_CURRENT_BINARY_DIR}/user-traits)
+    set_tests_properties(run_user_traits PROPERTIES DEPENDS compile_user_traits)
+    foreach(trait_error
+            user_trait_missing_impl
+            user_trait_duplicate_impl
+            user_trait_private_leak)
+        add_test(NAME reject_${trait_error} COMMAND zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/${trait_error}.zeta)
+        set_tests_properties(reject_${trait_error} PROPERTIES WILL_FAIL TRUE)
+    endforeach()
     foreach(constraint_error
             multiple_constraints_duplicate
             multiple_constraints_unknown

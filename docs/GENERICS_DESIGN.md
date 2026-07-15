@@ -41,5 +41,6 @@ et sont toutes cumulables ; aucune combinaison n'est donc incompatible. Cette
 règle devra être revisitée si une future contrainte exprime une exclusion.
 
 Le contrat canonique participe à l'empreinte d'interface et à l'identité des
-instances monomorphisées. Le format d'interface `11`, les tokens génériques `3`
-et le cache de modules `24` invalident les artefacts antérieurs.
+instances monomorphisées. Les traits marqueurs utilisateur portent les versions
+courantes à l'interface `12`, aux tokens génériques `4` et au cache de modules
+`26`.

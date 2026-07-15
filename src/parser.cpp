@@ -130,9 +130,10 @@ std::uint32_t decodeCharacter(const Token& token) {
 }
 
 Parser::Parser(std::vector<Token> tokens, ImportedStructures importedStructures,
-               ImportedEnumerations importedEnumerations)
+               ImportedEnumerations importedEnumerations, std::string moduleName)
     : tokens_(std::move(tokens)), importedStructures_(std::move(importedStructures)),
-      importedEnumerations_(std::move(importedEnumerations)) {
+      importedEnumerations_(std::move(importedEnumerations)),
+      moduleName_(std::move(moduleName)) {
     enumerations_.emplace("Option", builtinOptionType());
 }
 
@@ -566,6 +567,44 @@ void Parser::expressionContinuation() {
     skipSeparators();
 }
 
+std::string Parser::traitName() {
+    const Token& first = consume(TokenKind::Identifier, "nom de trait attendu");
+    std::string name = first.text;
+    if (match(TokenKind::Dot)) {
+        const Token& second = consume(TokenKind::Identifier,
+                                      "nom de trait attendu après '.'");
+        name += "." + second.text;
+        return name;
+    }
+    if (name == "Copy" || name == "Numeric" || name == "Ordered" ||
+        name == "Equatable" || moduleName_.empty()) return name;
+    return moduleName_ + "." + name;
+}
+
+TraitDeclaration Parser::trait(bool publicTrait) {
+    const Token& name = consume(TokenKind::Identifier,
+                                "identifiant attendu après 'trait'");
+    consume(TokenKind::LeftBrace, "'{' attendue après le nom du trait");
+    skipSeparators();
+    consume(TokenKind::RightBrace,
+            "les méthodes de trait ne sont pas encore prises en charge, '}' attendue");
+    return TraitDeclaration{name.location,
+        moduleName_.empty() ? name.text : moduleName_ + "." + name.text,
+        publicTrait};
+}
+
+TraitImplementation Parser::traitImplementation() {
+    const SourceLocation location = previous().location;
+    std::string implementedTrait = traitName();
+    consume(TokenKind::For, "'for' attendu après le nom du trait");
+    ValueType type = consumeType("type concret attendu après 'for'");
+    consume(TokenKind::LeftBrace, "'{' attendue après le type implémenté");
+    skipSeparators();
+    consume(TokenKind::RightBrace,
+            "les méthodes de trait ne sont pas encore prises en charge, '}' attendue");
+    return TraitImplementation{location, std::move(implementedTrait), std::move(type)};
+}
+
 Program Parser::parse() {
     Program program;
     skipSeparators();
@@ -590,8 +629,16 @@ Program Parser::parse() {
             current_ += 2U;
             program.enumerations.push_back(enumeration(true));
         }
+        else if (check(TokenKind::Pub) && current_ + 1U < tokens_.size() &&
+                 tokens_[current_ + 1U].kind == TokenKind::Trait) {
+            current_ += 2U;
+            program.traits.push_back(trait(true));
+        }
         else if (match(TokenKind::Struct)) program.structures.push_back(structure());
         else if (match(TokenKind::Enum)) program.enumerations.push_back(enumeration());
+        else if (match(TokenKind::Trait)) program.traits.push_back(trait());
+        else if (match(TokenKind::Impl))
+            program.traitImplementations.push_back(traitImplementation());
         else program.statements.push_back(statement());
         if (!check(TokenKind::End) && !matchSeparator()) {
             throw CompileError(peek().location, "fin d'instruction attendue");
@@ -729,13 +776,13 @@ Declaration Parser::declaration(BindingKind kind) {
             if (match(TokenKind::Colon)) {
                 std::vector<std::string> constraints;
                 do {
-                    const Token& item = consume(TokenKind::Identifier,
-                        "nom de contrainte attendu après ':' ou '+'");
-                    if (std::find(constraints.begin(), constraints.end(), item.text) !=
+                    const SourceLocation itemLocation = peek().location;
+                    std::string item = traitName();
+                    if (std::find(constraints.begin(), constraints.end(), item) !=
                         constraints.end())
-                        throw CompileError(item.location, "contrainte générique dupliquée '" +
-                                                          item.text + "'");
-                    constraints.push_back(item.text);
+                        throw CompileError(itemLocation, "contrainte générique dupliquée '" +
+                                                         item + "'");
+                    constraints.push_back(std::move(item));
                 } while (match(TokenKind::Plus));
                 std::sort(constraints.begin(), constraints.end());
                 for (std::size_t i = 0; i < constraints.size(); ++i) {

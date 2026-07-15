@@ -26,6 +26,8 @@ struct ModuleInterface {
     std::unordered_map<std::string, ExportedSymbol> exports;
     std::vector<std::shared_ptr<const StructType>> structures;
     std::vector<std::shared_ptr<const EnumType>> enumerations;
+    std::vector<std::string> traits;
+    std::vector<TraitImplementation> traitImplementations;
 };
 
 struct Module {
@@ -64,6 +66,7 @@ private:
     bool validPrecompiledModule(const std::string& name) const;
     void buildInterface(const std::string& name);
     void buildInterfaces();
+    void validateTraitCoherence() const;
     void buildDependencyGraph();
     void buildFingerprints();
     std::filesystem::path sourceDirectory_;

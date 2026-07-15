@@ -38,6 +38,10 @@ private:
     void pushBorrowScope();
     void popBorrowScope();
     void releaseBorrow(const std::string& referenceName);
+    bool satisfiesSingleConstraint(const ValueType& type,
+                                   std::string_view constraint) const;
+    bool satisfiesConstraint(const ValueType& type,
+                             const std::string& constraints) const;
 
     struct BorrowState { std::size_t shared{0}; bool mutableBorrow{false}; };
     struct ReferenceBorrow {
@@ -64,4 +68,6 @@ private:
         std::unordered_map<std::string, MethodSymbol>> methods_;
     std::unordered_map<std::string, MethodSymbol> vecMethods_;
     std::unordered_set<const StructType*> localMethodOwners_;
+    std::unordered_set<std::string> knownTraits_;
+    std::vector<TraitImplementation> traitImplementations_;
 };

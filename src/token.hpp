@@ -11,6 +11,9 @@ enum class TokenKind {
     Extend,
     Struct,
     Enum,
+    Trait,
+    Impl,
+    For,
     Match,
     Import,
     Pub,
@@ -86,6 +89,9 @@ inline std::string tokenName(TokenKind kind) {
     case TokenKind::Extend: return "'extend'";
     case TokenKind::Struct: return "'struct'";
     case TokenKind::Enum: return "'enum'";
+    case TokenKind::Trait: return "'trait'";
+    case TokenKind::Impl: return "'impl'";
+    case TokenKind::For: return "'for'";
     case TokenKind::Match: return "'match'";
     case TokenKind::Import: return "'import'";
     case TokenKind::Pub: return "'pub'";

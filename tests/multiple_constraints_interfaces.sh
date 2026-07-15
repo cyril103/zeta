@@ -11,7 +11,7 @@ trap 'rm -rf "$work"' EXIT
 
 interface="$work/published.modules/api.zti"
 grep -q '^export "same" .* "T" "Copy+Equatable"$' "$interface"
-grep -q '^generic_tokens 3 ' "$interface"
+grep -q '^generic_tokens 4 ' "$interface"
 
 mkdir "$work/consumer"
 cp "$fixtures/main.zeta" "$work/consumer/main.zeta"

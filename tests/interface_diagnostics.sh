@@ -30,7 +30,7 @@ rejects() {
 }
 
 prepare version
-sed -i '1s/ZTI 11/ZTI 999/' "$work/version/types.zti"
+sed -i '1s/ZTI 12/ZTI 999/' "$work/version/types.zti"
 rejects version ZTI001
 
 prepare syntax
@@ -57,7 +57,7 @@ grep -q "énumération 'Result', variante 'Ok', champ 'value'" \
     "$work/enum-layout/error"
 
 prepare generic
-sed -i 's/^generic_tokens 3 /generic_tokens 999 /' "$work/generic/types.zti"
+sed -i 's/^generic_tokens 4 /generic_tokens 999 /' "$work/generic/types.zti"
 rejects generic ZTI300
 
 prepare module-name

@@ -15,7 +15,7 @@ les primitives existantes sans ajouter un builtin pour chaque nouveau type.
 
 - construction CMake réussie ;
 - stdlib locale régénérée ;
-- 438 tests CTest réussis sur 438 ;
+- 444 tests CTest réussis sur 444 ;
 - exemple complet compilé, exécuté et couvert par CTest ;
 - aucun changement suivi en attente à la fin de la session ;
 - `build/`, `stdlib/precompiled/` et certains artefacts de tests sont ignorés.
@@ -42,9 +42,9 @@ chercher à le simplifier sans réduire sa sûreté.
 | --- | ---: |
 | Compilateur | `0.1.0` |
 | ABI | `5` |
-| Interface `.zti` | `11` |
-| Tokens génériques | `3` |
-| Cache de modules | `25` |
+| Interface `.zti` | `12` |
+| Tokens génériques | `4` |
+| Cache de modules | `26` |
 | Cache de démarrage | `2` |
 | Manifeste de stdlib | `1` |
 
@@ -112,7 +112,8 @@ L'exemple est compréhensible, mais trop cérémonieux :
   quotidien ;
 - un `Vec[T]` placé dans une structure ne permet pas encore de construire
   naturellement une nouvelle collection ;
-- seules les capacités intégrées peuvent servir de contraintes génériques ;
+- les traits utilisateur sont encore des marqueurs et ne peuvent pas imposer ni
+  appeler de méthode dans un corps générique ;
 - l'absence de fonctions de première classe bloque `map`, `filter`, `fold` et les
   comparateurs personnalisés.
 
@@ -393,8 +394,21 @@ les appels plus concis sans réintroduire de duplication.
 
 ### Traits utilisateur
 
-**Prochain chantier.** Commencer par des contrats sans état et monomorphisés ;
-reporter les objets de traits dynamiques.
+**Fondation livrée le 15 juillet 2026.** `trait Nom {}` déclare une capacité
+nominale sans état et `impl Nom for Type {}` l'accorde à un type concret. Les
+traits se composent avec `+`, participent à la propagation des contraintes et
+restent entièrement monomorphisés. La cohérence autorise une implémentation au
+propriétaire du trait ou du type ; les paires dupliquées, implémentations
+orphelines et fuites d'un trait privé sont rejetées.
+
+Les traits publics et leurs implémentations sont sérialisés dans `.zti`. Une
+implémentation définie par le propriétaire d'un type dans un second module est
+validée avec les seules paires `.zti` + `.o`. Ce contrat porte les versions à
+l'interface `12`, aux tokens génériques `4` et au cache de modules `26`.
+
+**Prochain incrément.** Ajouter les signatures de méthodes requises et leur
+résolution statique dans les corps génériques. Reporter les méthodes par défaut,
+types associés, objets de traits et vtables.
 
 ## Priorité 4 — itération
 
@@ -488,12 +502,14 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-Poursuivre la priorité 3 avec la conception des traits utilisateur. Définir
-d'abord un contrat statique sans état, sa syntaxe de déclaration et
-d'implémentation, puis son emploi comme contrainte générique monomorphisée.
-Documenter la cohérence des implémentations entre modules, sérialiser les contrats
-publics dans `.zti` et couvrir leur consommation sans sources. Reporter les objets
-de traits, la distribution dynamique et les méthodes par défaut.
+Poursuivre la priorité 3 avec les méthodes requises des traits utilisateur.
+Étendre le corps de `trait` avec des signatures sans implémentation, vérifier que
+chaque bloc `impl` fournit exactement les méthodes attendues, puis résoudre un
+appel sur un paramètre générique vers l'implémentation concrète pendant la
+monomorphisation. Sérialiser les signatures et les implémentations publiques dans
+`.zti`, couvrir la consommation sans sources et conserver la règle de cohérence
+déjà livrée. Reporter méthodes par défaut, types associés, objets de traits et
+vtables.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

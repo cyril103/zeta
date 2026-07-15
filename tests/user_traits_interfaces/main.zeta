@@ -1,0 +1,7 @@
+import capabilities
+import models
+
+def main(): Int = {
+    val token = capabilities.keep(models.Token { value: 42 })
+    if (token.value == 42) 0 else 1
+}

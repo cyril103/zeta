@@ -16,7 +16,8 @@ public:
 
     explicit Parser(std::vector<Token> tokens,
                     ImportedStructures importedStructures = {},
-                    ImportedEnumerations importedEnumerations = {});
+                    ImportedEnumerations importedEnumerations = {},
+                    std::string moduleName = {});
     Program parse();
 
 private:
@@ -31,6 +32,9 @@ private:
     ValueType consumeType(const std::string& message);
     std::shared_ptr<StructType> structure(bool publicType = false);
     std::shared_ptr<EnumType> enumeration(bool publicType = false);
+    TraitDeclaration trait(bool publicTrait = false);
+    TraitImplementation traitImplementation();
+    std::string traitName();
     std::shared_ptr<const EnumType> instantiateEnumeration(
         const std::shared_ptr<const EnumType>& enumeration, std::vector<ValueType> arguments,
         SourceLocation location);
@@ -77,4 +81,5 @@ private:
     std::unordered_map<std::string, std::shared_ptr<EnumType>> enumerations_;
     std::unordered_set<std::string> importedModules_;
     bool optionShadowed_{false};
+    std::string moduleName_;
 };

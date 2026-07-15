@@ -24,7 +24,7 @@ std::string declarationName(const std::vector<Token>& tokens,
     const TokenKind declaration = tokens[cursor++].kind;
     if (declaration != TokenKind::Val && declaration != TokenKind::Var &&
         declaration != TokenKind::Def && declaration != TokenKind::Struct &&
-        declaration != TokenKind::Enum) return {};
+        declaration != TokenKind::Enum && declaration != TokenKind::Trait) return {};
     if (cursor >= end || (tokens[cursor].kind != TokenKind::Identifier &&
                           tokens[cursor].kind != TokenKind::VecType)) return {};
     std::string name = tokens[cursor++].text;

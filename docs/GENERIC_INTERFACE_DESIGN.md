@@ -47,13 +47,14 @@ l'interface ; elle ne doit jamais produire silencieusement un bloc incomplet.
 Une interface qui exporte au moins un générique contient un bloc :
 
 ```text
-generic_tokens 3 <nombre>
+generic_tokens 4 <nombre>
 token <genre> <ligne> <colonne> "<texte>"
 ...
 ```
 
-`1` est la version propre de cette représentation. Le genre correspond à un
-`TokenKind` validé par le lecteur. Le texte est conservé avec l'échappement
+`4` est la version courante de cette représentation ; elle inclut les tokens des
+traits utilisateur. Le genre correspond à un `TokenKind` validé par le lecteur.
+Le texte est conservé avec l'échappement
 standard des chaînes du format `.zti`; les positions servent uniquement aux
 diagnostics. Le dernier élément doit être le token `End`, et aucun élément ne
 peut le précéder après un premier `End`.
