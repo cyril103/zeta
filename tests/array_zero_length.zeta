@@ -1,7 +1,8 @@
 import collections
+import option
 
 def main(): Int = {
     val empty: [Int; 0] = []
     val view: Slice[Int] = Slice(&empty)
-    if (view.length == 0 && collections.isNone(collections.first(view))) 0 else 1
+    if (view.length == 0 && option.isNone(collections.first(view))) 0 else 1
 }

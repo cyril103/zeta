@@ -8,16 +8,6 @@ pub def at[T: Copy](values: Slice[T], index: Int): Option[T] = {
     if (index < 0 || index >= values.length) Option[T].None else Option[T].Some(value: values[index])
 }
 
-pub def isNone[T: Copy](option: Option[T]): Bool = match (option) {
-    Option[T].Some(_) => false
-    Option[T].None => true
-}
-
-pub def unwrapOr[T: Copy](option: Option[T], fallback: T): T = match (option) {
-    Option[T].Some(value) => value
-    Option[T].None => fallback
-}
-
 // Collection LIFO possédée, construite à partir de Vec sans support builtin dédié.
 
 pub struct Stack[T] {

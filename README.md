@@ -730,8 +730,9 @@ utilisent cette définition commune au lieu de déclarer chacun leur propre type
 
 Le module standard `collections` fournit `first`, `second` et `at` sur `Slice[T]`.
 Ces fonctions retournent `Option[T]` et n'évaluent jamais un accès hors limites.
-`collections.isNone(option)` teste l'absence et
-`collections.unwrapOr(option, fallback)` extrait une valeur avec repli.
+Le module standard `option` centralise les opérations génériques communes :
+`option.isNone(value)` teste l'absence et `option.unwrapOr(value, fallback)`
+extrait une valeur avec repli. Ces deux fonctions acceptent les types `Copy`.
 
 ## Vecteurs dynamiques
 
@@ -891,7 +892,7 @@ cmake --build build
 La compilation produit `build/basic.ir`, `build/basic.asm` et l'exécutable
 `build/basic`. La cible actuelle est Linux x86-64 et nécessite `fasm` dans le
 `PATH`. `stdlib_showcase.zeta` présente ensemble les modules `io`, `collections`,
-`strings` et `sequences`, ainsi que `Vec`, `Option` et les slices.
+`option`, `strings` et `sequences`, ainsi que `Vec`, `Option` et les slices.
 
 ## Architecture du compilateur
 

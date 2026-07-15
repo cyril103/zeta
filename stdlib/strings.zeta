@@ -17,13 +17,3 @@ pub def nextByteOffset(value: String, offset: Int): Int = {
     else if (decoded <= 65535) offset + 3
     else offset + 4
 }
-
-pub def isNone[T: Copy](option: Option[T]): Bool = match (option) {
-    Option[T].Some(_) => false
-    Option[T].None => true
-}
-
-pub def unwrapOr[T: Copy](option: Option[T], fallback: T): T = match (option) {
-    Option[T].Some(value) => value
-    Option[T].None => fallback
-}

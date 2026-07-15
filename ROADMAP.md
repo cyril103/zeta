@@ -15,7 +15,7 @@ les primitives existantes sans ajouter un builtin pour chaque nouveau type.
 
 - construction CMake réussie ;
 - stdlib locale régénérée ;
-- 435 tests CTest réussis sur 435 ;
+- 438 tests CTest réussis sur 438 ;
 - exemple complet compilé, exécuté et couvert par CTest ;
 - aucun changement suivi en attente à la fin de la session ;
 - `build/`, `stdlib/precompiled/` et certains artefacts de tests sont ignorés.
@@ -44,7 +44,7 @@ chercher à le simplifier sans réduire sa sûreté.
 | ABI | `5` |
 | Interface `.zti` | `11` |
 | Tokens génériques | `3` |
-| Cache de modules | `24` |
+| Cache de modules | `25` |
 | Cache de démarrage | `2` |
 | Manifeste de stdlib | `1` |
 
@@ -101,17 +101,18 @@ Les autres acquis particulièrement utiles sont :
 
 L'exemple est compréhensible, mais trop cérémonieux :
 
-- chaque variable locale exige une annotation de type ;
+- les tableaux vides et appels génériques insuffisamment contraints exigent encore
+  une annotation locale ;
 - les algorithmes mutateurs autres que `sort` exposent encore `SliceMut` pour un
   usage courant ;
-- `collections.unwrapOr` et `strings.unwrapOr` dupliquent une API qui appartient
-  conceptuellement à `Option[T]` ;
+- `Option[T]` n'accepte pas encore de méthodes inhérentes utilisateur ; son API
+  commune reste donc qualifiée par le module `option` ;
 - tous les parcours utilisent une boucle `while` et un indice manuel ;
 - les offsets UTF-8 en octets sont corrects mais trop bas niveau pour l'usage
   quotidien ;
 - un `Vec[T]` placé dans une structure ne permet pas encore de construire
   naturellement une nouvelle collection ;
-- une seule contrainte générique peut être exprimée par paramètre ;
+- seules les capacités intégrées peuvent servir de contraintes génériques ;
 - l'absence de fonctions de première classe bloque `map`, `filter`, `fold` et les
   comparateurs personnalisés.
 
@@ -167,6 +168,7 @@ La stdlib publique contient exactement :
 
 - `io` ;
 - `collections` ;
+- `option` ;
 - `strings` ;
 - `sequences`.
 
@@ -379,18 +381,20 @@ def replaceAll[T: Equatable + Copy](values: SliceMut[T], old: T, next: T): Int
 
 ### API commune d'Option
 
-Éliminer la duplication de `collections.unwrapOr`, `strings.unwrapOr` et
-`isNone`. Deux directions sont acceptables :
+**Livré le 15 juillet 2026.** Le module standard `option` fournit l'unique
+implémentation générique de `isNone[T: Copy]` et `unwrapOr[T: Copy]`. Les anciennes
+exportations de `collections` et `strings` ont été retirées et tous les
+consommateurs migrés. La paire `option.zti` + `option.o` est validée sans sources,
+avec des instanciations sur plusieurs types `Copy` et un rejet sur `Box[Int]`.
+Le cache de modules passe à `25`.
 
-- module standard `option` ;
-- méthodes génériques sur `Option[T]` après livraison des méthodes utilisateur.
-
-Ne pas dupliquer une troisième fois les helpers entre modules.
+Une future prise en charge des méthodes utilisateur sur les enums pourra rendre
+les appels plus concis sans réintroduire de duplication.
 
 ### Traits utilisateur
 
-À entreprendre après les contraintes multiples. Commencer par des contrats sans
-état et monomorphisés ; reporter les objets de traits dynamiques.
+**Prochain chantier.** Commencer par des contrats sans état et monomorphisés ;
+reporter les objets de traits dynamiques.
 
 ## Priorité 4 — itération
 
@@ -484,11 +488,12 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-Poursuivre la priorité 3 avec l'API commune d'`Option[T]`. Préférer un module
-standard `option` tant que les méthodes inhérentes d'enums ne sont pas prises en
-charge. Migrer `isNone` et `unwrapOr` hors de `collections` et `strings`, couvrir
-les types `Copy`, documenter la transition puis valider la stdlib précompilée sans
-sources. Ne pas introduire une troisième implémentation temporaire.
+Poursuivre la priorité 3 avec la conception des traits utilisateur. Définir
+d'abord un contrat statique sans état, sa syntaxe de déclaration et
+d'implémentation, puis son emploi comme contrainte générique monomorphisée.
+Documenter la cohérence des implémentations entre modules, sérialiser les contrats
+publics dans `.zti` et couvrir leur consommation sans sources. Reporter les objets
+de traits, la distribution dynamique et les méthodes par défaut.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

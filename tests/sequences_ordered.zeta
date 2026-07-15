@@ -1,4 +1,4 @@
-import collections
+import option
 import sequences
 
 def main(): Int = {
@@ -12,11 +12,11 @@ def main(): Int = {
     val initiallySorted: Bool = sequences.isSorted(values.asSlice())
     val swaps: Int = sequences.sort(values.asSliceMut())
     val sorted: Bool = sequences.isSorted(values.asSlice())
-    val firstTen: Int = collections.unwrapOr(
+    val firstTen: Int = option.unwrapOr(
         sequences.binarySearch(values.asSlice(), 10), -1)
-    val forty: Int = collections.unwrapOr(
+    val forty: Int = option.unwrapOr(
         sequences.binarySearch(values.asSlice(), 40), -1)
-    val missing: Bool = collections.isNone(
+    val missing: Bool = option.isNone(
         sequences.binarySearch(values.asSlice(), 25))
     val view: Slice[Int] = values.asSlice()
     val orderOk: Bool = view[0] == 10 && view[1] == 10 && view[2] == 20 &&
@@ -32,7 +32,7 @@ def main(): Int = {
     val empty: [Int; 0] = []
     val emptyView: Slice[Int] = Slice(&empty)
     val emptyOk: Bool = sequences.isSorted(emptyView) &&
-        collections.isNone(sequences.binarySearch(emptyView, 1))
+        option.isNone(sequences.binarySearch(emptyView, 1))
 
     if (!initiallySorted && swaps > 0 && sorted && firstTen >= 0 && forty == 4 &&
         missing && orderOk && letterSwaps > 0 && lettersOk && emptyOk) 0 else 1

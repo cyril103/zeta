@@ -1,0 +1,6 @@
+import option
+
+def main(): Int = {
+    val absent: Option[Box[Int]] = Option[Box[Int]].None
+    if (option.isNone(absent)) 0 else 1
+}

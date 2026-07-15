@@ -265,7 +265,8 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_bounds.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_aggregate.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/stack.zeta
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/queue.zeta)
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/queue.zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/option_module.zeta)
     add_test(NAME persisted_module_interfaces
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/persisted_interfaces.sh
             $<TARGET_FILE:zeta>
@@ -371,6 +372,15 @@ if(BUILD_TESTING)
         -o ${CMAKE_CURRENT_BINARY_DIR}/collections-module)
     add_test(NAME run_collections_module COMMAND ${CMAKE_CURRENT_BINARY_DIR}/collections-module)
     set_tests_properties(run_collections_module PROPERTIES DEPENDS compile_collections_module)
+
+    add_test(NAME compile_option_module COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/option_module.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/option-module)
+    add_test(NAME run_option_module COMMAND ${CMAKE_CURRENT_BINARY_DIR}/option-module)
+    set_tests_properties(run_option_module PROPERTIES DEPENDS compile_option_module)
+    add_test(NAME reject_option_non_copy COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/option_non_copy.zeta)
+    set_tests_properties(reject_option_non_copy PROPERTIES WILL_FAIL TRUE)
 
     add_test(NAME compile_sequences_read COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_read.zeta

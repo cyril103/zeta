@@ -1,3 +1,4 @@
+import option
 import strings
 
 def main(): Int = {
@@ -6,12 +7,12 @@ def main(): Int = {
     var count: Int = 0
     var total: Int = 0
     while (offset < text.lengthBytes) do {
-        val value: Char = strings.unwrapOr(strings.charAtByte(text, offset), '?')
+        val value: Char = option.unwrapOr(strings.charAtByte(text, offset), '?')
         total = total + Int(value)
         offset = strings.nextByteOffset(text, offset)
         count = count + 1
     }
-    val invalid: Bool = strings.isNone(strings.charAtByte(text, 2))
+    val invalid: Bool = option.isNone(strings.charAtByte(text, 2))
     if (count == 4 && offset == 10 && invalid &&
         total == Int('h') + Int('é') + Int('€') + Int('🚀')) 0 else 1
 }

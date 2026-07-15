@@ -1,0 +1,17 @@
+import option
+
+def main(): Int = {
+    val someInt: Option[Int] = Option[Int].Some(value: 42)
+    val noInt: Option[Int] = Option[Int].None
+    val someChar: Option[Char] = Option[Char].Some(value: 'z')
+    val noBool: Option[Bool] = Option[Bool].None
+
+    val value: Int = option.unwrapOr(someInt, -1)
+    val fallback: Int = option.unwrapOr(noInt, 7)
+    val character: Char = option.unwrapOr(someChar, '?')
+    val boolean: Bool = option.unwrapOr(noBool, true)
+
+    if (value == 42 && fallback == 7 && character == 'z' && boolean &&
+        !option.isNone(Option[Byte].Some(value: 3)) &&
+        option.isNone(Option[Double].None)) 0 else 1
+}

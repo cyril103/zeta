@@ -1,4 +1,4 @@
-import collections
+import option
 import sequences
 
 def main(): Int = {
@@ -20,7 +20,7 @@ def main(): Int = {
     val suffix: Slice[Int] = Slice(&suffixArray)
     val tooLong: Slice[Int] = Slice(&tooLongArray)
 
-    val lastTen: Int = collections.unwrapOr(
+    val lastTen: Int = option.unwrapOr(
         sequences.lastIndexOf(values.asSlice(), 10), -1)
     val equal: Bool = sequences.equals(values.asSlice(), same)
     val notEqual: Bool = sequences.equals(values.asSlice(), different)

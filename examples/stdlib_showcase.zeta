@@ -1,5 +1,6 @@
 import collections
 import io
+import option
 import sequences
 import strings
 
@@ -13,13 +14,13 @@ def main(): Int = {
     scores.push(2)
 
     val original = scores.asSlice()
-    val first = collections.unwrapOr(collections.first(original), -1)
-    val second = collections.unwrapOr(collections.second(original), -1)
-    val missing = collections.isNone(collections.at(original, 99))
-    val total = collections.unwrapOr(sequences.sum(original), 0)
-    val product = collections.unwrapOr(sequences.product(original), 0)
-    val minimum = collections.unwrapOr(sequences.minimum(original), 0)
-    val maximum = collections.unwrapOr(sequences.maximum(original), 0)
+    val first = option.unwrapOr(collections.first(original), -1)
+    val second = option.unwrapOr(collections.second(original), -1)
+    val missing = option.isNone(collections.at(original, 99))
+    val total = option.unwrapOr(sequences.sum(original), 0)
+    val product = option.unwrapOr(sequences.product(original), 0)
+    val minimum = option.unwrapOr(sequences.minimum(original), 0)
+    val maximum = option.unwrapOr(sequences.maximum(original), 0)
     val occurrences = sequences.count(original, 2)
 
     io.println("Vec initial : [5, 2, 8, 2]")
@@ -33,7 +34,7 @@ def main(): Int = {
     val swaps = scores.sort()
     val sorted = scores.asSlice()
     val sortedOk = sequences.isSorted(sorted)
-    val positionEight = collections.unwrapOr(
+    val positionEight = option.unwrapOr(
         sequences.binarySearch(sorted, 8), -1)
     val twosBegin = sequences.lowerBound(sorted, 2)
     val twosEnd = sequences.upperBound(sorted, 2)
@@ -45,7 +46,7 @@ def main(): Int = {
         String(twosEnd) + ")")
 
     val unicode = "éclair"
-    val firstChar = strings.unwrapOr(strings.charAtByte(unicode, 0), '?')
+    val firstChar = option.unwrapOr(strings.charAtByte(unicode, 0), '?')
     val nextOffset = strings.nextByteOffset(unicode, 0)
 
     val message = "Bonjour Zeta"

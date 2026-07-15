@@ -16,6 +16,7 @@ sequences_bounds_program=${12}
 sequences_aggregate_program=${13}
 stack_program=${14}
 queue_program=${15}
+option_program=${16}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 mkdir "$work/stdlib"
@@ -28,6 +29,8 @@ test -f "$work/stdlib/precompiled/io.o"
 test -f "$work/stdlib/precompiled/io.zti"
 test -f "$work/stdlib/precompiled/collections.o"
 test -f "$work/stdlib/precompiled/collections.zti"
+test -f "$work/stdlib/precompiled/option.o"
+test -f "$work/stdlib/precompiled/option.zti"
 test -f "$work/stdlib/precompiled/sequences.o"
 test -f "$work/stdlib/precompiled/sequences.zti"
 test ! -e "$work/stdlib/precompiled/vectors.o"
@@ -63,6 +66,8 @@ mv "$work/stdlib"/*.zeta "$work/sources/"
 "$work/stack-app"
 "$compiler" "$queue_program" -o "$work/queue-app" --stdlib "$work/stdlib" >/dev/null
 "$work/queue-app"
+"$compiler" "$option_program" -o "$work/option-app" --stdlib "$work/stdlib" >/dev/null
+"$work/option-app"
 
 # Une source modifiée invalide son artefact partagé et force le fallback source.
 mv "$work/sources/io.zeta" "$work/stdlib/io.zeta"

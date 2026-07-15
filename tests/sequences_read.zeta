@@ -1,4 +1,4 @@
-import collections
+import option
 import sequences
 
 def main(): Int = {
@@ -10,17 +10,17 @@ def main(): Int = {
 
     val containsTen: Bool = sequences.contains(values.asSlice(), 10)
     val containsForty: Bool = sequences.contains(values.asSlice(), 40)
-    val firstTen: Int = collections.unwrapOr(
+    val firstTen: Int = option.unwrapOr(
         sequences.indexOf(values.asSlice(), 10), -1)
     val tens: Int = sequences.count(values.asSlice(), 10)
-    val minimum: Int = collections.unwrapOr(
+    val minimum: Int = option.unwrapOr(
         sequences.minimum(values.asSlice()), -1)
-    val maximum: Int = collections.unwrapOr(
+    val maximum: Int = option.unwrapOr(
         sequences.maximum(values.asSlice()), -1)
 
     val empty: [Int; 0] = []
     val emptyView: Slice[Int] = Slice(&empty)
-    val emptyMinimum: Bool = collections.isNone(sequences.minimum(emptyView))
+    val emptyMinimum: Bool = option.isNone(sequences.minimum(emptyView))
 
     if (containsTen && !containsForty && firstTen == 1 && tens == 2 &&
         minimum == 10 && maximum == 30 && emptyMinimum) 0 else 1
