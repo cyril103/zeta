@@ -283,12 +283,14 @@ TypedProgram SemanticAnalyzer::analyze(
     vecMethods_.clear();
     localMethodOwners_.clear();
     knownTraits_.clear();
+    traitDeclarations_.clear();
     traitImplementations_.clear();
     std::unordered_set<std::string> localTraits;
     for (const TraitDeclaration& trait : program.traits) {
         if (!localTraits.insert(trait.name).second)
             throw CompileError(trait.location, "trait dupliqué '" + trait.name + "'");
         knownTraits_.insert(trait.name);
+        traitDeclarations_.emplace(trait.name, trait);
     }
     for (const std::shared_ptr<const StructType>& structure : program.structures)
         localMethodOwners_.insert(structure->genericDefinition
@@ -299,8 +301,10 @@ TypedProgram SemanticAnalyzer::analyze(
             const auto module = interfaces->find(import.module);
             if (module == interfaces->end())
                 throw CompileError(import.location, "module inconnu '" + import.module + "'");
-            for (const std::string& trait : module->second.traits)
-                knownTraits_.insert(trait);
+            for (const TraitDeclaration& trait : module->second.traits) {
+                knownTraits_.insert(trait.name);
+                traitDeclarations_.emplace(trait.name, trait);
+            }
             for (const TraitImplementation& implementation :
                  module->second.traitImplementations)
                 traitImplementations_.push_back(implementation);
@@ -329,6 +333,25 @@ TypedProgram SemanticAnalyzer::analyze(
             }
         }
     }
+    for (const TraitDeclaration& trait : program.traits) {
+        for (const TraitMethodRequirement& method : trait.methods) {
+            if (method.parameters.empty() || method.parameters.front().name != "self" ||
+                method.parameters.front().type.kind != ValueType::Kind::Reference ||
+                method.parameters.front().type.element == nullptr ||
+                method.parameters.front().type.element->kind !=
+                    ValueType::Kind::TypeParameter ||
+                method.parameters.front().type.element->typeParameter != "Self")
+                throw CompileError(method.location,
+                    "la méthode de trait '" + method.name +
+                    "' doit commencer par self: &Self ou self: &mut Self");
+            std::unordered_set<std::string> parameterNames;
+            for (const Parameter& parameter : method.parameters)
+                if (!parameterNames.insert(parameter.name).second)
+                    throw CompileError(parameter.location,
+                        "paramètre dupliqué '" + parameter.name +
+                        "' dans la méthode de trait '" + method.name + "'");
+        }
+    }
     const auto ownsType = [&](const ValueType& type) {
         if (type.kind == ValueType::Kind::Struct)
             return std::any_of(program.structures.begin(), program.structures.end(),
@@ -352,6 +375,48 @@ TypedProgram SemanticAnalyzer::analyze(
             throw CompileError(implementation.location,
                 "implémentation orpheline interdite pour le trait '" +
                 implementation.trait + "' et le type " + typeName(implementation.type));
+        const TraitDeclaration& contract = traitDeclarations_.at(implementation.trait);
+        if (!contract.methods.empty() && implementation.type.kind != ValueType::Kind::Struct)
+            throw CompileError(implementation.location,
+                "les méthodes de trait exigent actuellement un type structure nominal");
+        if (implementation.methods.size() != contract.methods.size())
+            throw CompileError(implementation.location,
+                "l'implémentation du trait '" + implementation.trait + "' pour " +
+                typeName(implementation.type) + " doit fournir exactement " +
+                std::to_string(contract.methods.size()) + " méthode(s)");
+        const std::unordered_map<std::string, ValueType> selfType{{"Self", implementation.type}};
+        for (const TraitMethodRequirement& requirement : contract.methods) {
+            if (std::find(implementation.methods.begin(), implementation.methods.end(),
+                          requirement.name) == implementation.methods.end())
+                throw CompileError(implementation.location,
+                    "méthode requise manquante '" + requirement.name + "'");
+            const std::string implementationName = typeName(implementation.type) + "." +
+                                                   requirement.name;
+            const Declaration* method = nullptr;
+            for (const Statement& statement : program.statements) {
+                const auto* candidate = std::get_if<Declaration>(&statement.value);
+                if (candidate != nullptr && candidate->name == implementationName) {
+                    method = candidate;
+                    break;
+                }
+            }
+            if (method == nullptr)
+                throw CompileError(implementation.location,
+                                   "définition absente pour '" + implementationName + "'");
+            if (!method->typeParameters.empty() ||
+                method->parameters.size() != requirement.parameters.size() ||
+                method->type != substituteType(requirement.returnType, selfType))
+                throw CompileError(method->location,
+                    "signature incompatible pour la méthode de trait '" +
+                    requirement.name + "'");
+            for (std::size_t i = 0; i < method->parameters.size(); ++i)
+                if (method->parameters[i].name != requirement.parameters[i].name ||
+                    method->parameters[i].type !=
+                        substituteType(requirement.parameters[i].type, selfType))
+                    throw CompileError(method->parameters[i].location,
+                        "signature incompatible pour la méthode de trait '" +
+                        requirement.name + "'");
+        }
         const bool duplicate = std::any_of(traitImplementations_.begin(),
             traitImplementations_.end(), [&](const TraitImplementation& existing) {
                 return existing.trait == implementation.trait &&

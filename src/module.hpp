@@ -26,7 +26,7 @@ struct ModuleInterface {
     std::unordered_map<std::string, ExportedSymbol> exports;
     std::vector<std::shared_ptr<const StructType>> structures;
     std::vector<std::shared_ptr<const EnumType>> enumerations;
-    std::vector<std::string> traits;
+    std::vector<TraitDeclaration> traits;
     std::vector<TraitImplementation> traitImplementations;
 };
 

@@ -586,11 +586,45 @@ TraitDeclaration Parser::trait(bool publicTrait) {
                                 "identifiant attendu après 'trait'");
     consume(TokenKind::LeftBrace, "'{' attendue après le nom du trait");
     skipSeparators();
-    consume(TokenKind::RightBrace,
-            "les méthodes de trait ne sont pas encore prises en charge, '}' attendue");
+    std::vector<TraitMethodRequirement> methods;
+    activeTypeParameters_.insert("Self");
+    while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
+        const Token& start = consume(TokenKind::Def,
+                                     "signature 'def' attendue dans le trait");
+        const Token& method = consume(TokenKind::Identifier,
+                                      "nom de méthode attendu après 'def'");
+        if (std::any_of(methods.begin(), methods.end(),
+            [&](const TraitMethodRequirement& existing) {
+                return existing.name == method.text;
+            }))
+            throw CompileError(method.location,
+                               "méthode de trait dupliquée '" + method.text + "'");
+        consume(TokenKind::LeftParen, "'(' attendue après le nom de méthode");
+        std::vector<Parameter> parameters;
+        if (!check(TokenKind::RightParen)) {
+            do {
+                const Token& parameter = consume(TokenKind::Identifier,
+                                                  "nom de paramètre attendu");
+                consume(TokenKind::Colon, "':' attendu après le paramètre");
+                parameters.push_back(Parameter{parameter.location, parameter.text,
+                    consumeType("type attendu pour le paramètre")});
+            } while (match(TokenKind::Comma));
+        }
+        consume(TokenKind::RightParen, "')' attendue après les paramètres");
+        consume(TokenKind::Colon, "':' attendu après la signature");
+        ValueType returnType = consumeType("type de retour attendu");
+        methods.push_back(TraitMethodRequirement{start.location, method.text,
+            std::move(parameters), std::move(returnType)});
+        if (!check(TokenKind::RightBrace) && !matchSeparator())
+            throw CompileError(peek().location,
+                               "fin de ligne ou ';' attendue après la signature");
+        skipSeparators();
+    }
+    activeTypeParameters_.erase("Self");
+    consume(TokenKind::RightBrace, "'}' attendue après le trait");
     return TraitDeclaration{name.location,
         moduleName_.empty() ? name.text : moduleName_ + "." + name.text,
-        publicTrait};
+        publicTrait, std::move(methods)};
 }
 
 TraitImplementation Parser::traitImplementation() {
@@ -600,9 +634,28 @@ TraitImplementation Parser::traitImplementation() {
     ValueType type = consumeType("type concret attendu après 'for'");
     consume(TokenKind::LeftBrace, "'{' attendue après le type implémenté");
     skipSeparators();
-    consume(TokenKind::RightBrace,
-            "les méthodes de trait ne sont pas encore prises en charge, '}' attendue");
-    return TraitImplementation{location, std::move(implementedTrait), std::move(type)};
+    std::vector<std::string> methods;
+    while (!check(TokenKind::RightBrace) && !check(TokenKind::End)) {
+        consume(TokenKind::Def, "définition 'def' attendue dans l'implémentation");
+        Declaration method = declaration(BindingKind::Def);
+        if (method.name.find('.') != std::string::npos)
+            throw CompileError(method.location,
+                               "le nom d'une méthode d'implémentation doit être simple");
+        if (std::find(methods.begin(), methods.end(), method.name) != methods.end())
+            throw CompileError(method.location,
+                               "méthode d'implémentation dupliquée '" + method.name + "'");
+        methods.push_back(method.name);
+        method.name = typeName(type) + "." + method.name;
+        method.publicSymbol = false;
+        pendingTraitMethods_.emplace_back(std::move(method));
+        if (!check(TokenKind::RightBrace) && !matchSeparator())
+            throw CompileError(peek().location,
+                               "fin de ligne ou ';' attendue après la méthode");
+        skipSeparators();
+    }
+    consume(TokenKind::RightBrace, "'}' attendue après l'implémentation");
+    return TraitImplementation{location, std::move(implementedTrait), std::move(type),
+                               std::move(methods)};
 }
 
 Program Parser::parse() {
@@ -637,8 +690,12 @@ Program Parser::parse() {
         else if (match(TokenKind::Struct)) program.structures.push_back(structure());
         else if (match(TokenKind::Enum)) program.enumerations.push_back(enumeration());
         else if (match(TokenKind::Trait)) program.traits.push_back(trait());
-        else if (match(TokenKind::Impl))
+        else if (match(TokenKind::Impl)) {
             program.traitImplementations.push_back(traitImplementation());
+            for (Statement& method : pendingTraitMethods_)
+                program.statements.push_back(std::move(method));
+            pendingTraitMethods_.clear();
+        }
         else program.statements.push_back(statement());
         if (!check(TokenKind::End) && !matchSeparator()) {
             throw CompileError(peek().location, "fin d'instruction attendue");

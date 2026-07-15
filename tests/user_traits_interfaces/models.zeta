@@ -4,4 +4,7 @@ pub struct Token {
     value: Int
 }
 
-impl capabilities.Answer for Token {}
+impl capabilities.Answer for Token {
+    def answer(self: &Token): Int = (*self).value
+    def copyValue(self: &Token): Token = *self
+}

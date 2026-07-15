@@ -1,3 +1,6 @@
-pub trait Answer {}
+pub trait Answer {
+    def answer(self: &Self): Int
+    def copyValue(self: &Self): Self
+}
 
 pub def keep[T: Answer + Copy](value: T): T = value

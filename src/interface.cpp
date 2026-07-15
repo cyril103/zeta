@@ -238,10 +238,24 @@ std::string InterfaceCodec::serialize(
                        << field.offset << ' ' << std::quoted(encodeType(field.type)) << '\n';
         }
     }
-    std::vector<std::string> traits = interface.traits;
-    std::sort(traits.begin(), traits.end());
-    for (const std::string& trait : traits)
-        output << "trait " << std::quoted(trait) << '\n';
+    std::vector<const TraitDeclaration*> traits;
+    for (const TraitDeclaration& trait : interface.traits) traits.push_back(&trait);
+    std::sort(traits.begin(), traits.end(),
+        [](const TraitDeclaration* left, const TraitDeclaration* right) {
+            return left->name < right->name;
+        });
+    for (const TraitDeclaration* trait : traits) {
+        output << "trait " << std::quoted(trait->name) << ' ' << trait->methods.size() << '\n';
+        for (const TraitMethodRequirement& method : trait->methods) {
+            output << "trait_method " << std::quoted(method.name) << ' '
+                   << std::quoted(encodeType(method.returnType)) << ' '
+                   << method.parameters.size();
+            for (const Parameter& parameter : method.parameters)
+                output << ' ' << std::quoted(parameter.name) << ' '
+                       << std::quoted(encodeType(parameter.type));
+            output << '\n';
+        }
+    }
     std::vector<const TraitImplementation*> implementations;
     for (const TraitImplementation& implementation : interface.traitImplementations)
         implementations.push_back(&implementation);
@@ -250,9 +264,14 @@ std::string InterfaceCodec::serialize(
             if (left->trait != right->trait) return left->trait < right->trait;
             return typeName(left->type) < typeName(right->type);
         });
-    for (const TraitImplementation* implementation : implementations)
+    for (const TraitImplementation* implementation : implementations) {
         output << "implementation " << std::quoted(implementation->trait) << ' '
-               << std::quoted(encodeType(implementation->type)) << '\n';
+               << std::quoted(encodeType(implementation->type)) << ' '
+               << implementation->methods.size();
+        for (const std::string& method : implementation->methods)
+            output << ' ' << std::quoted(method);
+        output << '\n';
+    }
     std::vector<std::string> names;
     for (const auto& [name, symbol] : interface.exports) {
         static_cast<void>(symbol);
@@ -478,16 +497,46 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
         }
         if (word == "trait") {
             std::string name;
-            if (!(input >> std::quoted(name)) || name.empty() ||
-                std::find(result.interface.traits.begin(), result.interface.traits.end(), name) !=
-                    result.interface.traits.end())
+            std::size_t methodCount = 0;
+            if (!(input >> std::quoted(name) >> methodCount) || name.empty() ||
+                std::any_of(result.interface.traits.begin(), result.interface.traits.end(),
+                    [&](const TraitDeclaration& trait) { return trait.name == name; }))
                 interfaceFailure("ZTI400", "déclaration de trait invalide ou dupliquée");
-            result.interface.traits.push_back(std::move(name));
+            TraitDeclaration trait{{}, std::move(name), true, {}};
+            for (std::size_t methodIndex = 0; methodIndex < methodCount; ++methodIndex) {
+                std::string methodWord, methodName, encodedReturn;
+                std::size_t parameterCount = 0;
+                if (!(input >> methodWord >> std::quoted(methodName) >>
+                      std::quoted(encodedReturn) >> parameterCount) ||
+                    methodWord != "trait_method" || methodName.empty() ||
+                    std::any_of(trait.methods.begin(), trait.methods.end(),
+                        [&](const TraitMethodRequirement& method) {
+                            return method.name == methodName;
+                        }))
+                    interfaceFailure("ZTI400", "signature de méthode de trait invalide");
+                std::vector<Parameter> parameters;
+                for (std::size_t i = 0; i < parameterCount; ++i) {
+                    std::string parameterName, encodedType;
+                    if (!(input >> std::quoted(parameterName) >> std::quoted(encodedType)) ||
+                        parameterName.empty())
+                        interfaceFailure("ZTI400", "paramètre de méthode de trait invalide");
+                    parameters.push_back(Parameter{{}, std::move(parameterName),
+                        decodeTypeContext(encodedType, structures, enumerations,
+                            "méthode de trait '" + methodName + "'")});
+                }
+                trait.methods.push_back(TraitMethodRequirement{{}, std::move(methodName),
+                    std::move(parameters),
+                    decodeTypeContext(encodedReturn, structures, enumerations,
+                        "retour de méthode du trait '" + trait.name + "'")});
+            }
+            result.interface.traits.push_back(std::move(trait));
             continue;
         }
         if (word == "implementation") {
             std::string trait, encodedType;
-            if (!(input >> std::quoted(trait) >> std::quoted(encodedType)) || trait.empty())
+            std::size_t methodCount = 0;
+            if (!(input >> std::quoted(trait) >> std::quoted(encodedType) >> methodCount) ||
+                trait.empty())
                 interfaceFailure("ZTI400", "implémentation de trait invalide");
             ValueType type = decodeTypeContext(encodedType, structures, enumerations,
                                                "implémentation du trait '" + trait + "'");
@@ -499,8 +548,16 @@ PersistedInterface InterfaceCodec::deserialize(const std::string& contents) {
             if (duplicate)
                 interfaceFailure("ZTI400", "implémentation dupliquée du trait '" + trait +
                                            "' pour " + typeName(type));
-            result.interface.traitImplementations.push_back(
-                TraitImplementation{{}, std::move(trait), std::move(type)});
+            std::vector<std::string> methods;
+            for (std::size_t i = 0; i < methodCount; ++i) {
+                std::string method;
+                if (!(input >> std::quoted(method)) || method.empty() ||
+                    std::find(methods.begin(), methods.end(), method) != methods.end())
+                    interfaceFailure("ZTI400", "méthode d'implémentation invalide");
+                methods.push_back(std::move(method));
+            }
+            result.interface.traitImplementations.push_back(TraitImplementation{
+                {}, std::move(trait), std::move(type), std::move(methods)});
             continue;
         }
         if (word != "export")

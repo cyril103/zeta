@@ -1,0 +1,21 @@
+trait Answer {
+    def answer(self: &Self): Int
+    def add(self: &mut Self, amount: Int): Unit
+}
+
+struct Counter {
+    value: Int
+}
+
+impl Answer for Counter {
+    def answer(self: &Counter): Int = (*self).value
+    def add(self: &mut Counter, amount: Int): Unit = {
+        *self = Counter { value: (*self).value + amount }
+    }
+}
+
+def main(): Int = {
+    var counter = Counter { value: 40 }
+    counter.add(2)
+    if (counter.answer() == 42) 0 else 1
+}

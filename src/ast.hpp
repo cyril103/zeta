@@ -399,16 +399,25 @@ struct ReturnStatement { SourceLocation location; ExprPtr value; };
 struct BreakStatement { SourceLocation location; };
 struct ContinueStatement { SourceLocation location; };
 
+struct TraitMethodRequirement {
+    SourceLocation location;
+    std::string name;
+    std::vector<Parameter> parameters;
+    ValueType returnType;
+};
+
 struct TraitDeclaration {
     SourceLocation location;
     std::string name;
     bool publicTrait{false};
+    std::vector<TraitMethodRequirement> methods;
 };
 
 struct TraitImplementation {
     SourceLocation location;
     std::string trait;
     ValueType type;
+    std::vector<std::string> methods;
 };
 
 struct Statement {

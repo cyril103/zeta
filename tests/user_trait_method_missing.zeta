@@ -1,0 +1,11 @@
+trait Answer {
+    def answer(self: &Self): Int
+}
+
+struct Counter {
+    value: Int
+}
+
+impl Answer for Counter {}
+
+def main(): Int = 0

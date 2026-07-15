@@ -82,4 +82,5 @@ private:
     std::unordered_set<std::string> importedModules_;
     bool optionShadowed_{false};
     std::string moduleName_;
+    std::vector<Statement> pendingTraitMethods_;
 };

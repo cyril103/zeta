@@ -941,10 +941,19 @@ if(BUILD_TESTING)
         -o ${CMAKE_CURRENT_BINARY_DIR}/user-traits)
     add_test(NAME run_user_traits COMMAND ${CMAKE_CURRENT_BINARY_DIR}/user-traits)
     set_tests_properties(run_user_traits PROPERTIES DEPENDS compile_user_traits)
+    add_test(NAME compile_user_trait_methods COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/user_trait_methods.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/user-trait-methods)
+    add_test(NAME run_user_trait_methods
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/user-trait-methods)
+    set_tests_properties(run_user_trait_methods PROPERTIES
+        DEPENDS compile_user_trait_methods)
     foreach(trait_error
             user_trait_missing_impl
             user_trait_duplicate_impl
-            user_trait_private_leak)
+            user_trait_private_leak
+            user_trait_method_missing
+            user_trait_method_signature)
         add_test(NAME reject_${trait_error} COMMAND zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/${trait_error}.zeta)
         set_tests_properties(reject_${trait_error} PROPERTIES WILL_FAIL TRUE)

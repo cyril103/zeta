@@ -1,6 +1,6 @@
 # Traits utilisateur statiques
 
-## Incrément livré
+## Fondation
 
 Le premier contrat définissable par l'utilisateur est un trait marqueur sans
 état :
@@ -16,6 +16,34 @@ def keep[T: Answer + Copy](value: T): T = value
 Le trait étend le système de contraintes existant. Il ne crée aucune valeur à
 l'exécution et n'ajoute aucune indirection : les fonctions restent
 monomorphisées pour chaque type concret.
+
+## Méthodes requises
+
+Un trait peut déclarer des signatures sans corps avec le type spécial `Self` :
+
+```zeta
+trait CounterOps {
+    def read(self: &Self): Int
+    def add(self: &mut Self, amount: Int): Unit
+}
+
+impl CounterOps for Counter {
+    def read(self: &Counter): Int = (*self).value
+    def add(self: &mut Counter, amount: Int): Unit = {
+        *self = Counter { value: (*self).value + amount }
+    }
+}
+```
+
+Chaque signature commence par `self: &Self` ou `self: &mut Self`. Le bloc `impl`
+doit fournir exactement les méthodes du contrat avec les mêmes noms de
+paramètres, types, mutabilité et retour après substitution de `Self`. Les
+méthodes sont abaissées vers les méthodes statiques de structure existantes ; un
+appel sur un type concret ne crée donc ni vtable ni allocation.
+
+Les implémentations avec méthodes sont actuellement limitées aux structures
+nominales. Les traits marqueurs restent utilisables avec les builtins et les
+autres types concrets.
 
 ## Résolution et cohérence
 
@@ -34,17 +62,18 @@ portant sur un type privé reste locale et n'est pas exportée.
 
 ## Interfaces et compilation séparée
 
-Le format `.zti` 12 ajoute deux entrées :
+Le format `.zti` 13 sérialise le contrat et les méthodes fournies :
 
 ```text
-trait "capabilities.Answer"
-implementation "capabilities.Answer" "<type encodé>"
+trait "capabilities.Answer" 1
+trait_method "answer" "I" 1 "self" "R(T(Self))"
+implementation "capabilities.Answer" "<type encodé>" 1 "answer"
 ```
 
 Les déclarations de traits nécessaires à un corps générique entrent également
 dans la fermeture des tokens génériques. Leur table passe à la version 4. Les
-traits et implémentations participent à l'empreinte publique ; le cache de modules
-26 invalide les objets antérieurs.
+traits, signatures et implémentations participent à l'empreinte publique ; le
+cache de modules 27 invalide les objets antérieurs.
 
 Le test intermodules couvre une implémentation définie par le propriétaire d'un
 type dans un module distinct du trait, puis retire les sources et recompile le
@@ -52,7 +81,8 @@ consommateur depuis les seules paires `.zti` + `.o`.
 
 ## Limites et prochaine étape
 
-Le corps d'un trait et d'une implémentation doit rester vide. Le prochain
-incrément ajoutera les signatures de méthodes requises et leur résolution
-statique dans un corps générique. Les méthodes par défaut, types associés,
-objets de traits et vtables restent reportés.
+Un appel concret comme `counter.read()` est résolu. Le prochain incrément devra
+résoudre `value.read()` lorsque `value` possède le type paramétrique
+`T: CounterOps`, puis sélectionner la méthode de l'implémentation pendant la
+monomorphisation. Les méthodes par défaut, types associés, implémentations de
+méthodes sur enums, objets de traits et vtables restent reportés.

@@ -15,7 +15,7 @@ les primitives existantes sans ajouter un builtin pour chaque nouveau type.
 
 - construction CMake réussie ;
 - stdlib locale régénérée ;
-- 444 tests CTest réussis sur 444 ;
+- 448 tests CTest réussis sur 448 ;
 - exemple complet compilé, exécuté et couvert par CTest ;
 - aucun changement suivi en attente à la fin de la session ;
 - `build/`, `stdlib/precompiled/` et certains artefacts de tests sont ignorés.
@@ -42,9 +42,9 @@ chercher à le simplifier sans réduire sa sûreté.
 | --- | ---: |
 | Compilateur | `0.1.0` |
 | ABI | `5` |
-| Interface `.zti` | `12` |
+| Interface `.zti` | `13` |
 | Tokens génériques | `4` |
-| Cache de modules | `26` |
+| Cache de modules | `27` |
 | Cache de démarrage | `2` |
 | Manifeste de stdlib | `1` |
 
@@ -112,8 +112,8 @@ L'exemple est compréhensible, mais trop cérémonieux :
   quotidien ;
 - un `Vec[T]` placé dans une structure ne permet pas encore de construire
   naturellement une nouvelle collection ;
-- les traits utilisateur sont encore des marqueurs et ne peuvent pas imposer ni
-  appeler de méthode dans un corps générique ;
+- les traits imposent des méthodes, mais un appel sur un receveur générique `T`
+  n'est pas encore spécialisé vers l'implémentation concrète ;
 - l'absence de fonctions de première classe bloque `map`, `filter`, `fold` et les
   comparateurs personnalisés.
 
@@ -406,9 +406,21 @@ implémentation définie par le propriétaire d'un type dans un second module es
 validée avec les seules paires `.zti` + `.o`. Ce contrat porte les versions à
 l'interface `12`, aux tokens génériques `4` et au cache de modules `26`.
 
-**Prochain incrément.** Ajouter les signatures de méthodes requises et leur
-résolution statique dans les corps génériques. Reporter les méthodes par défaut,
-types associés, objets de traits et vtables.
+**Méthodes requises livrées le 15 juillet 2026.** Le corps d'un trait accepte des
+signatures utilisant `Self`, avec receveur partagé ou mutable. Chaque bloc `impl`
+doit fournir exactement les méthodes attendues ; noms de paramètres, types,
+mutabilité et retour sont vérifiés après substitution de `Self`. Les méthodes sur
+structures concrètes réutilisent le dispatch statique existant.
+
+Le format `.zti` `13` sérialise les signatures, les noms fournis et les exports de
+méthodes. Le chargeur refuse avec `ZTI400` une interface incomplète ou
+incompatible. Le cache de modules passe à `27`; les tokens restent en version
+`4`, aucun nouveau genre lexical n'ayant été ajouté.
+
+**Prochain incrément.** Résoudre un appel de méthode sur un receveur `T` à partir
+de ses contraintes, puis sélectionner l'export de l'implémentation concrète lors
+de la monomorphisation. Reporter les méthodes par défaut, types associés, méthodes
+de traits sur enums, objets de traits et vtables.
 
 ## Priorité 4 — itération
 
@@ -502,14 +514,13 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-Poursuivre la priorité 3 avec les méthodes requises des traits utilisateur.
-Étendre le corps de `trait` avec des signatures sans implémentation, vérifier que
-chaque bloc `impl` fournit exactement les méthodes attendues, puis résoudre un
-appel sur un paramètre générique vers l'implémentation concrète pendant la
-monomorphisation. Sérialiser les signatures et les implémentations publiques dans
-`.zti`, couvrir la consommation sans sources et conserver la règle de cohérence
-déjà livrée. Reporter méthodes par défaut, types associés, objets de traits et
-vtables.
+Poursuivre la priorité 3 avec le dispatch statique des méthodes de traits dans un
+corps générique. Lors de l'analyse de `value.method()` sur `T`, sélectionner une
+signature parmi les contraintes de `T`, conserver l'identité du trait dans
+l'AST typé, puis résoudre la fonction concrète après substitution des paramètres
+de type dans le générateur IR. Couvrir plusieurs implémentations, receveurs
+partagés et mutables, appels intermodules sans sources et diagnostics d'ambiguïté.
+Reporter méthodes par défaut, types associés, objets de traits et vtables.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

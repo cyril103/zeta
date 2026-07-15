@@ -669,11 +669,24 @@ def keep[T: Serializable + Copy](value: T): T = value
 ```
 
 Une implémentation est cohérente lorsque son module possède le trait ou le type.
-Les implémentations orphelines et dupliquées sont rejetées. Les traits traversent
-les interfaces `.zti` et restent vérifiés lors de la monomorphisation sans
-sources. Ce premier contrat est un marqueur sans état : les méthodes requises,
-méthodes par défaut, objets de traits et la distribution dynamique ne sont pas
-encore pris en charge.
+Les implémentations orphelines et dupliquées sont rejetées. Un trait peut aussi
+exiger des méthodes sur `Self` :
+
+```text
+trait HasValue {
+    def value(self: &Self): Int
+}
+
+impl HasValue for Counter {
+    def value(self: &Counter): Int = (*self).value
+}
+```
+
+Le bloc `impl` doit fournir exactement les noms, paramètres, mutabilité du
+receveur et retours déclarés. Ces méthodes utilisent le dispatch statique des
+structures et traversent les interfaces `.zti` sans sources. L'appel direct sur
+un receveur générique `T`, les méthodes par défaut, objets de traits et la
+distribution dynamique ne sont pas encore pris en charge.
 
 Les structures, y compris génériques, utilisent des champs nommés :
 

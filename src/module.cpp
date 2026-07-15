@@ -240,8 +240,7 @@ void ModuleLoader::loadModule(const std::string& name, const std::filesystem::pa
                     storedInterface.enumerations.push_back(enumeration);
         }
         if (program.traits.empty()) {
-            for (const std::string& trait : storedInterface.traits)
-                program.traits.push_back(TraitDeclaration{{}, trait, true});
+            program.traits = storedInterface.traits;
         }
         program.traitImplementations = storedInterface.traitImplementations;
         for (const auto& [symbolName, symbol] : storedInterface.exports) {
@@ -404,8 +403,16 @@ void ModuleLoader::buildFingerprints() {
             }
             exports.push_back(std::move(signature));
         }
-        for (const std::string& trait : graph_.interfaces.at(name).traits)
-            exports.push_back("trait:" + trait);
+        for (const TraitDeclaration& trait : graph_.interfaces.at(name).traits) {
+            std::string signature = "trait:" + trait.name;
+            for (const TraitMethodRequirement& method : trait.methods) {
+                signature += ":method:" + method.name + ":" + typeName(method.returnType);
+                for (const Parameter& parameter : method.parameters)
+                    signature += ":parameter:" + parameter.name + ":" +
+                                 typeName(parameter.type);
+            }
+            exports.push_back(std::move(signature));
+        }
         for (const TraitImplementation& implementation :
              graph_.interfaces.at(name).traitImplementations)
             exports.push_back("impl:" + implementation.trait + ":" +
@@ -437,11 +444,67 @@ void ModuleLoader::buildInterfaces() {
 }
 
 void ModuleLoader::validateTraitCoherence() const {
+    std::unordered_map<std::string, const TraitDeclaration*> traits;
+    for (const auto& [moduleName, interface] : graph_.interfaces) {
+        for (const TraitDeclaration& trait : interface.traits) {
+            if (!traits.emplace(trait.name, &trait).second)
+                throw std::runtime_error("[ZTI400] trait public dupliqué '" + trait.name +
+                                         "' autour du module '" + moduleName + "'");
+            for (const TraitMethodRequirement& method : trait.methods)
+                if (method.parameters.empty() || method.parameters.front().name != "self" ||
+                    method.parameters.front().type.kind != ValueType::Kind::Reference ||
+                    method.parameters.front().type.element == nullptr ||
+                    method.parameters.front().type.element->kind !=
+                        ValueType::Kind::TypeParameter ||
+                    method.parameters.front().type.element->typeParameter != "Self")
+                    throw std::runtime_error("[ZTI400] module '" + moduleName +
+                        "' : receveur invalide pour la méthode de trait '" + method.name + "'");
+        }
+    }
+    const auto substituteSelf = [&](const auto& self, const ValueType& type,
+                                    const ValueType& concrete) -> ValueType {
+        if (type.kind == ValueType::Kind::TypeParameter && type.typeParameter == "Self")
+            return concrete;
+        if (type.kind == ValueType::Kind::Array)
+            return ValueType(std::make_shared<ValueType>(self(self, *type.element, concrete)),
+                             type.length);
+        if (type.kind == ValueType::Kind::Reference)
+            return ValueType(std::make_shared<ValueType>(self(self, *type.element, concrete)),
+                             type.mutableReference);
+        if (type.kind == ValueType::Kind::Slice)
+            return ValueType(ValueType::Kind::Slice,
+                std::make_shared<ValueType>(self(self, *type.element, concrete)),
+                type.mutableReference);
+        if (type.kind == ValueType::Kind::Box || type.kind == ValueType::Kind::Vec)
+            return ValueType(type.kind,
+                std::make_shared<ValueType>(self(self, *type.element, concrete)));
+        if (type.kind == ValueType::Kind::Struct && !type.structure->typeArguments.empty()) {
+            std::vector<ValueType> arguments;
+            for (const ValueType& argument : type.structure->typeArguments)
+                arguments.push_back(self(self, argument, concrete));
+            return ValueType(instantiateStructType(type.structure, std::move(arguments),
+                                                   type.structure->location));
+        }
+        if (type.kind == ValueType::Kind::Enum && !type.enumeration->typeArguments.empty()) {
+            std::vector<ValueType> arguments;
+            for (const ValueType& argument : type.enumeration->typeArguments)
+                arguments.push_back(self(self, argument, concrete));
+            return ValueType(instantiateEnumType(type.enumeration, std::move(arguments),
+                                                 type.enumeration->location));
+        }
+        return type;
+    };
     std::vector<std::pair<std::string, ValueType>> implementations;
     for (const auto& [moduleName, interface] : graph_.interfaces) {
         for (const TraitImplementation& implementation : interface.traitImplementations) {
-            const bool ownsTrait = std::find(interface.traits.begin(), interface.traits.end(),
-                                             implementation.trait) != interface.traits.end();
+            const auto contract = traits.find(implementation.trait);
+            if (contract == traits.end())
+                throw std::runtime_error("[ZTI400] module '" + moduleName +
+                    "' : trait implémenté inconnu '" + implementation.trait + "'");
+            const bool ownsTrait = std::any_of(interface.traits.begin(), interface.traits.end(),
+                [&](const TraitDeclaration& trait) {
+                    return trait.name == implementation.trait;
+                });
             const bool ownsType =
                 (implementation.type.kind == ValueType::Kind::Struct &&
                  std::any_of(interface.structures.begin(), interface.structures.end(),
@@ -467,6 +530,31 @@ void ModuleLoader::validateTraitCoherence() const {
             if (duplicate)
                 throw std::runtime_error("[ZTI400] implémentation globale dupliquée du trait '" +
                     implementation.trait + "' pour " + typeName(implementation.type));
+            if (implementation.methods.size() != contract->second->methods.size())
+                throw std::runtime_error("[ZTI400] module '" + moduleName +
+                    "' : ensemble de méthodes incomplet pour le trait '" +
+                    implementation.trait + "'");
+            for (const TraitMethodRequirement& requirement : contract->second->methods) {
+                if (std::find(implementation.methods.begin(), implementation.methods.end(),
+                              requirement.name) == implementation.methods.end())
+                    throw std::runtime_error("[ZTI400] module '" + moduleName +
+                        "' : méthode requise absente '" + requirement.name + "'");
+                const std::string exportedName = typeName(implementation.type) + "." +
+                                                 requirement.name;
+                const auto exported = interface.exports.find(exportedName);
+                if (exported == interface.exports.end() || !exported->second.callable ||
+                    exported->second.type != substituteSelf(
+                        substituteSelf, requirement.returnType, implementation.type) ||
+                    exported->second.parameterTypes.size() != requirement.parameters.size())
+                    throw std::runtime_error("[ZTI400] module '" + moduleName +
+                        "' : signature absente ou incompatible pour '" + exportedName + "'");
+                for (std::size_t i = 0; i < requirement.parameters.size(); ++i)
+                    if (exported->second.parameterTypes[i] != substituteSelf(
+                            substituteSelf, requirement.parameters[i].type,
+                            implementation.type))
+                        throw std::runtime_error("[ZTI400] module '" + moduleName +
+                            "' : paramètre incompatible pour '" + exportedName + "'");
+            }
             implementations.emplace_back(implementation.trait, implementation.type);
         }
     }
@@ -516,13 +604,15 @@ void ModuleLoader::buildInterface(const std::string& name) {
         interface.enumerations.push_back(enumeration);
     }
     for (const TraitDeclaration& trait : module.program.traits)
-        if (trait.publicTrait) interface.traits.push_back(trait.name);
-    std::unordered_set<std::string> visibleTraits(interface.traits.begin(),
-                                                   interface.traits.end());
+        if (trait.publicTrait) interface.traits.push_back(trait);
+    std::unordered_set<std::string> visibleTraits;
+    for (const TraitDeclaration& trait : interface.traits)
+        visibleTraits.insert(trait.name);
     for (const Program::Import& import : module.program.imports) {
         const auto imported = graph_.interfaces.find(import.module);
         if (imported == graph_.interfaces.end()) continue;
-        visibleTraits.insert(imported->second.traits.begin(), imported->second.traits.end());
+        for (const TraitDeclaration& trait : imported->second.traits)
+            visibleTraits.insert(trait.name);
     }
     const auto isPublicType = [&](const auto& self, const ValueType& type) -> bool {
         if (type.kind == ValueType::Kind::Struct) {
@@ -551,6 +641,32 @@ void ModuleLoader::buildInterface(const std::string& name) {
         validatePublicType(validatePublicType, implementation.type,
                            implementation.location);
         interface.traitImplementations.push_back(implementation);
+        for (const std::string& methodName : implementation.methods) {
+            const std::string fullName = typeName(implementation.type) + "." + methodName;
+            const Declaration* declaration = nullptr;
+            for (const Statement& statement : module.program.statements) {
+                const auto* candidate = std::get_if<Declaration>(&statement.value);
+                if (candidate != nullptr && candidate->name == fullName) {
+                    declaration = candidate;
+                    break;
+                }
+            }
+            if (declaration == nullptr)
+                throw CompileError(implementation.location,
+                                   "définition absente pour '" + fullName + "'");
+            std::vector<ValueType> parameterTypes;
+            validatePublicType(validatePublicType, declaration->type, declaration->location);
+            for (const Parameter& parameter : declaration->parameters) {
+                validatePublicType(validatePublicType, parameter.type, parameter.location);
+                parameterTypes.push_back(parameter.type);
+            }
+            if (!interface.exports.emplace(fullName, ExportedSymbol{
+                    declaration->kind, declaration->type, declaration->callable,
+                    declaration->nativeSymbol, std::move(parameterTypes), declaration,
+                    declaration->extensionMethod}).second)
+                throw CompileError(declaration->location,
+                                   "méthode publique dupliquée '" + fullName + "'");
+        }
     }
     for (const Statement& statement : module.program.statements) {
         const auto* declaration = std::get_if<Declaration>(&statement.value);

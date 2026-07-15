@@ -69,5 +69,6 @@ private:
     std::unordered_map<std::string, MethodSymbol> vecMethods_;
     std::unordered_set<const StructType*> localMethodOwners_;
     std::unordered_set<std::string> knownTraits_;
+    std::unordered_map<std::string, TraitDeclaration> traitDeclarations_;
     std::vector<TraitImplementation> traitImplementations_;
 };

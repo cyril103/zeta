@@ -42,5 +42,5 @@ règle devra être revisitée si une future contrainte exprime une exclusion.
 
 Le contrat canonique participe à l'empreinte d'interface et à l'identité des
 instances monomorphisées. Les traits marqueurs utilisateur portent les versions
-courantes à l'interface `12`, aux tokens génériques `4` et au cache de modules
-`26`.
+courantes à l'interface `13`, aux tokens génériques `4` et au cache de modules
+`27`.
