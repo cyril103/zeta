@@ -919,12 +919,17 @@ cmake --build build
 ./build/basic
 ./build/zeta examples/stdlib_showcase.zeta -o build/stdlib-showcase
 ./build/stdlib-showcase
+./build/zeta examples/resource_showcase/main.zeta -o build/resource-showcase
+./build/resource-showcase
 ```
 
 La compilation produit `build/basic.ir`, `build/basic.asm` et l'exécutable
 `build/basic`. La cible actuelle est Linux x86-64 et nécessite `fasm` dans le
 `PATH`. `stdlib_showcase.zeta` présente ensemble les modules `io`, `collections`,
 `option`, `strings` et `sequences`, ainsi que `Vec`, `Option` et les slices.
+`resource_showcase` répartit un trait, deux implémentations et leur consommateur
+dans trois modules. Il montre le dispatch générique sur des receveurs partagés et
+mutables, un retour `Self` et une contrainte composée `Resource + Copy`.
 
 ## Architecture du compilateur
 

@@ -1,0 +1,30 @@
+import resources
+
+pub struct Health {
+    value: Int
+}
+
+pub struct Mana {
+    value: Int
+}
+
+impl resources.Resource for Health {
+    def amount(self: &Health): Int = (*self).value
+
+    def restore(self: &mut Health, points: Int): Unit = {
+        *self = Health { value: (*self).value + points }
+    }
+
+    def copyValue(self: &Health): Health = *self
+}
+
+impl resources.Resource for Mana {
+    def amount(self: &Mana): Int = (*self).value
+
+    def restore(self: &mut Mana, points: Int): Unit = {
+        val next = (*self).value + points
+        *self = Mana { value: if (next > 100) 100 else next }
+    }
+
+    def copyValue(self: &Mana): Mana = *self
+}

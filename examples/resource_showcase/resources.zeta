@@ -1,0 +1,17 @@
+pub trait Resource {
+    def amount(self: &Self): Int
+    def restore(self: &mut Self, points: Int): Unit
+    def copyValue(self: &Self): Self
+}
+
+pub def amountOf[T: Resource](resource: &T): Int = resource.amount()
+
+pub def refill[T: Resource](resource: &mut T, points: Int): Unit = resource.restore(points)
+
+pub def snapshot[T: Resource](resource: T): T = resource.copyValue()
+
+pub def restoredCopy[T: Resource + Copy](resource: T, points: Int): T = {
+    var copy: T = resource
+    copy.restore(points)
+    return copy.copyValue()
+}

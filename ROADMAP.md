@@ -15,7 +15,7 @@ les primitives existantes sans ajouter un builtin pour chaque nouveau type.
 
 - construction CMake réussie ;
 - stdlib locale régénérée ;
-- 450 tests CTest réussis sur 450 ;
+- 452 tests CTest réussis sur 452 ;
 - exemple complet compilé, exécuté et couvert par CTest ;
 - aucun changement suivi en attente à la fin de la session ;
 - `build/`, `stdlib/precompiled/` et certains artefacts de tests sont ignorés.
@@ -30,11 +30,17 @@ ctest --test-dir build --output-on-failure
 build/zeta --build-stdlib
 build/zeta examples/stdlib_showcase.zeta -o build/stdlib-showcase
 build/stdlib-showcase
+build/zeta examples/resource_showcase/main.zeta -o build/resource-showcase
+build/resource-showcase
 ```
 
 Le programme de référence utilisateur est
 `examples/stdlib_showcase.zeta`. Toute évolution ergonomique importante devrait
 chercher à le simplifier sans réduire sa sûreté.
+
+`examples/resource_showcase/main.zeta` est le programme de référence des traits.
+Il sépare contrat, implémentations et consommateur, puis exerce le dispatch
+générique partagé et mutable, le retour `Self` et les contraintes multiples.
 
 ## Versions actuelles
 

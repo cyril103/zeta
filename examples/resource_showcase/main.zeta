@@ -1,0 +1,31 @@
+import game_types
+import io
+import resources
+
+def main(): Int = {
+    io.println("=== Dispatch générique de traits ===")
+
+    var health = game_types.Health { value: 40 }
+    var mana = game_types.Mana { value: 90 }
+
+    resources.refill(&mut health, 15)
+    resources.refill(&mut mana, 15)
+
+    val healthSnapshot = resources.snapshot(health)
+    val boostedMana = resources.restoredCopy(mana, 20)
+
+    val healthAmount = resources.amountOf(&health)
+    val manaAmount = resources.amountOf(&mana)
+    val snapshotAmount = resources.amountOf(&healthSnapshot)
+    val boostedAmount = resources.amountOf(&boostedMana)
+
+    io.println("Santé restaurée : " + String(healthAmount))
+    io.println("Mana plafonné : " + String(manaAmount))
+    io.println("Snapshot de santé : " + String(snapshotAmount))
+    io.println("Copie de mana restaurée : " + String(boostedAmount))
+    io.println("Démonstration des traits terminée.")
+
+    val success = healthAmount == 55 && manaAmount == 100 &&
+        snapshotAmount == 55 && boostedAmount == 100
+    if (success) 0 else 1
+}

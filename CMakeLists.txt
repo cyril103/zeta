@@ -482,6 +482,16 @@ if(BUILD_TESTING)
         PASS_REGULAR_EXPRESSION "Démonstration terminée")
 
     add_test(
+        NAME compile_resource_showcase
+        COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/examples/resource_showcase/main.zeta
+                -o ${CMAKE_CURRENT_BINARY_DIR}/resource-showcase
+    )
+    add_test(NAME run_resource_showcase COMMAND ${CMAKE_CURRENT_BINARY_DIR}/resource-showcase)
+    set_tests_properties(run_resource_showcase PROPERTIES
+        DEPENDS compile_resource_showcase
+        PASS_REGULAR_EXPRESSION "Démonstration des traits terminée")
+
+    add_test(
         NAME compile_mutable_assignment
         COMMAND zeta ${CMAKE_CURRENT_SOURCE_DIR}/tests/mutable_assignment.zeta
                 -o ${CMAKE_CURRENT_BINARY_DIR}/mutable-assignment
