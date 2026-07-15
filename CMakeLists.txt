@@ -264,7 +264,8 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_sort_extension.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_bounds.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_aggregate.zeta
-            ${CMAKE_CURRENT_SOURCE_DIR}/tests/stack.zeta)
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/stack.zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/queue.zeta)
     add_test(NAME persisted_module_interfaces
         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/persisted_interfaces.sh
             $<TARGET_FILE:zeta>
@@ -567,6 +568,17 @@ if(BUILD_TESTING)
     add_test(NAME reject_generic_method_parameters COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/generic_method_parameters.zeta)
     set_tests_properties(reject_generic_method_parameters PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_queue COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/queue.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/queue)
+    add_test(NAME run_queue COMMAND ${CMAKE_CURRENT_BINARY_DIR}/queue)
+    set_tests_properties(run_queue PROPERTIES DEPENDS compile_queue)
+    add_test(NAME reject_queue_immutable COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/queue_immutable.zeta)
+    set_tests_properties(reject_queue_immutable PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_queue_borrow_conflict COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/queue_borrow_conflict.zeta)
+    set_tests_properties(reject_queue_borrow_conflict PROPERTIES WILL_FAIL TRUE)
 
     add_test(
         NAME compile_block_expressions

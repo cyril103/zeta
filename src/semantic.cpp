@@ -752,6 +752,9 @@ void SemanticAnalyzer::checkLoop(WhileStatement& loop) {
     ++loopDepth_;
     checkStatements(loop.body);
     --loopDepth_;
+    for (const StatementPtr& statement : loop.body)
+        if (const auto* declaration = std::get_if<Declaration>(&statement->value))
+            movedBoxes_.erase(declaration->name);
     popBorrowScope();
     symbols_.popScope();
 }
@@ -1565,6 +1568,9 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
             if (node.result) checkExpression(*node.result, expected);
             else if (expected != ValueType::Unit && !blockEndsWithTerminator(node))
                 mismatch(expression.location, expected, ValueType::Unit);
+            for (const StatementPtr& statement : node.statements)
+                if (const auto* declaration = std::get_if<Declaration>(&statement->value))
+                    movedBoxes_.erase(declaration->name);
             popBorrowScope();
             symbols_.popScope();
             return node.result ? expected :
@@ -1610,6 +1616,8 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                             *branch.bindings[i] + "' masque un identifiant existant");
                 }
                 checkExpression(*branch.result, expected);
+                for (const auto& binding : branch.bindings)
+                    if (binding) movedBoxes_.erase(*binding);
                 symbols_.popScope();
                 if (!mergedMoves) mergedMoves = movedBoxes_;
                 else if (*mergedMoves != movedBoxes_)

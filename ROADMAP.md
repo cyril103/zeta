@@ -15,7 +15,7 @@ les primitives existantes sans ajouter un builtin pour chaque nouveau type.
 
 - construction CMake réussie ;
 - stdlib locale régénérée ;
-- 424 tests CTest réussis sur 424 ;
+- 428 tests CTest réussis sur 428 ;
 - exemple complet compilé, exécuté et couvert par CTest ;
 - aucun changement suivi en attente à la fin de la session ;
 - `build/`, `stdlib/precompiled/` et certains artefacts de tests sont ignorés.
@@ -44,7 +44,7 @@ chercher à le simplifier sans réduire sa sûreté.
 | ABI | `5` |
 | Interface `.zti` | `10` |
 | Tokens génériques | `2` |
-| Cache de modules | `22` |
+| Cache de modules | `23` |
 | Cache de démarrage | `2` |
 | Manifeste de stdlib | `1` |
 
@@ -348,10 +348,16 @@ Objectif : permettre d'écrire une collection possédée entièrement en Zeta.
 6. **Livré le 15 juillet 2026** — écrire `Stack[T]` comme validation minimale,
    avec méthodes inhérentes génériques, projection directe de son champ `Vec[T]`,
    opérations mutantes `Unit` et consommation précompilée sans sources ;
-7. écrire `Queue[T]` comme critère de sortie réel.
+7. **Livré le 15 juillet 2026** — écrire `Queue[T]` comme critère de sortie réel,
+   avec deux `Vec[T]`, transferts amortis sans copie, ordre FIFO, éléments
+   possédés et consommation précompilée sans sources.
 
 Le compilateur ne doit pas recevoir un nouveau builtin `Stack` ou `Queue`. Le but
 est précisément de prouver que `Vec` est une brique de fondation suffisante.
+
+**Critère de sortie atteint le 15 juillet 2026.** `Stack[T]` et `Queue[T]` sont
+entièrement écrites dans `collections`, fonctionnent avec des éléments `Box[T]`
+et ne possèdent aucun traitement nominal dans le compilateur.
 
 ## Priorité 3 — généricité composable
 
@@ -474,31 +480,18 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-Poursuivre la priorité 2 avec `Queue[T]`, écrite dans la stdlib et non dans le
-compilateur. `Stack[T]` a validé l'API suivante :
+Commencer la priorité 3 par les contraintes génériques multiples. La syntaxe
+cible reste :
 
 ```zeta
-pub struct Stack[T] {
-    values: Vec[T]
-}
-
-pub def Stack.push[T](self: &mut Stack[T], value: T): Unit
-pub def Stack.pop[T](self: &mut Stack[T]): Option[T]
-pub def Stack.isEmpty[T](self: &Stack[T]): Bool
+def replaceAll[T: Equatable + Copy](values: SliceMut[T], old: T, next: T): Int
 ```
 
-Ordre de travail recommandé pour la file :
+Ordre recommandé : parser `+`, canonicaliser l'ensemble, rejeter doublons et
+contraintes inconnues, appliquer toutes les contraintes lors de l'inférence,
+réviser les tokens génériques et `.zti`, puis couvrir la compilation sans sources.
+Les incompatibilités sémantiques éventuelles entre contraintes doivent être
+définies explicitement avant d'introduire les traits utilisateur.
 
-1. choisir une représentation qui n'impose pas un décalage `O(n)` à chaque
-   retrait, probablement un `Vec[T]` accompagné d'un index de tête ;
-2. définir `push`, `pop` et `isEmpty` avec les mêmes contrats de propriété que la
-   pile, puis préciser le traitement des cases déjà consommées ;
-3. préserver la destruction exacte des éléments possédés et éviter toute copie
-   implicite lors d'une éventuelle compaction ;
-4. couvrir FIFO, file vide, plusieurs types, valeurs possédées, rejets d'emprunt
-   et consommation `.zti` + `.o` sans sources ;
-5. n'ajouter aucun builtin `Queue` au compilateur.
-
-La limite à garder visible est le retour ABI des agrégats de plus de 16 octets :
-`Stack[T]` se construit encore par littéral, et `Queue[T]` devra probablement
-faire de même pour ce jalon.
+La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
+littéral, car leurs agrégats dépassent 16 octets.

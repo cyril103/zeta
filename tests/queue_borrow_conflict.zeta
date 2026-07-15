@@ -1,0 +1,11 @@
+import collections
+
+def main(): Int = {
+    var values = collections.Queue[Int] {
+        incoming: Vec[Int]()
+        outgoing: Vec[Int]()
+    }
+    val borrowed = &mut values
+    values.pop()
+    (*borrowed).incoming.length
+}

@@ -80,3 +80,5 @@ Une méthode de structure générique peut aussi projeter un champ `Vec[T]` depu
 l'indice du champ. Le backend ajoute l'offset du champ à l'adresse reçue ; aucune
 valeur `Vec` intermédiaire n'est chargée. `collections.Stack[T]` valide ce chemin
 pour les propriétés, `push` et `pop`, y compris depuis une interface précompilée.
+`collections.Queue[T]` étend cette validation à deux projections distinctes et
+aux déplacements de payloads génériques entre deux `Vec[T]` dans une boucle.

@@ -1,0 +1,10 @@
+import collections
+
+def main(): Int = {
+    val values = collections.Queue[Int] {
+        incoming: Vec[Int]()
+        outgoing: Vec[Int]()
+    }
+    values.push(1)
+    0
+}

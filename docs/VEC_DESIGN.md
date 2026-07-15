@@ -63,6 +63,12 @@ peuvent projeter un champ depuis une référence de structure : la lecture et `g
 acceptent une référence partagée, tandis que `pop` et les mutations exigent une
 référence mutable. `Stack[T]` s'appuie sur ce contrat.
 
+`Queue[T]` compose deux champs `Vec[T]`. Lorsqu'un retrait trouve le vecteur de
+sortie vide, les éléments du vecteur d'entrée sont déplacés par couples
+`pop`/`push`. Cette inversion amortie conserve l'ordre FIFO, accepte les types non
+`Copy` et ne nécessite ni accès mémoire non contrôlé ni primitive de file dans le
+compilateur.
+
 ## Allocation et croissance
 
 Un vecteur vide n'alloue rien. `reserve(additional)` garantit une capacité d'au

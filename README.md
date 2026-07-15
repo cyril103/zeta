@@ -790,6 +790,22 @@ val empty = stack.isEmpty()
 `Stack[T]` n'est pas un builtin. Ses méthodes projettent son champ `Vec[T]`
 directement à travers `&Stack[T]` ou `&mut Stack[T]`, sans copier le propriétaire.
 
+Le même module fournit `Queue[T]`, une file FIFO générique fondée sur deux
+vecteurs. Les éléments sont déplacés de `incoming` vers `outgoing` uniquement
+quand le vecteur de sortie est vide ; aucun élément n'est copié et aucun décalage
+linéaire n'est effectué à chaque retrait :
+
+```zeta
+var queue = collections.Queue[Box[Int]] {
+    incoming: Vec[Box[Int]]()
+    outgoing: Vec[Box[Int]]()
+}
+queue.push(Box(42))
+val value = queue.pop()
+```
+
+`Queue[T]` n'est pas davantage un builtin et accepte les éléments non `Copy`.
+
 `asSlice()` et `asSliceMut()` créent des vues sans allocation. Les emprunts
 empêchent toute croissance ou mutation concurrente jusqu'à leur dernière
 utilisation. Un échec d'allocation ou un dépassement de capacité termine le

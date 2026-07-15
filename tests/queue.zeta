@@ -1,0 +1,48 @@
+import collections
+
+def main(): Int = {
+    var numbers = collections.Queue[Int] {
+        incoming: Vec[Int]()
+        outgoing: Vec[Int]()
+    }
+    val initiallyEmpty = numbers.isEmpty()
+    numbers.push(10)
+    numbers.push(20)
+    val first = numbers.pop()
+    numbers.push(30)
+    val second = numbers.pop()
+    val third = numbers.pop()
+    val missing = numbers.pop()
+    val firstValue = match (first) {
+        Option[Int].Some(value) => value
+        Option[Int].None => 0
+    }
+    val secondValue = match (second) {
+        Option[Int].Some(value) => value
+        Option[Int].None => 0
+    }
+    val thirdValue = match (third) {
+        Option[Int].Some(value) => value
+        Option[Int].None => 0
+    }
+    val missingIsNone = match (missing) {
+        Option[Int].Some(_) => false
+        Option[Int].None => true
+    }
+
+    var owned = collections.Queue[Box[Int]] {
+        incoming: Vec[Box[Int]]()
+        outgoing: Vec[Box[Int]]()
+    }
+    owned.push(Box(41))
+    owned.push(Box(42))
+    val moved = owned.pop()
+    val movedValue = match (moved) {
+        Option[Box[Int]].Some(value) => *value
+        Option[Box[Int]].None => 0
+    }
+
+    if (initiallyEmpty && firstValue == 10 && secondValue == 20 &&
+        thirdValue == 30 && missingIsNone && numbers.isEmpty() &&
+        movedValue == 41 && !owned.isEmpty()) 0 else 1
+}

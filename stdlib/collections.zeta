@@ -31,3 +31,30 @@ pub def Stack.push[T](self: &mut Stack[T], value: T): Unit = {
 pub def Stack.pop[T](self: &mut Stack[T]): Option[T] = (*self).values.pop()
 
 pub def Stack.isEmpty[T](self: &Stack[T]): Bool = (*self).values.isEmpty
+
+// Collection FIFO possédée. Les deux Vec permettent de déplacer les éléments
+// sans exiger Copy et sans décaler le stockage à chaque retrait.
+
+pub struct Queue[T] {
+    incoming: Vec[T]
+    outgoing: Vec[T]
+}
+
+pub def Queue.push[T](self: &mut Queue[T], value: T): Unit = {
+    (*self).incoming.push(value)
+}
+
+pub def Queue.pop[T](self: &mut Queue[T]): Option[T] = {
+    if ((*self).outgoing.isEmpty) {
+        while (!(*self).incoming.isEmpty) do {
+            val moved: Option[T] = (*self).incoming.pop()
+            match (moved) {
+                Option[T].Some(value) => (*self).outgoing.push(value)
+                Option[T].None => (*self).incoming.clear()
+            }
+        }
+    }
+    (*self).outgoing.pop()
+}
+
+pub def Queue.isEmpty[T](self: &Queue[T]): Bool = (*self).incoming.isEmpty && (*self).outgoing.isEmpty
