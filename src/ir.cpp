@@ -196,12 +196,18 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
     boxScopes_.clear();
     boxParameters_.clear();
     typeSubstitutions_.clear();
+    traitDispatches_.clear();
     genericInstances_.clear();
     genericInstanceNames_.clear();
     nextLabel_ = 0;
     loopLabels_.clear();
     inFunction_ = false;
     std::vector<const Declaration*> functions;
+    for (const TraitImplementation& implementation : program.traitImplementations)
+        for (const std::string& method : implementation.methods)
+            traitDispatches_.push_back(TraitDispatch{
+                implementation.trait, implementation.type,
+                typeName(implementation.type) + "." + method});
     for (const Statement& statement : program.statements) {
         std::visit([&](const auto& node) {
             using T = std::decay_t<decltype(node)>;
@@ -302,6 +308,7 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
         emitTailExpression(*function.initializer, parameters, function);
     }
     typeSubstitutions_.clear();
+    traitDispatches_.clear();
     return std::move(ir_);
 }
 
@@ -334,6 +341,14 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
         std::string linkName;
     };
     std::vector<FunctionRecord> functions;
+
+    for (const auto& [moduleName, module] : graph.modules)
+        for (const TraitImplementation& implementation :
+             module.program.traitImplementations)
+            for (const std::string& method : implementation.methods)
+                traitDispatches_.push_back(TraitDispatch{
+                    implementation.trait, implementation.type,
+                    moduleName + "." + typeName(implementation.type) + "." + method});
 
     for (const auto& [moduleName, module] : graph.modules) {
         for (const Statement& statement : module.program.statements) {
@@ -967,12 +982,31 @@ ValueId IrGenerator::expression(
                 static_cast<std::size_t>(found - fields.begin())});
             return output;
         } else if constexpr (std::is_same_v<T, MethodCallExpr>) {
-            if (!node.resolvedFunction.empty()) {
-                const auto found = symbols_.find(node.resolvedFunction);
+            std::string resolvedFunction = node.resolvedFunction;
+            if (!node.resolvedTrait.empty()) {
+                const ValueType receiverType = resolveType(node.object->inferredType);
+                const ValueType& ownerType = receiverType.kind == ValueType::Kind::Reference
+                    ? *receiverType.element : receiverType;
+                const auto dispatch = std::find_if(
+                    traitDispatches_.begin(), traitDispatches_.end(),
+                    [&](const TraitDispatch& candidate) {
+                        return candidate.trait == node.resolvedTrait &&
+                               candidate.type == ownerType &&
+                               candidate.functionName.ends_with("." + node.method);
+                    });
+                if (dispatch == traitDispatches_.end())
+                    throw CompileError(expressionNode.location,
+                        "implémentation introuvable pour la méthode de trait '" +
+                        node.resolvedTrait + "." + node.method + "' sur " +
+                        typeName(ownerType));
+                resolvedFunction = dispatch->functionName;
+            }
+            if (!resolvedFunction.empty()) {
+                const auto found = symbols_.find(resolvedFunction);
                 if (found == symbols_.end() || found->second.declaration == nullptr)
                     throw CompileError(expressionNode.location,
                                        "méthode résolue introuvable '" +
-                                       node.resolvedFunction + "'");
+                                       resolvedFunction + "'");
                 const Declaration& method = *found->second.declaration;
                 std::vector<ValueId> arguments;
                 std::vector<ValueType> argumentTypes;
@@ -1098,6 +1132,17 @@ ValueId IrGenerator::expression(
                 return output;
             }
             const auto& name = std::get<NameExpr>(node.operand->value);
+            if (const auto parameter = parameters.find(name.name);
+                parameter != parameters.end()) {
+                const ValueType operandType = resolveType(node.operand->inferredType);
+                const SlotId slot = ir_.slots.size();
+                ir_.slots.push_back(IrSlot{
+                    name.name + "$borrow" + std::to_string(slot), operandType, false});
+                ir_.instructions.push_back(IrStore{slot, parameter->second, operandType});
+                const ValueId output = nextValue(resolveType(expressionNode.inferredType));
+                ir_.instructions.push_back(IrAddressOf{output, slot});
+                return output;
+            }
             const auto found = symbols_.find(name.name);
             if (found == symbols_.end())
                 throw CompileError(expressionNode.location, "cible d'emprunt inconnue");

@@ -1,0 +1,7 @@
+struct Value {
+    value: Int
+}
+
+def read[T](value: T): Int = value.read()
+
+def main(): Int = read(Value { value: 42 })

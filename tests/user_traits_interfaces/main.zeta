@@ -3,6 +3,6 @@ import models
 
 def main(): Int = {
     val token = capabilities.keep(models.Token { value: 42 })
-    val copy = token.copyValue()
-    if (copy.answer() == 42) 0 else 1
+    val copy = capabilities.copyAnswer(token)
+    if (capabilities.answerOf(copy) == 42) 0 else 1
 }

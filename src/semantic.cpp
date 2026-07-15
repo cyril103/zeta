@@ -1006,6 +1006,24 @@ ValueType SemanticAnalyzer::inferType(const Expression& expression) const {
                         return substituteType(declaration->type, substitutions);
                 }
             }
+            if (ownerType->kind == ValueType::Kind::TypeParameter) {
+                const auto constraints =
+                    activeTypeConstraints_.find(ownerType->typeParameter);
+                if (constraints != activeTypeConstraints_.end())
+                    for (const std::string_view constraint :
+                         constraintNames(constraints->second)) {
+                        const auto trait = traitDeclarations_.find(std::string(constraint));
+                        if (trait == traitDeclarations_.end()) continue;
+                        const auto requirement = std::find_if(
+                            trait->second.methods.begin(), trait->second.methods.end(),
+                            [&](const TraitMethodRequirement& method) {
+                                return method.name == node.method;
+                            });
+                        if (requirement != trait->second.methods.end())
+                            return substituteType(requirement->returnType,
+                                {{"Self", *ownerType}});
+                    }
+            }
             if (ownerType->kind == ValueType::Kind::Vec &&
                 (node.method == "asSlice" || node.method == "asSliceMut"))
                 return ValueType(ValueType::Kind::Slice,
@@ -1310,6 +1328,94 @@ ValueType SemanticAnalyzer::checkExpression(Expression& expression, ValueType ex
                 node.resolvedFunction = userMethod->functionName;
                 return generic == nullptr ? methodSymbol.type
                                           : substituteType(methodSymbol.type, substitutions);
+            }
+            if (userOwnerType->kind == ValueType::Kind::TypeParameter) {
+                const auto constraints =
+                    activeTypeConstraints_.find(userOwnerType->typeParameter);
+                const TraitDeclaration* contract = nullptr;
+                std::string resolvedTrait;
+                if (constraints != activeTypeConstraints_.end()) {
+                    for (const std::string_view constraint :
+                         constraintNames(constraints->second)) {
+                        const auto trait = traitDeclarations_.find(std::string(constraint));
+                        if (trait == traitDeclarations_.end()) continue;
+                        const auto requirement = std::find_if(
+                            trait->second.methods.begin(), trait->second.methods.end(),
+                            [&](const TraitMethodRequirement& method) {
+                                return method.name == node.method;
+                            });
+                        if (requirement == trait->second.methods.end()) continue;
+                        if (contract != nullptr)
+                            throw CompileError(expression.location,
+                                "appel ambigu de la méthode '" + node.method +
+                                "' : les traits '" + resolvedTrait + "' et '" +
+                                trait->first + "' la déclarent");
+                        contract = &trait->second;
+                        resolvedTrait = trait->first;
+                    }
+                }
+                if (contract == nullptr)
+                    throw CompileError(expression.location, "méthode inconnue '" +
+                        node.method + "' pour " + typeName(*userOwnerType));
+                const auto requirement = std::find_if(
+                    contract->methods.begin(), contract->methods.end(),
+                    [&](const TraitMethodRequirement& method) {
+                        return method.name == node.method;
+                    });
+                if (node.arguments.size() + 1U != requirement->parameters.size())
+                    throw CompileError(expression.location, "'" + node.method + "' attend " +
+                        std::to_string(requirement->parameters.size() - 1U) +
+                        " argument(s), reçu " + std::to_string(node.arguments.size()));
+                const std::unordered_map<std::string, ValueType> selfType{
+                    {"Self", *userOwnerType}};
+                const ValueType receiverParameter =
+                    substituteType(requirement->parameters.front().type, selfType);
+                if (userReceiver.kind == ValueType::Kind::Reference) {
+                    if (userReceiver != receiverParameter)
+                        throw CompileError(node.object->location,
+                            "receveur " + typeName(receiverParameter) + " attendu, reçu " +
+                            typeName(userReceiver));
+                    checkExpression(*node.object, receiverParameter);
+                } else {
+                    const auto* receiverName = std::get_if<NameExpr>(&node.object->value);
+                    if (receiverName == nullptr)
+                        throw CompileError(node.object->location,
+                            "le receveur d'une méthode doit être un identifiant");
+                    const SemanticSymbol* receiverSymbol = symbols_.lookup(receiverName->name);
+                    if (receiverSymbol == nullptr)
+                        throw CompileError(node.object->location, "receveur inconnu '" +
+                            receiverName->name + "'");
+                    if (movedBoxes_.contains(receiverName->name))
+                        throw CompileError(node.object->location, "utilisation de '" +
+                            receiverName->name + "' après son déplacement");
+                    const bool mutableReceiver = receiverParameter.mutableReference;
+                    if (mutableReceiver &&
+                        (receiverSymbol->parameter || receiverSymbol->kind != BindingKind::Var))
+                        throw CompileError(node.object->location, "la méthode '" +
+                            node.method + "' exige un receveur déclaré avec 'var'");
+                    if (const auto borrowed = borrows_.find(receiverName->name);
+                        borrowed != borrows_.end() &&
+                        (borrowed->second.mutableBorrow ||
+                         (mutableReceiver && borrowed->second.shared != 0)))
+                        throw CompileError(node.object->location, "le receveur '" +
+                            receiverName->name + "' est déjà emprunté");
+                    ExprPtr receiver = std::move(node.object);
+                    node.object = std::make_unique<Expression>(Expression{
+                        receiver->location,
+                        AddressExpr{mutableReceiver, std::move(receiver)}});
+                    checkExpression(*node.object, receiverParameter);
+                }
+                for (std::size_t i = 0; i < node.arguments.size(); ++i) {
+                    const ValueType parameter =
+                        substituteType(requirement->parameters[i + 1U].type, selfType);
+                    checkExpression(*node.arguments[i], parameter);
+                    if (isMoveOnlyValueType(parameter))
+                        if (const auto* moved =
+                                std::get_if<NameExpr>(&node.arguments[i]->value))
+                            movedBoxes_.insert(moved->name);
+                }
+                node.resolvedTrait = resolvedTrait;
+                return substituteType(requirement->returnType, selfType);
             }
             const auto* name = std::get_if<NameExpr>(&node.object->value);
             const auto* field = std::get_if<FieldExpr>(&node.object->value);

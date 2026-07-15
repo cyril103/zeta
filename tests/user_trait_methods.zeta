@@ -14,8 +14,19 @@ impl Answer for Counter {
     }
 }
 
+def read[T: Answer](value: T): Int = value.answer()
+
+def addTo[T: Answer](value: &mut T, amount: Int): Unit = value.add(amount)
+
+def raised[T: Answer + Copy](value: T, amount: Int): Int = {
+    var current: T = value
+    current.add(amount)
+    return current.answer()
+}
+
 def main(): Int = {
     var counter = Counter { value: 40 }
     counter.add(2)
-    if (counter.answer() == 42) 0 else 1
+    addTo(&mut counter, 5)
+    if (counter.answer() == 47 && read(counter) == 47 && raised(counter, 3) == 50) 0 else 1
 }

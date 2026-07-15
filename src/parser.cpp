@@ -1044,7 +1044,7 @@ ExprPtr Parser::postfix() {
                     field.location, MethodCallExpr{
                         std::move(expr), field.text, std::move(arguments),
                         field.text == "get" || field.text == "pop"
-                            ? enumerations_.at("Option") : nullptr, {}, {}}});
+                            ? enumerations_.at("Option") : nullptr, {}, {}, {}}});
             } else {
                 expr = std::make_unique<Expression>(Expression{
                     field.location, FieldExpr{std::move(expr), field.text}});

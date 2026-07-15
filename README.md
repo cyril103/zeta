@@ -684,9 +684,11 @@ impl HasValue for Counter {
 
 Le bloc `impl` doit fournir exactement les noms, paramètres, mutabilité du
 receveur et retours déclarés. Ces méthodes utilisent le dispatch statique des
-structures et traversent les interfaces `.zti` sans sources. L'appel direct sur
-un receveur générique `T`, les méthodes par défaut, objets de traits et la
-distribution dynamique ne sont pas encore pris en charge.
+structures et traversent les interfaces `.zti` sans sources. Dans un corps
+générique, `value.value()` sélectionne la signature apportée par la contrainte de
+`T`, puis la monomorphisation appelle directement `Type.value`. Deux traits qui
+déclarent le même nom rendent l'appel ambigu. Les méthodes par défaut, objets de
+traits et la distribution dynamique ne sont pas encore pris en charge.
 
 Les structures, y compris génériques, utilisent des champs nommés :
 

@@ -307,6 +307,7 @@ struct MethodCallExpr {
     std::vector<ExprPtr> arguments;
     std::shared_ptr<const EnumType> optionDefinition;
     std::string resolvedFunction;
+    std::string resolvedTrait;
     std::vector<ValueType> typeArguments;
 };
 struct IndexExpr { ExprPtr array; ExprPtr index; };

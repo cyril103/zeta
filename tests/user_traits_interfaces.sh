@@ -14,6 +14,8 @@ grep -q '^trait "capabilities.Answer" 2$' "$interface"
 grep -q '^trait_method "answer" "I" 1 "self" "R(T(Self))"$' "$interface"
 grep -q '^trait_method "copyValue" "T(Self)" 1 "self" "R(T(Self))"$' "$interface"
 grep -q '^export "keep" .* "T" "Copy+capabilities.Answer"$' "$interface"
+grep -q '^export "answerOf"' "$interface"
+grep -q '^export "copyAnswer"' "$interface"
 grep -q '^generic_tokens 4 ' "$interface"
 
 models_interface="$work/published.modules/models.zti"

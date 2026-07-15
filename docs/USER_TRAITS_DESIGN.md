@@ -73,16 +73,25 @@ implementation "capabilities.Answer" "<type encodé>" 1 "answer"
 Les déclarations de traits nécessaires à un corps générique entrent également
 dans la fermeture des tokens génériques. Leur table passe à la version 4. Les
 traits, signatures et implémentations participent à l'empreinte publique ; le
-cache de modules 27 invalide les objets antérieurs.
+cache de modules 28 invalide les objets antérieurs.
 
 Le test intermodules couvre une implémentation définie par le propriétaire d'un
 type dans un module distinct du trait, puis retire les sources et recompile le
 consommateur depuis les seules paires `.zti` + `.o`.
 
-## Limites et prochaine étape
+## Dispatch dans un corps générique
 
-Un appel concret comme `counter.read()` est résolu. Le prochain incrément devra
-résoudre `value.read()` lorsque `value` possède le type paramétrique
-`T: CounterOps`, puis sélectionner la méthode de l'implémentation pendant la
-monomorphisation. Les méthodes par défaut, types associés, implémentations de
-méthodes sur enums, objets de traits et vtables restent reportés.
+Pour `value.read()` avec `value: T`, l'analyse cherche `read` dans les traits qui
+contraignent `T`. Elle vérifie le receveur et les arguments après substitution de
+`Self`, puis conserve l'identité canonique du trait dans l'AST typé. Deux traits
+contraints qui déclarent le même nom produisent un diagnostic d'ambiguïté.
+
+À la monomorphisation, le générateur IR substitue le type concret, retrouve la
+paire cohérente `(trait, type)` et appelle directement l'export
+`module.Type.méthode`. Il ne choisit donc pas une méthode inhérente homonyme et
+n'introduit ni vtable ni test à l'exécution. Ce chemin fonctionne aussi lorsque
+le contrat, l'implémentation et le consommateur sont trois modules distincts dont
+les sources publiées ont été retirées.
+
+Les méthodes par défaut, types associés, implémentations de méthodes sur enums,
+objets de traits et vtables restent reportés.

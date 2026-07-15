@@ -15,7 +15,7 @@ les primitives existantes sans ajouter un builtin pour chaque nouveau type.
 
 - construction CMake réussie ;
 - stdlib locale régénérée ;
-- 448 tests CTest réussis sur 448 ;
+- 450 tests CTest réussis sur 450 ;
 - exemple complet compilé, exécuté et couvert par CTest ;
 - aucun changement suivi en attente à la fin de la session ;
 - `build/`, `stdlib/precompiled/` et certains artefacts de tests sont ignorés.
@@ -44,7 +44,7 @@ chercher à le simplifier sans réduire sa sûreté.
 | ABI | `5` |
 | Interface `.zti` | `13` |
 | Tokens génériques | `4` |
-| Cache de modules | `27` |
+| Cache de modules | `28` |
 | Cache de démarrage | `2` |
 | Manifeste de stdlib | `1` |
 
@@ -112,8 +112,8 @@ L'exemple est compréhensible, mais trop cérémonieux :
   quotidien ;
 - un `Vec[T]` placé dans une structure ne permet pas encore de construire
   naturellement une nouvelle collection ;
-- les traits imposent des méthodes, mais un appel sur un receveur générique `T`
-  n'est pas encore spécialisé vers l'implémentation concrète ;
+- les traits restent volontairement statiques : méthodes par défaut, types
+  associés, objets de traits et vtables ne sont pas encore disponibles ;
 - l'absence de fonctions de première classe bloque `map`, `filter`, `fold` et les
   comparateurs personnalisés.
 
@@ -417,10 +417,18 @@ méthodes. Le chargeur refuse avec `ZTI400` une interface incomplète ou
 incompatible. Le cache de modules passe à `27`; les tokens restent en version
 `4`, aucun nouveau genre lexical n'ayant été ajouté.
 
-**Prochain incrément.** Résoudre un appel de méthode sur un receveur `T` à partir
-de ses contraintes, puis sélectionner l'export de l'implémentation concrète lors
-de la monomorphisation. Reporter les méthodes par défaut, types associés, méthodes
-de traits sur enums, objets de traits et vtables.
+**Dispatch générique livré le 15 juillet 2026.** Un appel `value.method()` sur
+`T` sélectionne sa signature dans les contraintes, substitue `Self` et conserve
+l'identité canonique du trait dans l'AST typé. La monomorphisation retrouve
+ensuite la paire `(trait, type concret)` et appelle directement l'export de
+l'implémentation. Les receveurs partagés et mutables, le retour `Self`, la
+compilation intermodules sans sources et les ambiguïtés entre traits sont
+couverts. Ce changement de codegen porte le cache de modules à `28`, sans changer
+l'interface `13` ni les tokens `4`.
+
+Les méthodes par défaut, types associés, méthodes de traits sur enums, objets de
+traits et vtables restent reportés. Le cœur prévu de la priorité 3 est terminé ;
+la prochaine étape active est le protocole d'itération de la priorité 4.
 
 ## Priorité 4 — itération
 
@@ -514,13 +522,12 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-Poursuivre la priorité 3 avec le dispatch statique des méthodes de traits dans un
-corps générique. Lors de l'analyse de `value.method()` sur `T`, sélectionner une
-signature parmi les contraintes de `T`, conserver l'identité du trait dans
-l'AST typé, puis résoudre la fonction concrète après substitution des paramètres
-de type dans le générateur IR. Couvrir plusieurs implémentations, receveurs
-partagés et mutables, appels intermodules sans sources et diagnostics d'ambiguïté.
-Reporter méthodes par défaut, types associés, objets de traits et vtables.
+Ouvrir la priorité 4 par une conception minimale du protocole d'itération sans
+allocation. Fixer les types d'état et d'élément, les signatures nécessaires au
+dispatch statique, ainsi que les règles d'emprunt pour les parcours partagés et
+mutables. Valider ce contrat sur tableaux, `Slice[T]` et `Vec[T]` avant d'ajouter
+la syntaxe `for`; reporter l'itération consommatrice et le parcours UTF-8 tant que
+le socle d'emprunt n'est pas démontré.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

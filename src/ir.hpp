@@ -184,6 +184,12 @@ private:
         std::string linkName;
     };
 
+    struct TraitDispatch {
+        std::string trait;
+        ValueType type;
+        std::string functionName;
+    };
+
     void emitLoop(const WhileStatement& loop,
                   const std::unordered_map<std::string, ValueId>& parameters);
     void emitIndexStore(const IndexAssignment& assignment,
@@ -221,6 +227,7 @@ private:
     std::vector<std::vector<std::string>> boxScopes_;
     std::unordered_map<std::string, std::pair<ValueId, ValueType>> boxParameters_;
     std::unordered_map<std::string, ValueType> typeSubstitutions_;
+    std::vector<TraitDispatch> traitDispatches_;
     std::vector<GenericInstance> genericInstances_;
     std::unordered_map<std::string, std::string> genericInstanceNames_;
     std::unordered_map<const Declaration*, GenericOrigin> genericOrigins_;

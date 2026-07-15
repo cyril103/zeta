@@ -1,0 +1,11 @@
+trait First {
+    def value(self: &Self): Int
+}
+
+trait Second {
+    def value(self: &Self): Int
+}
+
+def ambiguous[T: First + Second](value: T): Int = value.value()
+
+def main(): Int = 0

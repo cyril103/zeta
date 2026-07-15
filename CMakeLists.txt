@@ -953,7 +953,9 @@ if(BUILD_TESTING)
             user_trait_duplicate_impl
             user_trait_private_leak
             user_trait_method_missing
-            user_trait_method_signature)
+            user_trait_method_signature
+            user_trait_method_ambiguous
+            user_trait_method_unconstrained)
         add_test(NAME reject_${trait_error} COMMAND zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/${trait_error}.zeta)
         set_tests_properties(reject_${trait_error} PROPERTIES WILL_FAIL TRUE)

@@ -4,3 +4,7 @@ pub trait Answer {
 }
 
 pub def keep[T: Answer + Copy](value: T): T = value
+
+pub def answerOf[T: Answer](value: T): Int = value.answer()
+
+pub def copyAnswer[T: Answer](value: T): T = value.copyValue()
