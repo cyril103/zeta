@@ -649,16 +649,17 @@ l'itérable d'un `for` jusqu'à la fin de la boucle. La contrainte reste inchang
 pas de trait public `Iterator`, pas d'allocation de state machine, et pas de
 copie implicite pour `T` non `Copy`.
 
-Le backend LLVM/Clang expérimental est amorcé :
+Le backend LLVM/Clang expérimental avance par tranches :
 `docs/LLVM_BACKEND_DESIGN.md` fixe le périmètre, `--emit-llvm` écrit un `.ll`
-minimal depuis l'IR Zeta vérifiée, et `emit_llvm_minimal` compile ce LLVM IR avec
-`clang` pour valider le smoke test `main(): Int = 42`. Le backend FASM reste le
-défaut et `--backend=clang` sans `--emit-llvm` reste volontairement bloqué.
+depuis l'IR Zeta vérifiée, `emit_llvm_minimal` compile le smoke test
+`main(): Int = 42` avec `clang`, et `emit_llvm_scalars` couvre maintenant les
+opérations scalaires `Int`/`Bool` (`IrBinary`, comparaisons, booléens simples,
+`IrCopy` sans allocation). Le backend FASM reste le défaut et `--backend=clang`
+sans `--emit-llvm` reste volontairement bloqué.
 
 Prochaine étape : élargir `LlvmIrCodeGenerator` par tests RED/GREEN aux
-opérations scalaires `Int`/`Bool` (`IrBinary`, comparaisons, `IrCopy`) puis aux
-labels/branches nécessaires à `if` et `while`, avant d'activer le linkage
-`--backend=clang`.
+labels/branches nécessaires à `if` et `while`, puis aux appels avec paramètres,
+avant d'activer le linkage `--backend=clang`.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

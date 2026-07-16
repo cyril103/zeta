@@ -119,16 +119,23 @@ Tranche recommandée :
 1. fait : ajouter `LlvmIrCodeGenerator` en parallèle de `FasmCodeGenerator` ;
 2. fait : ajouter les options CLI sans changer le comportement FASM par défaut ;
 3. fait : implémenter `--emit-llvm` pour un programme `main(): Int = 42` ;
-4. ajouter `--backend=clang` uniquement après validation que le `.ll` minimal est
-   accepté par `clang` ;
-5. élargir le générateur instruction par instruction.
+4. fait : élargir le générateur aux opérations scalaires `Int`/`Bool`
+   (`IrBinary`, comparaisons et copies scalaires) ;
+5. ajouter les labels/branches, puis les appels avec paramètres ;
+6. ajouter `--backend=clang` uniquement après validation que les programmes de
+   contrôle simples (`if`/`while`) sont acceptés par `clang`.
 
 État actuel : `emit_llvm_minimal` vérifie la génération de `target triple`,
 `define i32 @main()`, `ret i32 42`, puis compile le `.ll` avec `clang` et exécute
-le binaire obtenu. La génération LLVM accepte seulement le squelette exécutable,
-`IrCall`, `IrConst(Int/Bool)`, `IrExit`, `IrFunctionStart` et `IrReturn(Int)`.
-Toute autre instruction échoue explicitement avec `backend LLVM: instruction non
-supportée ...`.
+le binaire obtenu. `emit_llvm_scalars` ajoute un programme sans contrôle de flux
+qui couvre `IrBinary` arithmétique (`add nsw`, `sub nsw`, `mul nsw`, `sdiv`), les
+comparaisons (`icmp`), les opérations booléennes simples et `IrCopy` scalaire.
+
+La génération LLVM accepte donc le squelette exécutable, `IrCall` sans
+paramètre, `IrConst(Int/Bool)`, `IrExit`, `IrFunctionStart`, `IrReturn(Int/Bool)`,
+`IrBinary(Int/Bool)` et `IrCopy(Int/Bool/Unit)`. Toute autre instruction échoue
+explicitement avec `backend LLVM: instruction non supportée ...` ou un diagnostic
+de type non supporté.
 
 ## Matrice de tests
 
@@ -160,6 +167,8 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `docs/LLVM_BACKEND_DESIGN.md` existe et définit le périmètre.
 - fait : `--emit-llvm` produit un `.ll` minimal vérifiable pour
   `main(): Int = 42`.
+- fait : `--emit-llvm` couvre les opérations scalaires `Int`/`Bool` sans contrôle
+  de flux et les valide par compilation/exécution `clang`.
 - fait : le backend FASM par défaut reste inchangé.
-- fait : la roadmap pointe vers l'élargissement arithmétique/appels/branches
-  après le smoke test LLVM minimal.
+- fait : la roadmap pointe vers les labels/branches, puis les appels avec
+  paramètres, après la tranche scalaire.
