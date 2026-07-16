@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+compiler="$1"
+source="$2"
+output="$3"
+rm -f "${output}" "${output}.ll" "${output}.ir" "${output}.asm" "${output}.fasm" "${output}.fasm.ir" "${output}.fasm.asm" "${output}.stdout" "${output}.expected" "${output}.fasm.stdout"
+rm -rf "${output}.modules" "${output}.fasm.modules"
+"${compiler}" "${source}" --backend=clang -o "${output}"
+test -x "${output}"
+test -f "${output}.ll"
+test -f "${output}.ir"
+test ! -e "${output}.asm"
+grep -Fq 'declare i32 @printf(ptr, ...)' "${output}.ll"
+grep -Fq '@zeta.fmt.double' "${output}.ll"
+grep -Fq 'call i32 (ptr, ...) @printf' "${output}.ll"
+grep -Fq 'double ' "${output}.ll"
+"${output}" > "${output}.stdout"
+printf '00.5-2.5125.25\n' > "${output}.expected"
+cmp -s "${output}.expected" "${output}.stdout"
+"${compiler}" "${source}" -o "${output}.fasm" >/tmp/zeta-clang-backend-io-double-fasm.log
+"${output}.fasm" > "${output}.fasm.stdout"
+cmp -s "${output}.fasm.stdout" "${output}.stdout"

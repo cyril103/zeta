@@ -165,6 +165,11 @@ if(BUILD_TESTING)
         $<TARGET_FILE:zeta>
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/clang_backend_io_println_char.zeta
         ${CMAKE_CURRENT_BINARY_DIR}/clang_backend_io_println_char)
+    add_test(NAME compile_clang_backend_io_println_double COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_io_println_double.sh
+        $<TARGET_FILE:zeta>
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/clang_backend_io_println_double.zeta
+        ${CMAKE_CURRENT_BINARY_DIR}/clang_backend_io_println_double)
 
     add_test(NAME compile_public_struct_declaration COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_struct_declaration.zeta

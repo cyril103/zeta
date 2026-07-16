@@ -1,0 +1,11 @@
+import io
+
+
+def main(): Int = {
+    val half: Double = 0.5
+    io.printDouble(0.0)
+    io.printDouble(half)
+    io.printDouble(-2.5)
+    io.printlnDouble(125.25)
+    0
+}
