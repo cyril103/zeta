@@ -272,6 +272,14 @@ si elles sont atteignables, car leurs corps passent aujourd'hui par la conversio
 générale `String(Int)` qui reste hors périmètre. Cette tranche n'est donc pas une
 ABI native générale ni un support complet de `String(value)`.
 
+`compile_clang_backend_io_println_bool` ajoute une sortie booléenne ciblée : les
+appels stdlib directs `io.printBool(value: Bool)` et
+`io.printlnBool(value: Bool)` sélectionnent entre deux constantes privées `true`
+et `false`, puis appellent `write(1, ptr, len)` ; `printlnBool` écrit ensuite le
+newline privé partagé. Les helpers `io__printBool`/`io__printlnBool` sont sautés
+pendant l'émission LLVM pour éviter de dépendre de la conversion générale
+`String(Bool)`, encore hors périmètre.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -346,3 +354,5 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   via `write(1, ptr, len)` et comparaison stdout avec FASM.
 - fait : `--backend=clang` couvre `io.printInt`/`io.printlnInt` directs via
   `printf` spécialisé et comparaison stdout avec FASM.
+- fait : `--backend=clang` couvre `io.printBool`/`io.printlnBool` directs via
+  sélection `true`/`false` et `write`, avec comparaison stdout FASM.
