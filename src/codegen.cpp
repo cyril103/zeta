@@ -1230,7 +1230,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             out << fallthrough << ":\n";
             terminated = false;
         } else if (const auto* item = std::get_if<IrBinary>(&instruction)) {
-            if (item->operandType != ValueType::Int && item->operandType != ValueType::Bool &&
+            if (item->operandType != ValueType::Int && item->operandType != ValueType::Byte &&
+                item->operandType != ValueType::Bool && item->operandType != ValueType::Char &&
                 item->operandType != ValueType::Double)
                 throw std::runtime_error("backend LLVM: type opérande non supporté " +
                                          typeName(item->operandType));

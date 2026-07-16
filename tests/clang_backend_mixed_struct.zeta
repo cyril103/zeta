@@ -1,0 +1,18 @@
+struct Metrics {
+    ok: Bool
+    code: Byte
+    marker: Char
+    ratio: Double
+    label: String
+}
+
+
+def main(): Int = {
+    var metrics: Metrics = Metrics { ok: true, code: Byte(7), marker: 'A', ratio: 2.5, label: "zeta" }
+    metrics.code = Byte(Int(metrics.code) + 5)
+    val okCopy: Bool = metrics.ok
+    val ratioCopy: Double = metrics.ratio
+    val sameMarker: Bool = metrics.marker == 'A'
+    val sameCode: Bool = metrics.code == Byte(12)
+    Int(metrics.code) + metrics.label.lengthBytes + Int(metrics.marker) - 39
+}
