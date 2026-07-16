@@ -121,9 +121,10 @@ Tranche recommandée :
 3. fait : implémenter `--emit-llvm` pour un programme `main(): Int = 42` ;
 4. fait : élargir le générateur aux opérations scalaires `Int`/`Bool`
    (`IrBinary`, comparaisons et copies scalaires) ;
-5. ajouter les labels/branches, puis les appels avec paramètres ;
-6. ajouter `--backend=clang` uniquement après validation que les programmes de
-   contrôle simples (`if`/`while`) sont acceptés par `clang`.
+5. fait : ajouter les labels/branches et les slots scalaires nécessaires aux
+   programmes de contrôle simples (`if`/`while`) ;
+6. ajouter les appels avec paramètres ;
+7. ajouter `--backend=clang` pour le sous-ensemble validé.
 
 État actuel : `emit_llvm_minimal` vérifie la génération de `target triple`,
 `define i32 @main()`, `ret i32 42`, puis compile le `.ll` avec `clang` et exécute
@@ -136,6 +137,14 @@ paramètre, `IrConst(Int/Bool)`, `IrExit`, `IrFunctionStart`, `IrReturn(Int/Bool
 `IrBinary(Int/Bool)` et `IrCopy(Int/Bool/Unit)`. Toute autre instruction échoue
 explicitement avec `backend LLVM: instruction non supportée ...` ou un diagnostic
 de type non supporté.
+
+`emit_llvm_control` couvre maintenant un programme combinant `if` et `while`.
+Cette tranche ajoute `IrLabel`, `IrJump`, `IrBranch`, `IrLoad` et `IrStore` pour
+les slots scalaires `Int`/`Bool`. Les labels Zeta sont rendus comme blocs LLVM,
+les branches conditionnelles introduisent un bloc de continuation synthétique
+pour représenter le fallthrough, et les slots scalaires sont matérialisés par des
+`alloca` en entrée de fonction. Les types de slot non scalaires restent hors
+périmètre et doivent continuer à produire un diagnostic explicite.
 
 ## Matrice de tests
 
@@ -169,6 +178,8 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   `main(): Int = 42`.
 - fait : `--emit-llvm` couvre les opérations scalaires `Int`/`Bool` sans contrôle
   de flux et les valide par compilation/exécution `clang`.
+- fait : `--emit-llvm` couvre `if`/`while` via labels/branches et slots scalaires,
+  validés par compilation/exécution `clang`.
 - fait : le backend FASM par défaut reste inchangé.
-- fait : la roadmap pointe vers les labels/branches, puis les appels avec
-  paramètres, après la tranche scalaire.
+- fait : la roadmap pointe vers les appels avec paramètres puis vers le linkage
+  `--backend=clang` du sous-ensemble validé.
