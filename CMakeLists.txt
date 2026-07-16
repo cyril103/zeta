@@ -483,6 +483,20 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_array_non_copy_element.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/for-array-non-copy-element)
     set_tests_properties(reject_for_array_non_copy_element PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_for_mutable_iteration COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_mutable_iteration.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/for-mutable-iteration)
+    add_test(NAME run_for_mutable_iteration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/for-mutable-iteration)
+    set_tests_properties(run_for_mutable_iteration PROPERTIES DEPENDS compile_for_mutable_iteration)
+    add_test(NAME compile_for_mutable_box_iteration COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_mutable_box_iteration.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/for-mutable-box-iteration)
+    add_test(NAME run_for_mutable_box_iteration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/for-mutable-box-iteration)
+    set_tests_properties(run_for_mutable_box_iteration PROPERTIES DEPENDS compile_for_mutable_box_iteration)
+    add_test(NAME reject_for_mutable_requires_mutable_view COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_mutable_requires_mutable_view.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/for-mutable-requires-mutable-view)
+    set_tests_properties(reject_for_mutable_requires_mutable_view PROPERTIES WILL_FAIL TRUE)
 
     add_test(NAME compile_empty_slice_option COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_zero_length.zeta

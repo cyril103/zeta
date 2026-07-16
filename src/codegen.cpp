@@ -759,6 +759,23 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                 emitBlockCopy(out, "[rsi]",
                     "[rbp-" + std::to_string(valueOffset(program, item.output)) + "]",
                     elementBytes);
+            } else if constexpr (std::is_same_v<T, IrIndexAddress>) {
+                const std::size_t elementBytes = valueTypeSize(*item.arrayType.element);
+                out << "    movsxd rax, dword [rbp-" << valueOffset(program, item.index) << "]\n"
+                    << "    test rax, rax\n"
+                    << "    js ir_array_bounds_error\n";
+                if (item.arrayIsSlice)
+                    out << "    cmp rax, qword [rbp-" << valueOffset(program, item.array) - 8U << "]\n";
+                else
+                    out << "    cmp rax, " << item.arrayType.length << "\n";
+                out << "    jae ir_array_bounds_error\n"
+                    << "    imul rax, " << elementBytes << "\n";
+                if (item.arrayIsReference || item.arrayIsSlice)
+                    out << "    mov rsi, qword [rbp-" << valueOffset(program, item.array) << "]\n";
+                else
+                    out << "    lea rsi, [rbp-" << valueOffset(program, item.array) << "]\n";
+                out << "    add rsi, rax\n"
+                    << "    mov qword [rbp-" << valueOffset(program, item.output) << "], rsi\n";
             } else if constexpr (std::is_same_v<T, IrIndexStore>) {
                 if (item.arrayIsReference || item.arrayIsSlice) {
                     out << "    mov rdi, qword [rbp-" << valueOffset(program, item.array) << "]\n";
@@ -1337,6 +1354,7 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
     bool hasArrayAccess = false;
     for (const IrInstruction& instruction : program.instructions)
         hasArrayAccess = hasArrayAccess || std::holds_alternative<IrIndexLoad>(instruction) ||
+                         std::holds_alternative<IrIndexAddress>(instruction) ||
                          std::holds_alternative<IrIndexStore>(instruction) ||
                          std::holds_alternative<IrVecSet>(instruction);
     if (hasArrayAccess) {

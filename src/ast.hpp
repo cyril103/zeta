@@ -395,6 +395,7 @@ struct WhileStatement {
 struct ForStatement {
     SourceLocation location;
     std::string item;
+    bool mutableItem{false};
     ExprPtr iterable;
     std::vector<StatementPtr> body;
     ValueType itemType{ValueType::Int};

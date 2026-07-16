@@ -774,6 +774,7 @@ WhileStatement Parser::whileStatement() {
 ForStatement Parser::forStatement() {
     const Token start = previous();
     consume(TokenKind::LeftParen, "'(' attendue après 'for'");
+    const bool mutableItem = match(TokenKind::Mut);
     const Token& item = consume(TokenKind::Identifier,
                                 "nom de variable attendu dans la boucle 'for'");
     consume(TokenKind::In, "'in' attendu après la variable de boucle");
@@ -783,7 +784,7 @@ ForStatement Parser::forStatement() {
     consume(TokenKind::RightParen, "')' attendue après la source de la boucle");
     consume(TokenKind::Do, "'do' attendu après la source de la boucle");
     consume(TokenKind::LeftBrace, "'{' attendue après 'do'");
-    return ForStatement{start.location, item.text, std::move(iterable), loopBody()};
+    return ForStatement{start.location, item.text, mutableItem, std::move(iterable), loopBody()};
 }
 
 std::vector<StatementPtr> Parser::loopBody() {

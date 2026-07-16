@@ -1,0 +1,7 @@
+def main(): Int = {
+    val values: [Int; 1] = [1]
+    for (mut value in Slice(&values)) do {
+        *value = 2
+    }
+    0
+}

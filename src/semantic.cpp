@@ -924,13 +924,20 @@ void SemanticAnalyzer::checkForLoop(ForStatement& loop) {
         throw CompileError(loop.iterable->location,
                            "la boucle 'for' exige une Slice, SliceMut ou un tableau");
     const ValueType elementType = *iterableType.element;
-    if (!isCopyValueType(elementType))
+    ValueType itemType = elementType;
+    if (loop.mutableItem) {
+        if (iterableType.kind != ValueType::Kind::Slice ||
+            !iterableType.mutableReference)
+            throw CompileError(loop.location,
+                               "la boucle 'for mut' exige une SliceMut");
+        itemType = ValueType(std::make_shared<ValueType>(elementType), true);
+    } else if (!isCopyValueType(elementType))
         throw CompileError(loop.location,
                            "la boucle 'for' par valeur exige un élément Copy");
     if (symbols_.lookup(loop.item) != nullptr)
         throw CompileError(loop.location,
                            "variable de boucle '" + loop.item + "' déjà déclarée");
-    loop.itemType = elementType;
+    loop.itemType = itemType;
 
     pushBorrowScope();
     checkExpression(*loop.iterable, iterableType);
@@ -961,7 +968,7 @@ void SemanticAnalyzer::checkForLoop(ForStatement& loop) {
     }
     symbols_.pushScope();
     if (!symbols_.defineParameter(loop.item,
-            SemanticSymbol{elementType, BindingKind::Val, false, nullptr, true, {}}))
+            SemanticSymbol{itemType, BindingKind::Val, false, nullptr, true, {}}))
         throw CompileError(loop.location,
                            "variable de boucle '" + loop.item + "' déjà déclarée");
     ++loopDepth_;

@@ -768,7 +768,8 @@ void IrGenerator::emitForLoop(
     const ForStatement& loop,
     const std::unordered_map<std::string, ValueId>& parameters) {
     const ValueType iterableType = resolveType(loop.iterable->inferredType);
-    const ValueType elementType = resolveType(loop.itemType);
+    const ValueType loopItemType = resolveType(loop.itemType);
+    const ValueType elementType = resolveType(*iterableType.element);
     const SlotId iteratorSlot = ir_.slots.size();
     ir_.slots.push_back(IrSlot{loop.item + "$iterator" + std::to_string(iteratorSlot),
                                ValueType::Int, false});
@@ -800,10 +801,15 @@ void IrGenerator::emitForLoop(
     const ValueId itemIndex = nextValue(ValueType::Int);
     ir_.instructions.push_back(IrLoad{itemIndex, iteratorSlot, ValueType::Int});
     const ValueId itemIterable = expression(*loop.iterable, parameters);
-    const ValueId itemValue = nextValue(elementType);
+    const ValueId itemValue = nextValue(loopItemType);
     const bool iterableIsSlice = iterableType.kind == ValueType::Kind::Slice;
-    ir_.instructions.push_back(IrIndexLoad{itemValue, itemIterable, itemIndex,
-                                           iterableType, false, iterableIsSlice});
+    if (loop.mutableItem) {
+        ir_.instructions.push_back(IrIndexAddress{itemValue, itemIterable, itemIndex,
+                                                 iterableType, false, iterableIsSlice});
+    } else {
+        ir_.instructions.push_back(IrIndexLoad{itemValue, itemIterable, itemIndex,
+                                             iterableType, false, iterableIsSlice});
+    }
 
     std::unordered_map<std::string, ValueId> loopParameters = parameters;
     loopParameters.insert_or_assign(loop.item, itemValue);
@@ -1734,6 +1740,9 @@ std::string IrGenerator::print(const VerifiedIrProgram& verified) {
                 out << "  $" << item.output << " = box $" << item.value << '\n';
             else if constexpr (std::is_same_v<T, IrIndexLoad>)
                 out << "  $" << item.output << " = index " << '$' << item.array
+                    << "[$" << item.index << "]\n";
+            else if constexpr (std::is_same_v<T, IrIndexAddress>)
+                out << "  $" << item.output << " = index_address " << '$' << item.array
                     << "[$" << item.index << "]\n";
             else if constexpr (std::is_same_v<T, IrIndexStore>)
             {

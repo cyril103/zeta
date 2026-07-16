@@ -98,6 +98,7 @@ std::optional<ValueId> outputOf(const IrInstruction& instruction) {
                       std::is_same_v<T, IrSliceLength> ||
                       std::is_same_v<T, IrBoxConstruct> ||
                       std::is_same_v<T, IrIndexLoad> ||
+                      std::is_same_v<T, IrIndexAddress> ||
                       std::is_same_v<T, IrAddressOf> ||
                       std::is_same_v<T, IrDereference> ||
                       std::is_same_v<T, IrLoad> ||
@@ -179,7 +180,8 @@ std::vector<ValueId> readsOf(const IrInstruction& instruction) {
             return {item.slice};
         else if constexpr (std::is_same_v<T, IrBoxConstruct>)
             return {item.value};
-        else if constexpr (std::is_same_v<T, IrIndexLoad>)
+        else if constexpr (std::is_same_v<T, IrIndexLoad> ||
+                           std::is_same_v<T, IrIndexAddress>)
             return {item.array, item.index};
         else if constexpr (std::is_same_v<T, IrIndexStore>) {
             std::vector<ValueId> reads = item.indexes;
@@ -719,7 +721,7 @@ IrVerificationError::IrVerificationError(std::string code, const std::string& me
     : std::runtime_error("[" + code + "] " + message), code_(std::move(code)) {}
 
 VerifiedIrProgram IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
-    static_assert(std::variant_size_v<IrInstruction> == 48,
+    static_assert(std::variant_size_v<IrInstruction> == 49,
                   "mettre à jour l'inventaire du vérificateur d'IR");
     if (program.valueCount != program.valueTypes.size())
         fail("IRV001", "valueCount=" + std::to_string(program.valueCount) +

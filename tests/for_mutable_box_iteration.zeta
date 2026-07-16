@@ -1,0 +1,12 @@
+def replaceAll(values: SliceMut[Box[Int]]): Unit = {
+    for (mut value in values) do {
+        *value = Box(9)
+    }
+}
+
+
+def main(): Int = {
+    var values: [Box[Int]; 2] = [Box(1), Box(2)]
+    replaceAll(SliceMut(&mut values))
+    0
+}
