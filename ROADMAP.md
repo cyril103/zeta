@@ -734,11 +734,16 @@ passent par `printf("%g")` sur un périmètre de formats validés contre FASM.
 `compile_clang_backend_double_operations` élargit ensuite `Double` aux opérations
 arithmétiques `+`, `-`, `*`, `/` via `fadd`/`fsub`/`fmul`/`fdiv`, et aux
 comparaisons ordonnées via `fcmp o*` (`==`, `!=`, `<`, `<=`, `>`, `>=`).
+`compile_clang_backend_local_struct` introduit la première valeur composée simple :
+les `struct` locaux dont tous les champs sont déjà dans le sous-ensemble LLVM sont
+abaissés en agrégats LLVM littéraux (`{ i32, ... }`), construits par `insertvalue`,
+stockés/chargés localement, puis lus par `extractvalue`. Les agrégats globaux et
+les structs contenant `Box`/`Vec`/tableaux restent rejetés explicitement.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre contrôlé : `io.print`/`println` pour chaînes heap concaténées, gestion
-plus complète de propriété/retain des chaînes heap, première valeur composée
-simple, ou diagnostics d'agrégats restants, avant toute généralisation.
+périmètre contrôlé : mutation de champ struct locale, paramètres/retours de
+structs simples, `io.print`/`println` pour chaînes heap concaténées, ou gestion
+plus complète de propriété/retain des chaînes heap, avant toute généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

@@ -310,6 +310,15 @@ stables comparés à FASM.
 ordonnés `fcmp` (`oeq`, `one`, `olt`, `ole`, `ogt`, `oge`) pour rester explicites
 sur le comportement en présence de NaN.
 
+`compile_clang_backend_local_struct` introduit le premier agrégat positif : un
+`struct` local dont tous les champs ont déjà un type LLVM supporté est abaissé en
+type agrégat littéral (`{ i32, i32 }` pour le test initial). La construction utilise
+une chaîne `insertvalue`, les slots locaux deviennent `alloca { ... }`, `store` /
+`load` copient l'agrégat entier, et les lectures de champ utilisent `extractvalue`.
+Cette tranche reste volontairement locale et en lecture seule : les globales
+struct, les mutations de champ, les paramètres/retours de structs et les champs
+hors sous-ensemble (`Box`, `Vec`, tableaux, enums) restent hors périmètre.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -396,3 +405,6 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--backend=clang` couvre les opérations arithmétiques `Double`
   `+`/`-`/`*`/`/` via `fadd`/`fsub`/`fmul`/`fdiv`, et les comparaisons ordonnées
   via `fcmp o*`, avec exécution Clang et FASM.
+- fait : `--backend=clang` couvre les `struct` locaux simples en lecture :
+  types agrégats LLVM littéraux, construction `insertvalue`, slots `alloca`/`store`/
+  `load`, et lecture de champ `extractvalue`, avec exécution Clang et FASM.
