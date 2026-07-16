@@ -1,0 +1,10 @@
+import io
+
+
+def main(): Int = {
+    val accent: Char = 'é'
+    io.printChar('A')
+    io.printChar(accent)
+    io.printlnChar('🚀')
+    0
+}

@@ -3,6 +3,7 @@
 pub native def print (value : String) : Unit
 pub native def println (value : String) : Unit
 pub def printChar(value: Char): Unit = print(String(value))
+pub def printlnChar(value: Char): Unit = println(String(value))
 pub def printInt(value: Int): Unit = print(String(value))
 pub def printlnInt(value: Int): Unit = println(String(value))
 pub def printByte(value: Byte): Unit = print(String(value))

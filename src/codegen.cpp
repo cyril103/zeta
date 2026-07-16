@@ -654,6 +654,109 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 << "  call i32 (ptr, ...) @printf(ptr " << format << ", i32 " << widened << ")\n";
             return true;
         }
+        if (item.function == "io__printChar" || item.function == "io__printlnChar") {
+            if (item.arguments.size() != 1 || item.argumentTypes.size() != 1 ||
+                item.argumentTypes[0] != ValueType::Char || item.returnType != ValueType::Unit) {
+                throw std::runtime_error("backend LLVM: signature io.printChar/printlnChar non supportée");
+            }
+            const std::string prefix = "%v" + std::to_string(item.output) + ".char";
+            const std::string code = value(item.arguments[0]);
+            const std::string buffer = prefix + ".buf";
+            const std::string ptr = prefix + ".ptr";
+            const std::string one = prefix + ".one";
+            const std::string two = prefix + ".two";
+            const std::string three = prefix + ".three";
+            const std::string lenTailWide = prefix + ".len.tail.wide";
+            const std::string lenTail = prefix + ".len.tail";
+            const std::string len = prefix + ".len";
+            const std::string b0TwoShift = prefix + ".b0.two.shift";
+            const std::string b0Two = prefix + ".b0.two";
+            const std::string b0ThreeShift = prefix + ".b0.three.shift";
+            const std::string b0Three = prefix + ".b0.three";
+            const std::string b0FourShift = prefix + ".b0.four.shift";
+            const std::string b0Four = prefix + ".b0.four";
+            const std::string b0TailWide = prefix + ".b0.tail.wide";
+            const std::string b0MultiTail = prefix + ".b0.multi.tail";
+            const std::string b0 = prefix + ".b0";
+            const std::string b1ShiftTwo = prefix + ".b1.shift.two";
+            const std::string b1ShiftThree = prefix + ".b1.shift.three";
+            const std::string b1ShiftFour = prefix + ".b1.shift.four";
+            const std::string b1MaskedTwo = prefix + ".b1.masked.two";
+            const std::string b1MaskedThree = prefix + ".b1.masked.three";
+            const std::string b1MaskedFour = prefix + ".b1.masked.four";
+            const std::string b1Two = prefix + ".b1.two";
+            const std::string b1Three = prefix + ".b1.three";
+            const std::string b1Four = prefix + ".b1.four";
+            const std::string b1Tail = prefix + ".b1.tail";
+            const std::string b1 = prefix + ".b1";
+            const std::string b2Shift = prefix + ".b2.shift";
+            const std::string b2MaskedThree = prefix + ".b2.masked.three";
+            const std::string b2MaskedFour = prefix + ".b2.masked.four";
+            const std::string b2Three = prefix + ".b2.three";
+            const std::string b2Four = prefix + ".b2.four";
+            const std::string b2 = prefix + ".b2";
+            const std::string b3Masked = prefix + ".b3.masked";
+            const std::string b3 = prefix + ".b3";
+            const std::string b0i8 = prefix + ".b0.i8";
+            const std::string b1i8 = prefix + ".b1.i8";
+            const std::string b2i8 = prefix + ".b2.i8";
+            const std::string b3i8 = prefix + ".b3.i8";
+            const std::string p1 = prefix + ".ptr1";
+            const std::string p2 = prefix + ".ptr2";
+            const std::string p3 = prefix + ".ptr3";
+            out << "  " << buffer << " = alloca [4 x i8], align 1\n"
+                << "  " << ptr << " = getelementptr inbounds [4 x i8], ptr " << buffer << ", i64 0, i64 0\n"
+                << "  " << one << " = icmp ule i32 " << code << ", 127\n"
+                << "  " << two << " = icmp ule i32 " << code << ", 2047\n"
+                << "  " << three << " = icmp ule i32 " << code << ", 65535\n"
+                << "  " << lenTailWide << " = select i1 " << three << ", i64 3, i64 4\n"
+                << "  " << lenTail << " = select i1 " << two << ", i64 2, i64 " << lenTailWide << "\n"
+                << "  " << len << " = select i1 " << one << ", i64 1, i64 " << lenTail << "\n"
+                << "  " << b0TwoShift << " = lshr i32 " << code << ", 6\n"
+                << "  " << b0Two << " = or i32 " << b0TwoShift << ", 192\n"
+                << "  " << b0ThreeShift << " = lshr i32 " << code << ", 12\n"
+                << "  " << b0Three << " = or i32 " << b0ThreeShift << ", 224\n"
+                << "  " << b0FourShift << " = lshr i32 " << code << ", 18\n"
+                << "  " << b0Four << " = or i32 " << b0FourShift << ", 240\n"
+                << "  " << b0TailWide << " = select i1 " << three << ", i32 " << b0Three << ", i32 " << b0Four << "\n"
+                << "  " << b0MultiTail << " = select i1 " << two << ", i32 " << b0Two << ", i32 " << b0TailWide << "\n"
+                << "  " << b0 << " = select i1 " << one << ", i32 " << code << ", i32 " << b0MultiTail << "\n"
+                << "  " << b1ShiftTwo << " = lshr i32 " << code << ", 0\n"
+                << "  " << b1ShiftThree << " = lshr i32 " << code << ", 6\n"
+                << "  " << b1ShiftFour << " = lshr i32 " << code << ", 12\n"
+                << "  " << b1MaskedTwo << " = and i32 " << b1ShiftTwo << ", 63\n"
+                << "  " << b1MaskedThree << " = and i32 " << b1ShiftThree << ", 63\n"
+                << "  " << b1MaskedFour << " = and i32 " << b1ShiftFour << ", 63\n"
+                << "  " << b1Two << " = or i32 " << b1MaskedTwo << ", 128\n"
+                << "  " << b1Three << " = or i32 " << b1MaskedThree << ", 128\n"
+                << "  " << b1Four << " = or i32 " << b1MaskedFour << ", 128\n"
+                << "  " << b1Tail << " = select i1 " << two << ", i32 " << b1Two << ", i32 " << b1Three << "\n"
+                << "  " << b1 << " = select i1 " << three << ", i32 " << b1Tail << ", i32 " << b1Four << "\n"
+                << "  " << b2Shift << " = lshr i32 " << code << ", 6\n"
+                << "  " << b2MaskedThree << " = and i32 " << code << ", 63\n"
+                << "  " << b2MaskedFour << " = and i32 " << b2Shift << ", 63\n"
+                << "  " << b2Three << " = or i32 " << b2MaskedThree << ", 128\n"
+                << "  " << b2Four << " = or i32 " << b2MaskedFour << ", 128\n"
+                << "  " << b2 << " = select i1 " << three << ", i32 " << b2Three << ", i32 " << b2Four << "\n"
+                << "  " << b3Masked << " = and i32 " << code << ", 63\n"
+                << "  " << b3 << " = or i32 " << b3Masked << ", 128\n"
+                << "  " << b0i8 << " = trunc i32 " << b0 << " to i8\n"
+                << "  " << b1i8 << " = trunc i32 " << b1 << " to i8\n"
+                << "  " << b2i8 << " = trunc i32 " << b2 << " to i8\n"
+                << "  " << b3i8 << " = trunc i32 " << b3 << " to i8\n"
+                << "  store i8 " << b0i8 << ", ptr " << ptr << ", align 1\n"
+                << "  " << p1 << " = getelementptr i8, ptr " << ptr << ", i64 1\n"
+                << "  store i8 " << b1i8 << ", ptr " << p1 << ", align 1\n"
+                << "  " << p2 << " = getelementptr i8, ptr " << ptr << ", i64 2\n"
+                << "  store i8 " << b2i8 << ", ptr " << p2 << ", align 1\n"
+                << "  " << p3 << " = getelementptr i8, ptr " << ptr << ", i64 3\n"
+                << "  store i8 " << b3i8 << ", ptr " << p3 << ", align 1\n"
+                << "  call i64 @write(i32 1, ptr " << ptr << ", i64 " << len << ")\n";
+            if (item.function == "io__printlnChar") {
+                out << "  call i64 @write(i32 1, ptr @zeta.newline, i64 1)\n";
+            }
+            return true;
+        }
         if (item.function == "io__printBool" || item.function == "io__printlnBool") {
             if (item.arguments.size() != 1 || item.argumentTypes.size() != 1 ||
                 item.argumentTypes[0] != ValueType::Bool || item.returnType != ValueType::Unit) {
@@ -897,6 +1000,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
                 return call->function == "io__print" || call->function == "io__println" ||
+                       call->function == "io__printChar" || call->function == "io__printlnChar" ||
                        call->function == "io__printBool" || call->function == "io__printlnBool";
             return false;
         });
@@ -983,7 +1087,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             const bool unreachableImportedIoFunction =
                 (!reachableFunctions.contains(item->name) || item->name == "io__printInt" ||
                  item->name == "io__printlnInt" || item->name == "io__printByte" ||
-                 item->name == "io__printlnByte" || item->name == "io__printBool" ||
+                 item->name == "io__printlnByte" || item->name == "io__printChar" ||
+                 item->name == "io__printlnChar" || item->name == "io__printBool" ||
                  item->name == "io__printlnBool") &&
                 item->name.rfind("io__", 0) == 0;
             if (unreachableImportedStringsFunction || unreachableImportedIoFunction) {
