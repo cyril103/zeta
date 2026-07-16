@@ -387,7 +387,20 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     auto llvmType = [](const ValueType& type) -> std::string {
         if (type == ValueType::Int) return "i32";
         if (type == ValueType::Bool) return "i1";
+        if (type == ValueType::String || type == ValueType::StringView) return "{ ptr, i64 }";
         throw std::runtime_error("backend LLVM: type non supporté " + typeName(type));
+    };
+    auto llvmStringBytes = [](const std::string& text) -> std::string {
+        std::ostringstream escaped;
+        escaped << std::uppercase << std::hex << std::setfill('0');
+        for (unsigned char byte : text) {
+            if (byte >= 0x20 && byte <= 0x7e && byte != '"' && byte != '\\') {
+                escaped << static_cast<char>(byte);
+            } else {
+                escaped << '\\' << std::setw(2) << static_cast<unsigned>(byte);
+            }
+        }
+        return escaped.str();
     };
     auto value = [&](ValueId id) -> std::string {
         if (const auto found = values.find(id); found != values.end()) return found->second;
@@ -422,6 +435,13 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     };
 
     out << "target triple = \"x86_64-pc-linux-gnu\"\n\n";
+    for (const IrInstruction& instruction : program.instructions) {
+        if (const auto* item = std::get_if<IrStringConst>(&instruction)) {
+            out << "@str." << item->output << " = private unnamed_addr constant ["
+                << item->utf8.size() << " x i8] c\"" << llvmStringBytes(item->utf8)
+                << "\", align 1\n";
+        }
+    }
     for (SlotId id = 0; id < program.slots.size(); ++id) {
         const IrSlot& slot = program.slots[id];
         if (!slot.global && !slot.external) continue;
@@ -446,6 +466,9 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             if (item->type != ValueType::Int && item->type != ValueType::Bool)
                 throw std::runtime_error("backend LLVM: type non supporté " + typeName(item->type));
             values[item->output] = std::to_string(item->value);
+        } else if (const auto* item = std::get_if<IrStringConst>(&instruction)) {
+            values[item->output] = "{ ptr @str." + std::to_string(item->output) +
+                ", i64 " + std::to_string(item->utf8.size()) + " }";
         } else if (const auto* item = std::get_if<IrCall>(&instruction)) {
             const std::string returnType = llvmType(item->returnType);
             out << "  %v" << item->output << " = call " << returnType << " @"
@@ -566,6 +589,16 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             const std::string output = "%v" + std::to_string(item->output);
             out << "  " << output << " = load " << llvmType(item->type)
                 << ", ptr " << slotName(item->slot) << "\n";
+            values[item->output] = output;
+        } else if (const auto* item = std::get_if<IrStringLength>(&instruction)) {
+            const ValueType type = program.valueTypes.at(item->string);
+            if (type != ValueType::String && type != ValueType::StringView)
+                throw std::runtime_error("backend LLVM: longueur hors chaîne non supportée");
+            const std::string wide = "%v" + std::to_string(item->output) + ".wide";
+            const std::string output = "%v" + std::to_string(item->output);
+            out << "  " << wide << " = extractvalue " << llvmType(type) << " "
+                << value(item->string) << ", 1\n"
+                << "  " << output << " = trunc i64 " << wide << " to i32\n";
             values[item->output] = output;
         } else {
             unsupported("complexe");
