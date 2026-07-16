@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <type_traits>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace {
 std::string globalLabel(const IrSlot& slot) { return "zeta_global_" + slot.name; }
@@ -370,17 +371,41 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     std::unordered_map<ValueId, std::string> values;
     std::unordered_map<std::string, ValueType> functionReturnTypes;
     std::unordered_map<std::string, std::vector<ValueType>> functionParameterTypes;
+    std::unordered_map<std::string, std::vector<std::string>> functionCalls;
+    std::unordered_set<std::string> definedFunctions;
+    std::vector<std::string> rootCalls;
     std::string scannedFunction;
     for (const IrInstruction& instruction : program.instructions) {
         if (const auto* function = std::get_if<IrFunctionStart>(&instruction)) {
             scannedFunction = function->name;
+            definedFunctions.insert(function->name);
         } else if (!scannedFunction.empty()) {
             if (const auto* parameter = std::get_if<IrParameter>(&instruction)) {
                 functionParameterTypes[scannedFunction].push_back(parameter->type);
             } else if (const auto* result = std::get_if<IrReturn>(&instruction)) {
                 functionReturnTypes.insert_or_assign(scannedFunction, result->type);
-                scannedFunction.clear();
             }
+        }
+        if (const auto* call = std::get_if<IrCall>(&instruction)) {
+            if (scannedFunction.empty()) {
+                rootCalls.push_back(call->function);
+            } else {
+                functionCalls[scannedFunction].push_back(call->function);
+            }
+        }
+    }
+    std::unordered_set<std::string> reachableFunctions;
+    std::vector<std::string> pendingFunctions;
+    for (const std::string& function : rootCalls) {
+        if (definedFunctions.contains(function) && reachableFunctions.insert(function).second)
+            pendingFunctions.push_back(function);
+    }
+    while (!pendingFunctions.empty()) {
+        const std::string function = pendingFunctions.back();
+        pendingFunctions.pop_back();
+        for (const std::string& callee : functionCalls[function]) {
+            if (definedFunctions.contains(callee) && reachableFunctions.insert(callee).second)
+                pendingFunctions.push_back(callee);
         }
     }
 
@@ -426,6 +451,58 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     };
     auto unsupported = [](const char* instruction) -> void {
         throw std::runtime_error(std::string("backend LLVM: instruction non supportée ") + instruction);
+    };
+    auto emitStringViewCall = [&](const IrCall& item) -> bool {
+        if (item.function == "strings__view") {
+            if (item.arguments.size() != 3 || item.argumentTypes.size() != 3 ||
+                item.argumentTypes[0] != ValueType::String || item.argumentTypes[1] != ValueType::Int ||
+                item.argumentTypes[2] != ValueType::Int || item.returnType != ValueType::StringView) {
+                throw std::runtime_error("backend LLVM: signature strings.view non supportée");
+            }
+            const std::string base = "%v" + std::to_string(item.output);
+            const std::string sourcePtr = extractStringPart(base + ".source", item.arguments[0], 0);
+            const std::string sourceLen = extractStringPart(base + ".source", item.arguments[0], 1);
+            const std::string start64 = base + ".start64";
+            const std::string end64 = base + ".end64";
+            const std::string startOk = base + ".start_ok";
+            const std::string orderOk = base + ".order_ok";
+            const std::string endOk = base + ".end_ok";
+            const std::string validPrefix = base + ".valid_prefix";
+            const std::string valid = base + ".valid";
+            const std::string rawPtr = base + ".raw_ptr";
+            const std::string rawLen = base + ".raw_len";
+            const std::string viewPtr = base + ".ptr";
+            const std::string viewLen = base + ".len";
+            const std::string pairPtr = base + ".pair_ptr";
+            out << "  " << start64 << " = sext i32 " << value(item.arguments[1]) << " to i64\n"
+                << "  " << end64 << " = sext i32 " << value(item.arguments[2]) << " to i64\n"
+                << "  " << startOk << " = icmp sge i32 " << value(item.arguments[1]) << ", 0\n"
+                << "  " << orderOk << " = icmp sle i32 " << value(item.arguments[1]) << ", "
+                << value(item.arguments[2]) << "\n"
+                << "  " << endOk << " = icmp sle i64 " << end64 << ", " << sourceLen << "\n"
+                << "  " << validPrefix << " = and i1 " << startOk << ", " << orderOk << "\n"
+                << "  " << valid << " = and i1 " << validPrefix << ", " << endOk << "\n"
+                << "  " << rawPtr << " = getelementptr i8, ptr " << sourcePtr << ", i64 " << start64 << "\n"
+                << "  " << rawLen << " = sub i64 " << end64 << ", " << start64 << "\n"
+                << "  " << viewPtr << " = select i1 " << valid << ", ptr " << rawPtr << ", ptr null\n"
+                << "  " << viewLen << " = select i1 " << valid << ", i64 " << rawLen << ", i64 0\n"
+                << "  " << pairPtr << " = insertvalue { ptr, i64 } undef, ptr " << viewPtr << ", 0\n"
+                << "  " << base << " = insertvalue { ptr, i64 } " << pairPtr << ", i64 " << viewLen << ", 1\n";
+            values[item.output] = base;
+            return true;
+        }
+        if (item.function == "strings__viewIsValid") {
+            if (item.arguments.size() != 1 || item.argumentTypes.size() != 1 ||
+                item.argumentTypes[0] != ValueType::StringView || item.returnType != ValueType::Bool) {
+                throw std::runtime_error("backend LLVM: signature strings.viewIsValid non supportée");
+            }
+            const std::string output = "%v" + std::to_string(item.output);
+            const std::string ptr = extractStringPart(output, item.arguments[0], 0);
+            out << "  " << output << " = icmp ne ptr " << ptr << ", null\n";
+            values[item.output] = output;
+            return true;
+        }
+        return false;
     };
     auto slotName = [&](SlotId id) -> std::string {
         const IrSlot& slot = program.slots.at(id);
@@ -492,7 +569,37 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     bool terminated = false;
     std::size_t syntheticBlock = 0;
 
+    bool skippingFunction = false;
     for (const IrInstruction& instruction : program.instructions) {
+        if (const auto* item = std::get_if<IrFunctionStart>(&instruction)) {
+            if (openFunction) {
+                if (!terminated) out << "  ret i32 0\n";
+                out << "}\n\n";
+            }
+            const bool unreachableImportedStringsFunction =
+                !reachableFunctions.contains(item->name) && item->name.rfind("strings__", 0) == 0;
+            if (unreachableImportedStringsFunction) {
+                skippingFunction = true;
+                openFunction = false;
+                terminated = true;
+                continue;
+            }
+            skippingFunction = false;
+            const ValueType returnType = functionReturnTypes.contains(item->name)
+                ? functionReturnTypes.at(item->name) : ValueType::Int;
+            out << "define " << llvmType(returnType) << " @" << item->name << "(";
+            const std::vector<ValueType>& parameters = functionParameterTypes[item->name];
+            for (std::size_t i = 0; i < parameters.size(); ++i) {
+                if (i != 0) out << ", ";
+                out << llvmType(parameters[i]) << " %arg" << i;
+            }
+            out << ") {\nentry:\n";
+            emitScalarAllocas();
+            openFunction = true;
+            terminated = false;
+            continue;
+        }
+        if (skippingFunction) continue;
         if (const auto* item = std::get_if<IrConst>(&instruction)) {
             if (item->type != ValueType::Int && item->type != ValueType::Bool)
                 throw std::runtime_error("backend LLVM: type non supporté " + typeName(item->type));
@@ -501,6 +608,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             values[item->output] = "{ ptr @str." + std::to_string(item->output) +
                 ", i64 " + std::to_string(item->utf8.size()) + " }";
         } else if (const auto* item = std::get_if<IrCall>(&instruction)) {
+            if (emitStringViewCall(*item)) continue;
             const std::string returnType = llvmType(item->returnType);
             out << "  %v" << item->output << " = call " << returnType << " @"
                 << item->function << "(";

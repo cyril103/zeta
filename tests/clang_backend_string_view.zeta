@@ -1,0 +1,19 @@
+import strings
+
+def main(): Int = {
+    val text: String = "hé🚀!"
+    val middle: StringView = strings.view(text, 1, 7)
+    val empty: StringView = strings.view(text, 3, 3)
+    val invalid: StringView = strings.view(text, 7, 1)
+    var score: Int = middle.lengthBytes
+    while (strings.viewIsValid(middle) && score < 7) do {
+        score = score + 1
+    }
+    while (strings.viewIsValid(empty) && empty.isEmpty && score < 8) do {
+        score = score + 1
+    }
+    while (strings.viewIsValid(invalid) && score < 18) do {
+        score = score + 10
+    }
+    score
+}
