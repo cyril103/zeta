@@ -1,0 +1,10 @@
+def main(): Int = {
+    val left: String = "ze"
+    val right: String = "ta"
+    val joined: String = left + right
+    var score: Int = joined.lengthBytes
+    while (joined.isEmpty) do {
+        score = 90
+    }
+    score
+}

@@ -410,6 +410,15 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         if (const auto found = values.find(id); found != values.end()) return found->second;
         return "%v" + std::to_string(id);
     };
+    auto extractStringPart = [&](const std::string& prefix, ValueId id, unsigned index) -> std::string {
+        const ValueType type = program.valueTypes.at(id);
+        if (type != ValueType::String && type != ValueType::StringView)
+            throw std::runtime_error("backend LLVM: opération chaîne hors chaîne non supportée");
+        const std::string part = prefix + (index == 0 ? ".ptr" : ".len");
+        out << "  " << part << " = extractvalue " << llvmType(type) << " "
+            << value(id) << ", " << index << "\n";
+        return part;
+    };
     auto unsupported = [](const char* instruction) -> void {
         throw std::runtime_error(std::string("backend LLVM: instruction non supportée ") + instruction);
     };
@@ -438,7 +447,14 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         }
     };
 
+    const bool usesStringConcat = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) { return std::holds_alternative<IrStringConcat>(instruction); });
+
     out << "target triple = \"x86_64-pc-linux-gnu\"\n\n";
+    if (usesStringConcat) {
+        out << "declare ptr @malloc(i64)\n"
+            << "declare ptr @memcpy(ptr, ptr, i64)\n\n";
+    }
     for (const IrInstruction& instruction : program.instructions) {
         if (const auto* item = std::get_if<IrStringConst>(&instruction)) {
             out << "@str." << item->output << " = private unnamed_addr constant ["
@@ -594,6 +610,32 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             out << "  " << output << " = load " << llvmType(item->type)
                 << ", ptr " << slotName(item->slot) << "\n";
             values[item->output] = output;
+        } else if (const auto* item = std::get_if<IrStringConcat>(&instruction)) {
+            const std::string base = "%v" + std::to_string(item->output);
+            const std::string leftPtr = extractStringPart(base + ".left", item->left, 0);
+            const std::string leftLen = extractStringPart(base + ".left", item->left, 1);
+            const std::string rightPtr = extractStringPart(base + ".right", item->right, 0);
+            const std::string rightLen = extractStringPart(base + ".right", item->right, 1);
+            const std::string length = base + ".len";
+            const std::string allocationSize = base + ".alloc_size";
+            const std::string raw = base + ".raw";
+            const std::string lenPtr = base + ".len_ptr";
+            const std::string data = base + ".data";
+            const std::string rightDst = base + ".right_dst";
+            const std::string pairPtr = base + ".pair_ptr";
+            out << "  " << length << " = add i64 " << leftLen << ", " << rightLen << "\n"
+                << "  " << allocationSize << " = add i64 " << length << ", 16\n"
+                << "  " << raw << " = call ptr @malloc(i64 " << allocationSize << ")\n"
+                << "  store i64 1, ptr " << raw << "\n"
+                << "  " << lenPtr << " = getelementptr i8, ptr " << raw << ", i64 8\n"
+                << "  store i64 " << length << ", ptr " << lenPtr << "\n"
+                << "  " << data << " = getelementptr i8, ptr " << raw << ", i64 16\n"
+                << "  call ptr @memcpy(ptr " << data << ", ptr " << leftPtr << ", i64 " << leftLen << ")\n"
+                << "  " << rightDst << " = getelementptr i8, ptr " << data << ", i64 " << leftLen << "\n"
+                << "  call ptr @memcpy(ptr " << rightDst << ", ptr " << rightPtr << ", i64 " << rightLen << ")\n"
+                << "  " << pairPtr << " = insertvalue { ptr, i64 } undef, ptr " << data << ", 0\n"
+                << "  " << base << " = insertvalue { ptr, i64 } " << pairPtr << ", i64 " << length << ", 1\n";
+            values[item->output] = base;
         } else if (const auto* item = std::get_if<IrStringLength>(&instruction)) {
             const ValueType type = program.valueTypes.at(item->string);
             if (type != ValueType::String && type != ValueType::StringView)
