@@ -1,0 +1,5 @@
+def less(): Bool = 2 < 3
+
+def same(): Bool = 4 == 4
+
+def main(): Int = (6 * 7) + ((10 / 2) - 1)

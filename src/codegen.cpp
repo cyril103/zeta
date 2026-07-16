@@ -368,6 +368,18 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     const IrProgram& program = verified.program();
     std::ostringstream out;
     std::unordered_map<ValueId, std::string> values;
+    std::unordered_map<std::string, ValueType> functionReturnTypes;
+    std::string scannedFunction;
+    for (const IrInstruction& instruction : program.instructions) {
+        if (const auto* function = std::get_if<IrFunctionStart>(&instruction)) {
+            scannedFunction = function->name;
+        } else if (!scannedFunction.empty()) {
+            if (const auto* result = std::get_if<IrReturn>(&instruction)) {
+                functionReturnTypes.insert_or_assign(scannedFunction, result->type);
+                scannedFunction.clear();
+            }
+        }
+    }
 
     auto llvmType = [](const ValueType& type) -> std::string {
         if (type == ValueType::Int) return "i32";
@@ -413,16 +425,18 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 if (!terminated) out << "  ret i32 0\n";
                 out << "}\n\n";
             }
-            out << "define i32 @" << item->name << "() {\nentry:\n";
+            const ValueType returnType = functionReturnTypes.contains(item->name)
+                ? functionReturnTypes.at(item->name) : ValueType::Int;
+            out << "define " << llvmType(returnType) << " @" << item->name << "() {\nentry:\n";
             openFunction = true;
             terminated = false;
         } else if (const auto* item = std::get_if<IrParameter>(&instruction)) {
             static_cast<void>(item);
             unsupported("parameter");
         } else if (const auto* item = std::get_if<IrReturn>(&instruction)) {
-            if (item->type != ValueType::Int)
+            if (item->type != ValueType::Int && item->type != ValueType::Bool)
                 throw std::runtime_error("backend LLVM: type de retour non supporté " + typeName(item->type));
-            out << "  ret i32 " << value(item->value) << "\n";
+            out << "  ret " << llvmType(item->type) << " " << value(item->value) << "\n";
             terminated = true;
         } else if (std::holds_alternative<IrUnit>(instruction)) {
             unsupported("unit");
@@ -432,12 +446,50 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             unsupported("jump");
         } else if (std::holds_alternative<IrBranch>(instruction)) {
             unsupported("branch");
-        } else if (std::holds_alternative<IrBinary>(instruction)) {
-            unsupported("binary");
+        } else if (const auto* item = std::get_if<IrBinary>(&instruction)) {
+            if (item->operandType != ValueType::Int && item->operandType != ValueType::Bool)
+                throw std::runtime_error("backend LLVM: type opérande non supporté " +
+                                         typeName(item->operandType));
+            const std::string output = "%v" + std::to_string(item->output);
+            if (item->op == "+" || item->op == "-" || item->op == "*" || item->op == "/") {
+                if (item->type != ValueType::Int || item->operandType != ValueType::Int)
+                    throw std::runtime_error("backend LLVM: opération scalaire non supportée " + item->op);
+                const char* operation = item->op == "+" ? "add nsw" :
+                    item->op == "-" ? "sub nsw" : item->op == "*" ? "mul nsw" : "sdiv";
+                out << "  " << output << " = " << operation << " i32 "
+                    << value(item->left) << ", " << value(item->right) << "\n";
+                values[item->output] = output;
+            } else if (item->op == "==" || item->op == "!=" || item->op == "<" ||
+                       item->op == "<=" || item->op == ">" || item->op == ">=") {
+                if (item->type != ValueType::Bool)
+                    throw std::runtime_error("backend LLVM: comparaison non booléenne non supportée");
+                const char* predicate = item->op == "==" ? "eq" : item->op == "!=" ? "ne" :
+                    item->op == "<" ? "slt" : item->op == "<=" ? "sle" :
+                    item->op == ">" ? "sgt" : "sge";
+                out << "  " << output << " = icmp " << predicate << " "
+                    << llvmType(item->operandType) << " " << value(item->left) << ", "
+                    << value(item->right) << "\n";
+                values[item->output] = output;
+            } else if (item->op == "&&" || item->op == "||") {
+                if (item->type != ValueType::Bool || item->operandType != ValueType::Bool)
+                    throw std::runtime_error("backend LLVM: opération booléenne non supportée " + item->op);
+                out << "  " << output << " = " << (item->op == "&&" ? "and" : "or")
+                    << " i1 " << value(item->left) << ", " << value(item->right) << "\n";
+                values[item->output] = output;
+            } else {
+                unsupported("binary");
+            }
         } else if (std::holds_alternative<IrUnary>(instruction)) {
             unsupported("unary");
-        } else if (std::holds_alternative<IrCopy>(instruction)) {
-            unsupported("copy");
+        } else if (const auto* item = std::get_if<IrCopy>(&instruction)) {
+            if (item->type == ValueType::Unit) {
+                values[item->output] = "0";
+            } else if (item->type == ValueType::Int || item->type == ValueType::Bool) {
+                values[item->output] = value(item->input);
+            } else {
+                throw std::runtime_error("backend LLVM: type de copie non supporté " +
+                                         typeName(item->type));
+            }
         } else if (std::holds_alternative<IrStore>(instruction)) {
             unsupported("store");
         } else if (std::holds_alternative<IrLoad>(instruction)) {
