@@ -674,10 +674,13 @@ exemple `String`) afin d'échouer avant toute génération de `.ll` partielle.
 LLVM des chaînes : un littéral `String` direct est émis en constante globale
 `@str.N`, transporté comme paire `{ ptr, i64 }`, et `lengthBytes` extrait puis
 tronque la longueur vers `Int`; l'exécution reste comparée à FASM.
+`compile_clang_backend_string_is_empty` couvre aussi `isEmpty` sur littéraux
+directs : le backend extrait la longueur de la paire chaîne et compare en `i64`
+contre zéro, y compris dans des conditions de boucle.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre runtime contrôlé : chaînes locales simples (`val text: String = ...`)
-ou `isEmpty`, puis seulement ensuite concaténation, agrégats et stdlib.
+périmètre runtime contrôlé : chaînes locales simples (`val text: String = ...`),
+puis seulement ensuite concaténation, agrégats et stdlib.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

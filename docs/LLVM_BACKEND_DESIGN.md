@@ -188,6 +188,12 @@ littéral sont émis en constante privée `@str.N = private unnamed_addr constan
 vers `i32` (`Int`). Le test compile avec Clang, exécute le binaire, et compare le
 code retour avec FASM.
 
+`compile_clang_backend_string_is_empty` couvre `IrStringEmpty` sur des littéraux
+directs, dont une chaîne vide et une chaîne non vide dans des conditions de
+`while`. Le lowering réutilise la paire `{ ptr, i64 }`, extrait l'élément longueur
+avec `extractvalue`, puis émet `icmp eq i64 <len>, 0`. Comme pour `lengthBytes`,
+le test compare l'exécution Clang à FASM.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -237,3 +243,4 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   `Int`/`Bool` et comparaison d'exécution FASM.
 - fait : les diagnostics LLVM pour globales/slots non scalaires sont couverts.
 - fait : `--backend=clang` couvre un littéral `String` direct et `lengthBytes`.
+- fait : `--backend=clang` couvre `String.isEmpty` sur littéraux directs.
