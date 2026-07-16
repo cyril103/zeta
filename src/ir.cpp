@@ -242,6 +242,9 @@ IrProgram IrGenerator::generate(const TypedProgram& typedProgram) {
             } else if constexpr (std::is_same_v<T, WhileStatement>) {
                 const std::unordered_map<std::string, ValueId> parameterValues;
                 emitLoop(node, parameterValues);
+            } else if constexpr (std::is_same_v<T, ForStatement>) {
+                const std::unordered_map<std::string, ValueId> parameterValues;
+                emitForLoop(node, parameterValues);
             } else {
                 throw CompileError(node.location,
                                    "une expression seule n'est pas autorisée au niveau global");
@@ -424,6 +427,9 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
                 } else if constexpr (std::is_same_v<T, WhileStatement>) {
                     const std::unordered_map<std::string, ValueId> parameterValues;
                     emitLoop(node, parameterValues);
+                } else if constexpr (std::is_same_v<T, ForStatement>) {
+                    const std::unordered_map<std::string, ValueId> parameterValues;
+                    emitForLoop(node, parameterValues);
                 }
             }, statement.value);
         }
@@ -675,6 +681,8 @@ void IrGenerator::emitTailExpression(
                         reference, value, resolveType(item.value->inferredType)});
                 } else if constexpr (std::is_same_v<T, WhileStatement>) {
                     emitLoop(item, parameters);
+                } else if constexpr (std::is_same_v<T, ForStatement>) {
+                    emitForLoop(item, parameters);
                 } else if constexpr (std::is_same_v<T, ExpressionStatement>) {
                     expression(*item.expression, parameters);
                 } else if constexpr (std::is_same_v<T, ReturnStatement>) {
@@ -756,6 +764,129 @@ void IrGenerator::emitTailExpression(
 }
 
 
+void IrGenerator::emitForLoop(
+    const ForStatement& loop,
+    const std::unordered_map<std::string, ValueId>& parameters) {
+    const ValueType iterableType = resolveType(loop.iterable->inferredType);
+    const ValueType elementType = resolveType(loop.itemType);
+    const SlotId iteratorSlot = ir_.slots.size();
+    ir_.slots.push_back(IrSlot{loop.item + "$iterator" + std::to_string(iteratorSlot),
+                               ValueType::Int, false});
+    const ValueId zero = nextValue(ValueType::Int);
+    ir_.instructions.push_back(IrConst{zero, 0, ValueType::Int});
+    ir_.instructions.push_back(IrStore{iteratorSlot, zero, ValueType::Int});
+
+    const std::size_t conditionLabel = nextLabel_++;
+    const std::size_t continueLabel = nextLabel_++;
+    const std::size_t endLabel = nextLabel_++;
+    ir_.instructions.push_back(IrLabel{conditionLabel});
+    const ValueId conditionIndex = nextValue(ValueType::Int);
+    ir_.instructions.push_back(IrLoad{conditionIndex, iteratorSlot, ValueType::Int});
+    const ValueId conditionIterable = expression(*loop.iterable, parameters);
+    const ValueId length = nextValue(ValueType::Int);
+    ir_.instructions.push_back(IrSliceLength{length, conditionIterable});
+    const ValueId condition = nextValue(ValueType::Bool);
+    ir_.instructions.push_back(IrBinary{condition, "<", conditionIndex, length,
+                                        ValueType::Bool, ValueType::Int});
+    ir_.instructions.push_back(IrBranch{condition, false, endLabel});
+
+    const ValueId itemIndex = nextValue(ValueType::Int);
+    ir_.instructions.push_back(IrLoad{itemIndex, iteratorSlot, ValueType::Int});
+    const ValueId itemIterable = expression(*loop.iterable, parameters);
+    const ValueId itemValue = nextValue(elementType);
+    ir_.instructions.push_back(IrIndexLoad{itemValue, itemIterable, itemIndex,
+                                           iterableType, false, true});
+
+    std::unordered_map<std::string, ValueId> loopParameters = parameters;
+    loopParameters.insert_or_assign(loop.item, itemValue);
+    loopLabels_.emplace_back(continueLabel, endLabel);
+
+    std::vector<std::string> localNames;
+    boxScopes_.emplace_back();
+    bool terminated = false;
+    for (const StatementPtr& statement : loop.body) {
+        std::visit([&](const auto& item) {
+            using T = std::decay_t<decltype(item)>;
+            if constexpr (std::is_same_v<T, Declaration>) {
+                localNames.push_back(item.name);
+                const ValueType localType = resolveType(item.type);
+                if (valueTypeNeedsDrop(localType))
+                    boxScopes_.back().push_back(item.name);
+                if (item.kind == BindingKind::Def) {
+                    symbols_.emplace(item.name, Symbol{0, item.kind, &item, false, item.name});
+                } else {
+                    const ValueId value = expression(*item.initializer, loopParameters);
+                    if (isMoveOnlyValueType(localType))
+                        if (const auto* source =
+                                std::get_if<NameExpr>(&item.initializer->value))
+                            movedBoxes_.insert(source->name);
+                    if (valueTypeNeedsDrop(localType) && isCopyValueType(localType) &&
+                        std::holds_alternative<NameExpr>(item.initializer->value))
+                        ir_.instructions.push_back(IrRetain{value, localType});
+                    const SlotId slot = ir_.slots.size();
+                    symbols_.emplace(item.name, Symbol{slot, item.kind, &item, false, item.name});
+                    ir_.slots.push_back(IrSlot{item.name, localType, false});
+                    ir_.instructions.push_back(IrStore{slot, value, localType});
+                }
+            } else if constexpr (std::is_same_v<T, Assignment>) {
+                const auto found = symbols_.find(item.name);
+                const ValueId value = expression(*item.value, loopParameters);
+                ir_.instructions.push_back(IrStore{found->second.slot, value,
+                    resolveType(found->second.declaration->type)});
+            } else if constexpr (std::is_same_v<T, IndexAssignment>) {
+                emitIndexStore(item, loopParameters);
+            } else if constexpr (std::is_same_v<T, FieldAssignment>) {
+                emitFieldStore(item, loopParameters);
+            } else if constexpr (std::is_same_v<T, DereferenceAssignment>) {
+                const ValueId reference = expression(*item.reference, loopParameters);
+                const ValueId value = expression(*item.value, loopParameters);
+                ir_.instructions.push_back(IrDereferenceStore{
+                    reference, value, resolveType(item.value->inferredType)});
+            } else if constexpr (std::is_same_v<T, WhileStatement>) {
+                emitLoop(item, loopParameters);
+            } else if constexpr (std::is_same_v<T, ForStatement>) {
+                emitForLoop(item, loopParameters);
+            } else if constexpr (std::is_same_v<T, ExpressionStatement>) {
+                expression(*item.expression, loopParameters);
+            } else if constexpr (std::is_same_v<T, ReturnStatement>) {
+                const ValueId value = expression(*item.value, loopParameters);
+                const ValueType returnType = resolveType(item.value->inferredType);
+                if (isMoveOnlyValueType(returnType))
+                    if (const auto* moved = std::get_if<NameExpr>(&item.value->value))
+                        movedBoxes_.insert(moved->name);
+                emitAllBoxDrops();
+                ir_.instructions.push_back(IrReturn{value, returnType});
+            } else if constexpr (std::is_same_v<T, BreakStatement>) {
+                emitBoxDrops(boxScopes_.back());
+                ir_.instructions.push_back(IrJump{endLabel});
+            } else {
+                emitBoxDrops(boxScopes_.back());
+                ir_.instructions.push_back(IrJump{continueLabel});
+            }
+        }, statement->value);
+        if (endsWithControlTerminator(ir_)) {
+            terminated = true;
+            break;
+        }
+    }
+    if (!terminated) emitBoxDrops(boxScopes_.back());
+    ir_.instructions.push_back(IrLabel{continueLabel});
+    const ValueId current = nextValue(ValueType::Int);
+    ir_.instructions.push_back(IrLoad{current, iteratorSlot, ValueType::Int});
+    const ValueId one = nextValue(ValueType::Int);
+    ir_.instructions.push_back(IrConst{one, 1, ValueType::Int});
+    const ValueId next = nextValue(ValueType::Int);
+    ir_.instructions.push_back(IrBinary{next, "+", current, one,
+                                        ValueType::Int, ValueType::Int});
+    ir_.instructions.push_back(IrStore{iteratorSlot, next, ValueType::Int});
+    ir_.instructions.push_back(IrJump{conditionLabel});
+    ir_.instructions.push_back(IrLabel{endLabel});
+    loopLabels_.pop_back();
+    for (auto name = localNames.rbegin(); name != localNames.rend(); ++name)
+        symbols_.erase(*name);
+    boxScopes_.pop_back();
+}
+
 void IrGenerator::emitLoop(
     const WhileStatement& loop,
     const std::unordered_map<std::string, ValueId>& parameters) {
@@ -809,6 +940,8 @@ void IrGenerator::emitLoop(
                     reference, value, resolveType(item.value->inferredType)});
             } else if constexpr (std::is_same_v<T, WhileStatement>) {
                 emitLoop(item, parameters);
+            } else if constexpr (std::is_same_v<T, ForStatement>) {
+                emitForLoop(item, parameters);
             } else if constexpr (std::is_same_v<T, ExpressionStatement>) {
                 expression(*item.expression, parameters);
             } else if constexpr (std::is_same_v<T, ReturnStatement>) {
@@ -1315,6 +1448,8 @@ ValueId IrGenerator::expression(
                             reference, value, resolveType(item.value->inferredType)});
                     } else if constexpr (std::is_same_v<S, WhileStatement>) {
                         emitLoop(item, parameters);
+                    } else if constexpr (std::is_same_v<S, ForStatement>) {
+                        emitForLoop(item, parameters);
                     } else if constexpr (std::is_same_v<S, ExpressionStatement>) {
                         expression(*item.expression, parameters);
                     } else if constexpr (std::is_same_v<S, ReturnStatement>) {

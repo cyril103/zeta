@@ -161,6 +161,7 @@ std::vector<Token> Lexer::scan() {
             if (text == "trait") kind = TokenKind::Trait;
             if (text == "impl") kind = TokenKind::Impl;
             if (text == "for") kind = TokenKind::For;
+            if (text == "in") kind = TokenKind::In;
             if (text == "match") kind = TokenKind::Match;
             if (text == "import") kind = TokenKind::Import;
             if (text == "pub") kind = TokenKind::Pub;

@@ -193,6 +193,9 @@ void collectStatementNames(const Statement& statement,
         } else if constexpr (std::is_same_v<T, WhileStatement>) {
             collectExpressionNames(*node.condition, uses);
             for (const StatementPtr& item : node.body) collectStatementNames(*item, uses);
+        } else if constexpr (std::is_same_v<T, ForStatement>) {
+            collectExpressionNames(*node.iterable, uses);
+            for (const StatementPtr& item : node.body) collectStatementNames(*item, uses);
         } else if constexpr (std::is_same_v<T, ExpressionStatement>) {
             collectExpressionNames(*node.expression, uses);
         } else if constexpr (std::is_same_v<T, ReturnStatement>) {
@@ -456,6 +459,7 @@ void SemanticAnalyzer::checkStatement(Statement& statement, bool global) {
         else if constexpr (std::is_same_v<T, DereferenceAssignment>)
             checkDereferenceAssignment(node);
         else if constexpr (std::is_same_v<T, WhileStatement>) checkLoop(node);
+        else if constexpr (std::is_same_v<T, ForStatement>) checkForLoop(node);
         else if constexpr (std::is_same_v<T, ExpressionStatement>) {
             if (global) {
                 throw CompileError(node.location,
@@ -909,6 +913,31 @@ void SemanticAnalyzer::checkLoop(WhileStatement& loop) {
     for (const StatementPtr& statement : loop.body)
         if (const auto* declaration = std::get_if<Declaration>(&statement->value))
             movedBoxes_.erase(declaration->name);
+    popBorrowScope();
+    symbols_.popScope();
+}
+
+void SemanticAnalyzer::checkForLoop(ForStatement& loop) {
+    const ValueType iterableType = inferType(*loop.iterable);
+    if (iterableType.kind != ValueType::Kind::Slice)
+        throw CompileError(loop.iterable->location,
+                           "la boucle 'for' exige une Slice ou SliceMut");
+    const ValueType elementType = *iterableType.element;
+    if (!isCopyValueType(elementType))
+        throw CompileError(loop.location,
+                           "la boucle 'for' par valeur exige un élément Copy");
+    loop.itemType = elementType;
+    checkExpression(*loop.iterable, iterableType);
+
+    symbols_.pushScope();
+    pushBorrowScope();
+    if (!symbols_.defineParameter(loop.item,
+            SemanticSymbol{elementType, BindingKind::Val, false, nullptr, true, {}}))
+        throw CompileError(loop.location,
+                           "variable de boucle '" + loop.item + "' déjà déclarée");
+    ++loopDepth_;
+    checkStatements(loop.body);
+    --loopDepth_;
     popBorrowScope();
     symbols_.popScope();
 }

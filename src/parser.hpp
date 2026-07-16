@@ -53,6 +53,7 @@ private:
     Statement assignment();
     Statement dereferenceAssignment();
     WhileStatement whileStatement();
+    ForStatement forStatement();
     std::vector<StatementPtr> loopBody();
     ExprPtr expression();
     ExprPtr logicalOr();

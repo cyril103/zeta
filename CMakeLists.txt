@@ -268,6 +268,7 @@ if(BUILD_TESTING)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_bounds.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_aggregate.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/sequences_iteration.zeta
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_iteration.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/stack.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/queue.zeta
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/option_module.zeta)
@@ -452,6 +453,12 @@ if(BUILD_TESTING)
         -o ${CMAKE_CURRENT_BINARY_DIR}/sequences-iteration)
     add_test(NAME run_sequences_iteration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/sequences-iteration)
     set_tests_properties(run_sequences_iteration PROPERTIES DEPENDS compile_sequences_iteration)
+
+    add_test(NAME compile_for_iteration COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_iteration.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/for-iteration)
+    add_test(NAME run_for_iteration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/for-iteration)
+    set_tests_properties(run_for_iteration PROPERTIES DEPENDS compile_for_iteration)
 
     add_test(NAME compile_empty_slice_option COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_zero_length.zeta

@@ -33,6 +33,7 @@ private:
     void checkFieldAssignment(FieldAssignment& assignment);
     void checkDereferenceAssignment(DereferenceAssignment& assignment);
     void checkLoop(WhileStatement& loop);
+    void checkForLoop(ForStatement& loop);
     void checkStatements(std::vector<StatementPtr>& statements,
                          const Expression* trailingExpression = nullptr);
     void pushBorrowScope();

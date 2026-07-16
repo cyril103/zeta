@@ -1,0 +1,27 @@
+def sumSlice(values: Slice[Int]): Int = {
+    var total: Int = 0
+    for (value in values) do {
+        total = total + value
+    }
+    total
+}
+
+
+def sumSliceMut(values: SliceMut[Int]): Int = {
+    var total: Int = 0
+    for (value in values) do {
+        total = total + value
+    }
+    total
+}
+
+
+def main(): Int = {
+    val readValues: [Int; 3] = [1, 2, 3]
+    var mutableValues: [Int; 2] = [4, 5]
+
+    val readTotal: Int = sumSlice(Slice(&readValues))
+    val mutableTotal: Int = sumSliceMut(SliceMut(&mut mutableValues))
+
+    if (readTotal == 6 && mutableTotal == 9) 0 else 1
+}

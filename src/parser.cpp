@@ -736,6 +736,7 @@ Statement Parser::statement() {
     if (match(TokenKind::Var)) return declaration(BindingKind::Var);
     if (match(TokenKind::Def)) return declaration(BindingKind::Def);
     if (match(TokenKind::While)) return whileStatement();
+    if (match(TokenKind::For)) return forStatement();
     if (match(TokenKind::Return)) {
         const Token token = previous();
         return ReturnStatement{token.location, expression()};
@@ -770,6 +771,21 @@ WhileStatement Parser::whileStatement() {
     return WhileStatement{start.location, std::move(condition), loopBody()};
 }
 
+ForStatement Parser::forStatement() {
+    const Token start = previous();
+    consume(TokenKind::LeftParen, "'(' attendue après 'for'");
+    const Token& item = consume(TokenKind::Identifier,
+                                "nom de variable attendu dans la boucle 'for'");
+    consume(TokenKind::In, "'in' attendu après la variable de boucle");
+    expressionContinuation();
+    ExprPtr iterable = expression();
+    expressionContinuation();
+    consume(TokenKind::RightParen, "')' attendue après la source de la boucle");
+    consume(TokenKind::Do, "'do' attendu après la source de la boucle");
+    consume(TokenKind::LeftBrace, "'{' attendue après 'do'");
+    return ForStatement{start.location, item.text, std::move(iterable), loopBody()};
+}
+
 std::vector<StatementPtr> Parser::loopBody() {
     std::vector<StatementPtr> body;
     ++blockDepth_;
@@ -778,7 +794,8 @@ std::vector<StatementPtr> Parser::loopBody() {
         const bool startsStatement = check(TokenKind::Pub) || check(TokenKind::Native) ||
             check(TokenKind::Extend) ||
             check(TokenKind::Val) || check(TokenKind::Var) ||
-            check(TokenKind::Def) || check(TokenKind::While) || check(TokenKind::Return) ||
+            check(TokenKind::Def) || check(TokenKind::While) || check(TokenKind::For) ||
+            check(TokenKind::Return) ||
             check(TokenKind::Break) || check(TokenKind::Continue) ||
             startsAssignment();
         const bool startsDereferenceAssignment = check(TokenKind::Star) &&
@@ -1416,7 +1433,8 @@ ExprPtr Parser::blockExpression(SourceLocation location) {
         const bool startsDeclaration = check(TokenKind::Val) || check(TokenKind::Var) ||
                                        check(TokenKind::Extend) ||
                                        check(TokenKind::Def) || check(TokenKind::While) ||
-                                       check(TokenKind::Return) || check(TokenKind::Break) ||
+                                       check(TokenKind::For) || check(TokenKind::Return) ||
+                                       check(TokenKind::Break) ||
                                        check(TokenKind::Continue);
         const bool startsDereferenceAssignment = check(TokenKind::Star) &&
             current_ + 2 < tokens_.size() &&

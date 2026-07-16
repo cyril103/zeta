@@ -192,6 +192,8 @@ private:
 
     void emitLoop(const WhileStatement& loop,
                   const std::unordered_map<std::string, ValueId>& parameters);
+    void emitForLoop(const ForStatement& loop,
+                     const std::unordered_map<std::string, ValueId>& parameters);
     void emitIndexStore(const IndexAssignment& assignment,
                         const std::unordered_map<std::string, ValueId>& parameters);
     void emitFieldStore(const FieldAssignment& assignment,

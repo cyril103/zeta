@@ -392,6 +392,14 @@ struct WhileStatement {
     std::vector<StatementPtr> body;
 };
 
+struct ForStatement {
+    SourceLocation location;
+    std::string item;
+    ExprPtr iterable;
+    std::vector<StatementPtr> body;
+    ValueType itemType{ValueType::Int};
+};
+
 struct ExpressionStatement {
     SourceLocation location;
     ExprPtr expression;
@@ -422,7 +430,7 @@ struct TraitImplementation {
 };
 
 struct Statement {
-    std::variant<Declaration, Assignment, IndexAssignment, FieldAssignment, DereferenceAssignment, WhileStatement, ExpressionStatement, ReturnStatement,
+    std::variant<Declaration, Assignment, IndexAssignment, FieldAssignment, DereferenceAssignment, WhileStatement, ForStatement, ExpressionStatement, ReturnStatement,
                  BreakStatement, ContinueStatement> value;
 
     Statement(Declaration declaration) : value(std::move(declaration)) {}
@@ -431,6 +439,7 @@ struct Statement {
     Statement(FieldAssignment assignment) : value(std::move(assignment)) {}
     Statement(DereferenceAssignment assignment) : value(std::move(assignment)) {}
     Statement(WhileStatement loop) : value(std::move(loop)) {}
+    Statement(ForStatement loop) : value(std::move(loop)) {}
     Statement(ExpressionStatement expression) : value(std::move(expression)) {}
     Statement(ReturnStatement statement) : value(std::move(statement)) {}
     Statement(BreakStatement statement) : value(statement) {}
