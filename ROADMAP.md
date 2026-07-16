@@ -639,18 +639,20 @@ chaîne, mutation d'un `Vec` dont la vue `asSlice()` est active, réutilisation
 d'un `Vec` consommé par `for`, et ordre d'insertion de l'itération
 consommatrice.
 
-Prochaine étape : renforcer l'analyse d'emprunts dans les corps de boucle.
-Commencer par des tests RED où une vue `asSlice()`/`asSliceMut()` ou une
-référence d'élément n'est plus utilisée avant une mutation ou un déplacement
-ultérieur dans le même corps de boucle, puis livrer l'analyse de dernière
-utilisation minimale sans élargir les durées de vie lexicales existantes. Garder
-la contrainte : pas de trait public `Iterator`, pas d'allocation de state
-machine, et pas de copie implicite pour `T` non `Copy`.
+L'analyse d'emprunts dans les corps de boucle a été renforcée : les tests
+`loop_local_slice_last_use_allows_vec_push` et
+`loop_local_slice_mut_last_use_allows_vec_push` valident qu'une vue locale
+`asSlice()`/`asSliceMut()` est libérée à sa dernière utilisation avant une
+mutation ultérieure dans la même itération, tandis que
+`reject_for_iterable_slice_blocks_vec_push` verrouille l'emprunt caché de
+l'itérable d'un `for` jusqu'à la fin de la boucle. La contrainte reste inchangée :
+pas de trait public `Iterator`, pas d'allocation de state machine, et pas de
+copie implicite pour `T` non `Copy`.
+
+Prochaine étape : préparer `docs/LLVM_BACKEND_DESIGN.md` avec l'interface CLI, la
+forme du LLVM IR émis, le sous-ensemble initial `--emit-llvm`, le mapping des
+types Zeta, la stratégie runtime, le linkage avec `clang` et la matrice de tests
+FASM/Clang.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
-
-
-En parallèle, préparer `docs/LLVM_BACKEND_DESIGN.md` : interface CLI, forme du
-LLVM IR émis, mapping des types Zeta, stratégie runtime, linkage avec `clang`,
-matrice de tests FASM/Clang et limites du premier sous-ensemble `--emit-llvm`.

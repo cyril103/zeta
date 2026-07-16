@@ -235,7 +235,12 @@ déplacés par `tests/for_vec_consuming_drop_items.zeta`, et le rejet d'une
 réutilisation du vecteur déplacé par `tests/for_vec_consuming_use_after.zeta`.
 Le parcours Unicode est couvert par `tests/for_string_char_iteration.zeta` pour
 `String`, `tests/for_string_view_char_iteration.zeta` pour `StringView`, et
-`tests/for_string_mut_rejected.zeta` pour le rejet de `mut`.
+`tests/for_string_mut_rejected.zeta` pour le rejet de `mut`. L'analyse de
+dernière utilisation dans les corps de boucle est couverte par
+`tests/loop_local_slice_last_use_allows_vec_push.zeta` et
+`tests/loop_local_slice_mut_last_use_allows_vec_push.zeta` : une vue locale
+`asSlice()`/`asSliceMut()` peut être libérée avant une mutation ultérieure dans
+la même itération quand elle n'est plus utilisée.
 
 ## Interaction avec `Vec[T]`
 
@@ -248,9 +253,11 @@ Cela préserve les invariants existants : un parcours ne peut pas appeler `push`
 `pop`, `reserve`, `clear` ou déplacer le vecteur tant que la vue est vivante. La
 longueur parcourue reste donc stable. Les diagnostics négatifs couvrent maintenant
 la croissance via déclaration de slice (`vec_slice_blocks_growth`), la croissance
-via `for (value in values.asSlice())` (`for_borrow_conflict`), l'accès pendant une
-vue mutable (`vec_slice_mut_blocks_access`) et le déplacement pendant une vue
-partagée (`vec_slice_blocks_move`).
+via `for (value in values.asSlice())` (`for_borrow_conflict`), le cas où l'emprunt
+caché de l'itérable doit rester actif pendant tout le corps
+(`reject_for_iterable_slice_blocks_vec_push`), l'accès pendant une vue mutable
+(`vec_slice_mut_blocks_access`) et le déplacement pendant une vue partagée
+(`vec_slice_blocks_move`).
 
 En revanche, `for (value in values)` sur un `Vec[T]` propriétaire est une opération
 consommatrice : elle retire les éléments du vecteur et déplace le vecteur source.
@@ -304,8 +311,13 @@ La validation du protocole a précédé le sucre syntaxique. Les tests couvrent 
    `for (mut value in SliceMut[T])` est livrée sous forme de référence d'élément
    `&mut T`, y compris pour `T` non `Copy`.
 9. Ajouter l'itération consommatrice minimale de `Vec[T]` propriétaire. La tranche
-   `Vec[Box[Int]]` est livrée par retrait destructif depuis la fin, avec `drop`
-   automatique des éléments non déplacés et diagnostic use-after-move du vecteur.
+   `Vec[Box[Int]]` est livrée par retrait destructif en ordre d'insertion, avec
+   `drop` automatique des éléments non déplacés et diagnostic use-after-move du
+   vecteur.
+10. Renforcer l'analyse d'emprunts dans les corps de boucle. La première tranche
+    est livrée : les emprunts locaux sont libérés à leur dernière utilisation,
+    mais l'emprunt caché de l'itérable d'un `for` reste actif jusqu'à la fin de
+    la boucle.
 
 ## Décisions reportées
 
