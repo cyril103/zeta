@@ -1,0 +1,18 @@
+def consume(value: Box[Int]): Int = *value
+
+
+def main(): Int = {
+    var values: Vec[Box[Int]] = Vec[Box[Int]]()
+    values.push(Box(1))
+    values.push(Box(2))
+    values.push(Box(3))
+
+    var weight: Int = 1
+    var score: Int = 0
+    for (value in values) do {
+        score = score + consume(value) * weight
+        weight = weight * 10
+    }
+
+    if (score == 321) 0 else 1
+}

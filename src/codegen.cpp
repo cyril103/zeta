@@ -740,18 +740,30 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
             } else if constexpr (std::is_same_v<T, IrVecPopValue>) {
                 const std::string address = vecMutationAddress(program, item.target);
                 const std::size_t output = valueOffset(program, item.output);
+                const std::size_t elementSize = valueTypeSize(item.elementType);
+                const std::size_t id = resourceSequence++;
+                const std::string done = "ir_vec_pop_value_done_" + std::to_string(id);
                 emitVecMutationTargetSetup(out, program, item.target);
                 out << "    mov rax, qword " << displacedAddress(address, 8U) << "\n"
                     << "    test rax, rax\n"
                     << "    jz ir_array_bounds_error\n"
-                    << "    dec rax\n"
-                    << "    mov qword " << displacedAddress(address, 8U) << ", rax\n"
-                    << "    imul rax, " << valueTypeSize(item.elementType) << "\n"
-                    << "    mov rsi, qword " << address << "\n"
-                    << "    add rsi, rax\n";
+                    << "    mov rsi, qword " << address << "\n";
                 emitBlockCopy(out, "[rsi]",
                     "[rbp-" + std::to_string(output) + "]",
-                    valueTypeSize(item.elementType));
+                    elementSize);
+                out << "    mov rdx, qword " << displacedAddress(address, 8U) << "\n"
+                    << "    dec rdx\n"
+                    << "    mov qword " << displacedAddress(address, 8U) << ", rdx\n"
+                    << "    test rdx, rdx\n"
+                    << "    jz " << done << "\n"
+                    << "    mov rdi, qword " << address << "\n"
+                    << "    mov rsi, rdi\n"
+                    << "    add rsi, " << elementSize << "\n"
+                    << "    mov rcx, rdx\n"
+                    << "    imul rcx, " << elementSize << "\n"
+                    << "    cld\n"
+                    << "    rep movsb\n"
+                    << done << ":\n";
                 emitVecMutationTargetCleanup(out, item.target);
             } else if constexpr (std::is_same_v<T, IrVecSet>) {
                 const std::size_t id = resourceSequence++;

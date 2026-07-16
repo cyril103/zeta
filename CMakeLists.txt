@@ -502,6 +502,11 @@ if(BUILD_TESTING)
         -o ${CMAKE_CURRENT_BINARY_DIR}/for-vec-consuming-iteration)
     add_test(NAME run_for_vec_consuming_iteration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/for-vec-consuming-iteration)
     set_tests_properties(run_for_vec_consuming_iteration PROPERTIES DEPENDS compile_for_vec_consuming_iteration)
+    add_test(NAME compile_for_vec_consuming_order COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_vec_consuming_order.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/for-vec-consuming-order)
+    add_test(NAME run_for_vec_consuming_order COMMAND ${CMAKE_CURRENT_BINARY_DIR}/for-vec-consuming-order)
+    set_tests_properties(run_for_vec_consuming_order PROPERTIES DEPENDS compile_for_vec_consuming_order)
     add_test(NAME compile_for_vec_consuming_drop_items COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_vec_consuming_drop_items.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/for-vec-consuming-drop-items)
