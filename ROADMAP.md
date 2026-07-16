@@ -689,10 +689,14 @@ lisibles, au lieu de laisser le backend produire un `.ll` partiel.
 `reject_clang_backend_unsupported_global_aggregates` couvre le même garde-fou
 pour les globales agrégées (`pub val pair: Pair`, `pub val values: Vec[Int]`) et
 conserve séparément le diagnostic global `String` déjà existant.
+`compile_clang_backend_string_view` livre la première surface stdlib chaîne :
+`strings.view` et `strings.viewIsValid` sont abaissés directement côté LLVM pour
+des `String` locaux, produisent des `StringView` valides/invalides par paire
+`{ ptr, i64 }`, et restent comparés à FASM.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre runtime contrôlé : première surface stdlib chaîne très ciblée, avant
-toute généralisation.
+périmètre runtime contrôlé : recherche `strings.indexOf`/`strings.contains` très
+ciblée ou itération UTF-8 sur `StringView`, avant toute généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

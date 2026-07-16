@@ -209,6 +209,17 @@ reconstruit une paire `{ ptr, i64 }` pointant sur le début des bytes. Cette tra
 valide `lengthBytes`/`isEmpty` sur le résultat et compare l'exécution Clang à
 FASM. La libération explicite du buffer reste une amélioration runtime séparée.
 
+`compile_clang_backend_string_view` ajoute une première surface `stdlib/strings` :
+`strings.view(text, start, end)` est abaissé en LLVM sans appel runtime externe.
+Le backend extrait `{ ptr, i64 }`, vérifie `start >= 0`, `start <= end` et
+`end <= length`, calcule le pointeur par `getelementptr i8`, puis sélectionne soit
+la vue valide, soit `{ null, 0 }`. `strings.viewIsValid(view)` devient un test
+`icmp ne ptr ... null`. Pour éviter que l'import de `strings` force la génération
+LLVM de fonctions stdlib non utilisées et encore hors périmètre (`charAtByte`,
+`nextByteOffset`), le backend saute uniquement les fonctions `strings__*` non
+atteignables depuis l'exécutable courant ; les fonctions utilisateur non appelées
+restent émises afin de préserver les tests `--emit-llvm` historiques.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -269,3 +280,5 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : les diagnostics LLVM distinguent les agrégats globaux non supportés
   (`struct`, `Vec[T]`) avec des noms source lisibles, séparément des globales
   `String`.
+- fait : `--backend=clang` couvre `strings.view` et `strings.viewIsValid` comme
+  première surface stdlib chaîne ciblée.
