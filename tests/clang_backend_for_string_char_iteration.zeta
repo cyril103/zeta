@@ -1,0 +1,36 @@
+import strings
+
+
+def main(): Int = {
+    val text: String = "hé€🚀"
+    var textCount: Int = 0
+    var textTotal: Int = 0
+    for (value in text) do {
+        textTotal = textTotal + Int(value)
+        textCount = textCount + 1
+    }
+
+    val source: String = "ab🚀cd"
+    val view: StringView = strings.view(source, 1, 6)
+    var viewCount: Int = 0
+    var viewTotal: Int = 0
+    for (value in view) do {
+        viewTotal = viewTotal + Int(value)
+        viewCount = viewCount + 1
+    }
+
+    var score: Int = 0
+    while (textCount == 4 && score < 10) do {
+        score = score + 10
+    }
+    while (textTotal == Int('h') + Int('é') + Int('€') + Int('🚀') && score < 20) do {
+        score = score + 10
+    }
+    while (viewCount == 2 && score < 30) do {
+        score = score + 10
+    }
+    while (viewTotal == Int('b') + Int('🚀') && score < 40) do {
+        score = score + 10
+    }
+    score
+}

@@ -128,6 +128,11 @@ if(BUILD_TESTING)
         $<TARGET_FILE:zeta>
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/clang_backend_string_utf8_decode.zeta
         ${CMAKE_CURRENT_BINARY_DIR}/clang-backend-string-utf8-decode)
+    add_test(NAME compile_clang_backend_for_string_char_iteration COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_for_string_char_iteration.sh
+        $<TARGET_FILE:zeta>
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/clang_backend_for_string_char_iteration.zeta
+        ${CMAKE_CURRENT_BINARY_DIR}/clang-backend-for-string-char-iteration)
 
     add_test(NAME compile_public_struct_declaration COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_struct_declaration.zeta
