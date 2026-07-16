@@ -1,0 +1,8 @@
+import io
+
+
+def main(): Int = {
+    io.printInt(40)
+    io.printlnInt(2)
+    0
+}
