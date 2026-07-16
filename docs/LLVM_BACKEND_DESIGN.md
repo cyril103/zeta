@@ -180,6 +180,14 @@ un local `val greeting: String` échoue avec `backend LLVM: slot local non scala
 non supporté greeting: String`. Ces erreurs utilisent le nom source quand un slot
 IR a été qualifié par son module.
 
+`compile_clang_backend_string_literal` ajoute la première représentation LLVM
+positive des chaînes : `def main(): Int = "zeta".lengthBytes`. Les bytes du
+littéral sont émis en constante privée `@str.N = private unnamed_addr constant
+[N x i8] c"..."`, la valeur `String` reste une paire `{ ptr, i64 }`, et
+`IrStringLength` devient un `extractvalue` de la longueur suivi d'un `trunc i64`
+vers `i32` (`Int`). Le test compile avec Clang, exécute le binaire, et compare le
+code retour avec FASM.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -228,3 +236,4 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--backend=clang` couvre les imports de modules scalaires avec globales
   `Int`/`Bool` et comparaison d'exécution FASM.
 - fait : les diagnostics LLVM pour globales/slots non scalaires sont couverts.
+- fait : `--backend=clang` couvre un littéral `String` direct et `lengthBytes`.

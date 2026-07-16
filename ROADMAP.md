@@ -670,10 +670,14 @@ bibliothèque/stdlib non pris en charge. `compile_clang_backend_global_values`
 en comparant l'exécution Clang au backend FASM. `reject_clang_backend_unsupported_types`
 verrouille les diagnostics pour les slots globaux et locaux non scalaires (par
 exemple `String`) afin d'échouer avant toute génération de `.ll` partielle.
+`compile_clang_backend_string_literal` introduit la première représentation
+LLVM des chaînes : un littéral `String` direct est émis en constante globale
+`@str.N`, transporté comme paire `{ ptr, i64 }`, et `lengthBytes` extrait puis
+tronque la longueur vers `Int`; l'exécution reste comparée à FASM.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre runtime contrôlé : représenter une première constante chaîne/littéral
-simple côté LLVM, puis seulement ensuite agrégats et stdlib.
+périmètre runtime contrôlé : chaînes locales simples (`val text: String = ...`)
+ou `isEmpty`, puis seulement ensuite concaténation, agrégats et stdlib.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
