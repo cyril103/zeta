@@ -116,13 +116,19 @@ responsable des `retain`/`drop` et le backend ne fait qu'émettre les appels.
 
 Tranche recommandée :
 
-1. extraire une petite interface de backend ou, au minimum, ajouter
-   `LlvmIrCodeGenerator` en parallèle de `FasmCodeGenerator` ;
-2. ajouter les options CLI sans changer le comportement FASM par défaut ;
-3. implémenter `--emit-llvm` pour un programme `main(): Int = 42` ;
+1. fait : ajouter `LlvmIrCodeGenerator` en parallèle de `FasmCodeGenerator` ;
+2. fait : ajouter les options CLI sans changer le comportement FASM par défaut ;
+3. fait : implémenter `--emit-llvm` pour un programme `main(): Int = 42` ;
 4. ajouter `--backend=clang` uniquement après validation que le `.ll` minimal est
    accepté par `clang` ;
 5. élargir le générateur instruction par instruction.
+
+État actuel : `emit_llvm_minimal` vérifie la génération de `target triple`,
+`define i32 @main()`, `ret i32 42`, puis compile le `.ll` avec `clang` et exécute
+le binaire obtenu. La génération LLVM accepte seulement le squelette exécutable,
+`IrCall`, `IrConst(Int/Bool)`, `IrExit`, `IrFunctionStart` et `IrReturn(Int)`.
+Toute autre instruction échoue explicitement avec `backend LLVM: instruction non
+supportée ...`.
 
 ## Matrice de tests
 
@@ -151,8 +157,9 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 
 ## Critères de sortie de la première étape
 
-- `docs/LLVM_BACKEND_DESIGN.md` existe et définit le périmètre.
-- `--emit-llvm` produit un `.ll` minimal vérifiable pour `main(): Int = 42`.
-- Le backend FASM par défaut reste inchangé.
-- La roadmap pointe vers l'élargissement arithmétique/appels/branches après le
-  smoke test LLVM minimal.
+- fait : `docs/LLVM_BACKEND_DESIGN.md` existe et définit le périmètre.
+- fait : `--emit-llvm` produit un `.ll` minimal vérifiable pour
+  `main(): Int = 42`.
+- fait : le backend FASM par défaut reste inchangé.
+- fait : la roadmap pointe vers l'élargissement arithmétique/appels/branches
+  après le smoke test LLVM minimal.
