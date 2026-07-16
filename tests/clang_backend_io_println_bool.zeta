@@ -1,0 +1,8 @@
+import io
+
+
+def main(): Int = {
+    io.printBool(true)
+    io.printlnBool(false)
+    0
+}

@@ -642,6 +642,24 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 << value(item.arguments[0]) << ")\n";
             return true;
         }
+        if (item.function == "io__printBool" || item.function == "io__printlnBool") {
+            if (item.arguments.size() != 1 || item.argumentTypes.size() != 1 ||
+                item.argumentTypes[0] != ValueType::Bool || item.returnType != ValueType::Unit) {
+                throw std::runtime_error("backend LLVM: signature io.printBool/printlnBool non supportée");
+            }
+            const std::string base = "%v" + std::to_string(item.output);
+            const std::string data = base + ".bool_data";
+            const std::string length = base + ".bool_len";
+            out << "  " << data << " = select i1 " << value(item.arguments[0])
+                << ", ptr @zeta.bool.true, ptr @zeta.bool.false\n"
+                << "  " << length << " = select i1 " << value(item.arguments[0])
+                << ", i64 4, i64 5\n"
+                << "  call i64 @write(i32 1, ptr " << data << ", i64 " << length << ")\n";
+            if (item.function == "io__printlnBool") {
+                out << "  call i64 @write(i32 1, ptr @zeta.newline, i64 1)\n";
+            }
+            return true;
+        }
         if (item.function == "strings__view") {
             if (item.arguments.size() != 3 || item.argumentTypes.size() != 3 ||
                 item.argumentTypes[0] != ValueType::String || item.argumentTypes[1] != ValueType::Int ||
@@ -866,13 +884,20 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     const bool usesIoWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
-                return call->function == "io__print" || call->function == "io__println";
+                return call->function == "io__print" || call->function == "io__println" ||
+                       call->function == "io__printBool" || call->function == "io__printlnBool";
             return false;
         });
     const bool usesIoPrintf = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
                 return call->function == "io__printInt" || call->function == "io__printlnInt";
+            return false;
+        });
+    const bool usesIoBoolWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            if (const auto* call = std::get_if<IrCall>(&instruction))
+                return call->function == "io__printBool" || call->function == "io__printlnBool";
             return false;
         });
 
@@ -900,6 +925,10 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     }
     if (usesIoWrite) {
         out << "@zeta.newline = private unnamed_addr constant [1 x i8] c\"\\0A\", align 1\n";
+    }
+    if (usesIoBoolWrite) {
+        out << "@zeta.bool.true = private unnamed_addr constant [4 x i8] c\"true\", align 1\n"
+            << "@zeta.bool.false = private unnamed_addr constant [5 x i8] c\"false\", align 1\n";
     }
     if (usesIoPrintf) {
         out << "@zeta.fmt.int = private unnamed_addr constant [3 x i8] c\"%d\\00\", align 1\n"
@@ -938,7 +967,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 item->name.rfind("strings__", 0) == 0;
             const bool unreachableImportedIoFunction =
                 (!reachableFunctions.contains(item->name) || item->name == "io__printInt" ||
-                 item->name == "io__printlnInt") &&
+                 item->name == "io__printlnInt" || item->name == "io__printBool" ||
+                 item->name == "io__printlnBool") &&
                 item->name.rfind("io__", 0) == 0;
             if (unreachableImportedStringsFunction || unreachableImportedIoFunction) {
                 skippingFunction = true;
