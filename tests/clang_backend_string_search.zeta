@@ -1,0 +1,20 @@
+import strings
+
+def main(): Int = {
+    val text: String = "zeta zeta!"
+    val other: String = "no"
+    val haystack: StringView = strings.view(text, 0, text.lengthBytes)
+    val first: StringView = strings.view(text, 0, 4)
+    val second: StringView = strings.view(text, 5, 9)
+    val missing: StringView = strings.view(other, 0, other.lengthBytes)
+    val empty: StringView = strings.view(text, 4, 4)
+    var score: Int = strings.indexOf(haystack, second)
+    while (strings.contains(haystack, first) && score < 7) do {
+        score = score + 1
+    }
+    while (strings.contains(haystack, missing) && score < 17) do {
+        score = score + 10
+    }
+    score = score + strings.indexOf(haystack, empty)
+    score
+}

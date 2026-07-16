@@ -452,6 +452,10 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     auto unsupported = [](const char* instruction) -> void {
         throw std::runtime_error(std::string("backend LLVM: instruction non supportée ") + instruction);
     };
+    std::size_t syntheticBlock = 0;
+    auto nextSyntheticPrefix = [&](const std::string& stem) -> std::string {
+        return stem + std::to_string(syntheticBlock++);
+    };
     auto emitStringViewCall = [&](const IrCall& item) -> bool {
         if (item.function == "strings__view") {
             if (item.arguments.size() != 3 || item.argumentTypes.size() != 3 ||
@@ -502,6 +506,93 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             values[item.output] = output;
             return true;
         }
+        auto emitStringIndexOf = [&](const std::string& base, ValueId haystackId, ValueId needleId) -> std::string {
+            const std::string prefix = nextSyntheticPrefix("string_search");
+            const std::string invalidLabel = prefix + ".invalid";
+            const std::string rangeLabel = prefix + ".range";
+            const std::string emptyLabel = prefix + ".empty";
+            const std::string loopLabel = prefix + ".loop";
+            const std::string compareLabel = prefix + ".compare";
+            const std::string memcmpLabel = prefix + ".memcmp";
+            const std::string foundLabel = prefix + ".found";
+            const std::string nextLabel = prefix + ".next";
+            const std::string doneLabel = prefix + ".done";
+            const std::string hayPtr = extractStringPart(base + ".haystack", haystackId, 0);
+            const std::string hayLen = extractStringPart(base + ".haystack", haystackId, 1);
+            const std::string needlePtr = extractStringPart(base + ".needle", needleId, 0);
+            const std::string needleLen = extractStringPart(base + ".needle", needleId, 1);
+            const std::string hayValid = base + ".haystack_valid";
+            const std::string needleValid = base + ".needle_valid";
+            const std::string valid = base + ".valid";
+            const std::string isEmpty = base + ".empty";
+            const std::string fits = base + ".fits";
+            const std::string limit = base + ".limit";
+            const std::string index = base + ".index";
+            const std::string inRange = base + ".in_range";
+            const std::string candidate = base + ".candidate";
+            const std::string cmp = base + ".cmp";
+            const std::string match = base + ".match";
+            const std::string found32 = base + ".found32";
+            const std::string next = base + ".next";
+            out << "  " << hayValid << " = icmp ne ptr " << hayPtr << ", null\n"
+                << "  " << needleValid << " = icmp ne ptr " << needlePtr << ", null\n"
+                << "  " << valid << " = and i1 " << hayValid << ", " << needleValid << "\n"
+                << "  br i1 " << valid << ", label %" << rangeLabel << ", label %" << invalidLabel << "\n"
+                << invalidLabel << ":\n"
+                << "  br label %" << doneLabel << "\n"
+                << rangeLabel << ":\n"
+                << "  " << isEmpty << " = icmp eq i64 " << needleLen << ", 0\n"
+                << "  br i1 " << isEmpty << ", label %" << emptyLabel << ", label %" << loopLabel << "\n"
+                << emptyLabel << ":\n"
+                << "  br label %" << doneLabel << "\n"
+                << loopLabel << ":\n"
+                << "  " << fits << " = icmp ule i64 " << needleLen << ", " << hayLen << "\n"
+                << "  " << limit << " = sub i64 " << hayLen << ", " << needleLen << "\n"
+                << "  br i1 " << fits << ", label %" << compareLabel << ", label %" << invalidLabel << "\n"
+                << compareLabel << ":\n"
+                << "  " << index << " = phi i64 [ 0, %" << loopLabel << " ], [ " << next << ", %" << nextLabel << " ]\n"
+                << "  " << inRange << " = icmp ule i64 " << index << ", " << limit << "\n"
+                << "  br i1 " << inRange << ", label %" << memcmpLabel << ", label %" << invalidLabel << "\n"
+                << memcmpLabel << ":\n"
+                << "  " << candidate << " = getelementptr i8, ptr " << hayPtr << ", i64 " << index << "\n"
+                << "  " << cmp << " = call i32 @memcmp(ptr " << candidate << ", ptr " << needlePtr
+                << ", i64 " << needleLen << ")\n"
+                << "  " << match << " = icmp eq i32 " << cmp << ", 0\n"
+                << "  br i1 " << match << ", label %" << foundLabel << ", label %" << nextLabel << "\n"
+                << foundLabel << ":\n"
+                << "  " << found32 << " = trunc i64 " << index << " to i32\n"
+                << "  br label %" << doneLabel << "\n"
+                << nextLabel << ":\n"
+                << "  " << next << " = add i64 " << index << ", 1\n"
+                << "  br label %" << compareLabel << "\n"
+                << doneLabel << ":\n"
+                << "  " << base << " = phi i32 [ -1, %" << invalidLabel << " ], [ 0, %"
+                << emptyLabel << " ], [ " << found32 << ", %" << foundLabel << " ]\n";
+            return base;
+        };
+        if (item.function == "strings__indexOf") {
+            if (item.arguments.size() != 2 || item.argumentTypes.size() != 2 ||
+                item.argumentTypes[0] != ValueType::StringView || item.argumentTypes[1] != ValueType::StringView ||
+                item.returnType != ValueType::Int) {
+                throw std::runtime_error("backend LLVM: signature strings.indexOf non supportée");
+            }
+            const std::string output = "%v" + std::to_string(item.output);
+            values[item.output] = emitStringIndexOf(output, item.arguments[0], item.arguments[1]);
+            return true;
+        }
+        if (item.function == "strings__contains") {
+            if (item.arguments.size() != 2 || item.argumentTypes.size() != 2 ||
+                item.argumentTypes[0] != ValueType::StringView || item.argumentTypes[1] != ValueType::StringView ||
+                item.returnType != ValueType::Bool) {
+                throw std::runtime_error("backend LLVM: signature strings.contains non supportée");
+            }
+            const std::string index = emitStringIndexOf("%v" + std::to_string(item.output) + ".index",
+                item.arguments[0], item.arguments[1]);
+            const std::string output = "%v" + std::to_string(item.output);
+            out << "  " << output << " = icmp sge i32 " << index << ", 0\n";
+            values[item.output] = output;
+            return true;
+        }
         return false;
     };
     auto slotName = [&](SlotId id) -> std::string {
@@ -534,11 +625,20 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
 
     const bool usesStringConcat = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) { return std::holds_alternative<IrStringConcat>(instruction); });
+    const bool usesStringSearch = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            if (const auto* call = std::get_if<IrCall>(&instruction))
+                return call->function == "strings__indexOf" || call->function == "strings__contains";
+            return false;
+        });
 
     out << "target triple = \"x86_64-pc-linux-gnu\"\n\n";
     if (usesStringConcat) {
         out << "declare ptr @malloc(i64)\n"
             << "declare ptr @memcpy(ptr, ptr, i64)\n\n";
+    }
+    if (usesStringSearch) {
+        out << "declare i32 @memcmp(ptr, ptr, i64)\n\n";
     }
     for (const IrInstruction& instruction : program.instructions) {
         if (const auto* item = std::get_if<IrStringConst>(&instruction)) {
@@ -567,8 +667,6 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     emitScalarAllocas();
     bool openFunction = true;
     bool terminated = false;
-    std::size_t syntheticBlock = 0;
-
     bool skippingFunction = false;
     for (const IrInstruction& instruction : program.instructions) {
         if (const auto* item = std::get_if<IrFunctionStart>(&instruction)) {
@@ -577,7 +675,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 out << "}\n\n";
             }
             const bool unreachableImportedStringsFunction =
-                !reachableFunctions.contains(item->name) && item->name.rfind("strings__", 0) == 0;
+                (!reachableFunctions.contains(item->name) || item->name == "strings__contains") &&
+                item->name.rfind("strings__", 0) == 0;
             if (unreachableImportedStringsFunction) {
                 skippingFunction = true;
                 openFunction = false;
