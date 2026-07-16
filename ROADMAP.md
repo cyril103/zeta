@@ -664,11 +664,14 @@ validé par `compile_clang_backend_parameters`. FASM reste le backend par défau
 protégé par `run_fasm_backend_still_default`. Les diagnostics CLI du backend
 expérimental sont couverts par `reject_clang_backend_cli_diagnostics` : backend
 inconnu, `--emit-llvm` forcé vers FASM, et usage Clang/LLVM sur les modes
-bibliothèque/stdlib non pris en charge.
+bibliothèque/stdlib non pris en charge. `compile_clang_backend_global_values`
+élargit maintenant le périmètre runtime contrôlé aux imports de modules et aux
+`pub val` globales scalaires `Int`/`Bool` initialisées dans le wrapper principal,
+en comparant l'exécution Clang au backend FASM.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre runtime contrôlé (d'abord appels/valeurs scalaires sans dépendance
-native, puis seulement ensuite agrégats, chaînes et stdlib).
+périmètre runtime contrôlé : diagnostics LLVM pour les globales/types non
+scalaires, puis seulement ensuite agrégats, chaînes et stdlib.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

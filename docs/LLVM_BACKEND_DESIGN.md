@@ -165,6 +165,14 @@ et tentative d'utiliser Clang/LLVM sur les modes bibliothèque/stdlib. Ces modes
 restent exclus tant que les frontières objets/modules/runtime ne sont pas
 couvertes par des tests dédiés.
 
+`compile_clang_backend_global_values` couvre le premier périmètre runtime avec
+imports de modules : les fonctions scalaires importées étaient déjà représentées
+dans l'IR exécutable complet, et les `pub val` globales `Int`/`Bool` sont
+maintenant émises comme `@slotN = global ... 0`, initialisées dans le wrapper
+`@main`, puis relues par les fonctions importées via `load ..., ptr @slotN`. Le
+test compare le code de retour Clang au code de retour FASM pour éviter une
+divergence silencieuse entre backends.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -208,3 +216,5 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   sous-ensemble validé.
 - fait : le backend FASM par défaut reste inchangé et testé explicitement.
 - fait : les diagnostics CLI minimums du backend Clang/LLVM sont testés.
+- fait : `--backend=clang` couvre les imports de modules scalaires avec globales
+  `Int`/`Bool` et comparaison d'exécution FASM.
