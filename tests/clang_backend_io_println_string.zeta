@@ -1,0 +1,8 @@
+import io
+
+
+def main(): Int = {
+    val greeting: String = "zeta 🚀"
+    io.println(greeting)
+    0
+}

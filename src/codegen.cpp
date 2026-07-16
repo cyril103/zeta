@@ -618,6 +618,20 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         return base;
     };
     auto emitStringViewCall = [&](const IrCall& item) -> bool {
+        if (item.function == "io__print" || item.function == "io__println") {
+            if (item.arguments.size() != 1 || item.argumentTypes.size() != 1 ||
+                item.argumentTypes[0] != ValueType::String || item.returnType != ValueType::Unit) {
+                throw std::runtime_error("backend LLVM: signature io.print/println non supportée");
+            }
+            const std::string base = "%v" + std::to_string(item.output);
+            const std::string data = extractStringPart(base + ".string", item.arguments[0], 0);
+            const std::string length = extractStringPart(base + ".string", item.arguments[0], 1);
+            out << "  call i64 @write(i32 1, ptr " << data << ", i64 " << length << ")\n";
+            if (item.function == "io__println") {
+                out << "  call i64 @write(i32 1, ptr @zeta.newline, i64 1)\n";
+            }
+            return true;
+        }
         if (item.function == "strings__view") {
             if (item.arguments.size() != 3 || item.argumentTypes.size() != 3 ||
                 item.argumentTypes[0] != ValueType::String || item.argumentTypes[1] != ValueType::Int ||
@@ -839,6 +853,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 return call->function == "strings__indexOf" || call->function == "strings__contains";
             return false;
         });
+    const bool usesIoWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            if (const auto* call = std::get_if<IrCall>(&instruction))
+                return call->function == "io__print" || call->function == "io__println";
+            return false;
+        });
 
     out << "target triple = \"x86_64-pc-linux-gnu\"\n\n";
     if (usesStringConcat) {
@@ -849,12 +869,18 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     if (usesStringSearch) {
         out << "declare i32 @memcmp(ptr, ptr, i64)\n\n";
     }
+    if (usesIoWrite) {
+        out << "declare i64 @write(i32, ptr, i64)\n\n";
+    }
     for (const IrInstruction& instruction : program.instructions) {
         if (const auto* item = std::get_if<IrStringConst>(&instruction)) {
             out << "@str." << item->output << " = private unnamed_addr constant ["
                 << item->utf8.size() << " x i8] c\"" << llvmStringBytes(item->utf8)
                 << "\", align 1\n";
         }
+    }
+    if (usesIoWrite) {
+        out << "@zeta.newline = private unnamed_addr constant [1 x i8] c\"\\0A\", align 1\n";
     }
     for (SlotId id = 0; id < program.slots.size(); ++id) {
         const IrSlot& slot = program.slots[id];
@@ -887,7 +913,9 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 (!reachableFunctions.contains(item->name) || item->name == "strings__contains" ||
                  item->name == "strings__nextByteOffset") &&
                 item->name.rfind("strings__", 0) == 0;
-            if (unreachableImportedStringsFunction) {
+            const bool unreachableImportedIoFunction =
+                !reachableFunctions.contains(item->name) && item->name.rfind("io__", 0) == 0;
+            if (unreachableImportedStringsFunction || unreachableImportedIoFunction) {
                 skippingFunction = true;
                 openFunction = false;
                 terminated = true;
