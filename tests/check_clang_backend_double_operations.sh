@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+compiler="$1"
+source="$2"
+output="$3"
+rm -f "${output}" "${output}.ll" "${output}.ir" "${output}.asm" "${output}.fasm" "${output}.fasm.ir" "${output}.fasm.asm"
+rm -rf "${output}.modules" "${output}.fasm.modules"
+"${compiler}" "${source}" --backend=clang -o "${output}"
+test -x "${output}"
+test -f "${output}.ll"
+test -f "${output}.ir"
+test ! -e "${output}.asm"
+grep -Fq 'fadd double' "${output}.ll"
+grep -Fq 'fsub double' "${output}.ll"
+grep -Fq 'fmul double' "${output}.ll"
+grep -Fq 'fdiv double' "${output}.ll"
+grep -Fq 'fcmp oeq double' "${output}.ll"
+grep -Fq 'fcmp oge double' "${output}.ll"
+"${output}"
+"${compiler}" "${source}" -o "${output}.fasm" >/tmp/zeta-clang-backend-double-ops-fasm.log
+"${output}.fasm"

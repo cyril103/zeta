@@ -1,0 +1,8 @@
+def main(): Int = {
+    val score: Double = ((1.5 + 2.5) * 2.0) - (1.0 / 2.0)
+    if (score == 7.5) {
+        if ((1.25 + 0.75) == 2.0) {
+            if (3.0 >= 4.0) 3 else 0
+        } else 2
+    } else 1
+}

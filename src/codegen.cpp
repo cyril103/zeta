@@ -1204,28 +1204,44 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             out << fallthrough << ":\n";
             terminated = false;
         } else if (const auto* item = std::get_if<IrBinary>(&instruction)) {
-            if (item->operandType != ValueType::Int && item->operandType != ValueType::Bool)
+            if (item->operandType != ValueType::Int && item->operandType != ValueType::Bool &&
+                item->operandType != ValueType::Double)
                 throw std::runtime_error("backend LLVM: type opérande non supporté " +
                                          typeName(item->operandType));
             const std::string output = "%v" + std::to_string(item->output);
             if (item->op == "+" || item->op == "-" || item->op == "*" || item->op == "/") {
-                if (item->type != ValueType::Int || item->operandType != ValueType::Int)
+                if (item->type == ValueType::Int && item->operandType == ValueType::Int) {
+                    const char* operation = item->op == "+" ? "add nsw" :
+                        item->op == "-" ? "sub nsw" : item->op == "*" ? "mul nsw" : "sdiv";
+                    out << "  " << output << " = " << operation << " i32 "
+                        << value(item->left) << ", " << value(item->right) << "\n";
+                } else if (item->type == ValueType::Double && item->operandType == ValueType::Double) {
+                    const char* operation = item->op == "+" ? "fadd" :
+                        item->op == "-" ? "fsub" : item->op == "*" ? "fmul" : "fdiv";
+                    out << "  " << output << " = " << operation << " double "
+                        << value(item->left) << ", " << value(item->right) << "\n";
+                } else {
                     throw std::runtime_error("backend LLVM: opération scalaire non supportée " + item->op);
-                const char* operation = item->op == "+" ? "add nsw" :
-                    item->op == "-" ? "sub nsw" : item->op == "*" ? "mul nsw" : "sdiv";
-                out << "  " << output << " = " << operation << " i32 "
-                    << value(item->left) << ", " << value(item->right) << "\n";
+                }
                 values[item->output] = output;
             } else if (item->op == "==" || item->op == "!=" || item->op == "<" ||
                        item->op == "<=" || item->op == ">" || item->op == ">=") {
                 if (item->type != ValueType::Bool)
                     throw std::runtime_error("backend LLVM: comparaison non booléenne non supportée");
-                const char* predicate = item->op == "==" ? "eq" : item->op == "!=" ? "ne" :
-                    item->op == "<" ? "slt" : item->op == "<=" ? "sle" :
-                    item->op == ">" ? "sgt" : "sge";
-                out << "  " << output << " = icmp " << predicate << " "
-                    << llvmType(item->operandType) << " " << value(item->left) << ", "
-                    << value(item->right) << "\n";
+                if (item->operandType == ValueType::Double) {
+                    const char* predicate = item->op == "==" ? "oeq" : item->op == "!=" ? "one" :
+                        item->op == "<" ? "olt" : item->op == "<=" ? "ole" :
+                        item->op == ">" ? "ogt" : "oge";
+                    out << "  " << output << " = fcmp " << predicate << " double "
+                        << value(item->left) << ", " << value(item->right) << "\n";
+                } else {
+                    const char* predicate = item->op == "==" ? "eq" : item->op == "!=" ? "ne" :
+                        item->op == "<" ? "slt" : item->op == "<=" ? "sle" :
+                        item->op == ">" ? "sgt" : "sge";
+                    out << "  " << output << " = icmp " << predicate << " "
+                        << llvmType(item->operandType) << " " << value(item->left) << ", "
+                        << value(item->right) << "\n";
+                }
                 values[item->output] = output;
             } else if (item->op == "&&" || item->op == "||") {
                 if (item->type != ValueType::Bool || item->operandType != ValueType::Bool)
