@@ -317,9 +317,12 @@ une chaîne `insertvalue`, les slots locaux deviennent `alloca { ... }`, `store`
 `load` copient l'agrégat entier, et les lectures de champ utilisent `extractvalue`.
 `compile_clang_backend_local_struct_field_store` ajoute ensuite la mutation de
 champ locale : le backend recharge la valeur du slot, remplace le champ visé par
-`insertvalue`, puis restocke l'agrégat complet. Cette tranche reste volontairement
-locale : les globales struct, les paramètres/retours de structs et les champs hors
-sous-ensemble (`Box`, `Vec`, tableaux, enums) restent hors périmètre.
+`insertvalue`, puis restocke l'agrégat complet. `compile_clang_backend_struct_function_abi`
+étend ce même sous-ensemble aux signatures de fonctions : paramètres, retours et
+appels portent directement le type agrégat LLVM littéral (`{ i32, i32 }`) lorsque
+chaque champ est déjà supporté. Cette tranche reste volontairement limitée : les
+globales struct et les champs hors sous-ensemble (`Box`, `Vec`, tableaux, enums)
+restent hors périmètre.
 
 ## Matrice de tests
 
@@ -413,3 +416,6 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--backend=clang` couvre les mutations de champs de `struct` locaux
   simples par `load` de l'agrégat, `insertvalue` du champ remplacé, puis `store`
   de l'agrégat complet, avec exécution Clang et FASM.
+- fait : `--backend=clang` couvre les paramètres, retours et appels de fonctions
+  portant des `struct` simples, en émettant directement les signatures LLVM en
+  agrégats littéraux (`{ i32, i32 }`), avec exécution Clang et FASM.

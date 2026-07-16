@@ -739,14 +739,17 @@ les `struct` locaux dont tous les champs sont déjà dans le sous-ensemble LLVM 
 abaissés en agrégats LLVM littéraux (`{ i32, ... }`), construits par `insertvalue`,
 stockés/chargés localement, puis lus par `extractvalue`. `compile_clang_backend_local_struct_field_store`
 ajoute la mutation de champ locale en rechargeant l'agrégat, en le réécrivant par
-`insertvalue`, puis en le restockant. Les agrégats globaux et les structs contenant
-`Box`/`Vec`/tableaux restent rejetés explicitement.
+`insertvalue`, puis en le restockant. `compile_clang_backend_struct_function_abi`
+étend ce sous-ensemble aux paramètres, retours et appels de fonctions portant des
+structs simples, en conservant le type agrégat LLVM littéral dans la signature.
+Les agrégats globaux et les structs contenant `Box`/`Vec`/tableaux restent rejetés
+explicitement.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre contrôlé : paramètres/retours de structs simples, structs locaux imbriqués
-ou mixtes (`Bool`/`Byte`/`Char`/`Double`/`String`), `io.print`/`println` pour
-chaînes heap concaténées, ou gestion plus complète de propriété/retain des chaînes
-heap, avant toute généralisation.
+périmètre contrôlé : structs locaux imbriqués ou mixtes
+(`Bool`/`Byte`/`Char`/`Double`/`String`), `io.print`/`println` pour chaînes heap
+concaténées, ou gestion plus complète de propriété/retain des chaînes heap, avant
+toute généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
