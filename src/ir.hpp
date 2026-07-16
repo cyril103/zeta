@@ -54,6 +54,9 @@ struct IrVecGet {
 struct IrVecPop {
     ValueId output; IrVecMutationTarget target; ValueType optionType; ValueType elementType;
 };
+struct IrVecPopValue {
+    ValueId output; IrVecMutationTarget target; ValueType elementType;
+};
 struct IrVecSet {
     ValueId output; IrVecMutationTarget target; ValueId index; ValueId value;
     ValueType elementType;
@@ -144,7 +147,7 @@ struct IrExit { ValueId value; };
 struct IrBranch { ValueId condition; bool jumpWhenTrue; std::size_t label; };
 struct IrJump { std::size_t label; };
 struct IrLabel { std::size_t label; };
-using IrInstruction = std::variant<IrUnit, IrConst, IrDoubleConst, IrStringConst, IrStringConcat, IrStringLength, IrStringEmpty, IrArrayConstruct, IrVecConstruct, IrVecProperty, IrVecReserve, IrVecPush, IrVecClear, IrVecView, IrVecGet, IrVecPop, IrVecSet, IrStructConstruct, IrEnumConstruct, IrEnumTag, IrEnumFieldLoad, IrFieldLoad, IrFieldStore, IrSliceConstruct, IrSliceLength, IrBoxConstruct, IrIndexLoad, IrIndexAddress, IrIndexStore, IrAddressOf, IrDereference, IrDereferenceStore, IrLoad, IrConvert, IrUnary, IrBinary,
+using IrInstruction = std::variant<IrUnit, IrConst, IrDoubleConst, IrStringConst, IrStringConcat, IrStringLength, IrStringEmpty, IrArrayConstruct, IrVecConstruct, IrVecProperty, IrVecReserve, IrVecPush, IrVecClear, IrVecView, IrVecGet, IrVecPop, IrVecPopValue, IrVecSet, IrStructConstruct, IrEnumConstruct, IrEnumTag, IrEnumFieldLoad, IrFieldLoad, IrFieldStore, IrSliceConstruct, IrSliceLength, IrBoxConstruct, IrIndexLoad, IrIndexAddress, IrIndexStore, IrAddressOf, IrDereference, IrDereferenceStore, IrLoad, IrConvert, IrUnary, IrBinary,
                                    IrStore, IrCopy, IrCall, IrTailCall, IrFunctionStart, IrParameter,
                                    IrReturn, IrDrop, IrRetain, IrExit, IrBranch, IrJump, IrLabel>;
 

@@ -655,6 +655,22 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                     << "    mov dword [rbp-" << output << "], " << none << "\n"
                     << done << ":\n";
                 emitVecMutationTargetCleanup(out, item.target);
+            } else if constexpr (std::is_same_v<T, IrVecPopValue>) {
+                const std::string address = vecMutationAddress(program, item.target);
+                const std::size_t output = valueOffset(program, item.output);
+                emitVecMutationTargetSetup(out, program, item.target);
+                out << "    mov rax, qword " << displacedAddress(address, 8U) << "\n"
+                    << "    test rax, rax\n"
+                    << "    jz ir_array_bounds_error\n"
+                    << "    dec rax\n"
+                    << "    mov qword " << displacedAddress(address, 8U) << ", rax\n"
+                    << "    imul rax, " << valueTypeSize(item.elementType) << "\n"
+                    << "    mov rsi, qword " << address << "\n"
+                    << "    add rsi, rax\n";
+                emitBlockCopy(out, "[rsi]",
+                    "[rbp-" + std::to_string(output) + "]",
+                    valueTypeSize(item.elementType));
+                emitVecMutationTargetCleanup(out, item.target);
             } else if constexpr (std::is_same_v<T, IrVecSet>) {
                 const std::size_t id = resourceSequence++;
                 const std::string address = vecMutationAddress(program, item.target);
@@ -1356,6 +1372,7 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
         hasArrayAccess = hasArrayAccess || std::holds_alternative<IrIndexLoad>(instruction) ||
                          std::holds_alternative<IrIndexAddress>(instruction) ||
                          std::holds_alternative<IrIndexStore>(instruction) ||
+                         std::holds_alternative<IrVecPopValue>(instruction) ||
                          std::holds_alternative<IrVecSet>(instruction);
     if (hasArrayAccess) {
         out << "\nir_array_bounds_error:\n"

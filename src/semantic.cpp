@@ -920,10 +920,12 @@ void SemanticAnalyzer::checkLoop(WhileStatement& loop) {
 void SemanticAnalyzer::checkForLoop(ForStatement& loop) {
     const ValueType iterableType = inferType(*loop.iterable);
     if (iterableType.kind != ValueType::Kind::Slice &&
-        iterableType.kind != ValueType::Kind::Array)
+        iterableType.kind != ValueType::Kind::Array &&
+        iterableType.kind != ValueType::Kind::Vec)
         throw CompileError(loop.iterable->location,
-                           "la boucle 'for' exige une Slice, SliceMut ou un tableau");
+                           "la boucle 'for' exige une Slice, SliceMut, Vec ou un tableau");
     const ValueType elementType = *iterableType.element;
+    const bool consumingVec = iterableType.kind == ValueType::Kind::Vec;
     ValueType itemType = elementType;
     if (loop.mutableItem) {
         if (iterableType.kind != ValueType::Kind::Slice ||
@@ -931,9 +933,25 @@ void SemanticAnalyzer::checkForLoop(ForStatement& loop) {
             throw CompileError(loop.location,
                                "la boucle 'for mut' exige une SliceMut");
         itemType = ValueType(std::make_shared<ValueType>(elementType), true);
-    } else if (!isCopyValueType(elementType))
+    } else if (!consumingVec && !isCopyValueType(elementType))
         throw CompileError(loop.location,
                            "la boucle 'for' par valeur exige un élément Copy");
+    if (consumingVec) {
+        if (const auto* vectorName = std::get_if<NameExpr>(&loop.iterable->value)) {
+            if (const auto borrowed = borrows_.find(vectorName->name);
+                borrowed != borrows_.end() &&
+                (borrowed->second.mutableBorrow || borrowed->second.shared != 0))
+                throw CompileError(loop.iterable->location,
+                                   "le Vec '" + vectorName->name + "' est emprunté");
+            if (movedBoxes_.contains(vectorName->name))
+                throw CompileError(loop.iterable->location,
+                                   "utilisation de '" + vectorName->name +
+                                       "' après son déplacement");
+        } else {
+            throw CompileError(loop.iterable->location,
+                               "l'itération consommatrice exige un Vec nommé");
+        }
+    }
     if (symbols_.lookup(loop.item) != nullptr)
         throw CompileError(loop.location,
                            "variable de boucle '" + loop.item + "' déjà déclarée");
@@ -975,6 +993,9 @@ void SemanticAnalyzer::checkForLoop(ForStatement& loop) {
     checkStatements(loop.body);
     --loopDepth_;
     symbols_.popScope();
+    if (consumingVec)
+        if (const auto* vectorName = std::get_if<NameExpr>(&loop.iterable->value))
+            movedBoxes_.insert(vectorName->name);
     popBorrowScope();
 }
 

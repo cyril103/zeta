@@ -1,0 +1,11 @@
+def main(): Int = {
+    var values: Vec[Box[Int]] = Vec[Box[Int]]()
+    values.push(Box(1))
+    values.push(Box(2))
+
+    for (value in values) do {
+        *value
+    }
+
+    0
+}

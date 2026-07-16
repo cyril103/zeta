@@ -88,6 +88,7 @@ std::optional<ValueId> outputOf(const IrInstruction& instruction) {
                       std::is_same_v<T, IrVecView> ||
                       std::is_same_v<T, IrVecGet> ||
                       std::is_same_v<T, IrVecPop> ||
+                      std::is_same_v<T, IrVecPopValue> ||
                       std::is_same_v<T, IrVecSet> ||
                       std::is_same_v<T, IrStructConstruct> ||
                       std::is_same_v<T, IrEnumConstruct> ||
@@ -152,7 +153,8 @@ std::vector<ValueId> readsOf(const IrInstruction& instruction) {
             if (item.target.reference) return {*item.target.reference, item.index};
             return {item.index};
         }
-        else if constexpr (std::is_same_v<T, IrVecPop>) {
+        else if constexpr (std::is_same_v<T, IrVecPop> ||
+                           std::is_same_v<T, IrVecPopValue>) {
             if (item.target.reference) return {*item.target.reference};
             return {};
         }
@@ -225,6 +227,7 @@ std::vector<SlotId> slotsOf(const IrInstruction& instruction) {
                       std::is_same_v<T, IrVecClear> ||
                       std::is_same_v<T, IrVecGet> ||
                       std::is_same_v<T, IrVecPop> ||
+                      std::is_same_v<T, IrVecPopValue> ||
                       std::is_same_v<T, IrVecSet>) {
             if (item.target.slot) return {*item.target.slot};
         } else if constexpr (std::is_same_v<T, IrVecView>) {
@@ -477,6 +480,12 @@ void verifyInstructionTypes(const IrProgram& program, const IrInstruction& instr
             if constexpr (std::is_same_v<T, IrVecGet>)
                 expectValueType(program, item.index, ValueType::Int, context);
             expectOutputType(program, item.output, item.optionType, context);
+        } else if constexpr (std::is_same_v<T, IrVecPopValue>) {
+            concrete(item.elementType);
+            const ValueType vector(ValueType::Kind::Vec,
+                std::make_shared<ValueType>(item.elementType));
+            expectVecTargetType(program, item.target, vector, context, true);
+            expectOutputType(program, item.output, item.elementType, context);
         } else if constexpr (std::is_same_v<T, IrVecSet>) {
             concrete(item.elementType);
             const ValueType vector(ValueType::Kind::Vec,
@@ -721,7 +730,7 @@ IrVerificationError::IrVerificationError(std::string code, const std::string& me
     : std::runtime_error("[" + code + "] " + message), code_(std::move(code)) {}
 
 VerifiedIrProgram IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
-    static_assert(std::variant_size_v<IrInstruction> == 49,
+    static_assert(std::variant_size_v<IrInstruction> == 50,
                   "mettre à jour l'inventaire du vérificateur d'IR");
     if (program.valueCount != program.valueTypes.size())
         fail("IRV001", "valueCount=" + std::to_string(program.valueCount) +

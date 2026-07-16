@@ -788,32 +788,46 @@ void IrGenerator::emitForLoop(
         const ValueId conditionIterable = expression(*loop.iterable, parameters);
         length = nextValue(ValueType::Int);
         ir_.instructions.push_back(IrSliceLength{length, conditionIterable});
+    } else if (iterableType.kind == ValueType::Kind::Vec) {
+        length = nextValue(ValueType::Int);
+        ir_.instructions.push_back(IrVecProperty{length,
+            vecTarget(*loop.iterable, parameters), iterableType, "length"});
     } else {
         length = nextValue(ValueType::Int);
         ir_.instructions.push_back(IrConst{length,
             static_cast<int>(iterableType.length), ValueType::Int});
     }
     const ValueId condition = nextValue(ValueType::Bool);
-    ir_.instructions.push_back(IrBinary{condition, "<", conditionIndex, length,
+    const ValueId conditionLeft = iterableType.kind == ValueType::Kind::Vec ? zero : conditionIndex;
+    ir_.instructions.push_back(IrBinary{condition, "<", conditionLeft, length,
                                         ValueType::Bool, ValueType::Int});
     ir_.instructions.push_back(IrBranch{condition, false, endLabel});
 
     const ValueId itemIndex = nextValue(ValueType::Int);
     ir_.instructions.push_back(IrLoad{itemIndex, iteratorSlot, ValueType::Int});
-    const ValueId itemIterable = expression(*loop.iterable, parameters);
     const ValueId itemValue = nextValue(loopItemType);
     const bool iterableIsSlice = iterableType.kind == ValueType::Kind::Slice;
-    if (loop.mutableItem) {
-        ir_.instructions.push_back(IrIndexAddress{itemValue, itemIterable, itemIndex,
-                                                 iterableType, false, iterableIsSlice});
+    if (iterableType.kind == ValueType::Kind::Vec) {
+        ir_.instructions.push_back(IrVecPopValue{itemValue,
+            vecTarget(*loop.iterable, parameters), elementType});
     } else {
-        ir_.instructions.push_back(IrIndexLoad{itemValue, itemIterable, itemIndex,
-                                             iterableType, false, iterableIsSlice});
+        const ValueId itemIterable = expression(*loop.iterable, parameters);
+        if (loop.mutableItem) {
+            ir_.instructions.push_back(IrIndexAddress{itemValue, itemIterable, itemIndex,
+                                                     iterableType, false, iterableIsSlice});
+        } else {
+            ir_.instructions.push_back(IrIndexLoad{itemValue, itemIterable, itemIndex,
+                                                 iterableType, false, iterableIsSlice});
+        }
     }
 
     std::unordered_map<std::string, ValueId> loopParameters = parameters;
     loopParameters.insert_or_assign(loop.item, itemValue);
     loopLabels_.emplace_back(continueLabel, endLabel);
+    const auto emitLoopItemDrop = [&]() {
+        if (valueTypeNeedsDrop(loopItemType) && !movedBoxes_.contains(loop.item))
+            ir_.instructions.push_back(IrDrop{itemValue, loopItemType});
+    };
 
     std::vector<std::string> localNames;
     boxScopes_.emplace_back();
@@ -868,12 +882,15 @@ void IrGenerator::emitForLoop(
                 if (isMoveOnlyValueType(returnType))
                     if (const auto* moved = std::get_if<NameExpr>(&item.value->value))
                         movedBoxes_.insert(moved->name);
+                emitLoopItemDrop();
                 emitAllBoxDrops();
                 ir_.instructions.push_back(IrReturn{value, returnType});
             } else if constexpr (std::is_same_v<T, BreakStatement>) {
+                emitLoopItemDrop();
                 emitBoxDrops(boxScopes_.back());
                 ir_.instructions.push_back(IrJump{endLabel});
             } else {
+                emitLoopItemDrop();
                 emitBoxDrops(boxScopes_.back());
                 ir_.instructions.push_back(IrJump{continueLabel});
             }
@@ -883,7 +900,11 @@ void IrGenerator::emitForLoop(
             break;
         }
     }
-    if (!terminated) emitBoxDrops(boxScopes_.back());
+    if (!terminated) {
+        emitLoopItemDrop();
+        emitBoxDrops(boxScopes_.back());
+    }
+    movedBoxes_.erase(loop.item);
     ir_.instructions.push_back(IrLabel{continueLabel});
     const ValueId current = nextValue(ValueType::Int);
     ir_.instructions.push_back(IrLoad{current, iteratorSlot, ValueType::Int});
@@ -1696,6 +1717,9 @@ std::string IrGenerator::print(const VerifiedIrProgram& verified) {
                     << vecTarget(item.target) << ", $" << item.index << '\n';
             else if constexpr (std::is_same_v<T, IrVecPop>)
                 out << "  $" << item.output << " = vec_pop "
+                    << vecTarget(item.target) << '\n';
+            else if constexpr (std::is_same_v<T, IrVecPopValue>)
+                out << "  $" << item.output << " = vec_pop_value "
                     << vecTarget(item.target) << '\n';
             else if constexpr (std::is_same_v<T, IrVecSet>)
                 out << "  $" << item.output << " = vec_set "

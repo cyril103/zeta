@@ -497,6 +497,20 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_mutable_requires_mutable_view.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/for-mutable-requires-mutable-view)
     set_tests_properties(reject_for_mutable_requires_mutable_view PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_for_vec_consuming_iteration COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_vec_consuming_iteration.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/for-vec-consuming-iteration)
+    add_test(NAME run_for_vec_consuming_iteration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/for-vec-consuming-iteration)
+    set_tests_properties(run_for_vec_consuming_iteration PROPERTIES DEPENDS compile_for_vec_consuming_iteration)
+    add_test(NAME compile_for_vec_consuming_drop_items COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_vec_consuming_drop_items.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/for-vec-consuming-drop-items)
+    add_test(NAME run_for_vec_consuming_drop_items COMMAND ${CMAKE_CURRENT_BINARY_DIR}/for-vec-consuming-drop-items)
+    set_tests_properties(run_for_vec_consuming_drop_items PROPERTIES DEPENDS compile_for_vec_consuming_drop_items)
+    add_test(NAME reject_for_vec_consuming_use_after COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_vec_consuming_use_after.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/for-vec-consuming-use-after)
+    set_tests_properties(reject_for_vec_consuming_use_after PROPERTIES WILL_FAIL TRUE)
 
     add_test(NAME compile_empty_slice_option COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_zero_length.zeta

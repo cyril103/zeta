@@ -1,0 +1,16 @@
+def consume(value: Box[Int]): Int = *value
+
+
+def main(): Int = {
+    var values: Vec[Box[Int]] = Vec[Box[Int]]()
+    values.push(Box(1))
+    values.push(Box(2))
+    values.push(Box(3))
+
+    var total: Int = 0
+    for (value in values) do {
+        total = total + consume(value)
+    }
+
+    if (total == 6) 0 else 1
+}
