@@ -697,10 +697,15 @@ des `String` locaux, produisent des `StringView` valides/invalides par paire
 `strings.indexOf`/`strings.contains` sur `StringView`, avec boucle LLVM locale,
 appel `memcmp`, gestion de l'aiguille vide, des vues invalides et comparaison
 d'exécution FASM.
+`compile_clang_backend_string_utf8_decode` ajoute les primitives UTF-8
+`strings.decodeAtByte` et `strings.nextByteOffset` pour `String` : décodage 1/2/3/4
+octets, rejet des offsets invalides/continuations, progression par largeur UTF-8
+et comparaison d'exécution FASM.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre runtime contrôlé : itération UTF-8 sur `StringView` ou premier
-nettoyage runtime `drop/free` des chaînes concaténées, avant toute généralisation.
+périmètre runtime contrôlé : itération UTF-8 sur `StringView`/`String` via syntaxe
+`for` ou premier nettoyage runtime `drop/free` des chaînes concaténées, avant
+toute généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

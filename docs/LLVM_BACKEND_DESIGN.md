@@ -230,6 +230,16 @@ sautée côté LLVM, car les appels sont remplacés directement par cette primit
 spécialisée. Cette tranche ne définit pas encore d'ABI native générale pour les
 fonctions `StringView`.
 
+`compile_clang_backend_string_utf8_decode` ajoute les primitives UTF-8 de bas
+niveau sur `String`. `strings.decodeAtByte(text, offset)` extrait la paire chaîne,
+vérifie `offset >= 0 && offset < length`, lit le premier octet, puis produit un
+codepoint `Int` pour les séquences 1, 2, 3 ou 4 octets avec validation des octets
+de continuation ; les offsets invalides ou placés sur une continuation retournent
+`-1`. `strings.nextByteOffset(text, offset)` réutilise ce décodage spécialisé et
+avance de 1/2/3/4 octets, ou retourne `-1` si le décodage échoue. La tranche reste
+centrée sur `String` et ne couvre pas encore `charAtByte`/`Option[Char]`, ni une
+itération `for` directe sur `StringView`.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -294,3 +304,5 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   première surface stdlib chaîne ciblée.
 - fait : `--backend=clang` couvre `strings.indexOf` et `strings.contains` sur
   `StringView` via un lowering spécialisé et comparaison d'exécution FASM.
+- fait : `--backend=clang` couvre `strings.decodeAtByte` et
+  `strings.nextByteOffset` sur `String` pour les séquences UTF-8 1/2/3/4 octets.
