@@ -396,8 +396,9 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     auto unsupported = [](const char* instruction) -> void {
         throw std::runtime_error(std::string("backend LLVM: instruction non supportée ") + instruction);
     };
-    auto slotName = [](SlotId id) -> std::string {
-        return "%slot" + std::to_string(id);
+    auto slotName = [&](SlotId id) -> std::string {
+        const IrSlot& slot = program.slots.at(id);
+        return std::string(slot.global || slot.external ? "@slot" : "%slot") + std::to_string(id);
     };
     auto labelName = [](std::size_t id) -> std::string {
         return "label" + std::to_string(id);
@@ -412,8 +413,20 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         }
     };
 
-    out << "target triple = \"x86_64-pc-linux-gnu\"\n\n"
-        << "define i32 @main() {\nentry:\n";
+    out << "target triple = \"x86_64-pc-linux-gnu\"\n\n";
+    for (SlotId id = 0; id < program.slots.size(); ++id) {
+        const IrSlot& slot = program.slots[id];
+        if (!slot.global && !slot.external) continue;
+        if (slot.type != ValueType::Int && slot.type != ValueType::Bool)
+            throw std::runtime_error("backend LLVM: slot global non supporté " + typeName(slot.type));
+        out << slotName(id) << " = ";
+        if (slot.external) {
+            out << "external global " << llvmType(slot.type) << "\n";
+        } else {
+            out << "global " << llvmType(slot.type) << " 0\n";
+        }
+    }
+    out << "\ndefine i32 @main() {\nentry:\n";
     emitScalarAllocas();
     bool openFunction = true;
     bool terminated = false;

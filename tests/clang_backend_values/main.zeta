@@ -1,0 +1,3 @@
+import config
+
+def main(): Int = config.adjust(5)

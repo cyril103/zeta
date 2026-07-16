@@ -1,0 +1,4 @@
+pub val base: Int = 7
+pub val enabled: Bool = base < 10
+
+pub def adjust(value: Int): Int = if (enabled) value + base else value
