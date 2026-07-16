@@ -42,9 +42,13 @@ struct IndexIterator {
 }
 ```
 
-La première tranche n'a pas besoin d'exposer cette structure à l'utilisateur. Le
-compilateur peut continuer à compiler les helpers explicites vers des boucles
-indexées, puis la syntaxe `for` pourra être abaissée vers la même forme :
+La première tranche n'expose volontairement pas cette structure à l'utilisateur :
+les helpers publics de `sequences` utilisent aujourd'hui un `Int` comme état
+copiable (`iterate`, `iterateMut`, `hasNext`, `hasNextMut`, `position`,
+`advance`). Cela évite d'élargir trop tôt l'ABI publique avec un type d'itérateur
+spécifique tout en validant le modèle d'état séparé. Le compilateur peut
+continuer à compiler ces helpers explicites vers des boucles indexées, puis la
+syntaxe `for` pourra être abaissée vers la même forme :
 
 ```text
 state = 0
@@ -208,7 +212,9 @@ couvrir :
 
 1. Documenter ce contrat et aligner la roadmap.
 2. Ajouter des tests de helpers `sequences` qui expriment les parcours partagés et
-   mutables sans nouvelle syntaxe.
+   mutables sans nouvelle syntaxe. Cette première tranche est couverte par
+   `tests/sequences_iteration.zeta` pour `[Int; N]`, `Slice[Int]`,
+   `SliceMut[Int]` et `Vec[Int]`.
 3. Factoriser les boucles répétitives de `sequences` quand cela n'élargit pas la
    surface publique de manière prématurée.
 4. Ajouter les diagnostics nécessaires pour les emprunts actifs de vues issues de

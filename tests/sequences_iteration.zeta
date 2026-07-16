@@ -1,0 +1,51 @@
+import sequences
+
+
+def sumWithIterator(values: Slice[Int]): Int = {
+    var iterator = sequences.iterate(values)
+    var total: Int = 0
+    while (sequences.hasNext(iterator, values)) do {
+        val index: Int = sequences.position(iterator)
+        total = total + values[index]
+        iterator = sequences.advance(iterator)
+    }
+    total
+}
+
+
+def bumpWithIterator(values: SliceMut[Int]): Int = {
+    var iterator = sequences.iterateMut(values)
+    while (sequences.hasNextMut(iterator, values)) do {
+        val index: Int = sequences.position(iterator)
+        values[index] = values[index] + 1
+        iterator = sequences.advance(iterator)
+    }
+    values.length
+}
+
+
+def main(): Int = {
+    val arrayValues: [Int; 3] = [1, 2, 3]
+    val arraySum: Int = sumWithIterator(Slice(&arrayValues))
+
+    var vecValues: Vec[Int] = Vec[Int]()
+    vecValues.push(4)
+    vecValues.push(5)
+    vecValues.push(6)
+    val vecSum: Int = sumWithIterator(vecValues.asSlice())
+
+    var mutableArray: [Int; 2] = [10, 20]
+    val mutableArrayCount: Int = bumpWithIterator(SliceMut(&mut mutableArray))
+    val mutableArrayOk: Bool = mutableArray[0] == 11 && mutableArray[1] == 21
+
+    var mutableVec: Vec[Int] = Vec[Int]()
+    mutableVec.push(7)
+    mutableVec.push(8)
+    val mutableVecCount: Int = bumpWithIterator(mutableVec.asSliceMut())
+    val mutableVecView: Slice[Int] = mutableVec.asSlice()
+    val mutableVecOk: Bool = mutableVecView[0] == 8 && mutableVecView[1] == 9
+
+    if (arraySum == 6 && vecSum == 15 &&
+        mutableArrayCount == 2 && mutableArrayOk &&
+        mutableVecCount == 2 && mutableVecOk) 0 else 1
+}

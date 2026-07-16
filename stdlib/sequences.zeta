@@ -1,5 +1,17 @@
 // Algorithmes génériques sur les séquences contiguës en lecture.
 
+pub def iterate[T](values: Slice[T]): Int = 0
+
+pub def iterateMut[T](values: SliceMut[T]): Int = 0
+
+pub def position(iterator: Int): Int = iterator
+
+pub def hasNext[T](iterator: Int, values: Slice[T]): Bool = iterator < values.length
+
+pub def hasNextMut[T](iterator: Int, values: SliceMut[T]): Bool = iterator < values.length
+
+pub def advance(iterator: Int): Int = iterator + 1
+
 pub def contains[T: Equatable](values: Slice[T], expected: T): Bool = {
     var index: Int = 0
     while (index < values.length) do {
