@@ -487,8 +487,12 @@ n'est pas un simple parcours avant (`lastIndexOf`, recherche binaire, bornes,
 
 Étapes restantes :
 
-1. préciser l'itération consommatrice pour les collections propriétaires ;
-2. fournir un parcours de `String` par `Char` masquant les offsets UTF-8 ;
+1. **Livré le 16 juillet 2026** — préciser l'itération consommatrice pour
+   `Vec[T]` propriétaire : `for (value in values)` déplace les éléments sans
+   copie implicite, conserve l'ordre d'insertion, droppe l'élément de boucle non
+   déplacé et interdit la réutilisation du vecteur consommé ;
+2. **Livré le 16 juillet 2026** — fournir un parcours de `String` et
+   `StringView` par `Char`, masquant les offsets UTF-8 derrière l'état interne ;
 3. vérifier les emprunts jusqu'à la dernière utilisation pour les corps de boucle.
 
 L'itération directe des tableaux est livrée par abaissement spécialisé sur la
@@ -623,7 +627,7 @@ La syntaxe `for` sans allocation est livrée pour `Slice[T]`, `SliceMut[T]` et
 `[T; N]` lorsque `T: Copy`. `for (mut value in SliceMut[T])` lie `value` comme
 `&mut T` pour muter en place sans copier les éléments possédés non `Copy`.
 `for (value in Vec[T])` consomme un vecteur propriétaire par retrait destructif
-depuis la fin : l'élément est déplacé dans `value`, le vecteur source est
+en ordre d'insertion : l'élément est déplacé dans `value`, le vecteur source est
 considéré déplacé après la boucle, et les éléments non explicitement déplacés par
 le corps sont droppés à la fin de leur itération. `for (value in text)` sur
 `String` ou `StringView` parcourt maintenant les points de code Unicode en `Char`
@@ -631,14 +635,17 @@ avec un état d'offset d'octet interne.
 
 Les diagnostics négatifs couvrent source non iterable, élément non `Copy` sur
 parcours emprunté, nom d'élément dupliqué, demande `mut` sur vue partagée ou
-chaîne, mutation d'un `Vec` dont la vue `asSlice()` est active, et réutilisation
-d'un `Vec` consommé par `for`.
+chaîne, mutation d'un `Vec` dont la vue `asSlice()` est active, réutilisation
+d'un `Vec` consommé par `for`, et ordre d'insertion de l'itération
+consommatrice.
 
-Prochaine étape : stabiliser la surface de l'itération consommatrice. Commencer
-par des tests RED qui figent l'ordre voulu de `for (value in Vec[T])` ou
-introduisent une forme/API explicite lorsque l'ordre inverse par `pop` doit rester
-un détail d'implémentation. Garder la contrainte : pas de trait public `Iterator`,
-pas d'allocation de state machine, et pas de copie implicite pour `T` non `Copy`.
+Prochaine étape : renforcer l'analyse d'emprunts dans les corps de boucle.
+Commencer par des tests RED où une vue `asSlice()`/`asSliceMut()` ou une
+référence d'élément n'est plus utilisée avant une mutation ou un déplacement
+ultérieur dans le même corps de boucle, puis livrer l'analyse de dernière
+utilisation minimale sans élargir les durées de vie lexicales existantes. Garder
+la contrainte : pas de trait public `Iterator`, pas d'allocation de state
+machine, et pas de copie implicite pour `T` non `Copy`.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

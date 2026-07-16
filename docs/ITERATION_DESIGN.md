@@ -200,13 +200,15 @@ La première version de `for` est limitée à :
   de l'état par largeur d'encodage.
 
 Pour `Vec[T]` propriétaire, `for (value in values)` déplace chaque élément hors
-du vecteur avec un `pop` interne qui produit directement `T` et non `Option[T]`.
+du vecteur avec un retrait destructif interne qui produit directement `T` et non
+`Option[T]`.
 Le vecteur source est considéré déplacé après la boucle : il ne peut plus être
 consulté ou muté. Si le corps ne déplace pas explicitement `value`, le compilateur
 émet le `drop` de l'élément à la fin de l'itération courante ; si `value` est
-transmis à une fonction qui le consomme, aucun double `drop` n'est émis. Cette
-tranche parcourt les éléments en ordre inverse d'insertion, car l'abaissement
-minimal utilise `pop` pour éviter les trous et les copies d'éléments possédés.
+transmis à une fonction qui le consomme, aucun double `drop` n'est émis. Le
+parcours conserve l'ordre d'insertion : l'abaissement retire l'élément en tête,
+décale les éléments restants par déplacement mémoire, et décrémente la longueur
+sans copier sémantiquement ni retenir les éléments possédés.
 
 Pour `String` et `StringView`, l'état interne reste un `Int`, mais il représente
 un offset d'octet dans le tampon UTF-8 plutôt qu'un indice d'élément. La condition
@@ -227,9 +229,10 @@ une boucle sur `values.asSlice()` (`tests/for_borrow_conflict.zeta`). La syntaxe
 mutable est couverte par `tests/for_mutable_iteration.zeta` pour `SliceMut[Int]`
 et par `tests/for_mutable_box_iteration.zeta` pour `SliceMut[Box[Int]]` sans copie
 d'éléments possédés. L'itération consommatrice directe de `Vec[Box[Int]]` est
-couverte par `tests/for_vec_consuming_iteration.zeta`, le `drop` automatique des
-éléments non déplacés par `tests/for_vec_consuming_drop_items.zeta`, et le rejet
-d'une réutilisation du vecteur déplacé par `tests/for_vec_consuming_use_after.zeta`.
+couverte par `tests/for_vec_consuming_iteration.zeta`, l'ordre d'insertion par
+`tests/for_vec_consuming_order.zeta`, le `drop` automatique des éléments non
+déplacés par `tests/for_vec_consuming_drop_items.zeta`, et le rejet d'une
+réutilisation du vecteur déplacé par `tests/for_vec_consuming_use_after.zeta`.
 Le parcours Unicode est couvert par `tests/for_string_char_iteration.zeta` pour
 `String`, `tests/for_string_view_char_iteration.zeta` pour `StringView`, et
 `tests/for_string_mut_rejected.zeta` pour le rejet de `mut`.
