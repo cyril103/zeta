@@ -1200,11 +1200,11 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             openFunction = true;
             terminated = false;
         } else if (const auto* item = std::get_if<IrParameter>(&instruction)) {
-            if (item->type != ValueType::Int && item->type != ValueType::Bool && item->type != ValueType::Double)
+            if (!isLlvmValueType(item->type))
                 throw std::runtime_error("backend LLVM: paramètre non supporté " + typeName(item->type));
             values[item->output] = "%arg" + std::to_string(item->index);
         } else if (const auto* item = std::get_if<IrReturn>(&instruction)) {
-            if (item->type != ValueType::Int && item->type != ValueType::Bool && item->type != ValueType::Double)
+            if (!isLlvmValueType(item->type))
                 throw std::runtime_error("backend LLVM: type de retour non supporté " + typeName(item->type));
             out << "  ret " << llvmType(item->type) << " " << value(item->value) << "\n";
             terminated = true;
