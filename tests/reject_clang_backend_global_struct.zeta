@@ -1,0 +1,8 @@
+pub struct Pair {
+    left: Int
+    right: Int
+}
+
+pub val pair: Pair = Pair { left: 1, right: 2 }
+
+def main(): Int = pair.left

@@ -473,9 +473,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     for (SlotId id = 0; id < program.slots.size(); ++id) {
         const IrSlot& slot = program.slots[id];
         if (!slot.global && !slot.external) continue;
-        if (slot.type != ValueType::Int && slot.type != ValueType::Bool)
-            throw std::runtime_error("backend LLVM: globale non scalaire non supportée " +
+        if (slot.type != ValueType::Int && slot.type != ValueType::Bool) {
+            const std::string category = isLlvmUnsupportedAggregate(slot.type)
+                ? "agrégat global non supporté " : "globale non scalaire non supportée ";
+            throw std::runtime_error("backend LLVM: " + category +
                                      diagnosticSlotName(slot, id) + ": " + typeName(slot.type));
+        }
         out << slotName(id) << " = ";
         if (slot.external) {
             out << "external global " << llvmType(slot.type) << "\n";

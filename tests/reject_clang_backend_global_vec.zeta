@@ -1,0 +1,3 @@
+pub val values: Vec[Int] = Vec[Int]()
+
+def main(): Int = values.length
