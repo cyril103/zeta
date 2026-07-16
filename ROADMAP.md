@@ -67,8 +67,11 @@ masquer une correction. Ce cas a déjà été rencontré avec les locaux génér
 
 ## Vision
 
-Zeta est un langage statiquement typé produisant des exécutables Linux x86-64
-autonomes. Il privilégie :
+Zeta est un langage statiquement typé produisant des exécutables natifs. Le
+backend historique FASM garde la cible Linux x86-64 autonome comme référence et
+secours ; un backend LLVM/Clang expérimental doit maintenant être ajouté sans
+régression pour préparer optimisations, informations de débogage et portabilité.
+Il privilégie :
 
 - la propriété déterministe et l'absence de copies implicites dangereuses ;
 - les emprunts explicites ;
@@ -83,6 +86,25 @@ Pipeline actuel :
 source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
        -> IR par module -> assembleur FASM -> objets ELF64 -> ld -> exécutable
 ```
+
+Pipeline cible avec Clang :
+
+```text
+source -> lexer -> parser -> AST -> analyse sémantique -> AST typé
+       -> IR Zeta validée -> LLVM IR textuel -> clang/LLVM -> exécutable natif
+```
+
+Les deux backends doivent rester sélectionnables :
+
+```text
+zeta programme.zeta --backend=fasm  -o programme
+zeta programme.zeta --backend=clang -o programme
+zeta programme.zeta --emit-llvm     -o programme.ll
+```
+
+La migration vers Clang doit être incrémentale : `--emit-llvm` précède
+`--backend=clang`, FASM reste l'oracle de comportement, et chaque test backend
+doit comparer les résultats observables sur les mêmes programmes.
 
 ## Évaluation issue de l'exemple complet
 
@@ -167,7 +189,9 @@ plus avancée que la surface utilisateur.
 - déduplication `link-once` des instances génériques ;
 - diagnostics `ZTI`, `MOD`, `ABI`, `GEN` et `LIB` ;
 - construction et installation de bibliothèques sans sources ;
-- stdlib précompilée avec manifeste et fallback source.
+- stdlib précompilée avec manifeste et fallback source ;
+- toolchain LLVM/Clang/LLD 19 disponible localement sous `/opt/data/local/bin`
+  pour le futur backend expérimental.
 
 ### Bibliothèque standard
 
@@ -482,20 +506,49 @@ ensemble, mais livrés séparément.
 - remplacer progressivement les codes négatifs et arrêts de processus par des
   résultats typés lorsque la récupération est raisonnable.
 
-## Priorité 7 — performances et backend
+## Priorité 7 — backend LLVM/Clang et performances
 
 À commencer après le vérificateur d'IR, mais sans bloquer les améliorations
-d'ergonomie indépendantes :
+d'ergonomie indépendantes. Le backend FASM reste la référence ; Clang est ajouté
+comme cible expérimentale validée par comparaison.
 
-1. mesures reproductibles de taille et de temps ;
+### 7A. Backend LLVM/Clang expérimental
+
+Objectif : produire du LLVM IR textuel depuis l'IR Zeta validée, puis utiliser
+`clang` comme driver d'assemblage, d'optimisation et de linkage.
+
+1. introduire `--backend=fasm|clang` avec `fasm` par défaut ;
+2. ajouter `--emit-llvm` pour écrire le `.ll` sans lancer le linkage ;
+3. extraire une interface backend autour de `FasmCodeGenerator` ;
+4. créer `LlvmIrCodeGenerator` avec `target triple = "x86_64-pc-linux-gnu"` ;
+5. couvrir d'abord `Int`, `Bool`, fonctions, appels, labels, branches, boucles et
+   retours ;
+6. compiler le `.ll` avec `clang` et comparer codes de sortie/stdout avec FASM ;
+7. étendre ensuite à `Byte`, `Double`, `Char`, agrégats, tableaux, références,
+   slices, contrôles de bornes et chemins d'erreur ;
+8. définir une ABI commune pour runtime, `String`, `Box`, `retain`, `drop` et
+   destruction déterministe ;
+9. produire et relier les objets par module, la runtime et la stdlib via `clang` ;
+10. afficher des diagnostics clairs si `clang` ou `llvm-config` est absent, et
+    permettre de configurer leur chemin.
+
+Critère de sortie : un sous-ensemble documenté passe sur FASM et Clang, puis la
+stdlib et les modules séparés rejoignent progressivement cette matrice.
+
+### 7B. Optimisations communes
+
+Certaines optimisations restent dans l'IR Zeta pour bénéficier aux deux backends ;
+d'autres pourront être déléguées à LLVM quand `--backend=clang` sera stable.
+
+1. mesures reproductibles de taille et de temps pour FASM et Clang ;
 2. propagation et pliage des constantes ;
 3. simplification algébrique ;
 4. suppression de code mort ;
-5. réduction des temporaires de pile ;
+5. réduction des temporaires de pile pour FASM ;
 6. élimination des copies d'agrégats inutiles ;
 7. meilleur tri générique pour les grandes séquences ;
-8. informations de débogage source ;
-9. autres architectures et formats objets.
+8. informations de débogage source, idéalement via LLVM/DWARF ;
+9. autres architectures et formats objets via LLVM.
 
 Chaque passe doit produire une IR valide avant et après transformation.
 
@@ -504,7 +557,8 @@ Chaque passe doit produire une IR valide avant et après transformation.
 - `--build-stdlib` ne purge pas les anciens `.o`/`.zti` sans source correspondante ;
   le manifeste empêche leur chargement, mais un nettoyage manuel peut être requis ;
 - `stdlib/precompiled/` est local et ignoré par Git ;
-- cible unique Linux x86-64 avec FASM et `ld` ;
+- cible de production actuelle Linux x86-64 avec FASM et `ld` ;
+- backend LLVM/Clang encore absent du compilateur, malgré la toolchain installée ;
 - pas encore de gestionnaire de paquets ;
 - pas de dictionnaire, ensemble, fichiers ou réseau ;
 - références, slices et `StringView` ne peuvent pas encore être retournées ou
@@ -521,6 +575,7 @@ Chaque étape doit :
 - préserver fallback source, propriété, emprunts et invalidation des caches ;
 - exécuter `git diff --check`, les tests ciblés puis toute la suite CTest ;
 - régénérer la stdlib après toute modification de ses sources ;
+- comparer FASM et Clang sur les mêmes programmes pour tout chantier backend ;
 - mettre à jour README, roadmap et document de conception associé ;
 - ne jamais committer `build/` ou `stdlib/precompiled/` ;
 - ne jamais effacer les changements locaux d'un utilisateur pour nettoyer le
@@ -537,3 +592,8 @@ le socle d'emprunt n'est pas démontré.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
+
+
+En parallèle, préparer `docs/LLVM_BACKEND_DESIGN.md` : interface CLI, forme du
+LLVM IR émis, mapping des types Zeta, stratégie runtime, linkage avec `clang`,
+matrice de tests FASM/Clang et limites du premier sous-ensemble `--emit-llvm`.
