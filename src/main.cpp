@@ -71,6 +71,25 @@ void runLinker(const std::vector<fs::path>& objects, const fs::path& executable)
         throw std::runtime_error("ld n'a pas pu lier l'exécutable");
 }
 
+void runClang(const fs::path& llvmIr, const fs::path& executable) {
+    const pid_t child = fork();
+    if (child < 0) throw std::runtime_error("impossible de lancer clang");
+    if (child == 0) {
+        const std::string input = llvmIr.string();
+        const std::string output = executable.string();
+        execlp("clang", "clang", "-x", "ir", input.c_str(), "-o", output.c_str(),
+               static_cast<char*>(nullptr));
+        _exit(127);
+    }
+    int status{};
+    if (waitpid(child, &status, 0) < 0 || !WIFEXITED(status))
+        throw std::runtime_error("clang n'a pas pu produire l'exécutable");
+    if (WEXITSTATUS(status) == 127)
+        throw std::runtime_error("clang introuvable pour --backend=clang");
+    if (WEXITSTATUS(status) != 0)
+        throw std::runtime_error("clang n'a pas pu produire l'exécutable");
+}
+
 void runRelocatableLink(const std::vector<fs::path>& objects, const fs::path& output) {
     const pid_t child = fork();
     if (child < 0) throw std::runtime_error("impossible de lancer ld -r");
@@ -522,8 +541,15 @@ int main(int argc, char** argv) {
             writeFile(llvmIrPath, LlvmIrCodeGenerator::generate(verifiedIr));
             return 0;
         }
-        if (backend == Backend::Clang)
-            throw std::runtime_error("backend clang pas encore disponible sans --emit-llvm");
+        if (backend == Backend::Clang) {
+            writeFile(irPath, IrGenerator::print(verifiedIr));
+            writeFile(llvmIrPath, LlvmIrCodeGenerator::generate(verifiedIr));
+            runClang(llvmIrPath, outputPath);
+            std::cout << "IR créé          : " << irPath << '\n'
+                      << "LLVM IR créé     : " << llvmIrPath << '\n'
+                      << "Executable créé : " << outputPath << '\n';
+            return 0;
+        }
         fs::path assemblyPath = outputPath;
         assemblyPath += ".asm";
         writeFile(irPath, IrGenerator::print(verifiedIr));
