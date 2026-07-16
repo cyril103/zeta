@@ -658,12 +658,14 @@ opérations scalaires `Int`/`Bool` (`IrBinary`, comparaisons, booléens simples,
 `IrLoad`/`IrStore` scalaires et valide un programme combinant `if` et `while`
 compilé puis exécuté via `clang`. `emit_llvm_parameters` couvre maintenant les
 signatures de fonctions avec paramètres `Int`/`Bool`, `IrParameter` et les appels
-argumentés. Le backend FASM reste le défaut et `--backend=clang` sans
-`--emit-llvm` reste volontairement bloqué.
+argumentés. `--backend=clang` est maintenant activé pour ce sous-ensemble : il
+écrit le `.ir` et le `.ll`, appelle `clang -x ir`, puis produit l'exécutable natif
+validé par `compile_clang_backend_parameters`. FASM reste le backend par défaut,
+protégé par `run_fasm_backend_still_default`.
 
-Prochaine étape : activer le linkage `--backend=clang` par tests RED/GREEN pour
-le sous-ensemble LLVM déjà validé (`main`, scalaires, contrôle et appels avec
-paramètres), en gardant FASM comme backend par défaut.
+Prochaine étape : élargir le backend Clang par tests RED/GREEN aux diagnostics
+CLI et au prochain périmètre runtime contrôlé (d'abord appels/valeurs scalaires
+sans dépendance native, puis seulement ensuite agrégats, chaînes et stdlib).
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

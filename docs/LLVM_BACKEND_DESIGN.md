@@ -124,7 +124,7 @@ Tranche recommandée :
 5. fait : ajouter les labels/branches et les slots scalaires nécessaires aux
    programmes de contrôle simples (`if`/`while`) ;
 6. fait : ajouter les appels avec paramètres scalaires ;
-7. ajouter `--backend=clang` pour le sous-ensemble validé.
+7. fait : ajouter `--backend=clang` pour le sous-ensemble validé.
 
 État actuel : `emit_llvm_minimal` vérifie la génération de `target triple`,
 `define i32 @main()`, `ret i32 42`, puis compile le `.ll` avec `clang` et exécute
@@ -152,6 +152,12 @@ signature LLVM complète (`define i32 @fn(i32 %arg0, ...)`) avant le corps, puis
 lie chaque instruction `IrParameter` à `%argN` sans allocation supplémentaire.
 Les appels utilisent les types d'arguments déjà présents dans `IrCall` et restent
 limités aux types scalaires couverts par `llvmType`.
+
+`compile_clang_backend_parameters` active le premier chemin `--backend=clang` : le
+compilateur écrit le `.ir` vérifié et le `.ll`, invoque `clang -x ir -o <sortie>`,
+puis exécute le binaire attendu. `run_fasm_backend_still_default` compile le même
+programme sans option backend pour vérifier que FASM reste le défaut et que le
+chemin Clang ne crée pas d'artefact `.asm`.
 
 ## Matrice de tests
 
@@ -189,6 +195,6 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   validés par compilation/exécution `clang`.
 - fait : `--emit-llvm` couvre les appels avec paramètres scalaires, validés par
   compilation/exécution `clang`.
-- fait : le backend FASM par défaut reste inchangé.
-- fait : la roadmap pointe vers le linkage `--backend=clang` du sous-ensemble
-  validé.
+- fait : `--backend=clang` produit un exécutable via `clang -x ir` pour le
+  sous-ensemble validé.
+- fait : le backend FASM par défaut reste inchangé et testé explicitement.
