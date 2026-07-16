@@ -315,9 +315,11 @@ sur le comportement en présence de NaN.
 type agrégat littéral (`{ i32, i32 }` pour le test initial). La construction utilise
 une chaîne `insertvalue`, les slots locaux deviennent `alloca { ... }`, `store` /
 `load` copient l'agrégat entier, et les lectures de champ utilisent `extractvalue`.
-Cette tranche reste volontairement locale et en lecture seule : les globales
-struct, les mutations de champ, les paramètres/retours de structs et les champs
-hors sous-ensemble (`Box`, `Vec`, tableaux, enums) restent hors périmètre.
+`compile_clang_backend_local_struct_field_store` ajoute ensuite la mutation de
+champ locale : le backend recharge la valeur du slot, remplace le champ visé par
+`insertvalue`, puis restocke l'agrégat complet. Cette tranche reste volontairement
+locale : les globales struct, les paramètres/retours de structs et les champs hors
+sous-ensemble (`Box`, `Vec`, tableaux, enums) restent hors périmètre.
 
 ## Matrice de tests
 
@@ -408,3 +410,6 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--backend=clang` couvre les `struct` locaux simples en lecture :
   types agrégats LLVM littéraux, construction `insertvalue`, slots `alloca`/`store`/
   `load`, et lecture de champ `extractvalue`, avec exécution Clang et FASM.
+- fait : `--backend=clang` couvre les mutations de champs de `struct` locaux
+  simples par `load` de l'agrégat, `insertvalue` du champ remplacé, puis `store`
+  de l'agrégat complet, avec exécution Clang et FASM.
