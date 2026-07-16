@@ -187,7 +187,11 @@ La première version de `for` est limitée à :
 - les tableaux restent à couvrir directement ou via conversion dédiée vers slice.
 
 Tests livrés : `tests/for_iteration.zeta` couvre `for` sur `Slice[Int]`,
-`SliceMut[Int]` et `Vec[Int].asSlice()`.
+`SliceMut[Int]` et `Vec[Int].asSlice()`. Les rejets dédiés couvrent aussi la
+source non iterable (`tests/for_non_iterable.zeta`), l'élément non `Copy`
+(`tests/for_non_copy_element.zeta`), le nom d'élément déjà visible
+(`tests/for_duplicate_item.zeta`) et la mutation d'un `Vec` pendant une boucle
+sur `values.asSlice()` (`tests/for_borrow_conflict.zeta`).
 
 ## Interaction avec `Vec[T]`
 
@@ -199,14 +203,14 @@ Tests livrés : `tests/for_iteration.zeta` couvre `for` sur `Slice[Int]`,
 Cela préserve les invariants existants : un parcours ne peut pas appeler `push`,
 `pop`, `reserve`, `clear` ou déplacer le vecteur tant que la vue est vivante. La
 longueur parcourue reste donc stable. Les diagnostics négatifs couvrent maintenant
-la croissance (`vec_slice_blocks_growth`), l'accès pendant une vue mutable
-(`vec_slice_mut_blocks_access`) et le déplacement pendant une vue partagée
-(`vec_slice_blocks_move`).
+la croissance via déclaration de slice (`vec_slice_blocks_growth`), la croissance
+via `for (value in values.asSlice())` (`for_borrow_conflict`), l'accès pendant une
+vue mutable (`vec_slice_mut_blocks_access`) et le déplacement pendant une vue
+partagée (`vec_slice_blocks_move`).
 
-## Tests attendus avant la syntaxe `for`
+## Couverture de tests du protocole et de `for`
 
-La validation du protocole doit précéder le sucre syntaxique. Les tests doivent
-couvrir :
+La validation du protocole a précédé le sucre syntaxique. Les tests couvrent :
 
 1. parcours partagé de `[Int; N]`, `Slice[Int]` et `Vec[Int]` avec même résultat ;
 2. parcours mutable de `SliceMut[Int]` et `Vec[Int]` avec modification en place ;
@@ -216,7 +220,8 @@ couvrir :
 5. absence de copie implicite pour `Vec[Box[Int]]` ou autre élément possédé ;
 6. consommation d'une stdlib précompilée sans sources lorsque les helpers publics
    sont exposés ;
-7. diagnostics stables pour les erreurs d'emprunt ou de capacité non supportée.
+7. diagnostics stables pour les erreurs d'emprunt ou de capacité non supportée ;
+8. rejet de sources `for` non `Slice`/`SliceMut` et de noms d'élément dupliqués.
 
 ## Découpage committable
 
@@ -234,6 +239,8 @@ couvrir :
 5. Concevoir puis implémenter la syntaxe `for` comme abaissement testé vers les
    mêmes primitives. La première tranche est livrée pour `Slice[T]` et
    `SliceMut[T]` avec `T: Copy` via `tests/for_iteration.zeta`.
+6. Verrouiller les diagnostics négatifs de `for`. La tranche source non iterable,
+   élément non `Copy`, nom dupliqué et emprunt `Vec.asSlice()` actif est livrée.
 
 ## Décisions reportées
 

@@ -489,15 +489,17 @@ n'est pas un simple parcours avant (`lastIndexOf`, recherche binaire, bornes,
 
 1. compléter l'itération directe de tableaux, soit par conversion dédiée vers
    slice, soit par abaissement spécialisé ;
-2. ajouter des tests négatifs ciblés pour `for` : source non iterable, élément
-   non `Copy`, nom de variable dupliqué et emprunts actifs dans le corps ;
-3. distinguer ensuite itération partagée, mutable et consommatrice ;
-4. fournir un parcours de `String` par `Char` masquant les offsets UTF-8 ;
-5. vérifier les emprunts jusqu'à la dernière utilisation pour les corps de boucle.
+2. distinguer ensuite itération partagée, mutable et consommatrice ;
+3. fournir un parcours de `String` par `Char` masquant les offsets UTF-8 ;
+4. vérifier les emprunts jusqu'à la dernière utilisation pour les corps de boucle.
 
-Première action de la prochaine session : ajouter les tests RED négatifs de `for`
-pour verrouiller les diagnostics, en commençant par le rejet d'une source non
-`Slice`/`SliceMut` et d'un élément non `Copy`.
+La couverture négative dédiée de `for` est maintenant livrée : source non
+iterable, élément non `Copy`, nom de variable dupliqué et emprunt actif d'un
+`Vec` pendant `for (value in values.asSlice())`.
+
+Première action de la prochaine session : ajouter l'itération directe des
+tableaux avec tests RED sur `for (value in values)` pour `[Int; N]`, puis choisir
+entre conversion dédiée vers slice et abaissement spécialisé.
 
 Exemple cible :
 
@@ -610,15 +612,14 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-La conception minimale du protocole d'itération sans allocation est désormais
-posée dans `docs/ITERATION_DESIGN.md`. Elle fixe l'état indexé, les frontières
-`Slice[T]`/`SliceMut[T]`, les règles d'emprunt des parcours partagés et mutables,
-et le découpage avant la future syntaxe `for`.
+La première syntaxe `for` sans allocation est livrée pour `Slice[T]` et
+`SliceMut[T]` lorsque `T: Copy`, avec diagnostics négatifs pour source non
+iterable, élément non `Copy`, nom d'élément dupliqué et mutation d'un `Vec` dont
+la vue `asSlice()` est active.
 
-Prochaine étape : valider ce contrat par des helpers et tests sur tableaux,
-`Slice[T]`, `SliceMut[T]` et `Vec[T]` avant d'ajouter le sucre syntaxique ;
-l'itération consommatrice et le parcours UTF-8 restent reportés tant que le socle
-d'emprunt n'est pas démontré.
+Prochaine étape : ajouter l'itération directe de tableaux (`for (value in values)`
+sur `[T; N]`) avec tests RED, puis décider si l'abaissement crée une vue slice
+interne ou s'il reste spécialisé sur longueur et base de tableau.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
