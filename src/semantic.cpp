@@ -741,8 +741,14 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
     if (declaration.callable) returnType_ = declaration.type;
     checkExpression(*declaration.initializer, declaration.type);
     if (!declaration.callable && isMoveOnlyValueType(declaration.type)) {
-        if (const auto* source = std::get_if<NameExpr>(&declaration.initializer->value))
+        if (const auto* source = std::get_if<NameExpr>(&declaration.initializer->value)) {
+            if (const auto borrowed = borrows_.find(source->name);
+                borrowed != borrows_.end() &&
+                (borrowed->second.mutableBorrow || borrowed->second.shared != 0))
+                throw CompileError(declaration.initializer->location,
+                                   "la variable '" + source->name + "' est empruntée");
             movedBoxes_.insert(source->name);
+        }
     }
     returnType_ = previousReturnType;
     insideGenericDeclaration_ = previousGenericDeclaration;

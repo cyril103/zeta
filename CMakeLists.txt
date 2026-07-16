@@ -111,6 +111,9 @@ if(BUILD_TESTING)
     add_test(NAME reject_vec_slice_blocks_growth COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_slice_blocks_growth.zeta)
     set_tests_properties(reject_vec_slice_blocks_growth PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_vec_slice_blocks_move COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_slice_blocks_move.zeta)
+    set_tests_properties(reject_vec_slice_blocks_move PROPERTIES WILL_FAIL TRUE)
     add_test(NAME reject_vec_slice_mut_blocks_access COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_slice_mut_blocks_access.zeta)
     set_tests_properties(reject_vec_slice_mut_blocks_access PROPERTIES WILL_FAIL TRUE)
