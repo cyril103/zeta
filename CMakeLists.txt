@@ -180,6 +180,11 @@ if(BUILD_TESTING)
         $<TARGET_FILE:zeta>
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/clang_backend_local_struct.zeta
         ${CMAKE_CURRENT_BINARY_DIR}/clang_backend_local_struct)
+    add_test(NAME compile_clang_backend_local_struct_field_store COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_local_struct_field_store.sh
+        $<TARGET_FILE:zeta>
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/clang_backend_local_struct_field_store.zeta
+        ${CMAKE_CURRENT_BINARY_DIR}/clang_backend_local_struct_field_store)
 
     add_test(NAME compile_public_struct_declaration COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_struct_declaration.zeta

@@ -1,0 +1,12 @@
+struct Pair {
+    left: Int
+    right: Int
+}
+
+
+def main(): Int = {
+    var pair: Pair = Pair { left: 10, right: 32 }
+    pair.left = pair.left + 5
+    pair.right = pair.right - 5
+    pair.left + pair.right
+}

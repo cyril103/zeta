@@ -1335,6 +1335,22 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             out << "  " << output << " = extractvalue " << llvmType(item->objectType) << " "
                 << value(item->object) << ", " << item->field << "\n";
             values[item->output] = output;
+        } else if (const auto* item = std::get_if<IrFieldStore>(&instruction)) {
+            if (!isLlvmValueType(item->objectType) || item->objectType.kind != ValueType::Kind::Struct)
+                throw std::runtime_error("backend LLVM: mutation champ struct non supportée " +
+                                         typeName(item->objectType));
+            const StructField& field = item->objectType.structure->fields[item->field];
+            if (!isLlvmValueType(field.type))
+                throw std::runtime_error("backend LLVM: mutation champ struct non supportée " +
+                                         typeName(item->objectType));
+            const std::string base = "%slot" + std::to_string(item->slot) + ".field" + std::to_string(item->field);
+            const std::string current = base + ".load";
+            const std::string updated = base + ".updated";
+            const std::string structType = llvmType(item->objectType);
+            out << "  " << current << " = load " << structType << ", ptr " << slotName(item->slot) << "\n";
+            out << "  " << updated << " = insertvalue " << structType << " " << current
+                << ", " << llvmType(field.type) << " " << value(item->value) << ", " << item->field << "\n";
+            out << "  store " << structType << " " << updated << ", ptr " << slotName(item->slot) << "\n";
         } else if (const auto* item = std::get_if<IrStore>(&instruction)) {
             if (!isLlvmValueType(item->type))
                 throw std::runtime_error("backend LLVM: type de store non supporté " +
