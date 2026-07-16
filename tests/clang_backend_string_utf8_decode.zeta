@@ -1,0 +1,25 @@
+import strings
+
+def main(): Int = {
+    val text: String = "hé€🚀"
+    var offset: Int = 0
+    var count: Int = 0
+    var total: Int = 0
+    while (offset < text.lengthBytes) do {
+        total = total + strings.decodeAtByte(text, offset)
+        offset = strings.nextByteOffset(text, offset)
+        count = count + 1
+    }
+    val beforeStart: Int = 0 - 1
+    var score: Int = (total / 1000) + count + offset
+    while (strings.decodeAtByte(text, 2) < 0 && score < 152) do {
+        score = score + 1
+    }
+    while (strings.decodeAtByte(text, beforeStart) < 0 && score < 153) do {
+        score = score + 1
+    }
+    while (strings.decodeAtByte(text, text.lengthBytes) < 0 && score < 154) do {
+        score = score + 1
+    }
+    score
+}
