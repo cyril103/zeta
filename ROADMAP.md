@@ -727,11 +727,16 @@ non signée.
 `io.printChar`/`io.printlnChar` encodent le codepoint `i32` en UTF-8 dans un petit
 buffer stack et écrivent 1 à 4 octets via `write`, avec comparaison stdout FASM.
 La stdlib expose désormais aussi `printlnChar`.
+`compile_clang_backend_io_println_double` ajoute la sortie `Double` ciblée :
+`Double` est abaissé en `double`, les constantes et slots locaux doubles sont
+stockables, le moins unaire devient `fneg`, et `io.printDouble`/`io.printlnDouble`
+passent par `printf("%g")` sur un périmètre de formats validés contre FASM.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
 périmètre contrôlé : `io.print`/`println` pour chaînes heap concaténées, gestion
-plus complète de propriété/retain des chaînes heap, `Double` en IO spécialisée,
-ou première valeur composée simple, avant toute généralisation.
+plus complète de propriété/retain des chaînes heap, opérations arithmétiques et
+comparaisons `Double`, ou première valeur composée simple, avant toute
+généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

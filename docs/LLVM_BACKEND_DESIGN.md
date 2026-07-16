@@ -81,7 +81,8 @@ constant, puis élargir à arithmétique, `if`, `while` et appel de fonction.
 - `Bool` -> `i1` en SSA, normalisé depuis/vers `i32` lorsque l'IR Zeta attend une
   valeur stockable homogène
 - `Char` -> `i32` (codepoint Unicode, validé pour l'itération chaîne)
-- `Double` -> `double` (tranche suivante)
+- `Double` -> `double` (constantes, slots locaux et IO spécialisée ; opérations
+  arithmétiques complètes à couvrir par tranches suivantes)
 - `Unit` -> valeur fantôme côté IR Zeta ; pas d'allocation LLVM quand elle n'est
   pas observable
 - `Never` -> terminaison de bloc, pas de valeur
@@ -296,6 +297,14 @@ quatre octets. Le backend sélectionne une longueur 1/2/3/4, écrit les bytes vi
 `io__printChar`/`io__printlnChar` sont sautés pendant l'émission LLVM pour éviter
 la conversion générale `String(Char)`.
 
+`compile_clang_backend_io_println_double` ajoute une sortie `Double` ciblée :
+`Double` est représenté comme `double`, les constantes littérales et les slots
+locaux doubles sont stockables, le moins unaire est abaissé en `fneg double`, et
+les appels directs `io.printDouble` / `io.printlnDouble` passent par `printf`
+avec formats `%g` / `%g\n`. La tranche reste volontairement limitée aux formats
+stables comparés à FASM ; les opérations arithmétiques et comparaisons doubles
+sont laissées aux tranches suivantes.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -376,3 +385,6 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   `Byte` en `i8`, extension non signée et `printf`, avec comparaison stdout FASM.
 - fait : `--backend=clang` couvre `io.printChar`/`io.printlnChar` directs via
   encodage UTF-8 1-4 octets et `write`, avec comparaison stdout FASM.
+- fait : `--backend=clang` couvre `io.printDouble`/`io.printlnDouble` directs via
+  `Double` en `double`, constantes/slots locaux, `fneg` unaire et `printf("%g")`
+  sur formats stables comparés à FASM.
