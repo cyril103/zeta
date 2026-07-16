@@ -1,0 +1,8 @@
+def main(): Int = {
+    val value: Int = 1
+    val values: [Int; 1] = [2]
+    for (value in Slice(&values)) do {
+        value
+    }
+    0
+}

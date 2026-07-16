@@ -459,6 +459,22 @@ if(BUILD_TESTING)
         -o ${CMAKE_CURRENT_BINARY_DIR}/for-iteration)
     add_test(NAME run_for_iteration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/for-iteration)
     set_tests_properties(run_for_iteration PROPERTIES DEPENDS compile_for_iteration)
+    add_test(NAME reject_for_non_iterable COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_non_iterable.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/invalid-for-non-iterable)
+    set_tests_properties(reject_for_non_iterable PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_for_non_copy_element COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_non_copy_element.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/invalid-for-non-copy-element)
+    set_tests_properties(reject_for_non_copy_element PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_for_duplicate_item COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_duplicate_item.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/invalid-for-duplicate-item)
+    set_tests_properties(reject_for_duplicate_item PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME reject_for_borrow_conflict COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_borrow_conflict.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/invalid-for-borrow-conflict)
+    set_tests_properties(reject_for_borrow_conflict PROPERTIES WILL_FAIL TRUE)
 
     add_test(NAME compile_empty_slice_option COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_zero_length.zeta

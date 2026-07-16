@@ -926,11 +926,39 @@ void SemanticAnalyzer::checkForLoop(ForStatement& loop) {
     if (!isCopyValueType(elementType))
         throw CompileError(loop.location,
                            "la boucle 'for' par valeur exige un élément Copy");
+    if (symbols_.lookup(loop.item) != nullptr)
+        throw CompileError(loop.location,
+                           "variable de boucle '" + loop.item + "' déjà déclarée");
     loop.itemType = elementType;
-    checkExpression(*loop.iterable, iterableType);
 
-    symbols_.pushScope();
     pushBorrowScope();
+    checkExpression(*loop.iterable, iterableType);
+    if (const auto* method = std::get_if<MethodCallExpr>(&loop.iterable->value)) {
+        if (const auto* vectorName = std::get_if<NameExpr>(&method->object->value);
+            vectorName != nullptr &&
+            (method->method == "asSlice" || method->method == "asSliceMut")) {
+            const bool mutableView = method->method == "asSliceMut";
+            BorrowState& state = borrows_[vectorName->name];
+            if (mutableView) {
+                if (state.mutableBorrow || state.shared != 0)
+                    throw CompileError(loop.iterable->location,
+                                       "emprunt mutable exclusif impossible pour '" +
+                                           vectorName->name + "'");
+                state.mutableBorrow = true;
+            } else {
+                if (state.mutableBorrow)
+                    throw CompileError(loop.iterable->location,
+                                       "emprunt partagé impossible pour '" +
+                                           vectorName->name + "'");
+                ++state.shared;
+            }
+            const std::string referenceName = loop.item + "$iterable";
+            referenceBorrows_.insert_or_assign(referenceName,
+                ReferenceBorrow{vectorName->name, mutableView});
+            borrowScopes_.back().push_back(referenceName);
+        }
+    }
+    symbols_.pushScope();
     if (!symbols_.defineParameter(loop.item,
             SemanticSymbol{elementType, BindingKind::Val, false, nullptr, true, {}}))
         throw CompileError(loop.location,
@@ -938,8 +966,8 @@ void SemanticAnalyzer::checkForLoop(ForStatement& loop) {
     ++loopDepth_;
     checkStatements(loop.body);
     --loopDepth_;
-    popBorrowScope();
     symbols_.popScope();
+    popBorrowScope();
 }
 
 void SemanticAnalyzer::pushBorrowScope() { borrowScopes_.emplace_back(); }
