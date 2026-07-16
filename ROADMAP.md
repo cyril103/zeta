@@ -683,10 +683,14 @@ paire complète, puis `lengthBytes` et `isEmpty` depuis des variables locales.
 `compile_clang_backend_string_concat` couvre maintenant une concaténation locale
 minimale : extraction des deux paires chaîne, allocation via `malloc`, copie des
 bytes via `memcpy`, puis reconstruction de la paire résultat.
+`reject_clang_backend_unsupported_aggregates` verrouille les diagnostics des
+agrégats locaux encore hors périmètre (`struct`, `Vec[T]`) avec des noms source
+lisibles, au lieu de laisser le backend produire un `.ll` partiel.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre runtime contrôlé : diagnostics explicites pour les agrégats restants
-ou une première surface stdlib chaîne très ciblée, avant toute généralisation.
+périmètre runtime contrôlé : première surface stdlib chaîne très ciblée ou
+diagnostics complémentaires pour les formes agrégées globales, avant toute
+généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
