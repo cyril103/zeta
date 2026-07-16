@@ -159,6 +159,12 @@ puis exécute le binaire attendu. `run_fasm_backend_still_default` compile le m�
 programme sans option backend pour vérifier que FASM reste le défaut et que le
 chemin Clang ne crée pas d'artefact `.asm`.
 
+`reject_clang_backend_cli_diagnostics` fixe les diagnostics CLI minimums du
+backend expérimental : backend inconnu, `--emit-llvm` combiné à `--backend=fasm`,
+et tentative d'utiliser Clang/LLVM sur les modes bibliothèque/stdlib. Ces modes
+restent exclus tant que les frontières objets/modules/runtime ne sont pas
+couvertes par des tests dédiés.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -178,6 +184,9 @@ La suite complète doit continuer à passer avec FASM par défaut.
 Les erreurs doivent être explicites :
 
 - backend inconnu : `backend inconnu '...'` ;
+- combinaison exécutable requise : `--backend=clang et --emit-llvm sont réservés
+  aux exécutables` ;
+- `--emit-llvm` avec FASM : `--emit-llvm requiert le backend clang` ;
 - `clang` introuvable : `clang introuvable pour --backend=clang` ;
 - instruction IR non couverte : `backend LLVM: instruction non supportée ...` ;
 - type non couvert : `backend LLVM: type non supporté ...`.
@@ -198,3 +207,4 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--backend=clang` produit un exécutable via `clang -x ir` pour le
   sous-ensemble validé.
 - fait : le backend FASM par défaut reste inchangé et testé explicitement.
+- fait : les diagnostics CLI minimums du backend Clang/LLVM sont testés.

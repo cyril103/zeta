@@ -661,11 +661,14 @@ signatures de fonctions avec paramètres `Int`/`Bool`, `IrParameter` et les appe
 argumentés. `--backend=clang` est maintenant activé pour ce sous-ensemble : il
 écrit le `.ir` et le `.ll`, appelle `clang -x ir`, puis produit l'exécutable natif
 validé par `compile_clang_backend_parameters`. FASM reste le backend par défaut,
-protégé par `run_fasm_backend_still_default`.
+protégé par `run_fasm_backend_still_default`. Les diagnostics CLI du backend
+expérimental sont couverts par `reject_clang_backend_cli_diagnostics` : backend
+inconnu, `--emit-llvm` forcé vers FASM, et usage Clang/LLVM sur les modes
+bibliothèque/stdlib non pris en charge.
 
-Prochaine étape : élargir le backend Clang par tests RED/GREEN aux diagnostics
-CLI et au prochain périmètre runtime contrôlé (d'abord appels/valeurs scalaires
-sans dépendance native, puis seulement ensuite agrégats, chaînes et stdlib).
+Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
+périmètre runtime contrôlé (d'abord appels/valeurs scalaires sans dépendance
+native, puis seulement ensuite agrégats, chaînes et stdlib).
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
