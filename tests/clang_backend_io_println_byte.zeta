@@ -1,0 +1,9 @@
+import io
+
+
+def main(): Int = {
+    val small: Byte = 7
+    io.printByte(small)
+    io.printlnByte(Byte(250))
+    0
+}

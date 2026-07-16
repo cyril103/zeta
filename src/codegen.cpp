@@ -413,14 +413,15 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
 
     auto llvmType = [](const ValueType& type) -> std::string {
         if (type == ValueType::Int) return "i32";
+        if (type == ValueType::Byte) return "i8";
         if (type == ValueType::Bool) return "i1";
         if (type == ValueType::Char) return "i32";
         if (type == ValueType::String || type == ValueType::StringView) return "{ ptr, i64 }";
         throw std::runtime_error("backend LLVM: type non supporté " + typeName(type));
     };
     auto isLlvmScalarOrString = [](const ValueType& type) -> bool {
-        return type == ValueType::Int || type == ValueType::Bool || type == ValueType::Char ||
-            type == ValueType::String || type == ValueType::StringView;
+        return type == ValueType::Int || type == ValueType::Byte || type == ValueType::Bool ||
+            type == ValueType::Char || type == ValueType::String || type == ValueType::StringView;
     };
     auto isLlvmUnsupportedAggregate = [](const ValueType& type) -> bool {
         return type.kind == ValueType::Kind::Array || type.kind == ValueType::Kind::Slice ||
@@ -640,6 +641,17 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             const char* format = item.function == "io__printlnInt" ? "@zeta.fmt.int.nl" : "@zeta.fmt.int";
             out << "  call i32 (ptr, ...) @printf(ptr " << format << ", i32 "
                 << value(item.arguments[0]) << ")\n";
+            return true;
+        }
+        if (item.function == "io__printByte" || item.function == "io__printlnByte") {
+            if (item.arguments.size() != 1 || item.argumentTypes.size() != 1 ||
+                item.argumentTypes[0] != ValueType::Byte || item.returnType != ValueType::Unit) {
+                throw std::runtime_error("backend LLVM: signature io.printByte/printlnByte non supportée");
+            }
+            const std::string widened = "%v" + std::to_string(item.output) + ".byte_i32";
+            const char* format = item.function == "io__printlnByte" ? "@zeta.fmt.byte.nl" : "@zeta.fmt.byte";
+            out << "  " << widened << " = zext i8 " << value(item.arguments[0]) << " to i32\n"
+                << "  call i32 (ptr, ...) @printf(ptr " << format << ", i32 " << widened << ")\n";
             return true;
         }
         if (item.function == "io__printBool" || item.function == "io__printlnBool") {
@@ -891,7 +903,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     const bool usesIoPrintf = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
-                return call->function == "io__printInt" || call->function == "io__printlnInt";
+                return call->function == "io__printInt" || call->function == "io__printlnInt" ||
+                       call->function == "io__printByte" || call->function == "io__printlnByte";
             return false;
         });
     const bool usesIoBoolWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
@@ -932,7 +945,9 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     }
     if (usesIoPrintf) {
         out << "@zeta.fmt.int = private unnamed_addr constant [3 x i8] c\"%d\\00\", align 1\n"
-            << "@zeta.fmt.int.nl = private unnamed_addr constant [4 x i8] c\"%d\\0A\\00\", align 1\n";
+            << "@zeta.fmt.int.nl = private unnamed_addr constant [4 x i8] c\"%d\\0A\\00\", align 1\n"
+            << "@zeta.fmt.byte = private unnamed_addr constant [3 x i8] c\"%u\\00\", align 1\n"
+            << "@zeta.fmt.byte.nl = private unnamed_addr constant [4 x i8] c\"%u\\0A\\00\", align 1\n";
     }
     for (SlotId id = 0; id < program.slots.size(); ++id) {
         const IrSlot& slot = program.slots[id];
@@ -967,7 +982,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 item->name.rfind("strings__", 0) == 0;
             const bool unreachableImportedIoFunction =
                 (!reachableFunctions.contains(item->name) || item->name == "io__printInt" ||
-                 item->name == "io__printlnInt" || item->name == "io__printBool" ||
+                 item->name == "io__printlnInt" || item->name == "io__printByte" ||
+                 item->name == "io__printlnByte" || item->name == "io__printBool" ||
                  item->name == "io__printlnBool") &&
                 item->name.rfind("io__", 0) == 0;
             if (unreachableImportedStringsFunction || unreachableImportedIoFunction) {
@@ -993,7 +1009,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         }
         if (skippingFunction) continue;
         if (const auto* item = std::get_if<IrConst>(&instruction)) {
-            if (item->type != ValueType::Int && item->type != ValueType::Bool && item->type != ValueType::Char)
+            if (item->type != ValueType::Int && item->type != ValueType::Byte &&
+                item->type != ValueType::Bool && item->type != ValueType::Char)
                 throw std::runtime_error("backend LLVM: type non supporté " + typeName(item->type));
             values[item->output] = std::to_string(item->value);
         } else if (const auto* item = std::get_if<IrStringConst>(&instruction)) {
@@ -1101,7 +1118,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         } else if (const auto* item = std::get_if<IrCopy>(&instruction)) {
             if (item->type == ValueType::Unit) {
                 values[item->output] = "0";
-            } else if (item->type == ValueType::Int || item->type == ValueType::Bool || item->type == ValueType::Char) {
+            } else if (item->type == ValueType::Int || item->type == ValueType::Byte ||
+                       item->type == ValueType::Bool || item->type == ValueType::Char) {
                 values[item->output] = value(item->input);
             } else {
                 throw std::runtime_error("backend LLVM: type de copie non supporté " +
@@ -1111,6 +1129,14 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             if ((item->source == ValueType::Char && item->target == ValueType::Int) ||
                 (item->source == ValueType::Int && item->target == ValueType::Char)) {
                 values[item->output] = value(item->input);
+            } else if (item->source == ValueType::Int && item->target == ValueType::Byte) {
+                const std::string output = "%v" + std::to_string(item->output);
+                out << "  " << output << " = trunc i32 " << value(item->input) << " to i8\n";
+                values[item->output] = output;
+            } else if (item->source == ValueType::Byte && item->target == ValueType::Int) {
+                const std::string output = "%v" + std::to_string(item->output);
+                out << "  " << output << " = zext i8 " << value(item->input) << " to i32\n";
+                values[item->output] = output;
             } else {
                 throw std::runtime_error("backend LLVM: conversion non supportée " +
                                          typeName(item->source) + " vers " + typeName(item->target));
