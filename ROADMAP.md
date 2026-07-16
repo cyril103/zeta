@@ -683,6 +683,10 @@ paire complète, puis `lengthBytes` et `isEmpty` depuis des variables locales.
 `compile_clang_backend_string_concat` couvre maintenant une concaténation locale
 minimale : extraction des deux paires chaîne, allocation via `malloc`, copie des
 bytes via `memcpy`, puis reconstruction de la paire résultat.
+`compile_clang_backend_string_concat_drop` ajoute le premier nettoyage runtime :
+le backend suit conservativement les chaînes issues de concaténation stockées en
+slots locaux et émet `free(data - 16)` uniquement au `drop` de ces buffers heap,
+sans libérer les littéraux statiques.
 `reject_clang_backend_unsupported_aggregates` verrouille les diagnostics des
 agrégats locaux encore hors périmètre (`struct`, `Vec[T]`) avec des noms source
 lisibles, au lieu de laisser le backend produire un `.ll` partiel.
@@ -707,9 +711,9 @@ interprété comme offset d'octet, le backend Clang abaisse `IrStringDecodeAt` e
 `IrStringNextOffset`, et `Char` est représenté comme `i32` côté LLVM.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre runtime contrôlé : premier nettoyage runtime `drop/free` des chaînes
-concaténées ou support ciblé d'une autre primitive chaîne, avant toute
-généralisation.
+périmètre contrôlé : support ciblé d'une autre primitive chaîne, gestion plus
+complète de propriété/retain des chaînes heap, ou première valeur composée simple,
+avant toute généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

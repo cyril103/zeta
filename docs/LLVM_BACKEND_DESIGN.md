@@ -207,7 +207,16 @@ pour réserver `left.length + right.length + 16` octets, écrit le header compat
 avec le runtime actuel (`refcount`, `length`), copie les bytes avec `memcpy`, puis
 reconstruit une paire `{ ptr, i64 }` pointant sur le début des bytes. Cette tranche
 valide `lengthBytes`/`isEmpty` sur le résultat et compare l'exécution Clang à
-FASM. La libération explicite du buffer reste une amélioration runtime séparée.
+FASM.
+
+`compile_clang_backend_string_concat_drop` ajoute le premier nettoyage runtime
+pour ces chaînes heap : le backend marque les résultats de `IrStringConcat`,
+propage conservativement cette information à travers les `store`/`load` de slots
+locaux `String`, puis abaisse le `drop` du propriétaire en extraction du pointeur
+data, `getelementptr i8 ... -16` vers le header runtime, et `free(raw)`. Les
+littéraux statiques et `StringView` restent no-op au drop pour éviter de libérer
+des constantes ou des vues empruntées ; `retain`/aliasing heap complet reste hors
+périmètre.
 
 `compile_clang_backend_string_view` ajoute une première surface `stdlib/strings` :
 `strings.view(text, start, end)` est abaissé en LLVM sans appel runtime externe.
@@ -301,6 +310,8 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--backend=clang` couvre les slots locaux `String` initialisés par
   littéraux directs.
 - fait : `--backend=clang` couvre une concaténation locale minimale de chaînes.
+- fait : `--backend=clang` libère les buffers heap issus de concaténation au
+  `drop` local propriétaire, sans libérer les littéraux statiques.
 - fait : les diagnostics LLVM distinguent les agrégats locaux non supportés
   (`struct`, `Vec[T]`) avec des noms source lisibles.
 - fait : les diagnostics LLVM distinguent les agrégats globaux non supportés
