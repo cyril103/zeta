@@ -6,7 +6,9 @@
 #include <limits>
 #include <sstream>
 #include <set>
+#include <stdexcept>
 #include <type_traits>
+#include <unordered_map>
 
 namespace {
 std::string globalLabel(const IrSlot& slot) { return "zeta_global_" + slot.name; }
@@ -353,6 +355,102 @@ void emitEqualityChecks(std::ostringstream& out, const std::string& left,
         out << done << ":\n";
     }
 }
+}
+
+std::string LlvmIrCodeGenerator::generate(const IrProgram& program) {
+    return generate(IrVerifier::verify(program, IrVerificationMode::Executable));
+}
+
+std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
+    if (verified.mode() != IrVerificationMode::Executable)
+        throw IrVerificationError("IRV004", "mode objet fourni au codegen LLVM exécutable");
+
+    const IrProgram& program = verified.program();
+    std::ostringstream out;
+    std::unordered_map<ValueId, std::string> values;
+
+    auto llvmType = [](const ValueType& type) -> std::string {
+        if (type == ValueType::Int) return "i32";
+        if (type == ValueType::Bool) return "i1";
+        throw std::runtime_error("backend LLVM: type non supporté " + typeName(type));
+    };
+    auto value = [&](ValueId id) -> std::string {
+        if (const auto found = values.find(id); found != values.end()) return found->second;
+        return "%v" + std::to_string(id);
+    };
+    auto unsupported = [](const char* instruction) -> void {
+        throw std::runtime_error(std::string("backend LLVM: instruction non supportée ") + instruction);
+    };
+
+    out << "target triple = \"x86_64-pc-linux-gnu\"\n\n"
+        << "define i32 @main() {\nentry:\n";
+    bool openFunction = true;
+    bool terminated = false;
+
+    for (const IrInstruction& instruction : program.instructions) {
+        if (const auto* item = std::get_if<IrConst>(&instruction)) {
+            if (item->type != ValueType::Int && item->type != ValueType::Bool)
+                throw std::runtime_error("backend LLVM: type non supporté " + typeName(item->type));
+            values[item->output] = std::to_string(item->value);
+        } else if (const auto* item = std::get_if<IrCall>(&instruction)) {
+            const std::string returnType = llvmType(item->returnType);
+            out << "  %v" << item->output << " = call " << returnType << " @"
+                << item->function << "(";
+            for (std::size_t i = 0; i < item->arguments.size(); ++i) {
+                if (i != 0) out << ", ";
+                out << llvmType(item->argumentTypes.at(i)) << " " << value(item->arguments[i]);
+            }
+            out << ")\n";
+            values[item->output] = "%v" + std::to_string(item->output);
+        } else if (const auto* item = std::get_if<IrExit>(&instruction)) {
+            const ValueType type = program.valueTypes.at(item->value);
+            if (type != ValueType::Int)
+                throw std::runtime_error("backend LLVM: type de sortie non supporté " + typeName(type));
+            out << "  ret i32 " << value(item->value) << "\n";
+            terminated = true;
+        } else if (const auto* item = std::get_if<IrFunctionStart>(&instruction)) {
+            if (openFunction) {
+                if (!terminated) out << "  ret i32 0\n";
+                out << "}\n\n";
+            }
+            out << "define i32 @" << item->name << "() {\nentry:\n";
+            openFunction = true;
+            terminated = false;
+        } else if (const auto* item = std::get_if<IrParameter>(&instruction)) {
+            static_cast<void>(item);
+            unsupported("parameter");
+        } else if (const auto* item = std::get_if<IrReturn>(&instruction)) {
+            if (item->type != ValueType::Int)
+                throw std::runtime_error("backend LLVM: type de retour non supporté " + typeName(item->type));
+            out << "  ret i32 " << value(item->value) << "\n";
+            terminated = true;
+        } else if (std::holds_alternative<IrUnit>(instruction)) {
+            unsupported("unit");
+        } else if (std::holds_alternative<IrLabel>(instruction)) {
+            unsupported("label");
+        } else if (std::holds_alternative<IrJump>(instruction)) {
+            unsupported("jump");
+        } else if (std::holds_alternative<IrBranch>(instruction)) {
+            unsupported("branch");
+        } else if (std::holds_alternative<IrBinary>(instruction)) {
+            unsupported("binary");
+        } else if (std::holds_alternative<IrUnary>(instruction)) {
+            unsupported("unary");
+        } else if (std::holds_alternative<IrCopy>(instruction)) {
+            unsupported("copy");
+        } else if (std::holds_alternative<IrStore>(instruction)) {
+            unsupported("store");
+        } else if (std::holds_alternative<IrLoad>(instruction)) {
+            unsupported("load");
+        } else {
+            unsupported("complexe");
+        }
+    }
+    if (openFunction) {
+        if (!terminated) out << "  ret i32 0\n";
+        out << "}\n";
+    }
+    return out.str();
 }
 
 std::string FasmCodeGenerator::generate(const IrProgram& program) {

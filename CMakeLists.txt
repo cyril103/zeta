@@ -36,6 +36,11 @@ if(BUILD_TESTING)
     target_compile_options(ir_verifier_tests PRIVATE
         -Wall -Wextra -Wpedantic -Wconversion)
     add_test(NAME ir_verifier_unit COMMAND ir_verifier_tests)
+    add_test(NAME emit_llvm_minimal COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_emit_llvm_minimal.sh
+        $<TARGET_FILE:zeta>
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/emit_llvm_minimal.zeta
+        ${CMAKE_CURRENT_BINARY_DIR}/emit-llvm-minimal)
 
     add_test(NAME compile_public_struct_declaration COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_struct_declaration.zeta

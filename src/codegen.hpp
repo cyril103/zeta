@@ -17,3 +17,9 @@ public:
 private:
     static std::string generateUnchecked(const IrProgram& program);
 };
+
+class LlvmIrCodeGenerator {
+public:
+    static std::string generate(const IrProgram& program);
+    static std::string generate(const VerifiedIrProgram& program);
+};

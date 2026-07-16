@@ -113,13 +113,15 @@ void weakenGenericSymbols(const fs::path& object, const IrProgram& ir) {
 
 void usage() {
     std::cerr << "Usage: zeta <source.zeta> [-o executable] [--stdlib dossier]"
-                 " [--library-cache dossier]\n"
+                 " [--library-cache dossier] [--backend=fasm|clang] [--emit-llvm]\n"
                  "       zeta --build-library <source.zeta> -o dossier [--stdlib dossier]"
                  " [--library-cache dossier]\n"
                  "       zeta --install-library <module.zti> [--library-cache dossier]"
                  " [--force]\n"
                  "       zeta --build-stdlib [--stdlib dossier]\n";
 }
+
+enum class Backend { Fasm, Clang };
 
 class TemporaryFiles {
 public:
@@ -349,6 +351,8 @@ int main(int argc, char** argv) {
     bool buildLibraryModule = false;
     bool installLibraryModule = false;
     bool forceLibraryInstall = false;
+    bool emitLlvm = false;
+    Backend backend = Backend::Fasm;
     for (int i = 1; i < argc; ++i) {
         const std::string argument = argv[i];
         if (argument == "--build-stdlib") {
@@ -359,6 +363,17 @@ int main(int argc, char** argv) {
             installLibraryModule = true;
         } else if (argument == "--force") {
             forceLibraryInstall = true;
+        } else if (argument == "--emit-llvm") {
+            emitLlvm = true;
+            backend = Backend::Clang;
+        } else if (argument.rfind("--backend=", 0) == 0) {
+            const std::string selectedBackend = argument.substr(std::string("--backend=").size());
+            if (selectedBackend == "fasm") backend = Backend::Fasm;
+            else if (selectedBackend == "clang") backend = Backend::Clang;
+            else {
+                std::cerr << "Erreur: backend inconnu '" << selectedBackend << "'\n";
+                return 2;
+            }
         } else if (argument == "-o") {
             if (++i >= argc) {
                 usage();
@@ -397,6 +412,15 @@ int main(int argc, char** argv) {
     }
     if (forceLibraryInstall && !installLibraryModule) {
         usage();
+        return 2;
+    }
+    if ((buildStandardLibrary || buildLibraryModule || installLibraryModule) &&
+        (emitLlvm || backend == Backend::Clang)) {
+        usage();
+        return 2;
+    }
+    if (emitLlvm && backend == Backend::Fasm) {
+        std::cerr << "Erreur: --emit-llvm requiert le backend clang\n";
         return 2;
     }
     if (buildLibraryModule &&
@@ -492,6 +516,14 @@ int main(int argc, char** argv) {
 
         fs::path irPath = outputPath;
         irPath += ".ir";
+        fs::path llvmIrPath = outputPath;
+        llvmIrPath += ".ll";
+        if (emitLlvm) {
+            writeFile(llvmIrPath, LlvmIrCodeGenerator::generate(verifiedIr));
+            return 0;
+        }
+        if (backend == Backend::Clang)
+            throw std::runtime_error("backend clang pas encore disponible sans --emit-llvm");
         fs::path assemblyPath = outputPath;
         assemblyPath += ".asm";
         writeFile(irPath, IrGenerator::print(verifiedIr));
