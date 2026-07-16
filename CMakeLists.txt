@@ -46,6 +46,11 @@ if(BUILD_TESTING)
         $<TARGET_FILE:zeta>
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/emit_llvm_scalars.zeta
         ${CMAKE_CURRENT_BINARY_DIR}/emit-llvm-scalars)
+    add_test(NAME emit_llvm_control COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_emit_llvm_control.sh
+        $<TARGET_FILE:zeta>
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/emit_llvm_control.zeta
+        ${CMAKE_CURRENT_BINARY_DIR}/emit-llvm-control)
 
     add_test(NAME compile_public_struct_declaration COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_struct_declaration.zeta

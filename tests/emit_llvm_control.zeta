@@ -1,0 +1,11 @@
+def choose(): Int = if (2 < 3) 17 else 4
+
+def main(): Int = {
+    var i: Int = 0
+    var total: Int = 0
+    while (i < 4) do {
+        total = total + i
+        i = i + 1
+    }
+    total + choose()
+}

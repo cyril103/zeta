@@ -393,11 +393,28 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     auto unsupported = [](const char* instruction) -> void {
         throw std::runtime_error(std::string("backend LLVM: instruction non supportée ") + instruction);
     };
+    auto slotName = [](SlotId id) -> std::string {
+        return "%slot" + std::to_string(id);
+    };
+    auto labelName = [](std::size_t id) -> std::string {
+        return "label" + std::to_string(id);
+    };
+    auto emitScalarAllocas = [&]() -> void {
+        for (SlotId id = 0; id < program.slots.size(); ++id) {
+            const IrSlot& slot = program.slots[id];
+            if (slot.global || slot.external) continue;
+            if (slot.type != ValueType::Int && slot.type != ValueType::Bool)
+                throw std::runtime_error("backend LLVM: slot non supporté " + typeName(slot.type));
+            out << "  " << slotName(id) << " = alloca " << llvmType(slot.type) << "\n";
+        }
+    };
 
     out << "target triple = \"x86_64-pc-linux-gnu\"\n\n"
         << "define i32 @main() {\nentry:\n";
+    emitScalarAllocas();
     bool openFunction = true;
     bool terminated = false;
+    std::size_t syntheticBlock = 0;
 
     for (const IrInstruction& instruction : program.instructions) {
         if (const auto* item = std::get_if<IrConst>(&instruction)) {
@@ -428,6 +445,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             const ValueType returnType = functionReturnTypes.contains(item->name)
                 ? functionReturnTypes.at(item->name) : ValueType::Int;
             out << "define " << llvmType(returnType) << " @" << item->name << "() {\nentry:\n";
+            emitScalarAllocas();
             openFunction = true;
             terminated = false;
         } else if (const auto* item = std::get_if<IrParameter>(&instruction)) {
@@ -440,12 +458,25 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             terminated = true;
         } else if (std::holds_alternative<IrUnit>(instruction)) {
             unsupported("unit");
-        } else if (std::holds_alternative<IrLabel>(instruction)) {
-            unsupported("label");
-        } else if (std::holds_alternative<IrJump>(instruction)) {
-            unsupported("jump");
-        } else if (std::holds_alternative<IrBranch>(instruction)) {
-            unsupported("branch");
+        } else if (const auto* item = std::get_if<IrLabel>(&instruction)) {
+            if (!terminated) out << "  br label %" << labelName(item->label) << "\n";
+            out << labelName(item->label) << ":\n";
+            terminated = false;
+        } else if (const auto* item = std::get_if<IrJump>(&instruction)) {
+            out << "  br label %" << labelName(item->label) << "\n";
+            terminated = true;
+        } else if (const auto* item = std::get_if<IrBranch>(&instruction)) {
+            if (program.valueTypes.at(item->condition) != ValueType::Bool)
+                throw std::runtime_error("backend LLVM: condition de branche non booléenne");
+            const std::string fallthrough = "bb" + std::to_string(syntheticBlock++);
+            out << "  br i1 " << value(item->condition) << ", label %";
+            if (item->jumpWhenTrue) {
+                out << labelName(item->label) << ", label %" << fallthrough << "\n";
+            } else {
+                out << fallthrough << ", label %" << labelName(item->label) << "\n";
+            }
+            out << fallthrough << ":\n";
+            terminated = false;
         } else if (const auto* item = std::get_if<IrBinary>(&instruction)) {
             if (item->operandType != ValueType::Int && item->operandType != ValueType::Bool)
                 throw std::runtime_error("backend LLVM: type opérande non supporté " +
@@ -490,10 +521,20 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 throw std::runtime_error("backend LLVM: type de copie non supporté " +
                                          typeName(item->type));
             }
-        } else if (std::holds_alternative<IrStore>(instruction)) {
-            unsupported("store");
-        } else if (std::holds_alternative<IrLoad>(instruction)) {
-            unsupported("load");
+        } else if (const auto* item = std::get_if<IrStore>(&instruction)) {
+            if (item->type != ValueType::Int && item->type != ValueType::Bool)
+                throw std::runtime_error("backend LLVM: type de store non supporté " +
+                                         typeName(item->type));
+            out << "  store " << llvmType(item->type) << " " << value(item->value)
+                << ", ptr " << slotName(item->slot) << "\n";
+        } else if (const auto* item = std::get_if<IrLoad>(&instruction)) {
+            if (item->type != ValueType::Int && item->type != ValueType::Bool)
+                throw std::runtime_error("backend LLVM: type de load non supporté " +
+                                         typeName(item->type));
+            const std::string output = "%v" + std::to_string(item->output);
+            out << "  " << output << " = load " << llvmType(item->type)
+                << ", ptr " << slotName(item->slot) << "\n";
+            values[item->output] = output;
         } else {
             unsupported("complexe");
         }
