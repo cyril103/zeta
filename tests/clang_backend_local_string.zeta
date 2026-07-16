@@ -1,0 +1,12 @@
+def main(): Int = {
+    val text: String = "zeta"
+    val empty: String = ""
+    var score: Int = text.lengthBytes
+    while (empty.isEmpty && score < 7) do {
+        score = score + 3
+    }
+    while (text.isEmpty) do {
+        score = 90
+    }
+    score
+}

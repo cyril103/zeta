@@ -80,7 +80,6 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_unsupported_types.sh
         $<TARGET_FILE:zeta>
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/reject_clang_backend_global_string.zeta
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/reject_clang_backend_local_string.zeta
         ${CMAKE_CURRENT_BINARY_DIR}/clang-backend-unsupported-types)
     add_test(NAME compile_clang_backend_string_literal COMMAND bash
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_string_literal.sh
@@ -92,6 +91,11 @@ if(BUILD_TESTING)
         $<TARGET_FILE:zeta>
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/clang_backend_string_is_empty.zeta
         ${CMAKE_CURRENT_BINARY_DIR}/clang-backend-string-is-empty)
+    add_test(NAME compile_clang_backend_local_string COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_local_string.sh
+        $<TARGET_FILE:zeta>
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/clang_backend_local_string.zeta
+        ${CMAKE_CURRENT_BINARY_DIR}/clang-backend-local-string)
 
     add_test(NAME compile_public_struct_declaration COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_struct_declaration.zeta

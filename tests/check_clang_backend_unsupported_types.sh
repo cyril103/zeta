@@ -2,8 +2,7 @@
 set -euo pipefail
 compiler="$1"
 global_source="$2"
-local_source="$3"
-output="$4"
+output="$3"
 rm -f "${output}" "${output}.ll" "${output}.ir" "${output}.diag"
 
 expect_failure() {
@@ -20,4 +19,3 @@ expect_failure() {
 }
 
 expect_failure "${global_source}" 'backend LLVM: globale non scalaire non supportée greeting: String'
-expect_failure "${local_source}" 'backend LLVM: slot local non scalaire non supporté greeting: String'

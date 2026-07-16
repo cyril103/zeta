@@ -390,6 +390,10 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         if (type == ValueType::String || type == ValueType::StringView) return "{ ptr, i64 }";
         throw std::runtime_error("backend LLVM: type non supporté " + typeName(type));
     };
+    auto isLlvmScalarOrString = [](const ValueType& type) -> bool {
+        return type == ValueType::Int || type == ValueType::Bool ||
+            type == ValueType::String || type == ValueType::StringView;
+    };
     auto llvmStringBytes = [](const std::string& text) -> std::string {
         std::ostringstream escaped;
         escaped << std::uppercase << std::hex << std::setfill('0');
@@ -427,8 +431,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         for (SlotId id = 0; id < program.slots.size(); ++id) {
             const IrSlot& slot = program.slots[id];
             if (slot.global || slot.external) continue;
-            if (slot.type != ValueType::Int && slot.type != ValueType::Bool)
-                throw std::runtime_error("backend LLVM: slot local non scalaire non supporté " +
+            if (!isLlvmScalarOrString(slot.type))
+                throw std::runtime_error("backend LLVM: slot local non supporté " +
                                          diagnosticSlotName(slot, id) + ": " + typeName(slot.type));
             out << "  " << slotName(id) << " = alloca " << llvmType(slot.type) << "\n";
         }
@@ -577,13 +581,13 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                                          typeName(item->type));
             }
         } else if (const auto* item = std::get_if<IrStore>(&instruction)) {
-            if (item->type != ValueType::Int && item->type != ValueType::Bool)
+            if (!isLlvmScalarOrString(item->type))
                 throw std::runtime_error("backend LLVM: type de store non supporté " +
                                          typeName(item->type));
             out << "  store " << llvmType(item->type) << " " << value(item->value)
                 << ", ptr " << slotName(item->slot) << "\n";
         } else if (const auto* item = std::get_if<IrLoad>(&instruction)) {
-            if (item->type != ValueType::Int && item->type != ValueType::Bool)
+            if (!isLlvmScalarOrString(item->type))
                 throw std::runtime_error("backend LLVM: type de load non supporté " +
                                          typeName(item->type));
             const std::string output = "%v" + std::to_string(item->output);
@@ -610,6 +614,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 << value(item->string) << ", 1\n"
                 << "  " << output << " = icmp eq i64 " << length << ", 0\n";
             values[item->output] = output;
+        } else if (const auto* item = std::get_if<IrDrop>(&instruction)) {
+            if (!isLlvmScalarOrString(item->type) && item->type != ValueType::Unit)
+                throw std::runtime_error("backend LLVM: drop non supporté " + typeName(item->type));
+        } else if (const auto* item = std::get_if<IrRetain>(&instruction)) {
+            if (!isLlvmScalarOrString(item->type) && item->type != ValueType::Unit)
+                throw std::runtime_error("backend LLVM: retain non supporté " + typeName(item->type));
         } else {
             unsupported("complexe");
         }

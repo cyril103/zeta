@@ -1,4 +1,0 @@
-def main(): Int = {
-    val greeting: String = "zeta"
-    0
-}
