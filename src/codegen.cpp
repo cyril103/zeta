@@ -369,12 +369,15 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     std::ostringstream out;
     std::unordered_map<ValueId, std::string> values;
     std::unordered_map<std::string, ValueType> functionReturnTypes;
+    std::unordered_map<std::string, std::vector<ValueType>> functionParameterTypes;
     std::string scannedFunction;
     for (const IrInstruction& instruction : program.instructions) {
         if (const auto* function = std::get_if<IrFunctionStart>(&instruction)) {
             scannedFunction = function->name;
         } else if (!scannedFunction.empty()) {
-            if (const auto* result = std::get_if<IrReturn>(&instruction)) {
+            if (const auto* parameter = std::get_if<IrParameter>(&instruction)) {
+                functionParameterTypes[scannedFunction].push_back(parameter->type);
+            } else if (const auto* result = std::get_if<IrReturn>(&instruction)) {
                 functionReturnTypes.insert_or_assign(scannedFunction, result->type);
                 scannedFunction.clear();
             }
@@ -444,13 +447,20 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             }
             const ValueType returnType = functionReturnTypes.contains(item->name)
                 ? functionReturnTypes.at(item->name) : ValueType::Int;
-            out << "define " << llvmType(returnType) << " @" << item->name << "() {\nentry:\n";
+            out << "define " << llvmType(returnType) << " @" << item->name << "(";
+            const std::vector<ValueType>& parameters = functionParameterTypes[item->name];
+            for (std::size_t i = 0; i < parameters.size(); ++i) {
+                if (i != 0) out << ", ";
+                out << llvmType(parameters[i]) << " %arg" << i;
+            }
+            out << ") {\nentry:\n";
             emitScalarAllocas();
             openFunction = true;
             terminated = false;
         } else if (const auto* item = std::get_if<IrParameter>(&instruction)) {
-            static_cast<void>(item);
-            unsupported("parameter");
+            if (item->type != ValueType::Int && item->type != ValueType::Bool)
+                throw std::runtime_error("backend LLVM: paramètre non supporté " + typeName(item->type));
+            values[item->output] = "%arg" + std::to_string(item->index);
         } else if (const auto* item = std::get_if<IrReturn>(&instruction)) {
             if (item->type != ValueType::Int && item->type != ValueType::Bool)
                 throw std::runtime_error("backend LLVM: type de retour non supporté " + typeName(item->type));

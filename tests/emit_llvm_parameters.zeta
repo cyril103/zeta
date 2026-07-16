@@ -1,0 +1,5 @@
+def add(a: Int, b: Int): Int = a + b
+
+def isSmall(value: Int): Bool = value < 10
+
+def main(): Int = if (isSmall(add(3, 4))) add(10, 2) else 1
