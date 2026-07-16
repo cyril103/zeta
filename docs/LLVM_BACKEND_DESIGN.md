@@ -320,9 +320,12 @@ champ locale : le backend recharge la valeur du slot, remplace le champ visé pa
 `insertvalue`, puis restocke l'agrégat complet. `compile_clang_backend_struct_function_abi`
 étend ce même sous-ensemble aux signatures de fonctions : paramètres, retours et
 appels portent directement le type agrégat LLVM littéral (`{ i32, i32 }`) lorsque
-chaque champ est déjà supporté. Cette tranche reste volontairement limitée : les
-globales struct et les champs hors sous-ensemble (`Box`, `Vec`, tableaux, enums)
-restent hors périmètre.
+chaque champ est déjà supporté. `compile_clang_backend_mixed_struct` élargit enfin
+les champs locaux supportés à un agrégat mixte `Bool`/`Byte`/`Char`/`Double`/
+`String` (`{ i1, i8, i32, double, { ptr, i64 } }`) et verrouille les comparaisons
+`Byte`/`Char` nécessaires par `icmp`. Cette tranche reste volontairement limitée :
+les globales struct et les champs hors sous-ensemble (`Box`, `Vec`, tableaux,
+enums) restent hors périmètre.
 
 ## Matrice de tests
 
@@ -419,3 +422,7 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--backend=clang` couvre les paramètres, retours et appels de fonctions
   portant des `struct` simples, en émettant directement les signatures LLVM en
   agrégats littéraux (`{ i32, i32 }`), avec exécution Clang et FASM.
+- fait : `--backend=clang` couvre les `struct` locaux mixtes contenant
+  `Bool`/`Byte`/`Char`/`Double`/`String`, avec agrégat LLVM littéral
+  `{ i1, i8, i32, double, { ptr, i64 } }`, comparaisons `Byte`/`Char` par `icmp`,
+  et exécution Clang/FASM.
