@@ -400,6 +400,13 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         const IrSlot& slot = program.slots.at(id);
         return std::string(slot.global || slot.external ? "@slot" : "%slot") + std::to_string(id);
     };
+    auto diagnosticSlotName = [](const IrSlot& slot, SlotId id) -> std::string {
+        if (slot.name.empty()) return "slot" + std::to_string(id);
+        const std::size_t separator = slot.name.rfind("__");
+        if (separator != std::string::npos && separator + 2 < slot.name.size())
+            return slot.name.substr(separator + 2);
+        return slot.name;
+    };
     auto labelName = [](std::size_t id) -> std::string {
         return "label" + std::to_string(id);
     };
@@ -408,7 +415,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             const IrSlot& slot = program.slots[id];
             if (slot.global || slot.external) continue;
             if (slot.type != ValueType::Int && slot.type != ValueType::Bool)
-                throw std::runtime_error("backend LLVM: slot non supporté " + typeName(slot.type));
+                throw std::runtime_error("backend LLVM: slot local non scalaire non supporté " +
+                                         diagnosticSlotName(slot, id) + ": " + typeName(slot.type));
             out << "  " << slotName(id) << " = alloca " << llvmType(slot.type) << "\n";
         }
     };
@@ -418,7 +426,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         const IrSlot& slot = program.slots[id];
         if (!slot.global && !slot.external) continue;
         if (slot.type != ValueType::Int && slot.type != ValueType::Bool)
-            throw std::runtime_error("backend LLVM: slot global non supporté " + typeName(slot.type));
+            throw std::runtime_error("backend LLVM: globale non scalaire non supportée " +
+                                     diagnosticSlotName(slot, id) + ": " + typeName(slot.type));
         out << slotName(id) << " = ";
         if (slot.external) {
             out << "external global " << llvmType(slot.type) << "\n";

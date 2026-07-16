@@ -1,0 +1,3 @@
+pub val greeting: String = "zeta"
+
+def main(): Int = 0
