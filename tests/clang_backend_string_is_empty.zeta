@@ -1,0 +1,10 @@
+def main(): Int = {
+    var score: Int = 0
+    while ("".isEmpty && score < 5) do {
+        score = score + 5
+    }
+    while ("zeta".isEmpty) do {
+        score = 90
+    }
+    score + 2
+}

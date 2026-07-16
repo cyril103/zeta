@@ -600,6 +600,16 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 << value(item->string) << ", 1\n"
                 << "  " << output << " = trunc i64 " << wide << " to i32\n";
             values[item->output] = output;
+        } else if (const auto* item = std::get_if<IrStringEmpty>(&instruction)) {
+            const ValueType type = program.valueTypes.at(item->string);
+            if (type != ValueType::String && type != ValueType::StringView)
+                throw std::runtime_error("backend LLVM: isEmpty hors chaîne non supporté");
+            const std::string length = "%v" + std::to_string(item->output) + ".length";
+            const std::string output = "%v" + std::to_string(item->output);
+            out << "  " << length << " = extractvalue " << llvmType(type) << " "
+                << value(item->string) << ", 1\n"
+                << "  " << output << " = icmp eq i64 " << length << ", 0\n";
+            values[item->output] = output;
         } else {
             unsupported("complexe");
         }
