@@ -173,6 +173,13 @@ maintenant émises comme `@slotN = global ... 0`, initialisées dans le wrapper
 test compare le code de retour Clang au code de retour FASM pour éviter une
 divergence silencieuse entre backends.
 
+`reject_clang_backend_unsupported_types` verrouille les diagnostics pour les
+types non scalaires encore exclus du backend LLVM. Un `pub val greeting: String`
+échoue avec `backend LLVM: globale non scalaire non supportée greeting: String` ;
+un local `val greeting: String` échoue avec `backend LLVM: slot local non scalaire
+non supporté greeting: String`. Ces erreurs utilisent le nom source quand un slot
+IR a été qualifié par son module.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -196,6 +203,8 @@ Les erreurs doivent être explicites :
   aux exécutables` ;
 - `--emit-llvm` avec FASM : `--emit-llvm requiert le backend clang` ;
 - `clang` introuvable : `clang introuvable pour --backend=clang` ;
+- globale non scalaire : `backend LLVM: globale non scalaire non supportée ...` ;
+- slot local non scalaire : `backend LLVM: slot local non scalaire non supporté ...` ;
 - instruction IR non couverte : `backend LLVM: instruction non supportée ...` ;
 - type non couvert : `backend LLVM: type non supporté ...`.
 
@@ -218,3 +227,4 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : les diagnostics CLI minimums du backend Clang/LLVM sont testés.
 - fait : `--backend=clang` couvre les imports de modules scalaires avec globales
   `Int`/`Bool` et comparaison d'exécution FASM.
+- fait : les diagnostics LLVM pour globales/slots non scalaires sont couverts.

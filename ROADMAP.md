@@ -667,11 +667,13 @@ inconnu, `--emit-llvm` forcé vers FASM, et usage Clang/LLVM sur les modes
 bibliothèque/stdlib non pris en charge. `compile_clang_backend_global_values`
 élargit maintenant le périmètre runtime contrôlé aux imports de modules et aux
 `pub val` globales scalaires `Int`/`Bool` initialisées dans le wrapper principal,
-en comparant l'exécution Clang au backend FASM.
+en comparant l'exécution Clang au backend FASM. `reject_clang_backend_unsupported_types`
+verrouille les diagnostics pour les slots globaux et locaux non scalaires (par
+exemple `String`) afin d'échouer avant toute génération de `.ll` partielle.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre runtime contrôlé : diagnostics LLVM pour les globales/types non
-scalaires, puis seulement ensuite agrégats, chaînes et stdlib.
+périmètre runtime contrôlé : représenter une première constante chaîne/littéral
+simple côté LLVM, puis seulement ensuite agrégats et stdlib.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
