@@ -3,8 +3,9 @@
 Ce document fixe le premier contrat d'itération de Zeta. L'objectif immédiat est
 réduit : rendre les parcours de tableaux, `Slice[T]`, `SliceMut[T]` et `Vec[T]`
 composables sans allocation, sans vtable et sans affaiblir les règles d'emprunt.
-La syntaxe `for` viendra ensuite ; le premier livrable doit pouvoir être validé
-avec des fonctions et méthodes explicites.
+Le socle a d'abord été validé avec des fonctions et méthodes explicites ; une
+première syntaxe `for (value in view) do { ... }` est maintenant disponible pour
+les vues `Slice[T]` et `SliceMut[T]` lorsque `T: Copy`.
 
 ## Objectifs
 
@@ -25,7 +26,8 @@ avec des fonctions et méthodes explicites.
 - Pas d'allocation de state machine sur le tas.
 - Pas de retour de références hors de la durée lexicale du parcours.
 - Pas de protocole d'itération consommatrice pour les types possédés non `Copy`.
-- Pas encore de syntaxe `for`; elle sera un abaissement vers ce protocole.
+- Pas de généralisation de `for` au-delà de `Slice[T]`/`SliceMut[T]` avec `T:
+  Copy` dans cette tranche.
 
 ## Modèle retenu
 
@@ -47,8 +49,9 @@ les helpers publics de `sequences` utilisent aujourd'hui un `Int` comme état
 copiable (`iterate`, `iterateMut`, `hasNext`, `hasNextMut`, `position`,
 `advance`). Cela évite d'élargir trop tôt l'ABI publique avec un type d'itérateur
 spécifique tout en validant le modèle d'état séparé. Le compilateur peut
-continuer à compiler ces helpers explicites vers des boucles indexées, puis la
-syntaxe `for` pourra être abaissée vers la même forme :
+continuer à compiler ces helpers explicites vers des boucles indexées. La syntaxe
+`for` initiale est abaissée par le compilateur vers la même forme sans allocation
+ni état possédé :
 
 ```text
 state = 0
@@ -147,9 +150,9 @@ stdlib peuvent rester spécialisés sur `Slice[T]` et `SliceMut[T]` jusqu'à
 l'arrivée des types associés ou d'une autre représentation explicite du type
 d'élément.
 
-## Abaissement futur de `for`
+## Abaissement initial de `for`
 
-La forme utilisateur cible :
+La forme utilisateur disponible :
 
 ```zeta
 for (value in values.asSlice()) do {
@@ -175,12 +178,16 @@ Pour `SliceMut[T]`, l'abaissement doit conserver l'exclusivité de `__view` jusq
 la fin de la boucle. La variable d'élément ne doit jamais devenir une copie
 implicite d'une valeur non `Copy`.
 
-La première version de `for` peut donc être limitée à :
+La première version de `for` est limitée à :
 
 - `Slice[T]` avec `T: Copy` ;
 - `SliceMut[T]` avec mutation par indice ou élément `T: Copy` ;
-- `Vec[T]` seulement après conversion explicite ou implicite vers slice ;
-- tableaux après conversion vers slice.
+- `Vec[T]` après conversion explicite vers slice (`values.asSlice()` ou
+  `values.asSliceMut()`) ;
+- les tableaux restent à couvrir directement ou via conversion dédiée vers slice.
+
+Tests livrés : `tests/for_iteration.zeta` couvre `for` sur `Slice[Int]`,
+`SliceMut[Int]` et `Vec[Int].asSlice()`.
 
 ## Interaction avec `Vec[T]`
 
@@ -225,7 +232,8 @@ couvrir :
    il reste à compléter les cas tableaux si l'abaissement de `for` génère des vues
    empruntées temporaires.
 5. Concevoir puis implémenter la syntaxe `for` comme abaissement testé vers les
-   mêmes primitives.
+   mêmes primitives. La première tranche est livrée pour `Slice[T]` et
+   `SliceMut[T]` avec `T: Copy` via `tests/for_iteration.zeta`.
 
 ## Décisions reportées
 

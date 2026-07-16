@@ -470,11 +470,16 @@ protocole initial sans allocation : état copiable séparé de la vue, dispatch
 statique, pas de closure, pas de vtable et pas d'itérateur possédant les éléments.
 La première API publique reste volontairement minimale et ABI-stable :
 `iterate`, `iterateMut`, `hasNext`, `hasNextMut`, `position` et `advance` exposent
-un état `Int` plutôt qu'un type `IndexIterator` public prématuré.
+un état `Int` plutôt qu'un type `IndexIterator` public prématuré. La première
+syntaxe `for (value in view) do { ... }` est livrée pour `Slice[T]` et
+`SliceMut[T]` avec `T: Copy`, et s'abaisse sans allocation vers une boucle
+indexée compatible avec ce protocole.
 
 `tests/sequences_iteration.zeta` couvre les parcours partagés et mutables de
-`Slice[Int]`, `SliceMut[Int]`, tableaux et `Vec[Int]`. `sequences` utilise déjà
-ces helpers pour ses scans linéaires partagés (`contains`, `indexOf`, `count`,
+`Slice[Int]`, `SliceMut[Int]`, tableaux et `Vec[Int]`. `tests/for_iteration.zeta`
+couvre la syntaxe `for` sur `Slice[Int]`, `SliceMut[Int]` et `Vec[Int].asSlice()`.
+`sequences` utilise déjà ces helpers pour ses scans linéaires partagés
+(`contains`, `indexOf`, `count`,
 `allEqual`, `sum`, `product`, `minimum`, `maximum`, `equals`, `startsWith`,
 `endsWith`, `isSorted`) et pour `fill` en mutation. Les algorithmes dont la forme
 n'est pas un simple parcours avant (`lastIndexOf`, recherche binaire, bornes,
@@ -482,20 +487,17 @@ n'est pas un simple parcours avant (`lastIndexOf`, recherche binaire, bornes,
 
 Étapes restantes :
 
-1. compléter, si nécessaire pour l'abaissement de `for`, les diagnostics dédiés
-   aux vues temporaires issues de tableaux ; les vues `Vec.asSlice()` /
-   `Vec.asSliceMut()` couvrent déjà mutation, croissance, accès exclusif et
-   déplacement pendant qu'une vue reste utilisée ;
-2. concevoir puis implémenter `for` comme abaissement vers les helpers testés,
-   d'abord pour `Slice[T]`/`SliceMut[T]` avec `T: Copy` ;
+1. compléter l'itération directe de tableaux, soit par conversion dédiée vers
+   slice, soit par abaissement spécialisé ;
+2. ajouter des tests négatifs ciblés pour `for` : source non iterable, élément
+   non `Copy`, nom de variable dupliqué et emprunts actifs dans le corps ;
 3. distinguer ensuite itération partagée, mutable et consommatrice ;
 4. fournir un parcours de `String` par `Char` masquant les offsets UTF-8 ;
 5. vérifier les emprunts jusqu'à la dernière utilisation pour les corps de boucle.
 
-Première action de la prochaine session : concevoir le plus petit abaissement
-`for (value in view) do { ... }` vers les helpers `iterate` / `hasNext` /
-`position` / `advance`, puis écrire les tests RED sur `Slice[Int]` et
-`SliceMut[Int]` avant d'implémenter la syntaxe.
+Première action de la prochaine session : ajouter les tests RED négatifs de `for`
+pour verrouiller les diagnostics, en commençant par le rejet d'une source non
+`Slice`/`SliceMut` et d'un élément non `Copy`.
 
 Exemple cible :
 
