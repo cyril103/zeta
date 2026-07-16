@@ -1,0 +1,17 @@
+def main(): Int = {
+    var values: Vec[Int] = Vec[Int]()
+    values.push(1)
+    var i: Int = 0
+    while (i < 2) do {
+        val view: SliceMut[Int] = values.asSliceMut()
+        view[0] = view[0] + 1
+        values.push(3)
+        i = i + 1
+    }
+    val first: Option[Int] = values.get(0)
+    val firstValue: Int = match (first) {
+        Option[Int].Some(value) => value
+        Option[Int].None => 0
+    }
+    if (values.length == 3 && firstValue == 3) 0 else 1
+}

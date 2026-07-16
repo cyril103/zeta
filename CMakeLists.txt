@@ -120,6 +120,23 @@ if(BUILD_TESTING)
     add_test(NAME reject_vec_slice_mut_immutable COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_slice_mut_immutable.zeta)
     set_tests_properties(reject_vec_slice_mut_immutable PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_loop_local_slice_last_use_allows_vec_push COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/loop_local_slice_last_use_allows_vec_push.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/loop-local-slice-last-use-allows-vec-push)
+    add_test(NAME run_loop_local_slice_last_use_allows_vec_push
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/loop-local-slice-last-use-allows-vec-push)
+    set_tests_properties(run_loop_local_slice_last_use_allows_vec_push PROPERTIES
+        DEPENDS compile_loop_local_slice_last_use_allows_vec_push)
+    add_test(NAME compile_loop_local_slice_mut_last_use_allows_vec_push COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/loop_local_slice_mut_last_use_allows_vec_push.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/loop-local-slice-mut-last-use-allows-vec-push)
+    add_test(NAME run_loop_local_slice_mut_last_use_allows_vec_push
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/loop-local-slice-mut-last-use-allows-vec-push)
+    set_tests_properties(run_loop_local_slice_mut_last_use_allows_vec_push PROPERTIES
+        DEPENDS compile_loop_local_slice_mut_last_use_allows_vec_push)
+    add_test(NAME reject_for_iterable_slice_blocks_vec_push COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/reject_for_iterable_slice_blocks_vec_push.zeta)
+    set_tests_properties(reject_for_iterable_slice_blocks_vec_push PROPERTIES WILL_FAIL TRUE)
     add_test(NAME compile_vec_complete_api COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/vec_complete_api.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/vec-complete-api)

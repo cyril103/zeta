@@ -1,0 +1,11 @@
+def main(): Int = {
+    var values: Vec[Int] = Vec[Int]()
+    values.push(1)
+    values.push(2)
+    var total: Int = 0
+    for (value in values.asSlice()) do {
+        total = total + value
+        values.push(3)
+    }
+    total
+}

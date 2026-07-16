@@ -1,0 +1,14 @@
+def main(): Int = {
+    var values: Vec[Int] = Vec[Int]()
+    values.push(1)
+    values.push(2)
+    var total: Int = 0
+    var i: Int = 0
+    while (i < 2) do {
+        val view: Slice[Int] = values.asSlice()
+        total = total + view[0]
+        values.push(3)
+        i = i + 1
+    }
+    if (total == 2 && values.length == 4) 0 else 1
+}

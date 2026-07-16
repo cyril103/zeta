@@ -982,7 +982,7 @@ void SemanticAnalyzer::checkForLoop(ForStatement& loop) {
             }
             const std::string referenceName = loop.item + "$iterable";
             referenceBorrows_.insert_or_assign(referenceName,
-                ReferenceBorrow{vectorName->name, mutableView});
+                ReferenceBorrow{vectorName->name, mutableView, true, true});
             borrowScopes_.back().push_back(referenceName);
         }
     }
