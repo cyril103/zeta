@@ -191,7 +191,10 @@ La première version de `for` peut donc être limitée à :
 
 Cela préserve les invariants existants : un parcours ne peut pas appeler `push`,
 `pop`, `reserve`, `clear` ou déplacer le vecteur tant que la vue est vivante. La
-longueur parcourue reste donc stable.
+longueur parcourue reste donc stable. Les diagnostics négatifs couvrent maintenant
+la croissance (`vec_slice_blocks_growth`), l'accès pendant une vue mutable
+(`vec_slice_mut_blocks_access`) et le déplacement pendant une vue partagée
+(`vec_slice_blocks_move`).
 
 ## Tests attendus avant la syntaxe `for`
 
@@ -218,7 +221,9 @@ couvrir :
 3. Factoriser les boucles répétitives de `sequences` quand cela n'élargit pas la
    surface publique de manière prématurée.
 4. Ajouter les diagnostics nécessaires pour les emprunts actifs de vues issues de
-   `Vec` ou de tableaux.
+   `Vec` ou de tableaux. La tranche `Vec.asSlice()`/`Vec.asSliceMut()` est livrée ;
+   il reste à compléter les cas tableaux si l'abaissement de `for` génère des vues
+   empruntées temporaires.
 5. Concevoir puis implémenter la syntaxe `for` comme abaissement testé vers les
    mêmes primitives.
 

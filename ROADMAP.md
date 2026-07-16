@@ -482,8 +482,9 @@ n'est pas un simple parcours avant (`lastIndexOf`, recherche binaire, bornes,
 
 Étapes restantes :
 
-1. ajouter des diagnostics dédiés pour les emprunts actifs de vues issues de
-   `Vec` et de tableaux, en vérifiant notamment mutation, croissance et
+1. compléter, si nécessaire pour l'abaissement de `for`, les diagnostics dédiés
+   aux vues temporaires issues de tableaux ; les vues `Vec.asSlice()` /
+   `Vec.asSliceMut()` couvrent déjà mutation, croissance, accès exclusif et
    déplacement pendant qu'une vue reste utilisée ;
 2. concevoir puis implémenter `for` comme abaissement vers les helpers testés,
    d'abord pour `Slice[T]`/`SliceMut[T]` avec `T: Copy` ;
@@ -491,9 +492,10 @@ n'est pas un simple parcours avant (`lastIndexOf`, recherche binaire, bornes,
 4. fournir un parcours de `String` par `Char` masquant les offsets UTF-8 ;
 5. vérifier les emprunts jusqu'à la dernière utilisation pour les corps de boucle.
 
-Première action de la prochaine session : ajouter les tests négatifs manquants
-sur les vues actives (`Vec.asSlice()` / `Vec.asSliceMut()`) et stabiliser les
-diagnostics avant d'introduire la syntaxe `for`.
+Première action de la prochaine session : concevoir le plus petit abaissement
+`for (value in view) do { ... }` vers les helpers `iterate` / `hasNext` /
+`position` / `advance`, puis écrire les tests RED sur `Slice[Int]` et
+`SliceMut[Int]` avant d'implémenter la syntaxe.
 
 Exemple cible :
 
