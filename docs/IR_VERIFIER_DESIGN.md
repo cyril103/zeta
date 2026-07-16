@@ -170,6 +170,8 @@ pas répétés sur chaque ligne.
 | `IrStringConcat` | `left`, `right : String` | `output : String` | — | suite |
 | `IrStringLength` | `string : String` ou `StringView` | `output : Int` | — | suite |
 | `IrStringEmpty` | `string : String` ou `StringView` | `output : Bool` | — | suite |
+| `IrStringDecodeAt` | `string : String` ou `StringView`, `offset : Int` | `output : Char` | offset d'octet UTF-8 contrôlé par l'abaissement de `for` | suite |
+| `IrStringNextOffset` | `string : String` ou `StringView`, `offset : Int` | `output : Int` | avance de 1 à 4 octets selon le premier octet UTF-8 | suite |
 | `IrArrayConstruct` | `elements[*] : E` | `output : T` | `T == Array[E, N]` et `elements.size() == N` | suite |
 | `IrVecConstruct` | — | `output : T` | `T == Vec[E]` | suite |
 | `IrVecProperty` | cible Vec partagée | `output : Int` pour `length`/`capacity`, `Bool` pour `isEmpty` | propriété dans cet ensemble fermé | suite |

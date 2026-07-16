@@ -1,12 +1,14 @@
 # Protocole d'itération sans allocation
 
 Ce document fixe le premier contrat d'itération de Zeta. L'objectif immédiat est
-réduit : rendre les parcours de tableaux, `Slice[T]`, `SliceMut[T]` et `Vec[T]`
-composables sans allocation, sans vtable et sans affaiblir les règles d'emprunt.
+réduit : rendre les parcours de tableaux, `Slice[T]`, `SliceMut[T]`, `Vec[T]`,
+`String` et `StringView` composables sans allocation, sans vtable et sans
+affaiblir les règles d'emprunt.
 Le socle a d'abord été validé avec des fonctions et méthodes explicites ; une
 première syntaxe `for (value in source) do { ... }` est maintenant disponible
 pour les vues `Slice[T]` et `SliceMut[T]` lorsque `T: Copy`, les tableaux fixes
-`[T; N]` lorsque `T: Copy`, et les `Vec[T]` propriétaires par consommation.
+`[T; N]` lorsque `T: Copy`, les `Vec[T]` propriétaires par consommation, et les
+chaînes/vues de chaîne par décodage Unicode en `Char`.
 
 ## Objectifs
 
@@ -18,8 +20,8 @@ pour les vues `Slice[T]` et `SliceMut[T]` lorsque `T: Copy`, les tableaux fixes
   `Iterator` magique dans le compilateur.
 - Garder l'itération consommatrice explicite : elle s'applique d'abord aux
   collections propriétaires, pas aux vues empruntées.
-- Reporter le parcours Unicode de `String` tant que le socle partagé/mutable et
-  propriétaire n'est pas suffisamment stabilisé.
+- Itérer `String` et `StringView` par points de code Unicode (`Char`) avec un
+  état d'octet interne, sans allocation et sans exposer d'itérateur public.
 
 ## Non-objectifs de la première tranche
 
@@ -193,7 +195,9 @@ La première version de `for` est limitée à :
 - `Vec[T]` après conversion explicite vers slice (`values.asSlice()` ou
   `values.asSliceMut()`) pour les parcours empruntés ;
 - `Vec[T]` propriétaire directement, par consommation destructive depuis la fin
-  du vecteur.
+  du vecteur ;
+- `String` et `StringView` directement, par décodage UTF-8 en `Char` et avance
+  de l'état par largeur d'encodage.
 
 Pour `Vec[T]` propriétaire, `for (value in values)` déplace chaque élément hors
 du vecteur avec un `pop` interne qui produit directement `T` et non `Option[T]`.
@@ -203,6 +207,13 @@ consulté ou muté. Si le corps ne déplace pas explicitement `value`, le compil
 transmis à une fonction qui le consomme, aucun double `drop` n'est émis. Cette
 tranche parcourt les éléments en ordre inverse d'insertion, car l'abaissement
 minimal utilise `pop` pour éviter les trous et les copies d'éléments possédés.
+
+Pour `String` et `StringView`, l'état interne reste un `Int`, mais il représente
+un offset d'octet dans le tampon UTF-8 plutôt qu'un indice d'élément. La condition
+compare cet offset à `lengthBytes`, puis l'abaissement décode le point de code à
+l'offset courant en `Char` et avance l'offset de 1, 2, 3 ou 4 octets selon le
+premier octet. La forme `for (mut value in text)` est rejetée : les chaînes et
+vues de chaîne ne fournissent pas de mutation élément par élément.
 
 Tests livrés : `tests/for_iteration.zeta` couvre `for` sur `Slice[Int]`,
 `SliceMut[Int]` et `Vec[Int].asSlice()`. `tests/for_array_iteration.zeta` couvre
@@ -219,6 +230,9 @@ d'éléments possédés. L'itération consommatrice directe de `Vec[Box[Int]]` e
 couverte par `tests/for_vec_consuming_iteration.zeta`, le `drop` automatique des
 éléments non déplacés par `tests/for_vec_consuming_drop_items.zeta`, et le rejet
 d'une réutilisation du vecteur déplacé par `tests/for_vec_consuming_use_after.zeta`.
+Le parcours Unicode est couvert par `tests/for_string_char_iteration.zeta` pour
+`String`, `tests/for_string_view_char_iteration.zeta` pour `StringView`, et
+`tests/for_string_mut_rejected.zeta` pour le rejet de `mut`.
 
 ## Interaction avec `Vec[T]`
 
@@ -256,9 +270,11 @@ La validation du protocole a précédé le sucre syntaxique. Les tests couvrent 
 6. consommation d'une stdlib précompilée sans sources lorsque les helpers publics
    sont exposés ;
 7. diagnostics stables pour les erreurs d'emprunt ou de capacité non supportée ;
-8. rejet de sources `for` non `Slice`/`SliceMut`/`Vec`/tableau, de noms d'élément
-   dupliqués, de `for (mut ...)` sur vue partagée, et de la réutilisation d'un
-   `Vec` consommé.
+8. rejet de sources `for` non `Slice`/`SliceMut`/`Vec`/`String`/`StringView`/
+   tableau, de noms d'élément dupliqués, de `for (mut ...)` sur vue partagée ou
+   chaîne, et de la réutilisation d'un `Vec` consommé ;
+9. parcours Unicode de `String` et `StringView` par `Char`, y compris des points
+   de code encodés sur 2, 3 et 4 octets.
 
 ## Découpage committable
 

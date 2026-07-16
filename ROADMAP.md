@@ -622,20 +622,23 @@ Chaque étape doit :
 La syntaxe `for` sans allocation est livrée pour `Slice[T]`, `SliceMut[T]` et
 `[T; N]` lorsque `T: Copy`. `for (mut value in SliceMut[T])` lie `value` comme
 `&mut T` pour muter en place sans copier les éléments possédés non `Copy`.
-`for (value in Vec[T])` consomme maintenant un vecteur propriétaire par retrait
-destructif depuis la fin : l'élément est déplacé dans `value`, le vecteur source
-est considéré déplacé après la boucle, et les éléments non explicitement déplacés
-par le corps sont droppés à la fin de leur itération.
+`for (value in Vec[T])` consomme un vecteur propriétaire par retrait destructif
+depuis la fin : l'élément est déplacé dans `value`, le vecteur source est
+considéré déplacé après la boucle, et les éléments non explicitement déplacés par
+le corps sont droppés à la fin de leur itération. `for (value in text)` sur
+`String` ou `StringView` parcourt maintenant les points de code Unicode en `Char`
+avec un état d'offset d'octet interne.
 
 Les diagnostics négatifs couvrent source non iterable, élément non `Copy` sur
-parcours emprunté, nom d'élément dupliqué, demande `mut` sur vue partagée,
-mutation d'un `Vec` dont la vue `asSlice()` est active, et réutilisation d'un
-`Vec` consommé par `for`.
+parcours emprunté, nom d'élément dupliqué, demande `mut` sur vue partagée ou
+chaîne, mutation d'un `Vec` dont la vue `asSlice()` est active, et réutilisation
+d'un `Vec` consommé par `for`.
 
-Prochaine étape : préciser l'étape suivante du protocole d'itération. Commencer
-par des tests RED pour soit stabiliser l'ordre et la surface de l'itération
-consommatrice, soit ouvrir le parcours Unicode `String`/`StringView` par `Char`,
-sans introduire de trait public `Iterator` ni d'allocation de state machine.
+Prochaine étape : stabiliser la surface de l'itération consommatrice. Commencer
+par des tests RED qui figent l'ordre voulu de `for (value in Vec[T])` ou
+introduisent une forme/API explicite lorsque l'ordre inverse par `pop` doit rester
+un détail d'implémentation. Garder la contrainte : pas de trait public `Iterator`,
+pas d'allocation de state machine, et pas de copie implicite pour `T` non `Copy`.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
