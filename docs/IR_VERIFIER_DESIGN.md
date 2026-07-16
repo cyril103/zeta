@@ -179,6 +179,7 @@ pas répétés sur chaque ligne.
 | `IrVecView` | cible Vec directe ou projetée depuis une référence de structure | `output : T` | `T == Slice[E]` ou `SliceMut[E]`; une sortie mutable exige une cible mutable | suite |
 | `IrVecGet` | `index : Int`, cible Vec partagée directe ou projetée | `output : Option[E]` | `elementType == E`, `optionType` est l'instance builtin exacte | suite |
 | `IrVecPop` | cible Vec mutable directe ou projetée | `output : Option[E]` | mêmes contraintes de type que `IrVecGet` | suite |
+| `IrVecPopValue` | cible Vec mutable directe ou projetée | `output : E` | retire un élément sans wrapper `Option`, utilisé par `for` consommateur après contrôle de longueur | suite |
 | `IrVecSet` | `index : Int`, `value : E`, cible Vec mutable directe ou projetée | `output : Unit` | même contrat de cible mutable exclusive | suite |
 
 ### Agrégats, vues et accès mémoire

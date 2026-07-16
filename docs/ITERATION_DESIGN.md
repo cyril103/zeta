@@ -4,8 +4,9 @@ Ce document fixe le premier contrat d'itération de Zeta. L'objectif immédiat e
 réduit : rendre les parcours de tableaux, `Slice[T]`, `SliceMut[T]` et `Vec[T]`
 composables sans allocation, sans vtable et sans affaiblir les règles d'emprunt.
 Le socle a d'abord été validé avec des fonctions et méthodes explicites ; une
-première syntaxe `for (value in view) do { ... }` est maintenant disponible pour
-les vues `Slice[T]` et `SliceMut[T]` lorsque `T: Copy`.
+première syntaxe `for (value in source) do { ... }` est maintenant disponible
+pour les vues `Slice[T]` et `SliceMut[T]` lorsque `T: Copy`, les tableaux fixes
+`[T; N]` lorsque `T: Copy`, et les `Vec[T]` propriétaires par consommation.
 
 ## Objectifs
 
@@ -15,8 +16,10 @@ les vues `Slice[T]` et `SliceMut[T]` lorsque `T: Copy`.
 - Réutiliser le dispatch statique déjà disponible pour les traits utilisateur.
 - Garder `Vec[T]`, tableaux et slices comme fondations ; ne pas ajouter de builtin
   `Iterator` magique dans le compilateur.
-- Reporter l'itération consommatrice et le parcours Unicode de `String` tant que
-  le socle partagé/mutable n'est pas démontré.
+- Garder l'itération consommatrice explicite : elle s'applique d'abord aux
+  collections propriétaires, pas aux vues empruntées.
+- Reporter le parcours Unicode de `String` tant que le socle partagé/mutable et
+  propriétaire n'est pas suffisamment stabilisé.
 
 ## Non-objectifs de la première tranche
 
@@ -25,9 +28,10 @@ les vues `Slice[T]` et `SliceMut[T]` lorsque `T: Copy`.
 - Pas d'objets de traits, de vtables ni de dispatch dynamique.
 - Pas d'allocation de state machine sur le tas.
 - Pas de retour de références hors de la durée lexicale du parcours.
-- Pas de protocole d'itération consommatrice pour les types possédés non `Copy`.
-- Pas de généralisation de `for` au-delà de `Slice[T]`/`SliceMut[T]` avec `T:
-  Copy` dans cette tranche.
+- Pas de trait public `IntoIterator`/`Iterator` ni de type associé exposé.
+- Pas d'itération consommatrice de vues empruntées (`Slice[T]`, `SliceMut[T]`) ni
+  de tableaux possédant des éléments non `Copy` dans cette tranche.
+- Pas de généralisation de `for` aux structures applicatives arbitraires.
 
 ## Modèle retenu
 
@@ -187,7 +191,18 @@ La première version de `for` est limitée à :
   y compris pour `T` non `Copy` ;
 - `[T; N]` avec `T: Copy`, par abaissement spécialisé sur la longueur statique ;
 - `Vec[T]` après conversion explicite vers slice (`values.asSlice()` ou
-  `values.asSliceMut()`).
+  `values.asSliceMut()`) pour les parcours empruntés ;
+- `Vec[T]` propriétaire directement, par consommation destructive depuis la fin
+  du vecteur.
+
+Pour `Vec[T]` propriétaire, `for (value in values)` déplace chaque élément hors
+du vecteur avec un `pop` interne qui produit directement `T` et non `Option[T]`.
+Le vecteur source est considéré déplacé après la boucle : il ne peut plus être
+consulté ou muté. Si le corps ne déplace pas explicitement `value`, le compilateur
+émet le `drop` de l'élément à la fin de l'itération courante ; si `value` est
+transmis à une fonction qui le consomme, aucun double `drop` n'est émis. Cette
+tranche parcourt les éléments en ordre inverse d'insertion, car l'abaissement
+minimal utilise `pop` pour éviter les trous et les copies d'éléments possédés.
 
 Tests livrés : `tests/for_iteration.zeta` couvre `for` sur `Slice[Int]`,
 `SliceMut[Int]` et `Vec[Int].asSlice()`. `tests/for_array_iteration.zeta` couvre
@@ -200,11 +215,14 @@ l'élément non `Copy` sur slice et tableau (`tests/for_non_copy_element.zeta`,
 une boucle sur `values.asSlice()` (`tests/for_borrow_conflict.zeta`). La syntaxe
 mutable est couverte par `tests/for_mutable_iteration.zeta` pour `SliceMut[Int]`
 et par `tests/for_mutable_box_iteration.zeta` pour `SliceMut[Box[Int]]` sans copie
-d'éléments possédés.
+d'éléments possédés. L'itération consommatrice directe de `Vec[Box[Int]]` est
+couverte par `tests/for_vec_consuming_iteration.zeta`, le `drop` automatique des
+éléments non déplacés par `tests/for_vec_consuming_drop_items.zeta`, et le rejet
+d'une réutilisation du vecteur déplacé par `tests/for_vec_consuming_use_after.zeta`.
 
 ## Interaction avec `Vec[T]`
 
-`Vec[T]` ne devient pas lui-même un itérateur. Il fournit des vues :
+`Vec[T]` ne devient pas lui-même un itérateur partagé/mutable. Il fournit des vues :
 
 - `values.asSlice()` pour l'itération partagée ;
 - `values.asSliceMut()` pour l'itération mutable.
@@ -217,6 +235,12 @@ via `for (value in values.asSlice())` (`for_borrow_conflict`), l'accès pendant 
 vue mutable (`vec_slice_mut_blocks_access`) et le déplacement pendant une vue
 partagée (`vec_slice_blocks_move`).
 
+En revanche, `for (value in values)` sur un `Vec[T]` propriétaire est une opération
+consommatrice : elle retire les éléments du vecteur et déplace le vecteur source.
+Ce choix évite une copie implicite de `T`, permet `Vec[Box[Int]]`, et garde la
+frontière d'emprunt simple. Les parcours partagés ou mutables de `Vec[T]` restent
+exprimés par `asSlice()`/`asSliceMut()`.
+
 ## Couverture de tests du protocole et de `for`
 
 La validation du protocole a précédé le sucre syntaxique. Les tests couvrent :
@@ -227,12 +251,14 @@ La validation du protocole a précédé le sucre syntaxique. Les tests couvrent 
 3. rejet d'une mutation de `Vec` pendant qu'une slice issue de ce `Vec` est encore
    utilisée ;
 4. rejet du déplacement d'un `Vec` pendant un parcours actif ;
-5. absence de copie implicite pour `Vec[Box[Int]]` ou autre élément possédé ;
+5. absence de copie implicite pour `Vec[Box[Int]]` ou autre élément possédé,
+   avec consommation directe de `Vec[Box[Int]]` ;
 6. consommation d'une stdlib précompilée sans sources lorsque les helpers publics
    sont exposés ;
 7. diagnostics stables pour les erreurs d'emprunt ou de capacité non supportée ;
-8. rejet de sources `for` non `Slice`/`SliceMut`/tableau, de noms d'élément
-   dupliqués et de `for (mut ...)` sur vue partagée.
+8. rejet de sources `for` non `Slice`/`SliceMut`/`Vec`/tableau, de noms d'élément
+   dupliqués, de `for (mut ...)` sur vue partagée, et de la réutilisation d'un
+   `Vec` consommé.
 
 ## Découpage committable
 
@@ -258,12 +284,16 @@ La validation du protocole a précédé le sucre syntaxique. Les tests couvrent 
 8. Séparer l'itération mutable d'éléments de l'itération par valeur. La syntaxe
    `for (mut value in SliceMut[T])` est livrée sous forme de référence d'élément
    `&mut T`, y compris pour `T` non `Copy`.
+9. Ajouter l'itération consommatrice minimale de `Vec[T]` propriétaire. La tranche
+   `Vec[Box[Int]]` est livrée par retrait destructif depuis la fin, avec `drop`
+   automatique des éléments non déplacés et diagnostic use-after-move du vecteur.
 
 ## Décisions reportées
 
 - Le nom final des traits publics d'itération.
 - Les types associés ou une alternative pour exprimer `Item`.
-- L'itération consommatrice des valeurs possédées.
+- La généralisation de l'itération consommatrice à d'autres collections et à un
+  ordre stable d'insertion si un futur protocole le nécessite.
 - Les références d'éléments retournées par un itérateur général.
 - Le parcours Unicode haut niveau de `String`/`StringView`.
 - Les adaptateurs `map`, `filter`, `fold`, `enumerate` et comparateurs

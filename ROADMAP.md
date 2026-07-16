@@ -619,17 +619,23 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-La première syntaxe `for` sans allocation est livrée pour `Slice[T]`,
-`SliceMut[T]` et `[T; N]` lorsque `T: Copy`, et `for (mut value in SliceMut[T])`
-lie maintenant `value` comme `&mut T` pour muter en place sans copier les éléments
-possédés non `Copy`. Les diagnostics négatifs couvrent source non iterable,
-élément non `Copy`, nom d'élément dupliqué, demande `mut` sur vue partagée et
-mutation d'un `Vec` dont la vue `asSlice()` est active.
+La syntaxe `for` sans allocation est livrée pour `Slice[T]`, `SliceMut[T]` et
+`[T; N]` lorsque `T: Copy`. `for (mut value in SliceMut[T])` lie `value` comme
+`&mut T` pour muter en place sans copier les éléments possédés non `Copy`.
+`for (value in Vec[T])` consomme maintenant un vecteur propriétaire par retrait
+destructif depuis la fin : l'élément est déplacé dans `value`, le vecteur source
+est considéré déplacé après la boucle, et les éléments non explicitement déplacés
+par le corps sont droppés à la fin de leur itération.
 
-Prochaine étape : préciser l'itération consommatrice. Commencer par des tests RED
-qui expriment le futur parcours par déplacement des collections propriétaires et
-son interaction avec `Box[T]`, `Vec[T]`, tableaux et drop déterministe, sans
-confondre ce modèle avec le parcours partagé ou mutable par référence.
+Les diagnostics négatifs couvrent source non iterable, élément non `Copy` sur
+parcours emprunté, nom d'élément dupliqué, demande `mut` sur vue partagée,
+mutation d'un `Vec` dont la vue `asSlice()` est active, et réutilisation d'un
+`Vec` consommé par `for`.
+
+Prochaine étape : préciser l'étape suivante du protocole d'itération. Commencer
+par des tests RED pour soit stabiliser l'ordre et la surface de l'itération
+consommatrice, soit ouvrir le parcours Unicode `String`/`StringView` par `Char`,
+sans introduire de trait public `Iterator` ni d'allocation de state machine.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
