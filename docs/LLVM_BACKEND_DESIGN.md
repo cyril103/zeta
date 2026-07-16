@@ -123,7 +123,7 @@ Tranche recommandée :
    (`IrBinary`, comparaisons et copies scalaires) ;
 5. fait : ajouter les labels/branches et les slots scalaires nécessaires aux
    programmes de contrôle simples (`if`/`while`) ;
-6. ajouter les appels avec paramètres ;
+6. fait : ajouter les appels avec paramètres scalaires ;
 7. ajouter `--backend=clang` pour le sous-ensemble validé.
 
 État actuel : `emit_llvm_minimal` vérifie la génération de `target triple`,
@@ -145,6 +145,13 @@ les branches conditionnelles introduisent un bloc de continuation synthétique
 pour représenter le fallthrough, et les slots scalaires sont matérialisés par des
 `alloca` en entrée de fonction. Les types de slot non scalaires restent hors
 périmètre et doivent continuer à produire un diagnostic explicite.
+
+`emit_llvm_parameters` couvre les signatures et appels paramétrés pour `Int` et
+`Bool`. Le générateur pré-scanne les `IrParameter` d'une fonction pour émettre la
+signature LLVM complète (`define i32 @fn(i32 %arg0, ...)`) avant le corps, puis
+lie chaque instruction `IrParameter` à `%argN` sans allocation supplémentaire.
+Les appels utilisent les types d'arguments déjà présents dans `IrCall` et restent
+limités aux types scalaires couverts par `llvmType`.
 
 ## Matrice de tests
 
@@ -180,6 +187,8 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   de flux et les valide par compilation/exécution `clang`.
 - fait : `--emit-llvm` couvre `if`/`while` via labels/branches et slots scalaires,
   validés par compilation/exécution `clang`.
+- fait : `--emit-llvm` couvre les appels avec paramètres scalaires, validés par
+  compilation/exécution `clang`.
 - fait : le backend FASM par défaut reste inchangé.
-- fait : la roadmap pointe vers les appels avec paramètres puis vers le linkage
-  `--backend=clang` du sous-ensemble validé.
+- fait : la roadmap pointe vers le linkage `--backend=clang` du sous-ensemble
+  validé.

@@ -656,12 +656,14 @@ depuis l'IR Zeta vérifiée, `emit_llvm_minimal` compile le smoke test
 opérations scalaires `Int`/`Bool` (`IrBinary`, comparaisons, booléens simples,
 `IrCopy` sans allocation). `emit_llvm_control` ajoute les labels/branches,
 `IrLoad`/`IrStore` scalaires et valide un programme combinant `if` et `while`
-compilé puis exécuté via `clang`. Le backend FASM reste le défaut et
-`--backend=clang` sans `--emit-llvm` reste volontairement bloqué.
+compilé puis exécuté via `clang`. `emit_llvm_parameters` couvre maintenant les
+signatures de fonctions avec paramètres `Int`/`Bool`, `IrParameter` et les appels
+argumentés. Le backend FASM reste le défaut et `--backend=clang` sans
+`--emit-llvm` reste volontairement bloqué.
 
-Prochaine étape : élargir `LlvmIrCodeGenerator` par tests RED/GREEN aux appels
-avec paramètres (`IrParameter`, `IrCall` argumenté), puis activer le linkage
-`--backend=clang` pour le sous-ensemble contrôlé.
+Prochaine étape : activer le linkage `--backend=clang` par tests RED/GREEN pour
+le sous-ensemble LLVM déjà validé (`main`, scalaires, contrôle et appels avec
+paramètres), en gardant FASM comme backend par défaut.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
