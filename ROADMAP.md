@@ -713,10 +713,13 @@ interprété comme offset d'octet, le backend Clang abaisse `IrStringDecodeAt` e
 les appels directs `io.print`/`io.println` sur `String` sont abaissés via
 `write(1, ptr, len)`, `println` ajoutant un octet newline statique, et le test
 compare la sortie UTF-8 Clang à FASM.
+`compile_clang_backend_io_println_int` ajoute une sortie entière ciblée :
+`io.printInt`/`io.printlnInt` sont abaissés directement vers `printf` avec formats
+`%d`/`%d\n`, sans activer les conversions générales `String(Int)`.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre contrôlé : `io.print`/`println` pour chaînes heap concaténées, support
-ciblé d'une autre primitive chaîne, gestion plus complète de propriété/retain des
+périmètre contrôlé : `io.printBool`/`io.printlnBool` ou `Byte`, `io.print`/`println`
+pour chaînes heap concaténées, gestion plus complète de propriété/retain des
 chaînes heap, ou première valeur composée simple, avant toute généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par

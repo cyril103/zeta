@@ -264,6 +264,14 @@ module sont sautées comme les helpers `strings__*` hors périmètre, afin d'év
 forcer dans cette tranche les conversions `Int`/`Bool`/`Double` vers `String` ou les
 retours `Unit` génériques. La tranche compare la sortie UTF-8 Clang à FASM.
 
+`compile_clang_backend_io_println_int` ajoute une sortie entière ciblée : les
+appels stdlib directs `io.printInt(value: Int)` et `io.printlnInt(value: Int)` sont
+abaissés vers `printf` avec deux formats privés (`%d` et `%d\n`). Les fonctions
+helpers `io__printInt`/`io__printlnInt` sont sautées pendant l'émission LLVM même
+si elles sont atteignables, car leurs corps passent aujourd'hui par la conversion
+générale `String(Int)` qui reste hors périmètre. Cette tranche n'est donc pas une
+ABI native générale ni un support complet de `String(value)`.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -336,3 +344,5 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   `StringView`, avec `Char` abaissé en `i32`.
 - fait : `--backend=clang` couvre `io.print`/`io.println` directs sur `String`
   via `write(1, ptr, len)` et comparaison stdout avec FASM.
+- fait : `--backend=clang` couvre `io.printInt`/`io.printlnInt` directs via
+  `printf` spécialisé et comparaison stdout avec FASM.
