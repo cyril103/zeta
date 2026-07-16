@@ -101,13 +101,14 @@ pub def product[T: Numeric](values: Slice[T]): Option[T] = {
 pub def minimum[T: Ordered](values: Slice[T]): Option[T] = {
     if (values.length == 0) Option[T].None else {
         var result: T = values[0]
-        var index: Int = 1
-        while (index < values.length) do {
+        var iterator: Int = advance(iterate(values))
+        while (hasNext(iterator, values)) do {
+            val index: Int = position(iterator)
             if (values[index] < result) {
                 result = values[index]
                 true
             } else false
-            index = index + 1
+            iterator = advance(iterator)
         }
         Option[T].Some(value: result)
     }
@@ -116,13 +117,14 @@ pub def minimum[T: Ordered](values: Slice[T]): Option[T] = {
 pub def maximum[T: Ordered](values: Slice[T]): Option[T] = {
     if (values.length == 0) Option[T].None else {
         var result: T = values[0]
-        var index: Int = 1
-        while (index < values.length) do {
+        var iterator: Int = advance(iterate(values))
+        while (hasNext(iterator, values)) do {
+            val index: Int = position(iterator)
             if (values[index] > result) {
                 result = values[index]
                 true
             } else false
-            index = index + 1
+            iterator = advance(iterator)
         }
         Option[T].Some(value: result)
     }
@@ -130,11 +132,12 @@ pub def maximum[T: Ordered](values: Slice[T]): Option[T] = {
 
 pub def equals[T: Equatable](left: Slice[T], right: Slice[T]): Bool = {
     if (left.length != right.length) false else {
-        var index: Int = 0
+        var iterator: Int = iterate(left)
         var equal: Bool = true
-        while (index < left.length && equal) do {
+        while (hasNext(iterator, left) && equal) do {
+            val index: Int = position(iterator)
             equal = left[index] == right[index]
-            index = index + 1
+            iterator = advance(iterator)
         }
         equal
     }
@@ -142,11 +145,12 @@ pub def equals[T: Equatable](left: Slice[T], right: Slice[T]): Bool = {
 
 pub def startsWith[T: Equatable](values: Slice[T], prefix: Slice[T]): Bool = {
     if (prefix.length > values.length) false else {
-        var index: Int = 0
+        var iterator: Int = iterate(prefix)
         var matches: Bool = true
-        while (index < prefix.length && matches) do {
+        while (hasNext(iterator, prefix) && matches) do {
+            val index: Int = position(iterator)
             matches = values[index] == prefix[index]
-            index = index + 1
+            iterator = advance(iterator)
         }
         matches
     }
@@ -155,22 +159,24 @@ pub def startsWith[T: Equatable](values: Slice[T], prefix: Slice[T]): Bool = {
 pub def endsWith[T: Equatable](values: Slice[T], suffix: Slice[T]): Bool = {
     if (suffix.length > values.length) false else {
         val offset: Int = values.length - suffix.length
-        var index: Int = 0
+        var iterator: Int = iterate(suffix)
         var matches: Bool = true
-        while (index < suffix.length && matches) do {
+        while (hasNext(iterator, suffix) && matches) do {
+            val index: Int = position(iterator)
             matches = values[offset + index] == suffix[index]
-            index = index + 1
+            iterator = advance(iterator)
         }
         matches
     }
 }
 
 pub def isSorted[T: Ordered](values: Slice[T]): Bool = {
-    var index: Int = 1
+    var iterator: Int = advance(iterate(values))
     var sorted: Bool = true
-    while (index < values.length && sorted) do {
+    while (hasNext(iterator, values) && sorted) do {
+        val index: Int = position(iterator)
         sorted = values[index] >= values[index - 1]
-        index = index + 1
+        iterator = advance(iterator)
     }
     sorted
 }
