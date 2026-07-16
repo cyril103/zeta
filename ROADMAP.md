@@ -731,12 +731,14 @@ La stdlib expose désormais aussi `printlnChar`.
 `Double` est abaissé en `double`, les constantes et slots locaux doubles sont
 stockables, le moins unaire devient `fneg`, et `io.printDouble`/`io.printlnDouble`
 passent par `printf("%g")` sur un périmètre de formats validés contre FASM.
+`compile_clang_backend_double_operations` élargit ensuite `Double` aux opérations
+arithmétiques `+`, `-`, `*`, `/` via `fadd`/`fsub`/`fmul`/`fdiv`, et aux
+comparaisons ordonnées via `fcmp o*` (`==`, `!=`, `<`, `<=`, `>`, `>=`).
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
 périmètre contrôlé : `io.print`/`println` pour chaînes heap concaténées, gestion
-plus complète de propriété/retain des chaînes heap, opérations arithmétiques et
-comparaisons `Double`, ou première valeur composée simple, avant toute
-généralisation.
+plus complète de propriété/retain des chaînes heap, première valeur composée
+simple, ou diagnostics d'agrégats restants, avant toute généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

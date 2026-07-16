@@ -302,8 +302,13 @@ la conversion générale `String(Char)`.
 locaux doubles sont stockables, le moins unaire est abaissé en `fneg double`, et
 les appels directs `io.printDouble` / `io.printlnDouble` passent par `printf`
 avec formats `%g` / `%g\n`. La tranche reste volontairement limitée aux formats
-stables comparés à FASM ; les opérations arithmétiques et comparaisons doubles
-sont laissées aux tranches suivantes.
+stables comparés à FASM.
+
+`compile_clang_backend_double_operations` couvre ensuite le noyau calculatoire
+`Double` : les opérations `+`, `-`, `*`, `/` sont abaissées respectivement en
+`fadd`, `fsub`, `fmul`, `fdiv`, et les comparaisons utilisent des prédicats
+ordonnés `fcmp` (`oeq`, `one`, `olt`, `ole`, `ogt`, `oge`) pour rester explicites
+sur le comportement en présence de NaN.
 
 ## Matrice de tests
 
@@ -388,3 +393,6 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--backend=clang` couvre `io.printDouble`/`io.printlnDouble` directs via
   `Double` en `double`, constantes/slots locaux, `fneg` unaire et `printf("%g")`
   sur formats stables comparés à FASM.
+- fait : `--backend=clang` couvre les opérations arithmétiques `Double`
+  `+`/`-`/`*`/`/` via `fadd`/`fsub`/`fmul`/`fdiv`, et les comparaisons ordonnées
+  via `fcmp o*`, avec exécution Clang et FASM.
