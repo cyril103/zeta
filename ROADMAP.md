@@ -465,12 +465,35 @@ la prochaine étape active est le protocole d'itération de la priorité 4.
 Objectif : remplacer les boucles indexées répétitives de la stdlib par une
 abstraction sûre.
 
-1. concevoir un protocole d'itération sans allocation ;
-2. ajouter `for` sur tableaux, slices et `Vec` ;
-3. distinguer itération partagée, mutable et consommatrice ;
+**Socle livré le 16 juillet 2026.** `docs/ITERATION_DESIGN.md` définit le
+protocole initial sans allocation : état copiable séparé de la vue, dispatch
+statique, pas de closure, pas de vtable et pas d'itérateur possédant les éléments.
+La première API publique reste volontairement minimale et ABI-stable :
+`iterate`, `iterateMut`, `hasNext`, `hasNextMut`, `position` et `advance` exposent
+un état `Int` plutôt qu'un type `IndexIterator` public prématuré.
+
+`tests/sequences_iteration.zeta` couvre les parcours partagés et mutables de
+`Slice[Int]`, `SliceMut[Int]`, tableaux et `Vec[Int]`. `sequences` utilise déjà
+ces helpers pour ses scans linéaires partagés (`contains`, `indexOf`, `count`,
+`allEqual`, `sum`, `product`, `minimum`, `maximum`, `equals`, `startsWith`,
+`endsWith`, `isSorted`) et pour `fill` en mutation. Les algorithmes dont la forme
+n'est pas un simple parcours avant (`lastIndexOf`, recherche binaire, bornes,
+`reverse`, `sort`) restent explicitement indexés.
+
+Étapes restantes :
+
+1. ajouter des diagnostics dédiés pour les emprunts actifs de vues issues de
+   `Vec` et de tableaux, en vérifiant notamment mutation, croissance et
+   déplacement pendant qu'une vue reste utilisée ;
+2. concevoir puis implémenter `for` comme abaissement vers les helpers testés,
+   d'abord pour `Slice[T]`/`SliceMut[T]` avec `T: Copy` ;
+3. distinguer ensuite itération partagée, mutable et consommatrice ;
 4. fournir un parcours de `String` par `Char` masquant les offsets UTF-8 ;
-5. migrer progressivement `sequences` vers ce protocole ;
-6. vérifier les emprunts jusqu'à la dernière utilisation.
+5. vérifier les emprunts jusqu'à la dernière utilisation pour les corps de boucle.
+
+Première action de la prochaine session : ajouter les tests négatifs manquants
+sur les vues actives (`Vec.asSlice()` / `Vec.asSliceMut()`) et stabiliser les
+diagnostics avant d'introduire la syntaxe `for`.
 
 Exemple cible :
 
