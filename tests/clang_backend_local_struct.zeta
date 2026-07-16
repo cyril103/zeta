@@ -1,0 +1,10 @@
+struct Pair {
+    left: Int
+    right: Int
+}
+
+
+def main(): Int = {
+    val pair: Pair = Pair { left: 19, right: 23 }
+    pair.left + pair.right
+}

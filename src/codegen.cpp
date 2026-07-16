@@ -2,6 +2,7 @@
 #include "ir_verifier.hpp"
 
 #include <algorithm>
+#include <functional>
 #include <iomanip>
 #include <limits>
 #include <sstream>
@@ -411,21 +412,42 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         }
     }
 
-    auto llvmType = [](const ValueType& type) -> std::string {
+    std::function<bool(const ValueType&)> isLlvmValueType;
+    std::function<std::string(const ValueType&)> llvmType;
+    isLlvmValueType = [&](const ValueType& type) -> bool {
+        if (type == ValueType::Int || type == ValueType::Byte || type == ValueType::Bool ||
+            type == ValueType::Char || type == ValueType::Double ||
+            type == ValueType::String || type == ValueType::StringView)
+            return true;
+        if (type.kind == ValueType::Kind::Struct) {
+            for (const StructField& field : type.structure->fields) {
+                if (!isLlvmValueType(field.type)) return false;
+            }
+            return true;
+        }
+        return false;
+    };
+    llvmType = [&](const ValueType& type) -> std::string {
         if (type == ValueType::Int) return "i32";
         if (type == ValueType::Byte) return "i8";
         if (type == ValueType::Bool) return "i1";
         if (type == ValueType::Char) return "i32";
         if (type == ValueType::Double) return "double";
         if (type == ValueType::String || type == ValueType::StringView) return "{ ptr, i64 }";
+        if (type.kind == ValueType::Kind::Struct && isLlvmValueType(type)) {
+            std::ostringstream aggregate;
+            aggregate << "{ ";
+            for (std::size_t i = 0; i < type.structure->fields.size(); ++i) {
+                if (i != 0) aggregate << ", ";
+                aggregate << llvmType(type.structure->fields[i].type);
+            }
+            aggregate << " }";
+            return aggregate.str();
+        }
         throw std::runtime_error("backend LLVM: type non supporté " + typeName(type));
     };
-    auto isLlvmScalarOrString = [](const ValueType& type) -> bool {
-        return type == ValueType::Int || type == ValueType::Byte || type == ValueType::Bool ||
-            type == ValueType::Char || type == ValueType::Double ||
-            type == ValueType::String || type == ValueType::StringView;
-    };
-    auto isLlvmUnsupportedAggregate = [](const ValueType& type) -> bool {
+    auto isLlvmUnsupportedAggregate = [&](const ValueType& type) -> bool {
+        if (type.kind == ValueType::Kind::Struct && isLlvmValueType(type)) return false;
         return type.kind == ValueType::Kind::Array || type.kind == ValueType::Kind::Slice ||
             type.kind == ValueType::Kind::Box || type.kind == ValueType::Kind::Vec ||
             type.kind == ValueType::Kind::Struct || type.kind == ValueType::Kind::Enum;
@@ -990,7 +1012,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         for (SlotId id = 0; id < program.slots.size(); ++id) {
             const IrSlot& slot = program.slots[id];
             if (slot.global || slot.external) continue;
-            if (!isLlvmScalarOrString(slot.type)) {
+            if (!isLlvmValueType(slot.type)) {
                 const std::string category = isLlvmUnsupportedAggregate(slot.type)
                     ? "agrégat local non supporté " : "slot local non supporté ";
                 throw std::runtime_error("backend LLVM: " + category +
@@ -1072,7 +1094,11 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         const IrSlot& slot = program.slots[id];
         if (!slot.global && !slot.external) continue;
         if (slot.type != ValueType::Int && slot.type != ValueType::Bool) {
-            const std::string category = isLlvmUnsupportedAggregate(slot.type)
+            const bool globalAggregate = slot.type.kind == ValueType::Kind::Array ||
+                slot.type.kind == ValueType::Kind::Slice || slot.type.kind == ValueType::Kind::Box ||
+                slot.type.kind == ValueType::Kind::Vec || slot.type.kind == ValueType::Kind::Struct ||
+                slot.type.kind == ValueType::Kind::Enum;
+            const std::string category = globalAggregate
                 ? "agrégat global non supporté " : "globale non scalaire non supportée ";
             throw std::runtime_error("backend LLVM: " + category +
                                      diagnosticSlotName(slot, id) + ": " + typeName(slot.type));
@@ -1265,7 +1291,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 values[item->output] = "0";
             } else if (item->type == ValueType::Int || item->type == ValueType::Byte ||
                        item->type == ValueType::Bool || item->type == ValueType::Char ||
-                       item->type == ValueType::Double) {
+                       item->type == ValueType::Double ||
+                       item->type.kind == ValueType::Kind::Struct) {
                 values[item->output] = value(item->input);
             } else {
                 throw std::runtime_error("backend LLVM: type de copie non supporté " +
@@ -1287,8 +1314,29 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 throw std::runtime_error("backend LLVM: conversion non supportée " +
                                          typeName(item->source) + " vers " + typeName(item->target));
             }
+        } else if (const auto* item = std::get_if<IrStructConstruct>(&instruction)) {
+            if (!isLlvmValueType(item->type) || item->type.kind != ValueType::Kind::Struct)
+                throw std::runtime_error("backend LLVM: construction struct non supportée " + typeName(item->type));
+            const std::string structType = llvmType(item->type);
+            std::string current = "undef";
+            for (std::size_t i = 0; i < item->fields.size(); ++i) {
+                const std::string output = "%v" + std::to_string(item->output) + ".field" + std::to_string(i);
+                const ValueType& fieldType = item->type.structure->fields[i].type;
+                out << "  " << output << " = insertvalue " << structType << " " << current
+                    << ", " << llvmType(fieldType) << " " << value(item->fields[i]) << ", " << i << "\n";
+                current = output;
+            }
+            values[item->output] = current;
+        } else if (const auto* item = std::get_if<IrFieldLoad>(&instruction)) {
+            if (!isLlvmValueType(item->objectType) || item->objectType.kind != ValueType::Kind::Struct)
+                throw std::runtime_error("backend LLVM: chargement champ struct non supporté " +
+                                         typeName(item->objectType));
+            const std::string output = "%v" + std::to_string(item->output);
+            out << "  " << output << " = extractvalue " << llvmType(item->objectType) << " "
+                << value(item->object) << ", " << item->field << "\n";
+            values[item->output] = output;
         } else if (const auto* item = std::get_if<IrStore>(&instruction)) {
-            if (!isLlvmScalarOrString(item->type))
+            if (!isLlvmValueType(item->type))
                 throw std::runtime_error("backend LLVM: type de store non supporté " +
                                          typeName(item->type));
             out << "  store " << llvmType(item->type) << " " << value(item->value)
@@ -1301,7 +1349,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 }
             }
         } else if (const auto* item = std::get_if<IrLoad>(&instruction)) {
-            if (!isLlvmScalarOrString(item->type))
+            if (!isLlvmValueType(item->type))
                 throw std::runtime_error("backend LLVM: type de load non supporté " +
                                          typeName(item->type));
             const std::string output = "%v" + std::to_string(item->output);
@@ -1395,7 +1443,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 << "  " << output << " = select i1 " << invalid << ", i32 -1, i32 " << tail1 << "\n";
             values[item->output] = output;
         } else if (const auto* item = std::get_if<IrDrop>(&instruction)) {
-            if (!isLlvmScalarOrString(item->type) && item->type != ValueType::Unit)
+            if (!isLlvmValueType(item->type) && item->type != ValueType::Unit)
                 throw std::runtime_error("backend LLVM: drop non supporté " + typeName(item->type));
             if (item->type == ValueType::String && heapStringValues.contains(item->value)) {
                 const std::string prefix = "%drop" + std::to_string(item->value);
@@ -1406,7 +1454,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 heapStringValues.erase(item->value);
             }
         } else if (const auto* item = std::get_if<IrRetain>(&instruction)) {
-            if (!isLlvmScalarOrString(item->type) && item->type != ValueType::Unit)
+            if (!isLlvmValueType(item->type) && item->type != ValueType::Unit)
                 throw std::runtime_error("backend LLVM: retain non supporté " + typeName(item->type));
         } else {
             unsupported("complexe");

@@ -1,9 +1,10 @@
 struct Pair {
     left: Int
-    right: Int
+    right: Box[Int]
 }
 
+
 def main(): Int = {
-    val pair: Pair = Pair { left: 1, right: 2 }
+    val pair: Pair = Pair { left: 1, right: Box(2) }
     pair.left
 }
