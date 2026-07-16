@@ -719,11 +719,15 @@ compare la sortie UTF-8 Clang à FASM.
 `compile_clang_backend_io_println_bool` ajoute la sortie booléenne ciblée :
 `io.printBool`/`io.printlnBool` sélectionnent statiquement les bytes `true` ou
 `false`, écrits via `write(1, ptr, len)`, sans conversion générale `String(Bool)`.
+`compile_clang_backend_io_println_byte` ajoute la sortie `Byte` ciblée : `Byte`
+est abaissé en `i8`, les conversions `Int <-> Byte` sont limitées à `trunc`/`zext`,
+et `io.printByte`/`io.printlnByte` passent par `printf("%u")` après extension
+non signée.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre contrôlé : `Byte` ou `Char` en IO spécialisée, `io.print`/`println` pour
-chaînes heap concaténées, gestion plus complète de propriété/retain des chaînes
-heap, ou première valeur composée simple, avant toute généralisation.
+périmètre contrôlé : `Char` en IO spécialisée, `io.print`/`println` pour chaînes
+heap concaténées, gestion plus complète de propriété/retain des chaînes heap, ou
+première valeur composée simple, avant toute généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

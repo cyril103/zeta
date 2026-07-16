@@ -280,6 +280,14 @@ newline privé partagé. Les helpers `io__printBool`/`io__printlnBool` sont saut
 pendant l'émission LLVM pour éviter de dépendre de la conversion générale
 `String(Bool)`, encore hors périmètre.
 
+`compile_clang_backend_io_println_byte` ajoute une sortie `Byte` ciblée : `Byte`
+est représenté comme `i8` côté LLVM, les conversions minimales `Int -> Byte` et
+`Byte -> Int` sont abaissées en `trunc i32 ... to i8` et `zext i8 ... to i32`, et
+les appels stdlib directs `io.printByte(value: Byte)` /
+`io.printlnByte(value: Byte)` passent par `printf` avec formats `%u` / `%u\n`
+après extension non signée. Les helpers `io__printByte`/`io__printlnByte` sont
+sautés pendant l'émission LLVM pour éviter la conversion générale `String(Byte)`.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -356,3 +364,5 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   `printf` spécialisé et comparaison stdout avec FASM.
 - fait : `--backend=clang` couvre `io.printBool`/`io.printlnBool` directs via
   sélection `true`/`false` et `write`, avec comparaison stdout FASM.
+- fait : `--backend=clang` couvre `io.printByte`/`io.printlnByte` directs via
+  `Byte` en `i8`, extension non signée et `printf`, avec comparaison stdout FASM.
