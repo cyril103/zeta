@@ -693,10 +693,14 @@ conserve séparément le diagnostic global `String` déjà existant.
 `strings.view` et `strings.viewIsValid` sont abaissés directement côté LLVM pour
 des `String` locaux, produisent des `StringView` valides/invalides par paire
 `{ ptr, i64 }`, et restent comparés à FASM.
+`compile_clang_backend_string_search` élargit cette surface à
+`strings.indexOf`/`strings.contains` sur `StringView`, avec boucle LLVM locale,
+appel `memcmp`, gestion de l'aiguille vide, des vues invalides et comparaison
+d'exécution FASM.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre runtime contrôlé : recherche `strings.indexOf`/`strings.contains` très
-ciblée ou itération UTF-8 sur `StringView`, avant toute généralisation.
+périmètre runtime contrôlé : itération UTF-8 sur `StringView` ou premier
+nettoyage runtime `drop/free` des chaînes concaténées, avant toute généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

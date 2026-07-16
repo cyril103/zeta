@@ -220,6 +220,16 @@ LLVM de fonctions stdlib non utilisées et encore hors périmètre (`charAtByte`
 atteignables depuis l'exécutable courant ; les fonctions utilisateur non appelées
 restent émises afin de préserver les tests `--emit-llvm` historiques.
 
+`compile_clang_backend_string_search` couvre ensuite `strings.indexOf` et
+`strings.contains` sur `StringView`. Le lowering reste spécialisé : il extrait les
+paires `{ ptr, i64 }`, rejette les vues invalides par résultat `-1`, traite
+l'aiguille vide comme l'offset `0`, borne la recherche par `haystack.length -
+needle.length`, puis compare chaque position avec `memcmp`. `contains` est abaissé
+comme `indexOf(...) >= 0` et la fonction stdlib `strings__contains` importée est
+sautée côté LLVM, car les appels sont remplacés directement par cette primitive
+spécialisée. Cette tranche ne définit pas encore d'ABI native générale pour les
+fonctions `StringView`.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -282,3 +292,5 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   `String`.
 - fait : `--backend=clang` couvre `strings.view` et `strings.viewIsValid` comme
   première surface stdlib chaîne ciblée.
+- fait : `--backend=clang` couvre `strings.indexOf` et `strings.contains` sur
+  `StringView` via un lowering spécialisé et comparaison d'exécution FASM.
