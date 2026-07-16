@@ -194,6 +194,13 @@ directs, dont une chaîne vide et une chaîne non vide dans des conditions de
 avec `extractvalue`, puis émet `icmp eq i64 <len>, 0`. Comme pour `lengthBytes`,
 le test compare l'exécution Clang à FASM.
 
+`compile_clang_backend_local_string` couvre ensuite les slots locaux `String` :
+`alloca { ptr, i64 }`, `store` de la paire complète, `load` de la paire, puis
+réutilisation des lowerings `lengthBytes` et `isEmpty`. Les `drop`/`retain` de ce
+sous-ensemble sont no-op côté LLVM pour l'instant, car les valeurs prises en
+charge sont des littéraux statiques ; l'allocation/runtime des chaînes produites
+par concaténation reste hors périmètre de cette tranche.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -244,3 +251,5 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : les diagnostics LLVM pour globales/slots non scalaires sont couverts.
 - fait : `--backend=clang` couvre un littéral `String` direct et `lengthBytes`.
 - fait : `--backend=clang` couvre `String.isEmpty` sur littéraux directs.
+- fait : `--backend=clang` couvre les slots locaux `String` initialisés par
+  littéraux directs.

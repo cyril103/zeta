@@ -677,10 +677,13 @@ tronque la longueur vers `Int`; l'exécution reste comparée à FASM.
 `compile_clang_backend_string_is_empty` couvre aussi `isEmpty` sur littéraux
 directs : le backend extrait la longueur de la paire chaîne et compare en `i64`
 contre zéro, y compris dans des conditions de boucle.
+`compile_clang_backend_local_string` étend cette représentation aux slots
+locaux `String` : allocation de la paire `{ ptr, i64 }`, `store`/`load` de la
+paire complète, puis `lengthBytes` et `isEmpty` depuis des variables locales.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre runtime contrôlé : chaînes locales simples (`val text: String = ...`),
-puis seulement ensuite concaténation, agrégats et stdlib.
+périmètre runtime contrôlé : concaténation de chaînes minimale ou diagnostics
+explicites pour les agrégats restants, puis seulement ensuite stdlib.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
