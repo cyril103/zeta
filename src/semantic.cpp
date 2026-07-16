@@ -919,9 +919,10 @@ void SemanticAnalyzer::checkLoop(WhileStatement& loop) {
 
 void SemanticAnalyzer::checkForLoop(ForStatement& loop) {
     const ValueType iterableType = inferType(*loop.iterable);
-    if (iterableType.kind != ValueType::Kind::Slice)
+    if (iterableType.kind != ValueType::Kind::Slice &&
+        iterableType.kind != ValueType::Kind::Array)
         throw CompileError(loop.iterable->location,
-                           "la boucle 'for' exige une Slice ou SliceMut");
+                           "la boucle 'for' exige une Slice, SliceMut ou un tableau");
     const ValueType elementType = *iterableType.element;
     if (!isCopyValueType(elementType))
         throw CompileError(loop.location,

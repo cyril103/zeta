@@ -473,8 +473,16 @@ if(BUILD_TESTING)
     set_tests_properties(reject_for_duplicate_item PROPERTIES WILL_FAIL TRUE)
     add_test(NAME reject_for_borrow_conflict COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_borrow_conflict.zeta
-        -o ${CMAKE_CURRENT_BINARY_DIR}/invalid-for-borrow-conflict)
+        -o ${CMAKE_CURRENT_BINARY_DIR}/for-borrow-conflict)
     set_tests_properties(reject_for_borrow_conflict PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_for_array_iteration COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_array_iteration.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/for-array-iteration)
+    add_test(NAME run_for_array_iteration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/for-array-iteration)
+    add_test(NAME reject_for_array_non_copy_element COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_array_non_copy_element.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/for-array-non-copy-element)
+    set_tests_properties(reject_for_array_non_copy_element PROPERTIES WILL_FAIL TRUE)
 
     add_test(NAME compile_empty_slice_option COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_zero_length.zeta

@@ -1,0 +1,20 @@
+def main(): Int = {
+    val values: [Int; 4] = [1, 2, 3, 4]
+    val more: [Int; 5] = [1, 2, 4, 7, 8]
+
+    var total: Int = 0
+    for (value in values) do {
+        total = total + value
+    }
+
+    var evens: Int = 0
+    for (value in more) do {
+        if (value / 2 * 2 == value) {
+            evens = evens + 1
+        } else {
+            evens = evens
+        }
+    }
+
+    if (total == 10 && evens == 3) 0 else 1
+}

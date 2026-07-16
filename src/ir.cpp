@@ -782,9 +782,16 @@ void IrGenerator::emitForLoop(
     ir_.instructions.push_back(IrLabel{conditionLabel});
     const ValueId conditionIndex = nextValue(ValueType::Int);
     ir_.instructions.push_back(IrLoad{conditionIndex, iteratorSlot, ValueType::Int});
-    const ValueId conditionIterable = expression(*loop.iterable, parameters);
-    const ValueId length = nextValue(ValueType::Int);
-    ir_.instructions.push_back(IrSliceLength{length, conditionIterable});
+    ValueId length{};
+    if (iterableType.kind == ValueType::Kind::Slice) {
+        const ValueId conditionIterable = expression(*loop.iterable, parameters);
+        length = nextValue(ValueType::Int);
+        ir_.instructions.push_back(IrSliceLength{length, conditionIterable});
+    } else {
+        length = nextValue(ValueType::Int);
+        ir_.instructions.push_back(IrConst{length,
+            static_cast<int>(iterableType.length), ValueType::Int});
+    }
     const ValueId condition = nextValue(ValueType::Bool);
     ir_.instructions.push_back(IrBinary{condition, "<", conditionIndex, length,
                                         ValueType::Bool, ValueType::Int});
@@ -794,8 +801,9 @@ void IrGenerator::emitForLoop(
     ir_.instructions.push_back(IrLoad{itemIndex, iteratorSlot, ValueType::Int});
     const ValueId itemIterable = expression(*loop.iterable, parameters);
     const ValueId itemValue = nextValue(elementType);
+    const bool iterableIsSlice = iterableType.kind == ValueType::Kind::Slice;
     ir_.instructions.push_back(IrIndexLoad{itemValue, itemIterable, itemIndex,
-                                           iterableType, false, true});
+                                           iterableType, false, iterableIsSlice});
 
     std::unordered_map<std::string, ValueId> loopParameters = parameters;
     loopParameters.insert_or_assign(loop.item, itemValue);
