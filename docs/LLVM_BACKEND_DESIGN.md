@@ -255,6 +255,15 @@ reste un `Int` mais représente un offset d'octet UTF-8, pas un index logique de
 caractère. La tranche ne définit toujours pas `charAtByte`/`Option[Char]` ni une
 ABI native générale pour des fonctions arbitraires prenant `StringView`.
 
+`compile_clang_backend_io_println_string` ajoute une première sortie standard
+ciblée : les appels natifs directs `io.print(value: String)` et
+`io.println(value: String)` sont remplacés par `write(1, ptr, len)` sur la paire
+chaîne LLVM `{ ptr, i64 }`; `println` ajoute un second `write` vers une constante
+newline privée. Les fonctions helper `io__*` non atteignables importées par le
+module sont sautées comme les helpers `strings__*` hors périmètre, afin d'éviter de
+forcer dans cette tranche les conversions `Int`/`Bool`/`Double` vers `String` ou les
+retours `Unit` génériques. La tranche compare la sortie UTF-8 Clang à FASM.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -325,3 +334,5 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   `strings.nextByteOffset` sur `String` pour les séquences UTF-8 1/2/3/4 octets.
 - fait : `--backend=clang` couvre l'itération `for` UTF-8 sur `String` et
   `StringView`, avec `Char` abaissé en `i32`.
+- fait : `--backend=clang` couvre `io.print`/`io.println` directs sur `String`
+  via `write(1, ptr, len)` et comparaison stdout avec FASM.

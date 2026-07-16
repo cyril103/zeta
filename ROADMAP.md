@@ -709,11 +709,15 @@ et comparaison d'exécution FASM.
 UTF-8 via `for` sur `String` et `StringView` : l'état de boucle reste un `Int`
 interprété comme offset d'octet, le backend Clang abaisse `IrStringDecodeAt` et
 `IrStringNextOffset`, et `Char` est représenté comme `i32` côté LLVM.
+`compile_clang_backend_io_println_string` ouvre une première sortie standard :
+les appels directs `io.print`/`io.println` sur `String` sont abaissés via
+`write(1, ptr, len)`, `println` ajoutant un octet newline statique, et le test
+compare la sortie UTF-8 Clang à FASM.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre contrôlé : support ciblé d'une autre primitive chaîne, gestion plus
-complète de propriété/retain des chaînes heap, ou première valeur composée simple,
-avant toute généralisation.
+périmètre contrôlé : `io.print`/`println` pour chaînes heap concaténées, support
+ciblé d'une autre primitive chaîne, gestion plus complète de propriété/retain des
+chaînes heap, ou première valeur composée simple, avant toute généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
