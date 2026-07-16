@@ -369,6 +369,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     const IrProgram& program = verified.program();
     std::ostringstream out;
     std::unordered_map<ValueId, std::string> values;
+    std::unordered_set<ValueId> heapStringValues;
+    std::unordered_set<SlotId> heapStringSlots;
     std::unordered_map<std::string, ValueType> functionReturnTypes;
     std::unordered_map<std::string, std::vector<ValueType>> functionParameterTypes;
     std::unordered_map<std::string, std::vector<std::string>> functionCalls;
@@ -841,7 +843,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     out << "target triple = \"x86_64-pc-linux-gnu\"\n\n";
     if (usesStringConcat) {
         out << "declare ptr @malloc(i64)\n"
-            << "declare ptr @memcpy(ptr, ptr, i64)\n\n";
+            << "declare ptr @memcpy(ptr, ptr, i64)\n"
+            << "declare void @free(ptr)\n\n";
     }
     if (usesStringSearch) {
         out << "declare i32 @memcmp(ptr, ptr, i64)\n\n";
@@ -1035,6 +1038,13 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                                          typeName(item->type));
             out << "  store " << llvmType(item->type) << " " << value(item->value)
                 << ", ptr " << slotName(item->slot) << "\n";
+            if (item->type == ValueType::String) {
+                if (heapStringValues.contains(item->value)) {
+                    heapStringSlots.insert(item->slot);
+                } else {
+                    heapStringSlots.erase(item->slot);
+                }
+            }
         } else if (const auto* item = std::get_if<IrLoad>(&instruction)) {
             if (!isLlvmScalarOrString(item->type))
                 throw std::runtime_error("backend LLVM: type de load non supporté " +
@@ -1043,6 +1053,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             out << "  " << output << " = load " << llvmType(item->type)
                 << ", ptr " << slotName(item->slot) << "\n";
             values[item->output] = output;
+            if (item->type == ValueType::String && heapStringSlots.contains(item->slot))
+                heapStringValues.insert(item->output);
         } else if (const auto* item = std::get_if<IrStringConcat>(&instruction)) {
             const std::string base = "%v" + std::to_string(item->output);
             const std::string leftPtr = extractStringPart(base + ".left", item->left, 0);
@@ -1069,6 +1081,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 << "  " << pairPtr << " = insertvalue { ptr, i64 } undef, ptr " << data << ", 0\n"
                 << "  " << base << " = insertvalue { ptr, i64 } " << pairPtr << ", i64 " << length << ", 1\n";
             values[item->output] = base;
+            heapStringValues.insert(item->output);
         } else if (const auto* item = std::get_if<IrStringLength>(&instruction)) {
             const ValueType type = program.valueTypes.at(item->string);
             if (type != ValueType::String && type != ValueType::StringView)
@@ -1129,6 +1142,14 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         } else if (const auto* item = std::get_if<IrDrop>(&instruction)) {
             if (!isLlvmScalarOrString(item->type) && item->type != ValueType::Unit)
                 throw std::runtime_error("backend LLVM: drop non supporté " + typeName(item->type));
+            if (item->type == ValueType::String && heapStringValues.contains(item->value)) {
+                const std::string prefix = "%drop" + std::to_string(item->value);
+                const std::string data = extractStringPart(prefix, item->value, 0);
+                const std::string raw = prefix + ".raw";
+                out << "  " << raw << " = getelementptr i8, ptr " << data << ", i64 -16\n"
+                    << "  call void @free(ptr " << raw << ")\n";
+                heapStringValues.erase(item->value);
+            }
         } else if (const auto* item = std::get_if<IrRetain>(&instruction)) {
             if (!isLlvmScalarOrString(item->type) && item->type != ValueType::Unit)
                 throw std::runtime_error("backend LLVM: retain non supporté " + typeName(item->type));
