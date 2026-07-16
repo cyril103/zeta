@@ -201,6 +201,14 @@ sous-ensemble sont no-op côté LLVM pour l'instant, car les valeurs prises en
 charge sont des littéraux statiques ; l'allocation/runtime des chaînes produites
 par concaténation reste hors périmètre de cette tranche.
 
+`compile_clang_backend_string_concat` ajoute une première concaténation locale :
+les deux opérandes `{ ptr, i64 }` sont déstructurés, le backend appelle `malloc`
+pour réserver `left.length + right.length + 16` octets, écrit le header compatible
+avec le runtime actuel (`refcount`, `length`), copie les bytes avec `memcpy`, puis
+reconstruit une paire `{ ptr, i64 }` pointant sur le début des bytes. Cette tranche
+valide `lengthBytes`/`isEmpty` sur le résultat et compare l'exécution Clang à
+FASM. La libération explicite du buffer reste une amélioration runtime séparée.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -253,3 +261,4 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--backend=clang` couvre `String.isEmpty` sur littéraux directs.
 - fait : `--backend=clang` couvre les slots locaux `String` initialisés par
   littéraux directs.
+- fait : `--backend=clang` couvre une concaténation locale minimale de chaînes.
