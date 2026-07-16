@@ -686,11 +686,13 @@ bytes via `memcpy`, puis reconstruction de la paire résultat.
 `reject_clang_backend_unsupported_aggregates` verrouille les diagnostics des
 agrégats locaux encore hors périmètre (`struct`, `Vec[T]`) avec des noms source
 lisibles, au lieu de laisser le backend produire un `.ll` partiel.
+`reject_clang_backend_unsupported_global_aggregates` couvre le même garde-fou
+pour les globales agrégées (`pub val pair: Pair`, `pub val values: Vec[Int]`) et
+conserve séparément le diagnostic global `String` déjà existant.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre runtime contrôlé : première surface stdlib chaîne très ciblée ou
-diagnostics complémentaires pour les formes agrégées globales, avant toute
-généralisation.
+périmètre runtime contrôlé : première surface stdlib chaîne très ciblée, avant
+toute généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

@@ -232,6 +232,7 @@ Les erreurs doivent être explicites :
   aux exécutables` ;
 - `--emit-llvm` avec FASM : `--emit-llvm requiert le backend clang` ;
 - `clang` introuvable : `clang introuvable pour --backend=clang` ;
+- agrégat global non couvert : `backend LLVM: agrégat global non supporté ...` ;
 - globale non scalaire : `backend LLVM: globale non scalaire non supportée ...` ;
 - agrégat local non couvert : `backend LLVM: agrégat local non supporté ...` ;
 - slot local non couvert : `backend LLVM: slot local non supporté ...` ;
@@ -265,3 +266,6 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--backend=clang` couvre une concaténation locale minimale de chaînes.
 - fait : les diagnostics LLVM distinguent les agrégats locaux non supportés
   (`struct`, `Vec[T]`) avec des noms source lisibles.
+- fait : les diagnostics LLVM distinguent les agrégats globaux non supportés
+  (`struct`, `Vec[T]`) avec des noms source lisibles, séparément des globales
+  `String`.
