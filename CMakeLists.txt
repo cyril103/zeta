@@ -511,6 +511,20 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_vec_consuming_use_after.zeta
         -o ${CMAKE_CURRENT_BINARY_DIR}/for-vec-consuming-use-after)
     set_tests_properties(reject_for_vec_consuming_use_after PROPERTIES WILL_FAIL TRUE)
+    add_test(NAME compile_for_string_char_iteration COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_string_char_iteration.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/for-string-char-iteration)
+    add_test(NAME run_for_string_char_iteration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/for-string-char-iteration)
+    set_tests_properties(run_for_string_char_iteration PROPERTIES DEPENDS compile_for_string_char_iteration)
+    add_test(NAME compile_for_string_view_char_iteration COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_string_view_char_iteration.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/for-string-view-char-iteration)
+    add_test(NAME run_for_string_view_char_iteration COMMAND ${CMAKE_CURRENT_BINARY_DIR}/for-string-view-char-iteration)
+    set_tests_properties(run_for_string_view_char_iteration PROPERTIES DEPENDS compile_for_string_view_char_iteration)
+    add_test(NAME reject_for_string_mut COMMAND zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/for_string_mut_rejected.zeta
+        -o ${CMAKE_CURRENT_BINARY_DIR}/for-string-mut-rejected)
+    set_tests_properties(reject_for_string_mut PROPERTIES WILL_FAIL TRUE)
 
     add_test(NAME compile_empty_slice_option COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/array_zero_length.zeta

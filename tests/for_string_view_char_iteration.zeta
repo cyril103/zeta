@@ -1,0 +1,14 @@
+import strings
+
+
+def main(): Int = {
+    val text: String = "ab🚀cd"
+    val view: StringView = strings.view(text, 1, 6)
+    var count: Int = 0
+    var total: Int = 0
+    for (value in view) do {
+        total = total + Int(value)
+        count = count + 1
+    }
+    if (count == 2 && total == Int('b') + Int('🚀')) 0 else 1
+}

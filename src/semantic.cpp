@@ -921,10 +921,12 @@ void SemanticAnalyzer::checkForLoop(ForStatement& loop) {
     const ValueType iterableType = inferType(*loop.iterable);
     if (iterableType.kind != ValueType::Kind::Slice &&
         iterableType.kind != ValueType::Kind::Array &&
-        iterableType.kind != ValueType::Kind::Vec)
+        iterableType.kind != ValueType::Kind::Vec &&
+        iterableType != ValueType::String && iterableType != ValueType::StringView)
         throw CompileError(loop.iterable->location,
-                           "la boucle 'for' exige une Slice, SliceMut, Vec ou un tableau");
-    const ValueType elementType = *iterableType.element;
+                           "la boucle 'for' exige une Slice, SliceMut, Vec, String, StringView ou un tableau");
+    const bool stringChars = iterableType == ValueType::String || iterableType == ValueType::StringView;
+    const ValueType elementType = stringChars ? ValueType::Char : *iterableType.element;
     const bool consumingVec = iterableType.kind == ValueType::Kind::Vec;
     ValueType itemType = elementType;
     if (loop.mutableItem) {

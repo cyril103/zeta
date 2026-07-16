@@ -79,6 +79,8 @@ std::optional<ValueId> outputOf(const IrInstruction& instruction) {
                       std::is_same_v<T, IrStringConcat> ||
                       std::is_same_v<T, IrStringLength> ||
                       std::is_same_v<T, IrStringEmpty> ||
+                      std::is_same_v<T, IrStringDecodeAt> ||
+                      std::is_same_v<T, IrStringNextOffset> ||
                       std::is_same_v<T, IrArrayConstruct> ||
                       std::is_same_v<T, IrVecConstruct> ||
                       std::is_same_v<T, IrVecProperty> ||
@@ -123,6 +125,9 @@ std::vector<ValueId> readsOf(const IrInstruction& instruction) {
         else if constexpr (std::is_same_v<T, IrStringLength> ||
                            std::is_same_v<T, IrStringEmpty>)
             return {item.string};
+        else if constexpr (std::is_same_v<T, IrStringDecodeAt> ||
+                           std::is_same_v<T, IrStringNextOffset>)
+            return {item.string, item.offset};
         else if constexpr (std::is_same_v<T, IrArrayConstruct>)
             return item.elements;
         else if constexpr (std::is_same_v<T, IrVecProperty>) {
@@ -423,6 +428,18 @@ void verifyInstructionTypes(const IrProgram& program, const IrInstruction& instr
             if (string != ValueType::String && string != ValueType::StringView)
                 fail("IRV040", context + " : isEmpty appliqué hors chaîne ou vue");
             expectOutputType(program, item.output, ValueType::Bool, context);
+        } else if constexpr (std::is_same_v<T, IrStringDecodeAt>) {
+            const ValueType& string = program.valueTypes[item.string];
+            if (string != ValueType::String && string != ValueType::StringView)
+                fail("IRV040", context + " : décodage UTF-8 appliqué hors chaîne ou vue");
+            expectValueType(program, item.offset, ValueType::Int, context);
+            expectOutputType(program, item.output, ValueType::Char, context);
+        } else if constexpr (std::is_same_v<T, IrStringNextOffset>) {
+            const ValueType& string = program.valueTypes[item.string];
+            if (string != ValueType::String && string != ValueType::StringView)
+                fail("IRV040", context + " : avancement UTF-8 appliqué hors chaîne ou vue");
+            expectValueType(program, item.offset, ValueType::Int, context);
+            expectOutputType(program, item.output, ValueType::Int, context);
         } else if constexpr (std::is_same_v<T, IrArrayConstruct>) {
             concrete(item.type);
             if (item.type.kind != ValueType::Kind::Array ||
@@ -730,7 +747,7 @@ IrVerificationError::IrVerificationError(std::string code, const std::string& me
     : std::runtime_error("[" + code + "] " + message), code_(std::move(code)) {}
 
 VerifiedIrProgram IrVerifier::verify(const IrProgram& program, IrVerificationMode mode) {
-    static_assert(std::variant_size_v<IrInstruction> == 50,
+    static_assert(std::variant_size_v<IrInstruction> == 52,
                   "mettre à jour l'inventaire du vérificateur d'IR");
     if (program.valueCount != program.valueTypes.size())
         fail("IRV001", "valueCount=" + std::to_string(program.valueCount) +

@@ -434,6 +434,88 @@ std::string FasmCodeGenerator::generateUnchecked(const IrProgram& program) {
                 out << "    cmp qword [rbp-" << valueOffset(program, item.string) - 8U << "], 0\n"
                     << "    sete al\n"
                     << "    mov byte [rbp-" << valueOffset(program, item.output) << "], al\n";
+            } else if constexpr (std::is_same_v<T, IrStringDecodeAt>) {
+                const std::size_t stringOffset = valueOffset(program, item.string);
+                const std::size_t offsetOffset = valueOffset(program, item.offset);
+                const std::size_t outputOffset = valueOffset(program, item.output);
+                const std::string two = "ir_string_decode_two_" + std::to_string(item.output);
+                const std::string three = "ir_string_decode_three_" + std::to_string(item.output);
+                const std::string four = "ir_string_decode_four_" + std::to_string(item.output);
+                const std::string done = "ir_string_decode_done_" + std::to_string(item.output);
+                out << "    mov rsi, qword [rbp-" << stringOffset << "]\n"
+                    << "    movsxd rcx, dword [rbp-" << offsetOffset << "]\n"
+                    << "    movzx eax, byte [rsi+rcx]\n"
+                    << "    cmp eax, 80h\n"
+                    << "    jb " << done << "\n"
+                    << "    cmp eax, 0E0h\n"
+                    << "    jb " << two << "\n"
+                    << "    cmp eax, 0F0h\n"
+                    << "    jb " << three << "\n"
+                    << "    jmp " << four << "\n"
+                    << two << ":\n"
+                    << "    and eax, 1Fh\n"
+                    << "    shl eax, 6\n"
+                    << "    movzx edx, byte [rsi+rcx+1]\n"
+                    << "    and edx, 3Fh\n"
+                    << "    or eax, edx\n"
+                    << "    jmp " << done << "\n"
+                    << three << ":\n"
+                    << "    and eax, 0Fh\n"
+                    << "    shl eax, 12\n"
+                    << "    movzx edx, byte [rsi+rcx+1]\n"
+                    << "    and edx, 3Fh\n"
+                    << "    shl edx, 6\n"
+                    << "    or eax, edx\n"
+                    << "    movzx edx, byte [rsi+rcx+2]\n"
+                    << "    and edx, 3Fh\n"
+                    << "    or eax, edx\n"
+                    << "    jmp " << done << "\n"
+                    << four << ":\n"
+                    << "    and eax, 07h\n"
+                    << "    shl eax, 18\n"
+                    << "    movzx edx, byte [rsi+rcx+1]\n"
+                    << "    and edx, 3Fh\n"
+                    << "    shl edx, 12\n"
+                    << "    or eax, edx\n"
+                    << "    movzx edx, byte [rsi+rcx+2]\n"
+                    << "    and edx, 3Fh\n"
+                    << "    shl edx, 6\n"
+                    << "    or eax, edx\n"
+                    << "    movzx edx, byte [rsi+rcx+3]\n"
+                    << "    and edx, 3Fh\n"
+                    << "    or eax, edx\n"
+                    << done << ":\n"
+                    << "    mov dword [rbp-" << outputOffset << "], eax\n";
+            } else if constexpr (std::is_same_v<T, IrStringNextOffset>) {
+                const std::size_t stringOffset = valueOffset(program, item.string);
+                const std::size_t offsetOffset = valueOffset(program, item.offset);
+                const std::size_t outputOffset = valueOffset(program, item.output);
+                const std::string oneLabel = "ir_string_next_one_" + std::to_string(item.output);
+                const std::string twoLabel = "ir_string_next_two_" + std::to_string(item.output);
+                const std::string threeLabel = "ir_string_next_three_" + std::to_string(item.output);
+                const std::string done = "ir_string_next_done_" + std::to_string(item.output);
+                out << "    mov rsi, qword [rbp-" << stringOffset << "]\n"
+                    << "    mov eax, dword [rbp-" << offsetOffset << "]\n"
+                    << "    movsxd rcx, eax\n"
+                    << "    movzx edx, byte [rsi+rcx]\n"
+                    << "    cmp edx, 80h\n"
+                    << "    jb " << oneLabel << "\n"
+                    << "    cmp edx, 0E0h\n"
+                    << "    jb " << twoLabel << "\n"
+                    << "    cmp edx, 0F0h\n"
+                    << "    jb " << threeLabel << "\n"
+                    << "    add eax, 4\n"
+                    << "    jmp " << done << "\n"
+                    << oneLabel << ":\n"
+                    << "    add eax, 1\n"
+                    << "    jmp " << done << "\n"
+                    << twoLabel << ":\n"
+                    << "    add eax, 2\n"
+                    << "    jmp " << done << "\n"
+                    << threeLabel << ":\n"
+                    << "    add eax, 3\n"
+                    << done << ":\n"
+                    << "    mov dword [rbp-" << outputOffset << "], eax\n";
             } else if constexpr (std::is_same_v<T, IrArrayConstruct>) {
                 const std::size_t output = valueOffset(program, item.output);
                 const std::size_t elementBytes = valueTypeSize(*item.type.element);

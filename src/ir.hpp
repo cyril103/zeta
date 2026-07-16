@@ -22,6 +22,8 @@ struct IrStringConst { ValueId output; std::string utf8; };
 struct IrStringConcat { ValueId output; ValueId left; ValueId right; };
 struct IrStringLength { ValueId output; ValueId string; };
 struct IrStringEmpty { ValueId output; ValueId string; };
+struct IrStringDecodeAt { ValueId output; ValueId string; ValueId offset; };
+struct IrStringNextOffset { ValueId output; ValueId string; ValueId offset; };
 struct IrArrayConstruct { ValueId output; std::vector<ValueId> elements; ValueType type; };
 struct IrVecConstruct { ValueId output; ValueType type; };
 struct IrVecMutationTarget {
@@ -147,7 +149,7 @@ struct IrExit { ValueId value; };
 struct IrBranch { ValueId condition; bool jumpWhenTrue; std::size_t label; };
 struct IrJump { std::size_t label; };
 struct IrLabel { std::size_t label; };
-using IrInstruction = std::variant<IrUnit, IrConst, IrDoubleConst, IrStringConst, IrStringConcat, IrStringLength, IrStringEmpty, IrArrayConstruct, IrVecConstruct, IrVecProperty, IrVecReserve, IrVecPush, IrVecClear, IrVecView, IrVecGet, IrVecPop, IrVecPopValue, IrVecSet, IrStructConstruct, IrEnumConstruct, IrEnumTag, IrEnumFieldLoad, IrFieldLoad, IrFieldStore, IrSliceConstruct, IrSliceLength, IrBoxConstruct, IrIndexLoad, IrIndexAddress, IrIndexStore, IrAddressOf, IrDereference, IrDereferenceStore, IrLoad, IrConvert, IrUnary, IrBinary,
+using IrInstruction = std::variant<IrUnit, IrConst, IrDoubleConst, IrStringConst, IrStringConcat, IrStringLength, IrStringEmpty, IrStringDecodeAt, IrStringNextOffset, IrArrayConstruct, IrVecConstruct, IrVecProperty, IrVecReserve, IrVecPush, IrVecClear, IrVecView, IrVecGet, IrVecPop, IrVecPopValue, IrVecSet, IrStructConstruct, IrEnumConstruct, IrEnumTag, IrEnumFieldLoad, IrFieldLoad, IrFieldStore, IrSliceConstruct, IrSliceLength, IrBoxConstruct, IrIndexLoad, IrIndexAddress, IrIndexStore, IrAddressOf, IrDereference, IrDereferenceStore, IrLoad, IrConvert, IrUnary, IrBinary,
                                    IrStore, IrCopy, IrCall, IrTailCall, IrFunctionStart, IrParameter,
                                    IrReturn, IrDrop, IrRetain, IrExit, IrBranch, IrJump, IrLabel>;
 

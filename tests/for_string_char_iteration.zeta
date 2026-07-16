@@ -1,0 +1,10 @@
+def main(): Int = {
+    val text: String = "hé€🚀"
+    var count: Int = 0
+    var total: Int = 0
+    for (value in text) do {
+        total = total + Int(value)
+        count = count + 1
+    }
+    if (count == 4 && total == Int('h') + Int('é') + Int('€') + Int('🚀')) 0 else 1
+}

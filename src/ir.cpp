@@ -769,7 +769,8 @@ void IrGenerator::emitForLoop(
     const std::unordered_map<std::string, ValueId>& parameters) {
     const ValueType iterableType = resolveType(loop.iterable->inferredType);
     const ValueType loopItemType = resolveType(loop.itemType);
-    const ValueType elementType = resolveType(*iterableType.element);
+    const bool iterableIsString = iterableType == ValueType::String || iterableType == ValueType::StringView;
+    const ValueType elementType = iterableIsString ? ValueType::Char : resolveType(*iterableType.element);
     const SlotId iteratorSlot = ir_.slots.size();
     ir_.slots.push_back(IrSlot{loop.item + "$iterator" + std::to_string(iteratorSlot),
                                ValueType::Int, false});
@@ -792,6 +793,10 @@ void IrGenerator::emitForLoop(
         length = nextValue(ValueType::Int);
         ir_.instructions.push_back(IrVecProperty{length,
             vecTarget(*loop.iterable, parameters), iterableType, "length"});
+    } else if (iterableIsString) {
+        const ValueId conditionIterable = expression(*loop.iterable, parameters);
+        length = nextValue(ValueType::Int);
+        ir_.instructions.push_back(IrStringLength{length, conditionIterable});
     } else {
         length = nextValue(ValueType::Int);
         ir_.instructions.push_back(IrConst{length,
@@ -810,6 +815,9 @@ void IrGenerator::emitForLoop(
     if (iterableType.kind == ValueType::Kind::Vec) {
         ir_.instructions.push_back(IrVecPopValue{itemValue,
             vecTarget(*loop.iterable, parameters), elementType});
+    } else if (iterableIsString) {
+        const ValueId itemIterable = expression(*loop.iterable, parameters);
+        ir_.instructions.push_back(IrStringDecodeAt{itemValue, itemIterable, itemIndex});
     } else {
         const ValueId itemIterable = expression(*loop.iterable, parameters);
         if (loop.mutableItem) {
@@ -911,8 +919,13 @@ void IrGenerator::emitForLoop(
     const ValueId one = nextValue(ValueType::Int);
     ir_.instructions.push_back(IrConst{one, 1, ValueType::Int});
     const ValueId next = nextValue(ValueType::Int);
-    ir_.instructions.push_back(IrBinary{next, "+", current, one,
-                                        ValueType::Int, ValueType::Int});
+    if (iterableIsString) {
+        const ValueId incrementIterable = expression(*loop.iterable, parameters);
+        ir_.instructions.push_back(IrStringNextOffset{next, incrementIterable, current});
+    } else {
+        ir_.instructions.push_back(IrBinary{next, "+", current, one,
+                                            ValueType::Int, ValueType::Int});
+    }
     ir_.instructions.push_back(IrStore{iteratorSlot, next, ValueType::Int});
     ir_.instructions.push_back(IrJump{conditionLabel});
     ir_.instructions.push_back(IrLabel{endLabel});
@@ -1687,6 +1700,12 @@ std::string IrGenerator::print(const VerifiedIrProgram& verified) {
                 out << "  $" << item.output << " = string_length $" << item.string << '\n';
             else if constexpr (std::is_same_v<T, IrStringEmpty>)
                 out << "  $" << item.output << " = string_empty $" << item.string << '\n';
+            else if constexpr (std::is_same_v<T, IrStringDecodeAt>)
+                out << "  $" << item.output << " = string_decode_at $" << item.string
+                    << ", $" << item.offset << '\n';
+            else if constexpr (std::is_same_v<T, IrStringNextOffset>)
+                out << "  $" << item.output << " = string_next_offset $" << item.string
+                    << ", $" << item.offset << '\n';
             else if constexpr (std::is_same_v<T, IrArrayConstruct>) {
                 out << "  $" << item.output << " = array " << typeName(item.type) << " [";
                 for (std::size_t i = 0; i < item.elements.size(); ++i) {

@@ -1,0 +1,7 @@
+def main(): Int = {
+    val text: String = "abc"
+    for (mut value in text) do {
+        value = 'z'
+    }
+    0
+}
