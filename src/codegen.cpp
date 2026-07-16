@@ -394,6 +394,11 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         return type == ValueType::Int || type == ValueType::Bool ||
             type == ValueType::String || type == ValueType::StringView;
     };
+    auto isLlvmUnsupportedAggregate = [](const ValueType& type) -> bool {
+        return type.kind == ValueType::Kind::Array || type.kind == ValueType::Kind::Slice ||
+            type.kind == ValueType::Kind::Box || type.kind == ValueType::Kind::Vec ||
+            type.kind == ValueType::Kind::Struct || type.kind == ValueType::Kind::Enum;
+    };
     auto llvmStringBytes = [](const std::string& text) -> std::string {
         std::ostringstream escaped;
         escaped << std::uppercase << std::hex << std::setfill('0');
@@ -440,9 +445,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         for (SlotId id = 0; id < program.slots.size(); ++id) {
             const IrSlot& slot = program.slots[id];
             if (slot.global || slot.external) continue;
-            if (!isLlvmScalarOrString(slot.type))
-                throw std::runtime_error("backend LLVM: slot local non supporté " +
+            if (!isLlvmScalarOrString(slot.type)) {
+                const std::string category = isLlvmUnsupportedAggregate(slot.type)
+                    ? "agrégat local non supporté " : "slot local non supporté ";
+                throw std::runtime_error("backend LLVM: " + category +
                                          diagnosticSlotName(slot, id) + ": " + typeName(slot.type));
+            }
             out << "  " << slotName(id) << " = alloca " << llvmType(slot.type) << "\n";
         }
     };

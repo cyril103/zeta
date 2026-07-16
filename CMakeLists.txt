@@ -81,6 +81,12 @@ if(BUILD_TESTING)
         $<TARGET_FILE:zeta>
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/reject_clang_backend_global_string.zeta
         ${CMAKE_CURRENT_BINARY_DIR}/clang-backend-unsupported-types)
+    add_test(NAME reject_clang_backend_unsupported_aggregates COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_unsupported_aggregates.sh
+        $<TARGET_FILE:zeta>
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/reject_clang_backend_local_struct.zeta
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/reject_clang_backend_local_vec.zeta
+        ${CMAKE_CURRENT_BINARY_DIR}/clang-backend-unsupported-aggregates)
     add_test(NAME compile_clang_backend_string_literal COMMAND bash
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_string_literal.sh
         $<TARGET_FILE:zeta>
