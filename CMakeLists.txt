@@ -66,6 +66,11 @@ if(BUILD_TESTING)
         $<TARGET_FILE:zeta>
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/emit_llvm_parameters.zeta
         ${CMAKE_CURRENT_BINARY_DIR}/fasm-backend-default)
+    add_test(NAME reject_clang_backend_cli_diagnostics COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_cli_diagnostics.sh
+        $<TARGET_FILE:zeta>
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/emit_llvm_parameters.zeta
+        ${CMAKE_CURRENT_BINARY_DIR}/clang-backend-cli-diagnostics)
 
     add_test(NAME compile_public_struct_declaration COMMAND zeta
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/public_struct_declaration.zeta

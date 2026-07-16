@@ -435,7 +435,7 @@ int main(int argc, char** argv) {
     }
     if ((buildStandardLibrary || buildLibraryModule || installLibraryModule) &&
         (emitLlvm || backend == Backend::Clang)) {
-        usage();
+        std::cerr << "Erreur: --backend=clang et --emit-llvm sont réservés aux exécutables\n";
         return 2;
     }
     if (emitLlvm && backend == Backend::Fasm) {
