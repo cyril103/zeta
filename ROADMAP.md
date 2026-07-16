@@ -487,23 +487,26 @@ n'est pas un simple parcours avant (`lastIndexOf`, recherche binaire, bornes,
 
 Étapes restantes :
 
-1. distinguer ensuite itération partagée, mutable et consommatrice ;
+1. préciser l'itération consommatrice pour les collections propriétaires ;
 2. fournir un parcours de `String` par `Char` masquant les offsets UTF-8 ;
 3. vérifier les emprunts jusqu'à la dernière utilisation pour les corps de boucle.
 
 L'itération directe des tableaux est livrée par abaissement spécialisé sur la
 longueur statique : `for (value in values)` fonctionne pour `[T; N]` lorsque
-`T: Copy`, sans conversion publique vers slice.
+`T: Copy`, sans conversion publique vers slice. La séparation partagé/mutable est
+également amorcée : `for (mut value in values)` sur `SliceMut[T]` produit une
+référence mutable d'élément `&mut T`, ce qui permet de modifier `Int` en place et
+de remplacer des `Box[T]` sans copie implicite.
 
 La couverture négative dédiée de `for` est maintenant livrée : source non
-iterable, élément non `Copy` sur slice et tableau, nom de variable dupliqué et
-emprunt actif d'un `Vec` pendant `for (value in values.asSlice())`.
+iterable, élément non `Copy` sur slice et tableau, nom de variable dupliqué,
+demande `mut` sur vue partagée et emprunt actif d'un `Vec` pendant
+`for (value in values.asSlice())`.
 
-Première action de la prochaine session : préciser la séparation entre itération
-partagée, mutable et consommatrice. Commencer par écrire les tests RED qui fixent
-la sémantique souhaitée pour `for` mutable et pour les éléments possédés non
-`Copy`, sans élargir l'ABI publique tant que les références d'élément ne sont pas
-mieux bornées.
+Première action de la prochaine session : préciser l'itération consommatrice des
+valeurs possédées. Commencer par écrire les tests RED qui distinguent clairement
+un futur `into`/parcours par déplacement d'un parcours partagé ou mutable par
+référence, sans déplacer implicitement les éléments de `Vec` ou de tableau.
 
 Exemple cible :
 
@@ -617,14 +620,16 @@ Chaque étape doit :
 ## Première action de la prochaine session
 
 La première syntaxe `for` sans allocation est livrée pour `Slice[T]`,
-`SliceMut[T]` et `[T; N]` lorsque `T: Copy`, avec diagnostics négatifs pour source
-non iterable, élément non `Copy`, nom d'élément dupliqué et mutation d'un `Vec`
-dont la vue `asSlice()` est active.
+`SliceMut[T]` et `[T; N]` lorsque `T: Copy`, et `for (mut value in SliceMut[T])`
+lie maintenant `value` comme `&mut T` pour muter en place sans copier les éléments
+possédés non `Copy`. Les diagnostics négatifs couvrent source non iterable,
+élément non `Copy`, nom d'élément dupliqué, demande `mut` sur vue partagée et
+mutation d'un `Vec` dont la vue `asSlice()` est active.
 
-Prochaine étape : préciser la séparation entre itération partagée, mutable et
-consommatrice. Commencer par des tests RED qui fixent la sémantique de `for`
-mutable et des éléments possédés non `Copy`, sans élargir l'ABI publique tant que
-les références d'élément ne sont pas mieux bornées.
+Prochaine étape : préciser l'itération consommatrice. Commencer par des tests RED
+qui expriment le futur parcours par déplacement des collections propriétaires et
+son interaction avec `Box[T]`, `Vec[T]`, tableaux et drop déterministe, sans
+confondre ce modèle avec le parcours partagé ou mutable par référence.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

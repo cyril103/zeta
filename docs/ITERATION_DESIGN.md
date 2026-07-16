@@ -174,14 +174,17 @@ s'abaisse conceptuellement en :
 }
 ```
 
-Pour `SliceMut[T]`, l'abaissement doit conserver l'exclusivité de `__view` jusqu'à
-la fin de la boucle. La variable d'élément ne doit jamais devenir une copie
-implicite d'une valeur non `Copy`.
+Pour `SliceMut[T]`, l'abaissement conserve l'exclusivité de `__view` jusqu'à
+la fin de la boucle. La forme `for (mut value in values)` lie `value` comme
+référence mutable d'élément (`&mut T`) calculée par adresse indexée ; elle ne
+copie donc pas les valeurs possédées non `Copy`.
 
 La première version de `for` est limitée à :
 
 - `Slice[T]` avec `T: Copy` ;
-- `SliceMut[T]` avec mutation par indice ou élément `T: Copy` ;
+- `SliceMut[T]` en parcours par valeur avec `T: Copy` ;
+- `SliceMut[T]` en parcours mutable `for (mut value in values)` où `value: &mut T`,
+  y compris pour `T` non `Copy` ;
 - `[T; N]` avec `T: Copy`, par abaissement spécialisé sur la longueur statique ;
 - `Vec[T]` après conversion explicite vers slice (`values.asSlice()` ou
   `values.asSliceMut()`).
@@ -192,8 +195,12 @@ l'abaissement direct de `[Int; N]` sans conversion publique vers slice. Les reje
 dédiés couvrent aussi la source non iterable (`tests/for_non_iterable.zeta`),
 l'élément non `Copy` sur slice et tableau (`tests/for_non_copy_element.zeta`,
 `tests/for_array_non_copy_element.zeta`), le nom d'élément déjà visible
-(`tests/for_duplicate_item.zeta`) et la mutation d'un `Vec` pendant une boucle
-sur `values.asSlice()` (`tests/for_borrow_conflict.zeta`).
+(`tests/for_duplicate_item.zeta`), la demande `mut` sur une vue partagée
+(`tests/for_mutable_requires_mutable_view.zeta`) et la mutation d'un `Vec` pendant
+une boucle sur `values.asSlice()` (`tests/for_borrow_conflict.zeta`). La syntaxe
+mutable est couverte par `tests/for_mutable_iteration.zeta` pour `SliceMut[Int]`
+et par `tests/for_mutable_box_iteration.zeta` pour `SliceMut[Box[Int]]` sans copie
+d'éléments possédés.
 
 ## Interaction avec `Vec[T]`
 
@@ -215,7 +222,8 @@ partagée (`vec_slice_blocks_move`).
 La validation du protocole a précédé le sucre syntaxique. Les tests couvrent :
 
 1. parcours partagé de `[Int; N]`, `Slice[Int]` et `Vec[Int]` avec même résultat ;
-2. parcours mutable de `SliceMut[Int]` et `Vec[Int]` avec modification en place ;
+2. parcours mutable de `SliceMut[Int]` et `Vec[Int]` avec modification en place,
+   et `for (mut value in SliceMut[Box[Int]])` sans copie de `Box` ;
 3. rejet d'une mutation de `Vec` pendant qu'une slice issue de ce `Vec` est encore
    utilisée ;
 4. rejet du déplacement d'un `Vec` pendant un parcours actif ;
@@ -223,8 +231,8 @@ La validation du protocole a précédé le sucre syntaxique. Les tests couvrent 
 6. consommation d'une stdlib précompilée sans sources lorsque les helpers publics
    sont exposés ;
 7. diagnostics stables pour les erreurs d'emprunt ou de capacité non supportée ;
-8. rejet de sources `for` non `Slice`/`SliceMut`/tableau et de noms d'élément
-   dupliqués.
+8. rejet de sources `for` non `Slice`/`SliceMut`/tableau, de noms d'élément
+   dupliqués et de `for (mut ...)` sur vue partagée.
 
 ## Découpage committable
 
@@ -247,6 +255,9 @@ La validation du protocole a précédé le sucre syntaxique. Les tests couvrent 
 7. Ajouter l'itération directe de tableaux `[T; N]`. La tranche `[Int; N]` et le
    rejet de `[Box[Int]; N]` sont livrés via un abaissement spécialisé sans slice
    publique.
+8. Séparer l'itération mutable d'éléments de l'itération par valeur. La syntaxe
+   `for (mut value in SliceMut[T])` est livrée sous forme de référence d'élément
+   `&mut T`, y compris pour `T` non `Copy`.
 
 ## Décisions reportées
 
