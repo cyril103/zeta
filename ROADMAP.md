@@ -723,11 +723,15 @@ compare la sortie UTF-8 Clang à FASM.
 est abaissé en `i8`, les conversions `Int <-> Byte` sont limitées à `trunc`/`zext`,
 et `io.printByte`/`io.printlnByte` passent par `printf("%u")` après extension
 non signée.
+`compile_clang_backend_io_println_char` ajoute la sortie `Char` ciblée :
+`io.printChar`/`io.printlnChar` encodent le codepoint `i32` en UTF-8 dans un petit
+buffer stack et écrivent 1 à 4 octets via `write`, avec comparaison stdout FASM.
+La stdlib expose désormais aussi `printlnChar`.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre contrôlé : `Char` en IO spécialisée, `io.print`/`println` pour chaînes
-heap concaténées, gestion plus complète de propriété/retain des chaînes heap, ou
-première valeur composée simple, avant toute généralisation.
+périmètre contrôlé : `io.print`/`println` pour chaînes heap concaténées, gestion
+plus complète de propriété/retain des chaînes heap, `Double` en IO spécialisée,
+ou première valeur composée simple, avant toute généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

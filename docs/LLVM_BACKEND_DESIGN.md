@@ -288,6 +288,14 @@ les appels stdlib directs `io.printByte(value: Byte)` /
 après extension non signée. Les helpers `io__printByte`/`io__printlnByte` sont
 sautés pendant l'émission LLVM pour éviter la conversion générale `String(Byte)`.
 
+`compile_clang_backend_io_println_char` ajoute une sortie `Char` ciblée : la
+stdlib expose désormais `printlnChar`, et les appels directs `io.printChar` /
+`io.printlnChar` encodent le codepoint `i32` en UTF-8 dans un buffer stack de
+quatre octets. Le backend sélectionne une longueur 1/2/3/4, écrit les bytes via
+`write(1, ptr, len)`, puis `printlnChar` écrit le newline partagé. Les helpers
+`io__printChar`/`io__printlnChar` sont sautés pendant l'émission LLVM pour éviter
+la conversion générale `String(Char)`.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -366,3 +374,5 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   sélection `true`/`false` et `write`, avec comparaison stdout FASM.
 - fait : `--backend=clang` couvre `io.printByte`/`io.printlnByte` directs via
   `Byte` en `i8`, extension non signée et `printf`, avec comparaison stdout FASM.
+- fait : `--backend=clang` couvre `io.printChar`/`io.printlnChar` directs via
+  encodage UTF-8 1-4 octets et `write`, avec comparaison stdout FASM.
