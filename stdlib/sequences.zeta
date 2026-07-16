@@ -241,10 +241,11 @@ pub def reverse[T: Copy](values: SliceMut[T]): Int = {
 }
 
 pub def fill[T: Copy](values: SliceMut[T], value: T): Int = {
-    var index: Int = 0
-    while (index < values.length) do {
+    var iterator: Int = iterateMut(values)
+    while (hasNextMut(iterator, values)) do {
+        val index: Int = position(iterator)
         values[index] = value
-        index = index + 1
+        iterator = advance(iterator)
     }
     values.length
 }
