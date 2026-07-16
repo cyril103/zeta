@@ -583,12 +583,15 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-Ouvrir la priorité 4 par une conception minimale du protocole d'itération sans
-allocation. Fixer les types d'état et d'élément, les signatures nécessaires au
-dispatch statique, ainsi que les règles d'emprunt pour les parcours partagés et
-mutables. Valider ce contrat sur tableaux, `Slice[T]` et `Vec[T]` avant d'ajouter
-la syntaxe `for`; reporter l'itération consommatrice et le parcours UTF-8 tant que
-le socle d'emprunt n'est pas démontré.
+La conception minimale du protocole d'itération sans allocation est désormais
+posée dans `docs/ITERATION_DESIGN.md`. Elle fixe l'état indexé, les frontières
+`Slice[T]`/`SliceMut[T]`, les règles d'emprunt des parcours partagés et mutables,
+et le découpage avant la future syntaxe `for`.
+
+Prochaine étape : valider ce contrat par des helpers et tests sur tableaux,
+`Slice[T]`, `SliceMut[T]` et `Vec[T]` avant d'ajouter le sucre syntaxique ;
+l'itération consommatrice et le parcours UTF-8 restent reportés tant que le socle
+d'emprunt n'est pas démontré.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
