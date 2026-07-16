@@ -477,8 +477,8 @@ indexée compatible avec ce protocole.
 
 `tests/sequences_iteration.zeta` couvre les parcours partagés et mutables de
 `Slice[Int]`, `SliceMut[Int]`, tableaux et `Vec[Int]`. `tests/for_iteration.zeta`
-couvre la syntaxe `for` sur `Slice[Int]`, `SliceMut[Int]` et `Vec[Int].asSlice()`.
-`sequences` utilise déjà ces helpers pour ses scans linéaires partagés
+couvre la syntaxe `for` sur `Slice[Int]`, `SliceMut[Int]`, `Vec[Int].asSlice()`
+et `[Int; N]` directement. `sequences` utilise déjà ces helpers pour ses scans linéaires partagés
 (`contains`, `indexOf`, `count`,
 `allEqual`, `sum`, `product`, `minimum`, `maximum`, `equals`, `startsWith`,
 `endsWith`, `isSorted`) et pour `fill` en mutation. Les algorithmes dont la forme
@@ -487,19 +487,23 @@ n'est pas un simple parcours avant (`lastIndexOf`, recherche binaire, bornes,
 
 Étapes restantes :
 
-1. compléter l'itération directe de tableaux, soit par conversion dédiée vers
-   slice, soit par abaissement spécialisé ;
-2. distinguer ensuite itération partagée, mutable et consommatrice ;
-3. fournir un parcours de `String` par `Char` masquant les offsets UTF-8 ;
-4. vérifier les emprunts jusqu'à la dernière utilisation pour les corps de boucle.
+1. distinguer ensuite itération partagée, mutable et consommatrice ;
+2. fournir un parcours de `String` par `Char` masquant les offsets UTF-8 ;
+3. vérifier les emprunts jusqu'à la dernière utilisation pour les corps de boucle.
+
+L'itération directe des tableaux est livrée par abaissement spécialisé sur la
+longueur statique : `for (value in values)` fonctionne pour `[T; N]` lorsque
+`T: Copy`, sans conversion publique vers slice.
 
 La couverture négative dédiée de `for` est maintenant livrée : source non
-iterable, élément non `Copy`, nom de variable dupliqué et emprunt actif d'un
-`Vec` pendant `for (value in values.asSlice())`.
+iterable, élément non `Copy` sur slice et tableau, nom de variable dupliqué et
+emprunt actif d'un `Vec` pendant `for (value in values.asSlice())`.
 
-Première action de la prochaine session : ajouter l'itération directe des
-tableaux avec tests RED sur `for (value in values)` pour `[Int; N]`, puis choisir
-entre conversion dédiée vers slice et abaissement spécialisé.
+Première action de la prochaine session : préciser la séparation entre itération
+partagée, mutable et consommatrice. Commencer par écrire les tests RED qui fixent
+la sémantique souhaitée pour `for` mutable et pour les éléments possédés non
+`Copy`, sans élargir l'ABI publique tant que les références d'élément ne sont pas
+mieux bornées.
 
 Exemple cible :
 
@@ -612,14 +616,15 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-La première syntaxe `for` sans allocation est livrée pour `Slice[T]` et
-`SliceMut[T]` lorsque `T: Copy`, avec diagnostics négatifs pour source non
-iterable, élément non `Copy`, nom d'élément dupliqué et mutation d'un `Vec` dont
-la vue `asSlice()` est active.
+La première syntaxe `for` sans allocation est livrée pour `Slice[T]`,
+`SliceMut[T]` et `[T; N]` lorsque `T: Copy`, avec diagnostics négatifs pour source
+non iterable, élément non `Copy`, nom d'élément dupliqué et mutation d'un `Vec`
+dont la vue `asSlice()` est active.
 
-Prochaine étape : ajouter l'itération directe de tableaux (`for (value in values)`
-sur `[T; N]`) avec tests RED, puis décider si l'abaissement crée une vue slice
-interne ou s'il reste spécialisé sur longueur et base de tableau.
+Prochaine étape : préciser la séparation entre itération partagée, mutable et
+consommatrice. Commencer par des tests RED qui fixent la sémantique de `for`
+mutable et des éléments possédés non `Copy`, sans élargir l'ABI publique tant que
+les références d'élément ne sont pas mieux bornées.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

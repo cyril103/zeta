@@ -182,14 +182,16 @@ La première version de `for` est limitée à :
 
 - `Slice[T]` avec `T: Copy` ;
 - `SliceMut[T]` avec mutation par indice ou élément `T: Copy` ;
+- `[T; N]` avec `T: Copy`, par abaissement spécialisé sur la longueur statique ;
 - `Vec[T]` après conversion explicite vers slice (`values.asSlice()` ou
-  `values.asSliceMut()`) ;
-- les tableaux restent à couvrir directement ou via conversion dédiée vers slice.
+  `values.asSliceMut()`).
 
 Tests livrés : `tests/for_iteration.zeta` couvre `for` sur `Slice[Int]`,
-`SliceMut[Int]` et `Vec[Int].asSlice()`. Les rejets dédiés couvrent aussi la
-source non iterable (`tests/for_non_iterable.zeta`), l'élément non `Copy`
-(`tests/for_non_copy_element.zeta`), le nom d'élément déjà visible
+`SliceMut[Int]` et `Vec[Int].asSlice()`. `tests/for_array_iteration.zeta` couvre
+l'abaissement direct de `[Int; N]` sans conversion publique vers slice. Les rejets
+dédiés couvrent aussi la source non iterable (`tests/for_non_iterable.zeta`),
+l'élément non `Copy` sur slice et tableau (`tests/for_non_copy_element.zeta`,
+`tests/for_array_non_copy_element.zeta`), le nom d'élément déjà visible
 (`tests/for_duplicate_item.zeta`) et la mutation d'un `Vec` pendant une boucle
 sur `values.asSlice()` (`tests/for_borrow_conflict.zeta`).
 
@@ -221,7 +223,8 @@ La validation du protocole a précédé le sucre syntaxique. Les tests couvrent 
 6. consommation d'une stdlib précompilée sans sources lorsque les helpers publics
    sont exposés ;
 7. diagnostics stables pour les erreurs d'emprunt ou de capacité non supportée ;
-8. rejet de sources `for` non `Slice`/`SliceMut` et de noms d'élément dupliqués.
+8. rejet de sources `for` non `Slice`/`SliceMut`/tableau et de noms d'élément
+   dupliqués.
 
 ## Découpage committable
 
@@ -241,6 +244,9 @@ La validation du protocole a précédé le sucre syntaxique. Les tests couvrent 
    `SliceMut[T]` avec `T: Copy` via `tests/for_iteration.zeta`.
 6. Verrouiller les diagnostics négatifs de `for`. La tranche source non iterable,
    élément non `Copy`, nom dupliqué et emprunt `Vec.asSlice()` actif est livrée.
+7. Ajouter l'itération directe de tableaux `[T; N]`. La tranche `[Int; N]` et le
+   rejet de `[Box[Int]; N]` sont livrés via un abaissement spécialisé sans slice
+   publique.
 
 ## Décisions reportées
 
