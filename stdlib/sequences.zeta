@@ -13,21 +13,23 @@ pub def hasNextMut[T](iterator: Int, values: SliceMut[T]): Bool = iterator < val
 pub def advance(iterator: Int): Int = iterator + 1
 
 pub def contains[T: Equatable](values: Slice[T], expected: T): Bool = {
-    var index: Int = 0
-    while (index < values.length) do {
+    var iterator: Int = iterate(values)
+    while (hasNext(iterator, values)) do {
+        val index: Int = position(iterator)
         if (values[index] == expected) { return true } else false
-        index = index + 1
+        iterator = advance(iterator)
     }
     false
 }
 
 pub def indexOf[T: Equatable](values: Slice[T], expected: T): Option[Int] = {
-    var index: Int = 0
-    while (index < values.length) do {
+    var iterator: Int = iterate(values)
+    while (hasNext(iterator, values)) do {
+        val index: Int = position(iterator)
         if (values[index] == expected) {
             return Option[Int].Some(value: index)
         } else false
-        index = index + 1
+        iterator = advance(iterator)
     }
     Option[Int].None
 }
@@ -44,25 +46,27 @@ pub def lastIndexOf[T: Equatable](values: Slice[T], expected: T): Option[Int] = 
 }
 
 pub def count[T: Equatable](values: Slice[T], expected: T): Int = {
-    var index: Int = 0
+    var iterator: Int = iterate(values)
     var total: Int = 0
-    while (index < values.length) do {
+    while (hasNext(iterator, values)) do {
+        val index: Int = position(iterator)
         if (values[index] == expected) {
             total = total + 1
             true
         } else false
-        index = index + 1
+        iterator = advance(iterator)
     }
     total
 }
 
 pub def allEqual[T: Equatable](values: Slice[T]): Bool = {
     if (values.length < 2) true else {
-        var index: Int = 1
+        var iterator: Int = advance(iterate(values))
         var equal: Bool = true
-        while (index < values.length && equal) do {
+        while (hasNext(iterator, values) && equal) do {
+            val index: Int = position(iterator)
             equal = values[index] == values[0]
-            index = index + 1
+            iterator = advance(iterator)
         }
         equal
     }
@@ -71,10 +75,11 @@ pub def allEqual[T: Equatable](values: Slice[T]): Bool = {
 pub def sum[T: Numeric](values: Slice[T]): Option[T] = {
     if (values.length == 0) Option[T].None else {
         var result: T = values[0]
-        var index: Int = 1
-        while (index < values.length) do {
+        var iterator: Int = advance(iterate(values))
+        while (hasNext(iterator, values)) do {
+            val index: Int = position(iterator)
             result = result + values[index]
-            index = index + 1
+            iterator = advance(iterator)
         }
         Option[T].Some(value: result)
     }
@@ -83,10 +88,11 @@ pub def sum[T: Numeric](values: Slice[T]): Option[T] = {
 pub def product[T: Numeric](values: Slice[T]): Option[T] = {
     if (values.length == 0) Option[T].None else {
         var result: T = values[0]
-        var index: Int = 1
-        while (index < values.length) do {
+        var iterator: Int = advance(iterate(values))
+        while (hasNext(iterator, values)) do {
+            val index: Int = position(iterator)
             result = result * values[index]
-            index = index + 1
+            iterator = advance(iterator)
         }
         Option[T].Some(value: result)
     }
