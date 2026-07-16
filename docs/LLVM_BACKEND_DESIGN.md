@@ -80,7 +80,7 @@ constant, puis élargir à arithmétique, `if`, `while` et appel de fonction.
 - `Byte` -> `i8` (tranche suivante)
 - `Bool` -> `i1` en SSA, normalisé depuis/vers `i32` lorsque l'IR Zeta attend une
   valeur stockable homogène
-- `Char` -> `i32` (tranche suivante)
+- `Char` -> `i32` (codepoint Unicode, validé pour l'itération chaîne)
 - `Double` -> `double` (tranche suivante)
 - `Unit` -> valeur fantôme côté IR Zeta ; pas d'allocation LLVM quand elle n'est
   pas observable
@@ -236,9 +236,15 @@ vérifie `offset >= 0 && offset < length`, lit le premier octet, puis produit un
 codepoint `Int` pour les séquences 1, 2, 3 ou 4 octets avec validation des octets
 de continuation ; les offsets invalides ou placés sur une continuation retournent
 `-1`. `strings.nextByteOffset(text, offset)` réutilise ce décodage spécialisé et
-avance de 1/2/3/4 octets, ou retourne `-1` si le décodage échoue. La tranche reste
-centrée sur `String` et ne couvre pas encore `charAtByte`/`Option[Char]`, ni une
-itération `for` directe sur `StringView`.
+avance de 1/2/3/4 octets, ou retourne `-1` si le décodage échoue.
+
+`compile_clang_backend_for_string_char_iteration` réutilise ce décodage dans les
+instructions IR de boucle `IrStringDecodeAt` et `IrStringNextOffset`. Le backend
+Clang accepte désormais `Char` comme `i32`, les constantes/copies/conversions
+`Char` <-> `Int`, et l'itération `for` sur `String` comme sur `StringView` ; l'état
+reste un `Int` mais représente un offset d'octet UTF-8, pas un index logique de
+caractère. La tranche ne définit toujours pas `charAtByte`/`Option[Char]` ni une
+ABI native générale pour des fonctions arbitraires prenant `StringView`.
 
 ## Matrice de tests
 
@@ -306,3 +312,5 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   `StringView` via un lowering spécialisé et comparaison d'exécution FASM.
 - fait : `--backend=clang` couvre `strings.decodeAtByte` et
   `strings.nextByteOffset` sur `String` pour les séquences UTF-8 1/2/3/4 octets.
+- fait : `--backend=clang` couvre l'itération `for` UTF-8 sur `String` et
+  `StringView`, avec `Char` abaissé en `i32`.

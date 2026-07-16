@@ -701,11 +701,15 @@ d'exécution FASM.
 `strings.decodeAtByte` et `strings.nextByteOffset` pour `String` : décodage 1/2/3/4
 octets, rejet des offsets invalides/continuations, progression par largeur UTF-8
 et comparaison d'exécution FASM.
+`compile_clang_backend_for_string_char_iteration` couvre maintenant l'itération
+UTF-8 via `for` sur `String` et `StringView` : l'état de boucle reste un `Int`
+interprété comme offset d'octet, le backend Clang abaisse `IrStringDecodeAt` et
+`IrStringNextOffset`, et `Char` est représenté comme `i32` côté LLVM.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre runtime contrôlé : itération UTF-8 sur `StringView`/`String` via syntaxe
-`for` ou premier nettoyage runtime `drop/free` des chaînes concaténées, avant
-toute généralisation.
+périmètre runtime contrôlé : premier nettoyage runtime `drop/free` des chaînes
+concaténées ou support ciblé d'une autre primitive chaîne, avant toute
+généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
