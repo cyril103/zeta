@@ -1,0 +1,9 @@
+import io
+
+def main(): Int = {
+    val yes: String = String(true)
+    val no: String = String(false)
+    val message: String = yes + " / " + no
+    io.println(message)
+    0
+}

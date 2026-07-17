@@ -870,6 +870,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 return call->function == "strings__decodeAtByte" || call->function == "strings__nextByteOffset";
             return std::holds_alternative<IrStringDecodeAt>(instruction) || usesStringNextByteOffsetHelper;
         });
+    const bool usesStringFromBoolHelper = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            if (const auto* item = std::get_if<IrConvert>(&instruction))
+                return item->source == ValueType::Bool && item->target == ValueType::String;
+            return false;
+        });
     const bool usesIoStringWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
@@ -951,7 +957,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     if (usesIoWrite) {
         out << "@zeta.newline = private unnamed_addr constant [1 x i8] c\"\\0A\", align 1\n";
     }
-    if (usesIoBoolWrite) {
+    if (usesIoBoolWrite || usesStringFromBoolHelper) {
         out << "@zeta.bool.true = private unnamed_addr constant [4 x i8] c\"true\", align 1\n"
             << "@zeta.bool.false = private unnamed_addr constant [5 x i8] c\"false\", align 1\n";
     }
@@ -1099,6 +1105,18 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "  %tail1 = select i1 %one, i32 %plus1, i32 %tail2\n"
             << "  %next = select i1 %invalid, i32 -1, i32 %tail1\n"
             << "  ret i32 %next\n"
+            << "}\n";
+    }
+    if (usesStringFromBoolHelper) {
+        out << "\ndefine internal { ptr, i64 } @zeta_rt_string_from_bool(i1 %value) {\n"
+            << "entry:\n"
+            << "  %true_ptr = getelementptr [4 x i8], ptr @zeta.bool.true, i64 0, i64 0\n"
+            << "  %false_ptr = getelementptr [5 x i8], ptr @zeta.bool.false, i64 0, i64 0\n"
+            << "  %data = select i1 %value, ptr %true_ptr, ptr %false_ptr\n"
+            << "  %len = select i1 %value, i64 4, i64 5\n"
+            << "  %pair_ptr = insertvalue { ptr, i64 } undef, ptr %data, 0\n"
+            << "  %pair = insertvalue { ptr, i64 } %pair_ptr, i64 %len, 1\n"
+            << "  ret { ptr, i64 } %pair\n"
             << "}\n";
     }
     if (usesStringSearch) {
@@ -1483,6 +1501,11 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             } else if (item->source == ValueType::Byte && item->target == ValueType::Int) {
                 const std::string output = "%v" + std::to_string(item->output);
                 out << "  " << output << " = zext i8 " << value(item->input) << " to i32\n";
+                values[item->output] = output;
+            } else if (item->source == ValueType::Bool && item->target == ValueType::String) {
+                const std::string output = "%v" + std::to_string(item->output);
+                out << "  " << output << " = call { ptr, i64 } @zeta_rt_string_from_bool(i1 "
+                    << value(item->input) << ")\n";
                 values[item->output] = output;
             } else {
                 throw std::runtime_error("backend LLVM: conversion non supportée " +

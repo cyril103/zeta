@@ -138,6 +138,11 @@ if(BUILD_TESTING)
         $<TARGET_FILE:zeta>
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/clang_backend_for_string_char_iteration.zeta
         ${CMAKE_CURRENT_BINARY_DIR}/clang-backend-for-string-char-iteration)
+    add_test(NAME compile_clang_backend_string_bool_conversion COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_string_bool_conversion.sh
+        $<TARGET_FILE:zeta>
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/clang_backend_string_bool_conversion.zeta
+        ${CMAKE_CURRENT_BINARY_DIR}/clang-backend-string-bool-conversion)
     add_test(NAME compile_clang_backend_io_println_string COMMAND bash
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_io_println_string.sh
         $<TARGET_FILE:zeta>
