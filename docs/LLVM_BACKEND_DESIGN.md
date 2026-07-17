@@ -433,7 +433,10 @@ portant ces structs. Le mode `--build-library --backend=clang` produit désormai
 un objet bibliothèque LLVM (`.ll` + `.o` via `clang -c`) pour les modules simples,
 sans définir `main` dans l'IR de bibliothèque ; les exécutables `--backend=clang`
 relient aussi les objets précompilés LLVM installés depuis le cache de bibliothèques
-en les copiant dans `<app>.modules` avant l'appel final à `clang`.
+en les copiant dans `<app>.modules` avant l'appel final à `clang`. Le mode
+`--build-stdlib --backend=clang` sait aussi produire une stdlib précompilée LLVM
+pour les modules simples (`.zti`, `.ll`, `.o`, `manifest`), consommable ensuite par
+un exécutable Clang via le cache `precompiled`.
 
 Tests structurants déjà verrouillés côté structs/ownership :
 
@@ -478,9 +481,11 @@ Prochaines tranches nécessaires pour remplacer FASM :
    bibliothèque LLVM pour les modules simples (`LlvmIrCodeGenerator::generateObject`,
    `clang -c`, `.zti` + `.ll` + `.o`, test `compile_clang_backend_build_library`),
    et `--backend=clang` relie les exécutables aux objets précompilés LLVM installés
-   depuis le cache de bibliothèques (`compile_clang_backend_shared_library_cache`) ;
-   poursuivre avec la stdlib précompilée via `clang` et les modules locaux non
-   précompilés ;
+   depuis le cache de bibliothèques (`compile_clang_backend_shared_library_cache`),
+   et `--build-stdlib --backend=clang` précompile les modules stdlib simples en
+   `.zti`/`.ll`/`.o` avec manifeste (`compile_clang_backend_build_stdlib`) ;
+   poursuivre avec la vraie stdlib complète, ses modules génériques/agrégats et
+   les modules locaux non précompilés ;
 3. choisir le support ou le rejet final pour globals agrégats, tableaux dans
    structs, `Box`, `Vec`, enums et gros agrégats ;
 4. ajouter une matrice exemples + stdlib en `--backend=clang`, puis inverser le
@@ -622,6 +627,9 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   précompilées LLVM installées : les appels externes sont déclarés dans l'IR,
   les `.o` de dépendances sont copiés dans `<app>.modules`, puis passés au lien
   final `clang`, avec exécution du binaire résultant.
+- fait : `--build-stdlib --backend=clang` précompile une stdlib simple côté LLVM :
+  chaque module produit `.zti`, `.ll` et `.o`, le manifeste est écrit, les sources
+  peuvent ensuite être absentes, et un exécutable Clang consomme le cache `precompiled`.
 - fait : `--backend=clang` couvre les opérations arithmétiques `Double`
   `+`/`-`/`*`/`/` via `fadd`/`fsub`/`fmul`/`fdiv`, et les comparaisons ordonnées
   via `fcmp o*`, avec exécution Clang et FASM.
