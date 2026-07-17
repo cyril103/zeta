@@ -1,0 +1,23 @@
+import io
+
+struct Packet {
+    text: String
+    code: Int
+}
+
+
+def makePacket(word: String): Packet = Packet { text: "heap " + word, code: 11 }
+
+
+def usePacket(packet: Packet): Int = {
+    val copied: Packet = packet
+    io.println(packet.text)
+    io.println(copied.text)
+    if (packet.text.lengthBytes == 14 && copied.text.lengthBytes == 14 && packet.code == copied.code) 0 else 1
+}
+
+
+def main(): Int = {
+    val packet: Packet = makePacket("ownership")
+    usePacket(packet)
+}

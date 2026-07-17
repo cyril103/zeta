@@ -11,7 +11,7 @@ test -f "${output}.ll"
 test -f "${output}.ir"
 test ! -e "${output}.asm"
 
-grep -q '@str\.1 = private unnamed_addr constant \[4 x i8\] c"zeta"' "${output}.ll"
+grep -q '@str\.1 = private unnamed_addr constant { i64, i64, \[4 x i8\] } { i64 -1, i64 4, \[4 x i8\] c"zeta" }' "${output}.ll"
 grep -q 'extractvalue { ptr, i64 }' "${output}.ll"
 
 set +e

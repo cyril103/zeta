@@ -11,8 +11,8 @@ test -f "${output}.ll"
 test -f "${output}.ir"
 test ! -e "${output}.asm"
 
-grep -q '@str\.[0-9][0-9]* = private unnamed_addr constant \[0 x i8\] c""' "${output}.ll"
-grep -q '@str\.[0-9][0-9]* = private unnamed_addr constant \[4 x i8\] c"zeta"' "${output}.ll"
+grep -q '@str\.[0-9][0-9]* = private unnamed_addr constant { i64, i64, \[0 x i8\] } { i64 -1, i64 0, \[0 x i8\] c"" }' "${output}.ll"
+grep -q '@str\.[0-9][0-9]* = private unnamed_addr constant { i64, i64, \[4 x i8\] } { i64 -1, i64 4, \[4 x i8\] c"zeta" }' "${output}.ll"
 grep -q 'icmp eq i64' "${output}.ll"
 
 set +e

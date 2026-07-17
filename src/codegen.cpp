@@ -546,6 +546,18 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         }
         return paths;
     };
+    std::function<HeapStringPaths(const ValueType&)> heapStringPathsForType =
+        [&](const ValueType& type) -> HeapStringPaths {
+            if (type == ValueType::String) return HeapStringPaths{HeapStringPath{}};
+            if (type.kind != ValueType::Kind::Struct) return {};
+            HeapStringPaths paths;
+            for (std::size_t i = 0; i < type.structure->fields.size(); ++i) {
+                const HeapStringPaths fieldPaths = prefixPaths(
+                    heapStringPathsForType(type.structure->fields[i].type), i);
+                paths.insert(fieldPaths.begin(), fieldPaths.end());
+            }
+            return paths;
+        };
     std::size_t ownershipSequence = 0;
     auto emitStringFree = [&](const std::string& prefix, const std::string& stringValue,
                               const ValueType& stringType) -> void {
@@ -580,13 +592,22 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         const std::string data = prefix + ".ptr";
         const std::string raw = prefix + ".raw";
         const std::string count = prefix + ".refcount";
+        const std::string isStatic = prefix + ".is_static";
         const std::string retained = prefix + ".retained";
+        const std::string labelStem = "string.retain." + std::to_string(ownershipSequence++);
+        const std::string retainLabel = labelStem + ".retain";
+        const std::string doneLabel = labelStem + ".done";
         out << "  " << data << " = extractvalue " << llvmType(stringType) << " "
             << stringValue << ", 0\n"
             << "  " << raw << " = getelementptr i8, ptr " << data << ", i64 -16\n"
             << "  " << count << " = load i64, ptr " << raw << "\n"
+            << "  " << isStatic << " = icmp eq i64 " << count << ", -1\n"
+            << "  br i1 " << isStatic << ", label %" << doneLabel << ", label %" << retainLabel << "\n"
+            << retainLabel << ":\n"
             << "  " << retained << " = add i64 " << count << ", 1\n"
-            << "  store i64 " << retained << ", ptr " << raw << "\n";
+            << "  store i64 " << retained << ", ptr " << raw << "\n"
+            << "  br label %" << doneLabel << "\n"
+            << doneLabel << ":\n";
     };
     auto valueAtHeapStringPath = [&](const std::string& prefix, const std::string& rootValue,
                                      const ValueType& rootType,
@@ -1165,6 +1186,15 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
 
     const bool usesStringConcat = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) { return std::holds_alternative<IrStringConcat>(instruction); });
+    const bool usesStringOwnership = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [&](const IrInstruction& instruction) {
+            return std::visit([&](const auto& item) {
+                using T = std::decay_t<decltype(item)>;
+                if constexpr (std::is_same_v<T, IrDrop> || std::is_same_v<T, IrRetain>)
+                    return !heapStringPathsForType(item.type).empty();
+                return false;
+            }, instruction);
+        });
     const bool usesStringSearch = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
@@ -1197,8 +1227,10 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     out << "target triple = \"x86_64-pc-linux-gnu\"\n\n";
     if (usesStringConcat) {
         out << "declare ptr @malloc(i64)\n"
-            << "declare ptr @memcpy(ptr, ptr, i64)\n"
-            << "declare void @free(ptr)\n\n";
+            << "declare ptr @memcpy(ptr, ptr, i64)\n\n";
+    }
+    if (usesStringConcat || usesStringOwnership) {
+        out << "declare void @free(ptr)\n\n";
     }
     if (usesStringSearch) {
         out << "declare i32 @memcmp(ptr, ptr, i64)\n\n";
@@ -1211,9 +1243,10 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     }
     for (const IrInstruction& instruction : program.instructions) {
         if (const auto* item = std::get_if<IrStringConst>(&instruction)) {
-            out << "@str." << item->output << " = private unnamed_addr constant ["
-                << item->utf8.size() << " x i8] c\"" << llvmStringBytes(item->utf8)
-                << "\", align 1\n";
+            out << "@str." << item->output << " = private unnamed_addr constant { i64, i64, ["
+                << item->utf8.size() << " x i8] } { i64 -1, i64 " << item->utf8.size()
+                << ", [" << item->utf8.size() << " x i8] c\"" << llvmStringBytes(item->utf8)
+                << "\" }, align 8\n";
         }
     }
     if (usesIoWrite) {
@@ -1302,8 +1335,11 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 throw std::runtime_error("backend LLVM: type non supporté " + typeName(item->type));
             values[item->output] = std::to_string(item->value);
         } else if (const auto* item = std::get_if<IrStringConst>(&instruction)) {
-            values[item->output] = "{ ptr @str." + std::to_string(item->output) +
-                ", i64 " + std::to_string(item->utf8.size()) + " }";
+            const std::string global = "@str." + std::to_string(item->output);
+            values[item->output] = "{ ptr getelementptr inbounds ({ i64, i64, [" +
+                std::to_string(item->utf8.size()) + " x i8] }, ptr " + global +
+                ", i64 0, i32 2, i64 0), i64 " + std::to_string(item->utf8.size()) + " }";
+            rememberValuePaths(item->output, HeapStringPaths{HeapStringPath{}});
         } else if (const auto* item = std::get_if<IrDoubleConst>(&instruction)) {
             values[item->output] = formatDouble(item->value);
         } else if (const auto* item = std::get_if<IrCall>(&instruction)) {
@@ -1317,6 +1353,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             }
             out << ")\n";
             values[item->output] = "%v" + std::to_string(item->output);
+            rememberValuePaths(item->output, heapStringPathsForType(item->returnType));
         } else if (const auto* item = std::get_if<IrExit>(&instruction)) {
             const ValueType type = program.valueTypes.at(item->value);
             if (type != ValueType::Int)
@@ -1344,6 +1381,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             if (!isLlvmValueType(item->type))
                 throw std::runtime_error("backend LLVM: paramètre non supporté " + typeName(item->type));
             values[item->output] = "%arg" + std::to_string(item->index);
+            rememberValuePaths(item->output, heapStringPathsForType(item->type));
         } else if (const auto* item = std::get_if<IrReturn>(&instruction)) {
             if (!isLlvmValueType(item->type))
                 throw std::runtime_error("backend LLVM: type de retour non supporté " + typeName(item->type));

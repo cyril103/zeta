@@ -634,9 +634,7 @@ void SemanticAnalyzer::checkDeclaration(Declaration& declaration, bool allowRecu
     if (declaration.callable && declaration.type.kind == ValueType::Kind::Array)
         throw CompileError(declaration.location,
                            "le retour d'un tableau par valeur n'est pas encore pris en charge");
-    if (declaration.callable &&
-        (declaration.type.kind == ValueType::Kind::Struct ||
-         declaration.type.kind == ValueType::Kind::Enum) &&
+    if (declaration.callable && declaration.type.kind == ValueType::Kind::Enum &&
         valueTypeSize(declaration.type) > 16U)
         throw CompileError(declaration.location,
                            "le retour ABI d'un agrégat est limité à 16 octets");
