@@ -1,0 +1,8 @@
+import io
+
+pub val code: Byte = 250
+
+def main(): Int = {
+    io.printlnByte(code)
+    Int(code)
+}
