@@ -226,6 +226,14 @@ déclare `@module__name = external global ...`, relit cette globale depuis l'obj
 `.o` du cache, et le lien Clang réutilise l'objet copié dans `<app>.modules` sans
 redéfinition locale.
 
+`compile_clang_backend_shared_string_global_cache` étend ce chemin aux `pub val String`
+précompilées initialisées par littéral : le module objet garde la constante
+privée `@str.N = private unnamed_addr constant { i64, i64, [N x i8] } ...`, puis
+émet `@module__name = global { ptr, i64 } { ptr getelementptr ..., i64 N }` sans
+`store` top-level. Le consommateur déclare `@module__name = external global
+{ ptr, i64 }`, charge la paire depuis l'objet `.o` du cache, puis réutilise les
+helpers String existants comme `@zeta_rt_string_length_bytes`.
+
 Les diagnostics d'agrégats globaux restent couverts séparément par les tests
 `reject_clang_backend_unsupported_aggregates` et
 `reject_clang_backend_unsupported_global_aggregates` pour les tableaux, slices,
@@ -668,6 +676,10 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   précompilés LLVM : le producteur utilise les symboles globaux stables
   `module__name` avec initialiseur statique quand possible, le consommateur les
   déclare `external global`, puis relie l'objet `.o` du cache sans redéfinition.
+- fait : `--backend=clang` consomme les `pub val String` littérales de modules
+  précompilés LLVM : le producteur émet la paire `{ ptr, i64 }` comme initialiseur
+  global statique pointant vers `@str.N`, et le consommateur charge la paire depuis
+  `external global { ptr, i64 }` avant d'appeler les helpers String existants.
 - fait : `--build-stdlib --backend=clang` précompile une stdlib simple côté LLVM :
   chaque module produit `.zti`, `.ll` et `.o`, le manifeste est écrit, les sources
   peuvent ensuite être absentes, et un exécutable Clang consomme le cache `precompiled`.
