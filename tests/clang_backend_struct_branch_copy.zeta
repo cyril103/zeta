@@ -1,0 +1,16 @@
+struct Point {
+    x: Int
+    y: Int
+}
+
+def choose(flag: Bool, left: Point, right: Point): Point = {
+    if (flag) left else right
+}
+
+def main(): Int = {
+    val a: Point = Point { x: 20, y: 22 }
+    val b: Point = Point { x: 1, y: 2 }
+    val first: Point = choose(true, a, b)
+    val second: Point = choose(false, b, a)
+    first.x + first.y + second.x + second.y - 42
+}

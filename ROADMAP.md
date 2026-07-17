@@ -762,7 +762,8 @@ périmètre contrôlé : gestion plus complète de propriété/retain des chaîn
 ou mutation directe de sous-champs (`entry.point.x = ...`) avant toute
 généralisation. Les copies SSA à travers branches sont désormais matérialisées
 par stockage/rechargement pour les valeurs copiées sur plusieurs chemins et
-verrouillées par `compile_clang_backend_branch_copy`.
+verrouillées par `compile_clang_backend_branch_copy` pour les scalaires et
+`compile_clang_backend_struct_branch_copy` pour les agrégats LLVM de structs.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
