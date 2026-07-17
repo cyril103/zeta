@@ -757,13 +757,18 @@ struct imbriquée, en rechargeant l'agrégat parent puis en le réécrivant par
 étend cette garantie à la mutation directe de sous-champs (`entry.point.x = ...`) :
 le parseur conserve le chemin complet, l'analyse sémantique vérifie chaque étape
 structurée, puis l'IR reconstruit récursivement les agrégats parents avec
-`extractvalue`/`insertvalue` avant de restocker la racine.
+`extractvalue`/`insertvalue` avant de restocker la racine. Le test
+`compile_clang_backend_struct_heap_string_drop` couvre désormais la propriété des
+chaînes heap encapsulées dans des structs LLVM : le backend suit les chemins de
+champs contenant une chaîne issue de concaténation, les propage à travers
+`IrStructConstruct`/`IrStore`/`IrLoad`/`IrFieldLoad`, puis émet le `free` récursif
+sur le champ au `drop` de l'agrégat.
 Les agrégats globaux et les structs contenant `Box`/`Vec`/tableaux restent rejetés
 explicitement.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre contrôlé : gestion plus complète de propriété/retain des chaînes heap
-lors de mutations de structs ou d'affectations répétées, avant toute
+périmètre contrôlé : `retain`/copie des chaînes heap imbriquées dans des structs
+et remplacement de champs String heap lors de mutations répétées, avant toute
 généralisation. Les copies SSA à travers branches sont désormais matérialisées
 par stockage/rechargement pour les valeurs copiées sur plusieurs chemins et
 verrouillées par `compile_clang_backend_branch_copy` pour les scalaires et
