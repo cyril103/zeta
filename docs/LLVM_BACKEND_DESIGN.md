@@ -286,10 +286,10 @@ retours `Unit` génériques. La tranche compare la sortie UTF-8 Clang à FASM.
 `compile_clang_backend_io_println_int` ajoute une sortie entière ciblée : les
 appels stdlib directs `io.printInt(value: Int)` et `io.printlnInt(value: Int)` sont
 abaissés vers `printf` avec deux formats privés (`%d` et `%d\n`). Les fonctions
-helpers `io__printInt`/`io__printlnInt` sont sautées pendant l'émission LLVM même
-si elles sont atteignables, car leurs corps passent aujourd'hui par la conversion
-générale `String(Int)` qui reste hors périmètre. Cette tranche n'est donc pas une
-ABI native générale ni un support complet de `String(value)`.
+helpers `io__printInt`/`io__printlnInt` sont sautées pendant l'émission LLVM pour
+conserver les appels directs derrière `@zeta_rt_io_write_int(i32, i1)`, tandis que
+la conversion générale `String(Int)` est maintenant couverte séparément par
+`@zeta_rt_string_from_int(i32)`.
 
 `compile_clang_backend_io_println_bool` ajoute une sortie booléenne ciblée : les
 appels stdlib directs `io.printBool(value: Bool)` et
@@ -307,6 +307,12 @@ frontière runtime interne `@zeta_rt_string_from_bool(i1)`. Le helper réutilise
 constantes privées `@zeta.bool.true` / `@zeta.bool.false`, sélectionne la paire
 `{ ptr, i64 }` sans allocation ni ownership heap, et le test compare la sortie
 Clang/FASM après concaténation avec un littéral.
+
+`compile_clang_backend_string_int_conversion` couvre `String(Int)` côté Clang : le
+helper runtime interne `@zeta_rt_string_from_int(i32)` convertit les valeurs
+positives, négatives et zéro en décimal, alloue un buffer heap avec en-tête
+ownership compatible `drop`, retourne `{ ptr, i64 }`, puis le test compare la
+sortie Clang/FASM après concaténation.
 
 `compile_clang_backend_io_println_byte` ajoute une sortie `Byte` ciblée : `Byte`
 est représenté comme `i8` côté LLVM, les conversions minimales `Int -> Byte` et
@@ -379,7 +385,8 @@ runtime internes (`@zeta_rt_io_write_string` pour `io.print`/
 `io.printlnBool`, et `@zeta_rt_io_write_byte` pour `io.printByte`/
 `io.printlnByte`, et `@zeta_rt_io_write_char` pour `io.printChar`/
 `io.printlnChar`, et `@zeta_rt_io_write_double` pour `io.printDouble`/
-`io.printlnDouble`), conversion `String(Bool)` via `@zeta_rt_string_from_bool`,
+`io.printlnDouble`), conversions `String(Bool)` / `String(Int)` via
+`@zeta_rt_string_from_bool` / `@zeta_rt_string_from_int`,
 et frontières `strings.*` (`@zeta_rt_strings_view` pour
 `strings.view`, `@zeta_rt_strings_view_is_valid` pour `strings.viewIsValid`,
 `@zeta_rt_strings_decode_at_byte` pour `strings.decodeAtByte`,
@@ -415,12 +422,12 @@ Prochaines tranches nécessaires pour remplacer FASM :
    `@zeta_rt_strings_decode_at_byte(ptr, i64, i32)`,
    `@zeta_rt_strings_next_byte_offset(ptr, i64, i32)`,
    `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)`,
-   `@zeta_rt_string_from_bool(i1)`) utilisées par `io.print`/
+   `@zeta_rt_string_from_bool(i1)`, `@zeta_rt_string_from_int(i32)`) utilisées par `io.print`/
    `io.println(String)`, `io.printInt`/`io.printlnInt`, `io.printBool`/
    `io.printlnBool`, `io.printByte`/`io.printlnByte`, `io.printChar`/
    `io.printlnChar`, `io.printDouble`/`io.printlnDouble`, `strings.view`,
    `strings.viewIsValid`, `strings.decodeAtByte`, `strings.nextByteOffset`,
-   `strings.indexOf`/`strings.contains` et `String(Bool)` ; cibler ensuite
+   `strings.indexOf`/`strings.contains`, `String(Bool)` et `String(Int)` ; cibler ensuite
    les autres primitives `strings.*` ou les conversions générales vers `String` encore
    abaissées de façon spécialisée ;
 2. produire et relier modules séparés, stdlib précompilée et runtime via `clang` ;
@@ -513,6 +520,9 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--backend=clang` couvre `String(Bool)` via la frontière runtime interne
   `@zeta_rt_string_from_bool(i1)`, qui sélectionne la paire statique `true`/`false`
   sans allocation, avec exécution Clang et FASM.
+- fait : `--backend=clang` couvre `String(Int)` via la frontière runtime interne
+  `@zeta_rt_string_from_int(i32)`, qui convertit en décimal signé dans un buffer
+  heap propriétaire compatible `drop`, avec exécution Clang et FASM.
 - fait : `--backend=clang` couvre `io.printByte`/`io.printlnByte` directs via
   la frontière runtime interne `@zeta_rt_io_write_byte(i8, i1)`, qui centralise
   l'extension non signée, le choix du format `printf` avec ou sans newline et
