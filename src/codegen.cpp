@@ -1501,11 +1501,19 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             if (!isLlvmValueType(field.type))
                 throw std::runtime_error("backend LLVM: mutation champ struct non supportée " +
                                          typeName(item->objectType));
-            const std::string base = "%slot" + std::to_string(item->slot) + ".field" + std::to_string(item->field);
+            const std::string base = "%slot" + std::to_string(item->slot) + ".field" +
+                                     std::to_string(item->field) + ".store" +
+                                     std::to_string(ownershipSequence++);
             const std::string current = base + ".load";
             const std::string updated = base + ".updated";
             const std::string structType = llvmType(item->objectType);
             out << "  " << current << " = load " << structType << ", ptr " << slotName(item->slot) << "\n";
+            std::size_t replacedPathIndex = 0;
+            for (const HeapStringPath& path : heapStringSlotPaths[item->slot]) {
+                if (!path.empty() && path.front() == item->field)
+                    emitHeapStringPathDrop(base + ".replace" + std::to_string(replacedPathIndex++),
+                                           current, item->objectType, path);
+            }
             out << "  " << updated << " = insertvalue " << structType << " " << current
                 << ", " << llvmType(field.type) << " " << value(item->value) << ", " << item->field << "\n";
             out << "  store " << structType << " " << updated << ", ptr " << slotName(item->slot) << "\n";

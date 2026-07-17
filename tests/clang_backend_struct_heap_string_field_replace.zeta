@@ -1,0 +1,18 @@
+import io
+
+struct Packet {
+    text: String
+    code: Int
+}
+
+
+def main(): Int = {
+    val suffixA: String = "one"
+    val suffixB: String = "two"
+    val suffixC: String = "three"
+    var packet: Packet = Packet { text: "heap " + suffixA, code: 5 }
+    packet.text = "heap " + suffixB
+    packet.text = "heap " + suffixC
+    io.println(packet.text)
+    if (packet.text.lengthBytes == 10 && packet.code == 5) 0 else 1
+}
