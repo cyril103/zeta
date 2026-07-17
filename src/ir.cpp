@@ -381,7 +381,8 @@ IrProgram IrGenerator::generateModule(const ModuleGraph& graph, const std::strin
                     declaration, true, moduleName + "__" + declaration->name});
                 ir_.slots.push_back(IrSlot{moduleName + "__" + declaration->name,
                     declaration->type, true,
-                    moduleFilter_.has_value() && moduleName != *moduleFilter_});
+                    module.precompiled ||
+                    (moduleFilter_.has_value() && moduleName != *moduleFilter_)});
             }
         }
     }

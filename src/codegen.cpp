@@ -816,6 +816,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     };
     auto slotName = [&](SlotId id) -> std::string {
         const IrSlot& slot = program.slots.at(id);
+        if ((slot.external || (moduleObjectMode && slot.global)) && !slot.name.empty())
+            return "@" + slot.name;
         return std::string(slot.global || slot.external ? "@slot" : "%slot") + std::to_string(id);
     };
     auto diagnosticSlotName = [](const IrSlot& slot, SlotId id) -> std::string {
@@ -828,6 +830,28 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     auto labelName = [](std::size_t id) -> std::string {
         return "label" + std::to_string(id);
     };
+    auto moduleObjectStaticGlobalInitializers = [&]() -> std::unordered_map<SlotId, std::string> {
+        std::unordered_map<ValueId, std::string> constants;
+        std::unordered_map<SlotId, std::string> initializers;
+        if (!moduleObjectMode) return initializers;
+        for (const IrInstruction& instruction : program.instructions) {
+            if (std::holds_alternative<IrFunctionStart>(instruction)) break;
+            if (const auto* item = std::get_if<IrConst>(&instruction)) {
+                constants[item->output] = std::to_string(item->value);
+            } else if (const auto* item = std::get_if<IrDoubleConst>(&instruction)) {
+                constants[item->output] = formatDouble(item->value);
+            } else if (const auto* item = std::get_if<IrStore>(&instruction)) {
+                const IrSlot& slot = program.slots.at(item->slot);
+                if (slot.global && !slot.external) {
+                    if (const auto found = constants.find(item->value); found != constants.end())
+                        initializers[item->slot] = found->second;
+                }
+            }
+        }
+        return initializers;
+    };
+    const std::unordered_map<SlotId, std::string> staticGlobalInitializers =
+        moduleObjectStaticGlobalInitializers();
     auto emitScalarAllocas = [&]() -> void {
         for (SlotId id = 0; id < program.slots.size(); ++id) {
             const IrSlot& slot = program.slots[id];
@@ -1548,6 +1572,9 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         out << slotName(id) << " = ";
         if (slot.external) {
             out << "external global " << llvmType(slot.type) << "\n";
+        } else if (const auto found = staticGlobalInitializers.find(id);
+                   found != staticGlobalInitializers.end()) {
+            out << "global " << llvmType(slot.type) << " " << found->second << "\n";
         } else if (slot.type == ValueType::String) {
             out << "global " << llvmType(slot.type) << " zeroinitializer\n";
         } else if (slot.type == ValueType::Double) {
@@ -1873,6 +1900,10 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 heapStringSlotPaths[item->slot] = slotPaths;
             }
         } else if (const auto* item = std::get_if<IrStore>(&instruction)) {
+            if (moduleObjectMode && !openFunction) {
+                const IrSlot& slot = program.slots.at(item->slot);
+                if (slot.global && staticGlobalInitializers.contains(item->slot)) continue;
+            }
             if (!isLlvmValueType(item->type))
                 throw std::runtime_error("backend LLVM: type de store non supporté " +
                                          typeName(item->type));
