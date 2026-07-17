@@ -307,6 +307,12 @@ frontière runtime interne `@zeta_rt_string_length_bytes(ptr, i64)`, qui retourn
 longueur en `i32`. Le test conserve l'oracle FASM sur le code de sortie tout en
 vérifiant une définition unique du helper et un appel applicatif.
 
+`compile_clang_backend_string_is_empty` verrouille `String.isEmpty` côté Clang :
+l'accès au champ longueur de la paire `{ ptr, i64 }` passe désormais par la
+frontière runtime interne `@zeta_rt_string_is_empty(ptr, i64)`, qui centralise le
+prédicat `len == 0` et retourne `i1`. Le test vérifie les deux appels applicatifs
+sur `""` et `"zeta"`, l'exécution Clang et l'oracle FASM sur le code de sortie.
+
 `compile_clang_backend_string_bool_conversion` couvre la première conversion
 générale vers `String` côté Clang : `String(true)` / `String(false)` appellent la
 frontière runtime interne `@zeta_rt_string_from_bool(i1)`. Le helper réutilise les
@@ -411,7 +417,8 @@ runtime internes (`@zeta_rt_io_write_string` pour `io.print`/
 `io.printlnByte`, et `@zeta_rt_io_write_char` pour `io.printChar`/
 `io.printlnChar`, et `@zeta_rt_io_write_double` pour `io.printDouble`/
 `io.printlnDouble`), `String.lengthBytes` via
-`@zeta_rt_string_length_bytes(ptr, i64)`, conversions `String(Bool)` / `String(Int)` / `String(Byte)` /
+`@zeta_rt_string_length_bytes(ptr, i64)`, `String.isEmpty` via
+`@zeta_rt_string_is_empty(ptr, i64)`, conversions `String(Bool)` / `String(Int)` / `String(Byte)` /
 `String(Char)` / `String(Double)` via `@zeta_rt_string_from_bool(i1)`,
 `@zeta_rt_string_from_int(i32)`, `@zeta_rt_string_from_byte(i8)`,
 `@zeta_rt_string_from_char(i32)` et `@zeta_rt_string_from_double(double)`, strings (`String`/`StringView`, concaténation,
@@ -445,6 +452,7 @@ Prochaines tranches nécessaires pour remplacer FASM :
    `@zeta_rt_io_write_byte(i8, i1)`, `@zeta_rt_io_write_char(i32, i1)` et
    `@zeta_rt_io_write_double(double, i1)`,
    `@zeta_rt_string_length_bytes(ptr, i64)`,
+   `@zeta_rt_string_is_empty(ptr, i64)`,
    `@zeta_rt_strings_view(ptr, i64, i32, i32)`,
    `@zeta_rt_strings_view_is_valid(ptr)`,
    `@zeta_rt_strings_decode_at_byte(ptr, i64, i32)`,
@@ -456,7 +464,7 @@ Prochaines tranches nécessaires pour remplacer FASM :
    `io.println(String)`, `io.printInt`/`io.printlnInt`, `io.printBool`/
    `io.printlnBool`, `io.printByte`/`io.printlnByte`, `io.printChar`/
    `io.printlnChar`, `io.printDouble`/`io.printlnDouble`, `String.lengthBytes`,
-   `strings.view`,
+   `String.isEmpty`, `strings.view`,
    `strings.viewIsValid`, `strings.decodeAtByte`, `strings.nextByteOffset`,
    `strings.indexOf`/`strings.contains`, `String(Bool)`, `String(Int)`,
    `String(Byte)`, `String(Char)` et `String(Double)` ; cibler ensuite
@@ -580,6 +588,9 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--backend=clang` couvre `String.lengthBytes` via la frontière runtime
   interne `@zeta_rt_string_length_bytes(ptr, i64)`, qui centralise le passage
   longueur `{ ptr, i64 } -> i32`, avec exécution Clang et FASM.
+- fait : `--backend=clang` couvre `String.isEmpty` via la frontière runtime
+  interne `@zeta_rt_string_is_empty(ptr, i64)`, qui centralise le prédicat
+  `len == 0`, avec exécution Clang et FASM.
 - fait : `--backend=clang` couvre `strings.view` via la frontière runtime interne
   `@zeta_rt_strings_view(ptr, i64, i32, i32)`, qui centralise les bornes, le calcul
   du pointeur et le sentinelle `{ null, 0 }`; `strings.viewIsValid` passe par la
