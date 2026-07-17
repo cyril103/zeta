@@ -583,10 +583,13 @@ notamment :
 Les prochaines sessions doivent transformer LLVM de backend couvert à backend de
 travail par défaut pour le développement courant :
 
-1. **Ownership interprocédural des strings dans structs** : couvrir par tests
-   RED/GREEN les chaînes heap retournées par fonction ou passées en
-   appels/paramètres dans des structs, afin que les chemins de propriété survivent
-   aux frontières de fonctions.
+1. **Livré le 17 juillet 2026 — ownership interprocédural des strings dans
+   structs** : `compile_clang_backend_struct_heap_string_interprocedural` couvre
+   une fonction qui retourne une struct contenant un `String` heap et une fonction
+   qui reçoit/copie cette struct. Le backend LLVM propage maintenant les chemins
+   de propriété par paramètres, appels et retours, conserve les strings statiques
+   avec un refcount sentinelle, incrémente les copies heap et décrémente/free aux
+   drops sans double libération.
 2. **Runtime/stdlib par Clang** : remplacer les lowerings trop spécialisés par une
    ABI stable pour les helpers runtime/stdlib utilisés par LLVM, sans réintroduire
    d'assembleur FASM dans le chemin Clang.
@@ -660,23 +663,22 @@ Chaque étape doit :
 ## Première action de la prochaine session
 
 Reprendre la migration LLVM avec l'objectif explicite de remplacer FASM comme
-backend de développement. Le dépôt est vert après `compile_clang_backend_struct_heap_string_retain`
-et `compile_clang_backend_struct_heap_string_field_replace` : **526 tests CTest
+backend de développement. Le dépôt est vert après
+`compile_clang_backend_struct_heap_string_interprocedural` : **527 tests CTest
 passent** et le backend LLVM couvre déjà scalaires, strings, IO ciblée, structs
-imbriqués, copies à travers branches et ownership heap-string intra-struct.
+imbriqués, copies à travers branches, ownership heap-string intra-struct et
+propagation de cette propriété par paramètres/retours de fonctions portant des
+structs.
 
-Démarrer par une tranche RED/GREEN ciblée : **propagation de propriété des chaînes
-heap retournées par fonction ou circulant à travers appels/paramètres dans des
-structs**. Test conseillé : une fonction construit/retourne une struct contenant
-un champ `String` heap, une autre fonction reçoit ou copie cette struct, utilise
-à la fois l'original et la copie, puis les drops doivent décrémenter/free sans
-fuite ni double free. Le test Clang doit comparer stdout/code retour avec FASM et
-grepper le `.ll` pour `malloc`, `extractvalue`, incrément refcount, décrément et
-`free` conditionnel.
+Démarrer par une tranche RED/GREEN ciblée : **généraliser l'ABI runtime/stdlib
+appelée par LLVM** afin de réduire les lowerings spécialisés `io.*`/`strings.*`
+et préparer la construction de modules séparés/stdlib précompilée via Clang. Les
+tests doivent continuer à comparer Clang et FASM tant que FASM sert d'oracle, mais
+la nouvelle frontière doit être conçue pour le backend LLVM principal.
 
 Après cette tranche :
 
-1. généraliser l'ABI runtime/stdlib appelée par LLVM pour réduire les lowerings
+1. poursuivre la généralisation des helpers runtime/stdlib encore
    spécialisés `io.*`/`strings.*` ;
 2. faire construire modules séparés et stdlib précompilée via `clang` ;
 3. lever les diagnostics FASM-only des modes bibliothèque/stdlib quand les objets

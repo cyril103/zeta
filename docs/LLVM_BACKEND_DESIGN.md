@@ -340,13 +340,23 @@ les champs locaux supportés à un agrégat mixte `Bool`/`Byte`/`Char`/`Double`/
 les globales struct et les champs hors sous-ensemble (`Box`, `Vec`, tableaux,
 enums) restent hors périmètre.
 
+`compile_clang_backend_struct_heap_string_interprocedural` verrouille ensuite la
+propagation de propriété au-delà d'un seul corps de fonction : une fonction
+construit et retourne une struct contenant un `String` heap, une autre reçoit cette
+struct, la copie, utilise les deux valeurs, puis les drops doivent décrémenter le
+refcount et libérer exactement une fois. Le backend mémorise les chemins de
+champs `String` heap sur les paramètres et résultats d'appels, retient les copies
+non statiques, et conserve les littéraux avec un refcount sentinelle `-1` pour que
+les drops/retains conditionnels ne libèrent jamais les constantes.
+
 ## État de migration et prochaines tranches
 
 Le chemin LLVM/Clang couvre désormais un sous-ensemble exécutable large : scalaires
 `Int`/`Bool`/`Byte`/`Char`/`Double`, contrôle de flot, appels, modules source avec
 globales scalaires, strings et `StringView`, IO spécialisée, structs simples,
 mixtes et imbriqués, ABI de fonctions sur structs simples, copies à travers
-branches et ownership de chaînes heap encapsulées dans des structs.
+branches et ownership de chaînes heap encapsulées dans des structs, y compris à
+travers paramètres, appels et retours de fonctions portant ces structs.
 
 Tests structurants déjà verrouillés côté structs/ownership :
 
@@ -356,19 +366,18 @@ Tests structurants déjà verrouillés côté structs/ownership :
 - `compile_clang_backend_struct_heap_string_drop`
 - `compile_clang_backend_struct_heap_string_retain`
 - `compile_clang_backend_struct_heap_string_field_replace`
+- `compile_clang_backend_struct_heap_string_interprocedural`
 - `compile_clang_backend_branch_copy`
 - `compile_clang_backend_struct_branch_copy`
 
 Prochaines tranches nécessaires pour remplacer FASM :
 
-1. propager les chemins de propriété heap-string à travers retours de fonctions,
-   paramètres et appels portant des structs ;
-2. définir une ABI runtime/stdlib LLVM stable pour les helpers aujourd'hui abaissés
+1. définir une ABI runtime/stdlib LLVM stable pour les helpers aujourd'hui abaissés
    de façon spécialisée (`io.*`, `strings.*`, conversions générales vers `String`) ;
-3. produire et relier modules séparés, stdlib précompilée et runtime via `clang` ;
-4. choisir le support ou le rejet final pour globals agrégats, tableaux dans
+2. produire et relier modules séparés, stdlib précompilée et runtime via `clang` ;
+3. choisir le support ou le rejet final pour globals agrégats, tableaux dans
    structs, `Box`, `Vec`, enums et gros agrégats ;
-5. ajouter une matrice exemples + stdlib en `--backend=clang`, puis inverser le
+4. ajouter une matrice exemples + stdlib en `--backend=clang`, puis inverser le
    backend par défaut lorsque cette matrice est verte.
 
 ## Matrice de tests
@@ -470,6 +479,10 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   `Bool`/`Byte`/`Char`/`Double`/`String`, avec agrégat LLVM littéral
   `{ i1, i8, i32, double, { ptr, i64 } }`, comparaisons `Byte`/`Char` par `icmp`,
   et exécution Clang/FASM.
+- fait : `--backend=clang` propage l'ownership des chaînes heap contenues dans
+  des structs à travers paramètres, appels et retours de fonctions, avec retain
+  sur les copies, drops conditionnels, `free` final, et comparaison stdout/code
+  retour Clang/FASM.
 
 
 ## Critères de sortie de la migration FASM -> LLVM
