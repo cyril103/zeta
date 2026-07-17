@@ -201,6 +201,11 @@ par `store double` dans `@main`, relu via `load double, ptr @slotN`, puis utilis
 par `io.printlnDouble` et une comparaison `fcmp`, avec stdout et code retour
 vérifiés côté Clang.
 
+`compile_clang_backend_global_byte` couvre les `pub val Byte` globales :
+le slot est émis comme `@slotN = global i8 0`, initialisé par `store i8`, relu via
+`load i8, ptr @slotN`, puis utilisé par `io.printlnByte` et `Int(Byte)`, avec stdout
+et code retour vérifiés côté Clang.
+
 Les diagnostics d'agrégats globaux restent couverts séparément par les tests
 `reject_clang_backend_unsupported_aggregates` et
 `reject_clang_backend_unsupported_global_aggregates` pour les tableaux, slices,
@@ -650,6 +655,10 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   comme `global double 0.000000e+00`, puis en les initialisant dans `@main`; les
   lectures globales réutilisent `load double`, avec `io.printlnDouble`, comparaison
   `fcmp`, stdout et code retour vérifiés.
+- fait : `--backend=clang` couvre les `pub val Byte` globales en les émettant
+  comme `global i8 0`, puis en les initialisant dans `@main`; les lectures globales
+  réutilisent `load i8`, avec `io.printlnByte`, conversion `Int(Byte)`, stdout et
+  code retour vérifiés.
 - fait : `--backend=clang` couvre les opérations arithmétiques `Double`
   `+`/`-`/`*`/`/` via `fadd`/`fsub`/`fmul`/`fdiv`, et les comparaisons ordonnées
   via `fcmp o*`, avec exécution Clang et FASM.
