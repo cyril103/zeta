@@ -370,6 +370,7 @@ runtime internes (`@zeta_rt_io_write_string` pour `io.print`/
 `io.printlnChar`, et `@zeta_rt_io_write_double` pour `io.printDouble`/
 `io.printlnDouble`) et frontières `strings.*` (`@zeta_rt_strings_view` pour
 `strings.view`, `@zeta_rt_strings_view_is_valid` pour `strings.viewIsValid`,
+`@zeta_rt_strings_decode_at_byte` pour `strings.decodeAtByte`,
 `@zeta_rt_strings_index_of` pour `strings.indexOf`/`contains`),
 structs simples, mixtes et imbriqués, ABI de fonctions sur
 structs simples, copies à travers branches et ownership de chaînes heap encapsulées
@@ -398,11 +399,12 @@ Prochaines tranches nécessaires pour remplacer FASM :
    `@zeta_rt_io_write_double(double, i1)`,
    `@zeta_rt_strings_view(ptr, i64, i32, i32)`,
    `@zeta_rt_strings_view_is_valid(ptr)`,
+   `@zeta_rt_strings_decode_at_byte(ptr, i64, i32)`,
    `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)`) utilisées par `io.print`/
    `io.println(String)`, `io.printInt`/`io.printlnInt`, `io.printBool`/
    `io.printlnBool`, `io.printByte`/`io.printlnByte`, `io.printChar`/
    `io.printlnChar`, `io.printDouble`/`io.printlnDouble`, `strings.view`,
-   `strings.viewIsValid` et `strings.indexOf`/`strings.contains` ; cibler ensuite
+   `strings.viewIsValid`, `strings.decodeAtByte` et `strings.indexOf`/`strings.contains` ; cibler ensuite
    les autres primitives `strings.*` ou les conversions générales vers `String` encore
    abaissées de façon spécialisée ;
 2. produire et relier modules séparés, stdlib précompilée et runtime via `clang` ;
@@ -508,6 +510,9 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   `@zeta_rt_strings_view(ptr, i64, i32, i32)`, qui centralise les bornes, le calcul
   du pointeur et le sentinelle `{ null, 0 }`; `strings.viewIsValid` passe par la
   frontière interne `@zeta_rt_strings_view_is_valid(ptr)`, avec exécution Clang et FASM.
+- fait : `--backend=clang` couvre `strings.decodeAtByte` via la frontière runtime
+  interne `@zeta_rt_strings_decode_at_byte(ptr, i64, i32)`, qui centralise le
+  décodage UTF-8 direct et les rejets d'offset invalides, avec exécution Clang et FASM.
 - fait : `--backend=clang` couvre `strings.indexOf` et `strings.contains` via la
   frontière runtime interne `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)`, qui
   centralise les vues invalides, l'aiguille vide, la borne de recherche et la

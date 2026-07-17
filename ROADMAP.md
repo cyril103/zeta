@@ -612,13 +612,15 @@ travail par défaut pour le développement courant :
 3. **En cours le 17 juillet 2026 — helpers `strings.*` par Clang** :
    `strings.view` passe maintenant par le helper LLVM interne
    `@zeta_rt_strings_view(ptr, i64, i32, i32)`, `strings.viewIsValid` par
-   `@zeta_rt_strings_view_is_valid(ptr)`, et `strings.indexOf` /
+   `@zeta_rt_strings_view_is_valid(ptr)`, `strings.decodeAtByte` par
+   `@zeta_rt_strings_decode_at_byte(ptr, i64, i32)`, et `strings.indexOf` /
    `strings.contains` passent par `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)`,
    au lieu de dupliquer les bornes, le calcul de pointeur, le sentinelle
-   `{ null, 0 }`, le test de validité et la boucle `memcmp` dans chaque corps
-   applicatif. `compile_clang_backend_string_view` et
-   `compile_clang_backend_string_search` verrouillent chacun une définition unique
-   des helpers, les appels applicatifs et la comparaison Clang/FASM.
+   `{ null, 0 }`, le test de validité, le décodage UTF-8 direct et la boucle
+   `memcmp` dans chaque corps applicatif. `compile_clang_backend_string_view`,
+   `compile_clang_backend_string_utf8_decode` et `compile_clang_backend_string_search`
+   verrouillent chacun une définition unique des helpers, les appels applicatifs et
+   la comparaison Clang/FASM.
 4. **Suite runtime/stdlib par Clang** : étendre cette ABI stable aux autres
    primitives `strings.*` (UTF-8) et aux conversions
    générales vers `String`, après consolidation des `io.print*`/`io.println*`
@@ -714,7 +716,8 @@ pour `io.print`/
 `io.printlnChar`, `@zeta_rt_io_write_double(double, i1)` pour `io.printDouble`/
 `io.printlnDouble`, `@zeta_rt_strings_view(ptr, i64, i32, i32)` pour
 `strings.view`, et `@zeta_rt_strings_view_is_valid(ptr)` pour
-`strings.viewIsValid`, `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)` pour
+`strings.viewIsValid`, `@zeta_rt_strings_decode_at_byte(ptr, i64, i32)` pour
+`strings.decodeAtByte`, `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)` pour
 `strings.indexOf`/`strings.contains`, verrouillées respectivement par
 `compile_clang_backend_io_println_string`, `compile_clang_backend_io_println_int`,
 `compile_clang_backend_io_println_bool`, `compile_clang_backend_io_println_byte`,
