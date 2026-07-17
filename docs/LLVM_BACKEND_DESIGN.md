@@ -1,38 +1,48 @@
-# Backend LLVM/Clang expérimental
+# Backend LLVM/Clang — migration vers le backend principal
 
-Ce document décrit l'introduction progressive d'un backend LLVM pour Zeta. Le
-backend FASM reste la référence de correction ; le backend LLVM/Clang est ajouté
-comme cible expérimentale, derrière des options explicites, afin de gagner en
-optimisations, diagnostics d'assemblage/linkage et portabilité sans réécrire le
-front-end.
+Ce document décrivait l'introduction expérimentale d'un backend LLVM pour Zeta.
+L'objectif est maintenant plus ambitieux : **faire de LLVM/Clang le backend de
+développement principal et remplacer progressivement FASM**. FASM reste utile à
+court terme comme oracle de comparaison et fallback legacy, mais les nouvelles
+fonctionnalités doivent être conçues et testées d'abord pour le chemin LLVM.
 
-## Objectifs
+## Objectifs actualisés
 
 - Émettre du LLVM IR textuel (`.ll`) depuis l'IR Zeta déjà vérifiée.
 - Utiliser `clang` comme driver pour optimiser, assembler et lier le programme.
-- Garder `fasm` comme backend par défaut et oracle de comparaison.
-- Faire progresser le support par sous-ensembles testables.
-- Ne pas exposer de nouvelle ABI publique tant que le mapping runtime n'est pas
-  stabilisé.
+- Faire passer les exemples, la stdlib et les modules séparés par LLVM/Clang.
+- Garder FASM comme oracle temporaire de comparaison, puis comme backend legacy
+  explicite (`--backend=fasm`) après bascule du défaut vers Clang.
+- Stabiliser l'ABI runtime/stdlib côté LLVM pour éviter une prolifération de
+  lowerings spécialisés.
+- Continuer par sous-ensembles testables RED/GREEN, avec diagnostics explicites
+  pour tout périmètre non encore porté.
 
-## Non-objectifs de la première tranche
+## Non-objectifs immédiats de la bascule
 
 - Pas de remplacement du parser, de l'analyse sémantique ou de l'IR Zeta.
-- Pas de support immédiat pour `String`, `Box`, `Vec`, slices, modules séparés ou
-  stdlib précompilée via LLVM.
-- Pas de dépendance à l'API C++ LLVM dans le compilateur : la première tranche
-  produit du texte `.ll` déterministe.
-- Pas de sélection automatique du backend selon la présence de `clang`.
+- Pas de dépendance obligatoire à l'API C++ LLVM dans le compilateur tant que le
+  générateur textuel `.ll` reste suffisant.
+- Pas de suppression brutale de FASM avant que les exemples, la stdlib et les
+  modules séparés soient verts en LLVM.
 
 ## Interface CLI cible
 
-Le backend reste explicite :
+Interface actuelle, avant inversion du défaut :
 
 ```text
-zeta source.zeta -o programme                  # backend FASM par défaut
-zeta source.zeta --backend=fasm -o programme   # équivalent explicite
+zeta source.zeta -o programme                  # FASM par défaut tant que la matrice LLVM n'est pas complète
+zeta source.zeta --backend=fasm -o programme   # fallback/oracle explicite
 zeta source.zeta --emit-llvm -o programme      # écrit programme.ll seulement
-zeta source.zeta --backend=clang -o programme  # écrit .ll puis appelle clang
+zeta source.zeta --backend=clang -o programme  # écrit .ir/.ll puis appelle clang
+```
+
+Interface cible après bascule :
+
+```text
+zeta source.zeta -o programme                  # Clang/LLVM par défaut
+zeta source.zeta --backend=clang -o programme  # équivalent explicite
+zeta source.zeta --backend=fasm -o programme   # backend legacy explicite
 ```
 
 Contraintes initiales :
@@ -110,8 +120,11 @@ La première tranche évite le runtime natif. Ensuite :
 4. valider `String`, `StringView`, `Box`, `retain`, `drop` et destruction
    déterministe par comparaison avec FASM.
 
-Aucune sémantique de propriété ne doit être déplacée dans LLVM : l'IR Zeta reste
-responsable des `retain`/`drop` et le backend ne fait qu'émettre les appels.
+L'IR Zeta reste responsable des points `retain`/`drop` et de l'ordre de destruction.
+Le backend LLVM matérialise ensuite ces opérations avec l'ABI runtime disponible :
+appels runtime quand ils existent, ou séquences LLVM explicites de refcount/free
+pour les sous-ensembles déjà portés (notamment `String` heap et chemins de champs
+dans structs).
 
 ## Organisation du code
 
@@ -327,6 +340,37 @@ les champs locaux supportés à un agrégat mixte `Bool`/`Byte`/`Char`/`Double`/
 les globales struct et les champs hors sous-ensemble (`Box`, `Vec`, tableaux,
 enums) restent hors périmètre.
 
+## État de migration et prochaines tranches
+
+Le chemin LLVM/Clang couvre désormais un sous-ensemble exécutable large : scalaires
+`Int`/`Bool`/`Byte`/`Char`/`Double`, contrôle de flot, appels, modules source avec
+globales scalaires, strings et `StringView`, IO spécialisée, structs simples,
+mixtes et imbriqués, ABI de fonctions sur structs simples, copies à travers
+branches et ownership de chaînes heap encapsulées dans des structs.
+
+Tests structurants déjà verrouillés côté structs/ownership :
+
+- `compile_clang_backend_nested_struct`
+- `compile_clang_backend_nested_struct_field_store`
+- `compile_clang_backend_nested_struct_subfield_store`
+- `compile_clang_backend_struct_heap_string_drop`
+- `compile_clang_backend_struct_heap_string_retain`
+- `compile_clang_backend_struct_heap_string_field_replace`
+- `compile_clang_backend_branch_copy`
+- `compile_clang_backend_struct_branch_copy`
+
+Prochaines tranches nécessaires pour remplacer FASM :
+
+1. propager les chemins de propriété heap-string à travers retours de fonctions,
+   paramètres et appels portant des structs ;
+2. définir une ABI runtime/stdlib LLVM stable pour les helpers aujourd'hui abaissés
+   de façon spécialisée (`io.*`, `strings.*`, conversions générales vers `String`) ;
+3. produire et relier modules séparés, stdlib précompilée et runtime via `clang` ;
+4. choisir le support ou le rejet final pour globals agrégats, tableaux dans
+   structs, `Box`, `Vec`, enums et gros agrégats ;
+5. ajouter une matrice exemples + stdlib en `--backend=clang`, puis inverser le
+   backend par défaut lorsque cette matrice est verte.
+
 ## Matrice de tests
 
 Chaque tranche LLVM doit inclure :
@@ -426,3 +470,17 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   `Bool`/`Byte`/`Char`/`Double`/`String`, avec agrégat LLVM littéral
   `{ i1, i8, i32, double, { ptr, i64 } }`, comparaisons `Byte`/`Char` par `icmp`,
   et exécution Clang/FASM.
+
+
+## Critères de sortie de la migration FASM -> LLVM
+
+- `zeta source.zeta -o programme` utilise LLVM/Clang par défaut.
+- `--backend=fasm` reste disponible uniquement comme fallback legacy explicite.
+- Les exemples non triviaux et la stdlib se compilent/exécutent via Clang dans CTest.
+- Les modules séparés, `.zti`, objets runtime et stdlib précompilée sont produits
+  et reliés sans assembler FASM dans le chemin LLVM.
+- Les tests de comparaison FASM/Clang restent présents pour les zones où FASM sert
+  encore d'oracle, mais les nouveaux développements peuvent être validés avec LLVM
+  comme cible de référence.
+- Les diagnostics LLVM restants ne couvrent que des limitations documentées et
+  assumées, pas des morceaux nécessaires au développement quotidien de Zeta.

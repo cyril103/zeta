@@ -546,36 +546,70 @@ ensemble, mais livrés séparément.
 - remplacer progressivement les codes négatifs et arrêts de processus par des
   résultats typés lorsque la récupération est raisonnable.
 
-## Priorité 7 — backend LLVM/Clang et performances
+## Priorité 7 — migration LLVM/Clang comme backend principal
 
-À commencer après le vérificateur d'IR, mais sans bloquer les améliorations
-d'ergonomie indépendantes. Le backend FASM reste la référence ; Clang est ajouté
-comme cible expérimentale validée par comparaison.
+Objectif stratégique actualisé : **remplacer FASM comme backend de développement
+principal**. FASM reste temporairement l'oracle de compatibilité et le filet de
+sécurité, mais les nouvelles tranches de Zeta doivent désormais viser d'abord le
+backend LLVM/Clang (`--backend=clang`), puis préserver FASM tant qu'il sert à la
+comparaison.
 
-### 7A. Backend LLVM/Clang expérimental
+### 7A. Socle LLVM/Clang déjà livré
 
-Objectif : produire du LLVM IR textuel depuis l'IR Zeta validée, puis utiliser
-`clang` comme driver d'assemblage, d'optimisation et de linkage.
+Le backend LLVM/Clang n'est plus une simple preuve de concept : il produit des
+exécutables natifs via `clang -x ir`, écrit les artefacts `.ir`/`.ll`, et couvre un
+sous-ensemble applicatif riche validé par CTest contre FASM. Le socle livré inclut
+notamment :
 
-1. introduire `--backend=fasm|clang` avec `fasm` par défaut ;
-2. ajouter `--emit-llvm` pour écrire le `.ll` sans lancer le linkage ;
-3. extraire une interface backend autour de `FasmCodeGenerator` ;
-4. créer `LlvmIrCodeGenerator` avec `target triple = "x86_64-pc-linux-gnu"` ;
-5. couvrir d'abord `Int`, `Bool`, fonctions, appels, labels, branches, boucles et
-   retours ;
-6. compiler le `.ll` avec `clang` et comparer codes de sortie/stdout avec FASM ;
-7. étendre ensuite à `Byte`, `Double`, `Char`, agrégats, tableaux, références,
-   slices, contrôles de bornes et chemins d'erreur ;
-8. définir une ABI commune pour runtime, `String`, `Box`, `retain`, `drop` et
-   destruction déterministe ;
-9. produire et relier les objets par module, la runtime et la stdlib via `clang` ;
-10. afficher des diagnostics clairs si `clang` ou `llvm-config` est absent, et
-    permettre de configurer leur chemin.
+1. `--backend=fasm|clang`, `--emit-llvm`, diagnostics CLI et FASM encore par défaut ;
+2. génération textuelle LLVM après IR Zeta vérifiée (`LlvmIrCodeGenerator`) ;
+3. `Int`/`Bool`/`Byte`/`Char`/`Double`, arithmétique, comparaisons, conversions
+   couvertes et `Double` en `double` ;
+4. fonctions, paramètres, appels, retours, labels, branches, boucles, slots locaux
+   et copies SSA matérialisées si plusieurs chemins les définissent ;
+5. imports de modules source et globales scalaires `Int`/`Bool` ;
+6. `String`/`StringView` : littéraux, slots locaux, concat heap, `lengthBytes`,
+   `isEmpty`, vues, recherche, UTF-8, itération `for` ;
+7. `io.print*`/`io.println*` directs pour `String`, `Int`, `Bool`, `Byte`, `Char`,
+   `Double` via `write`/`printf` spécialisés ;
+8. structs locaux simples, mixtes et imbriqués, ABI de fonctions portant des
+   structs simples, mutations de champs et sous-champs ;
+9. ownership des chaînes heap dans des structs LLVM : propagation par chemins de
+   champs, `drop`, `retain`/copie, remplacement répété de champs `String` heap ;
+10. diagnostics explicites pour agrégats/globals/types encore hors périmètre.
 
-Critère de sortie : un sous-ensemble documenté passe sur FASM et Clang, puis la
-stdlib et les modules séparés rejoignent progressivement cette matrice.
+### 7B. Plan court terme pour basculer le développement sur LLVM
 
-### 7B. Optimisations communes
+Les prochaines sessions doivent transformer LLVM de backend couvert à backend de
+travail par défaut pour le développement courant :
+
+1. **Ownership interprocédural des strings dans structs** : couvrir par tests
+   RED/GREEN les chaînes heap retournées par fonction ou passées en
+   appels/paramètres dans des structs, afin que les chemins de propriété survivent
+   aux frontières de fonctions.
+2. **Runtime/stdlib par Clang** : remplacer les lowerings trop spécialisés par une
+   ABI stable pour les helpers runtime/stdlib utilisés par LLVM, sans réintroduire
+   d'assembleur FASM dans le chemin Clang.
+3. **Modules séparés et stdlib précompilée** : produire/relier objets runtime,
+   modules et stdlib via `clang`, puis lever les diagnostics FASM-only de
+   `--build-library`, `--install-library` et `--build-stdlib` pour le backend LLVM.
+4. **Agrégats restants** : décider et implémenter le support LLVM ou les rejets
+   définitifs pour globals agrégats, tableaux dans structs, `Box`, `Vec`, enums et
+   grands agrégats dépassant l'ABI actuelle.
+5. **Mode par défaut contrôlé** : ajouter un job/test de matrice qui compile les
+   exemples et la stdlib avec `--backend=clang`; quand il est vert, inverser le
+   défaut local de développement vers Clang tout en gardant `--backend=fasm` comme
+   fallback explicite.
+6. **Retrait progressif de FASM** : une fois la matrice LLVM verte sur exemples,
+   stdlib et modules, figer FASM en backend legacy puis supprimer les dépendances
+   de développement qui bloquent la portabilité.
+
+Critère de sortie de la migration : les exemples non triviaux, la stdlib et les
+modules séparés se construisent et s'exécutent via LLVM/Clang sans recourir à FASM;
+FASM n'est plus le backend par défaut ni nécessaire au développement de nouvelles
+fonctionnalités Zeta.
+
+### 7C. Optimisations communes
 
 Certaines optimisations restent dans l'IR Zeta pour bénéficier aux deux backends ;
 d'autres pourront être déléguées à LLVM quand `--backend=clang` sera stable.
@@ -597,8 +631,10 @@ Chaque passe doit produire une IR valide avant et après transformation.
 - `--build-stdlib` ne purge pas les anciens `.o`/`.zti` sans source correspondante ;
   le manifeste empêche leur chargement, mais un nettoyage manuel peut être requis ;
 - `stdlib/precompiled/` est local et ignoré par Git ;
-- cible de production actuelle Linux x86-64 avec FASM et `ld` ;
-- backend LLVM/Clang expérimental limité à `--emit-llvm` minimal pour le moment ;
+- cible de transition actuelle Linux x86-64 : FASM reste disponible, mais LLVM/Clang
+  est le backend visé pour le développement principal ;
+- backend LLVM/Clang déjà exécutable sur un large sous-ensemble, mais modules
+  séparés, stdlib précompilée et quelques familles d'agrégats restent à basculer ;
 - pas encore de gestionnaire de paquets ;
 - pas de dictionnaire, ensemble, fichiers ou réseau ;
 - références, slices et `StringView` ne peuvent pas encore être retournées ou
@@ -623,164 +659,32 @@ Chaque étape doit :
 
 ## Première action de la prochaine session
 
-La syntaxe `for` sans allocation est livrée pour `Slice[T]`, `SliceMut[T]` et
-`[T; N]` lorsque `T: Copy`. `for (mut value in SliceMut[T])` lie `value` comme
-`&mut T` pour muter en place sans copier les éléments possédés non `Copy`.
-`for (value in Vec[T])` consomme un vecteur propriétaire par retrait destructif
-en ordre d'insertion : l'élément est déplacé dans `value`, le vecteur source est
-considéré déplacé après la boucle, et les éléments non explicitement déplacés par
-le corps sont droppés à la fin de leur itération. `for (value in text)` sur
-`String` ou `StringView` parcourt maintenant les points de code Unicode en `Char`
-avec un état d'offset d'octet interne.
+Reprendre la migration LLVM avec l'objectif explicite de remplacer FASM comme
+backend de développement. Le dépôt est vert après `compile_clang_backend_struct_heap_string_retain`
+et `compile_clang_backend_struct_heap_string_field_replace` : **526 tests CTest
+passent** et le backend LLVM couvre déjà scalaires, strings, IO ciblée, structs
+imbriqués, copies à travers branches et ownership heap-string intra-struct.
 
-Les diagnostics négatifs couvrent source non iterable, élément non `Copy` sur
-parcours emprunté, nom d'élément dupliqué, demande `mut` sur vue partagée ou
-chaîne, mutation d'un `Vec` dont la vue `asSlice()` est active, réutilisation
-d'un `Vec` consommé par `for`, et ordre d'insertion de l'itération
-consommatrice.
+Démarrer par une tranche RED/GREEN ciblée : **propagation de propriété des chaînes
+heap retournées par fonction ou circulant à travers appels/paramètres dans des
+structs**. Test conseillé : une fonction construit/retourne une struct contenant
+un champ `String` heap, une autre fonction reçoit ou copie cette struct, utilise
+à la fois l'original et la copie, puis les drops doivent décrémenter/free sans
+fuite ni double free. Le test Clang doit comparer stdout/code retour avec FASM et
+grepper le `.ll` pour `malloc`, `extractvalue`, incrément refcount, décrément et
+`free` conditionnel.
 
-L'analyse d'emprunts dans les corps de boucle a été renforcée : les tests
-`loop_local_slice_last_use_allows_vec_push` et
-`loop_local_slice_mut_last_use_allows_vec_push` valident qu'une vue locale
-`asSlice()`/`asSliceMut()` est libérée à sa dernière utilisation avant une
-mutation ultérieure dans la même itération, tandis que
-`reject_for_iterable_slice_blocks_vec_push` verrouille l'emprunt caché de
-l'itérable d'un `for` jusqu'à la fin de la boucle. La contrainte reste inchangée :
-pas de trait public `Iterator`, pas d'allocation de state machine, et pas de
-copie implicite pour `T` non `Copy`.
+Après cette tranche :
 
-Le backend LLVM/Clang expérimental avance par tranches :
-`docs/LLVM_BACKEND_DESIGN.md` fixe le périmètre, `--emit-llvm` écrit un `.ll`
-depuis l'IR Zeta vérifiée, `emit_llvm_minimal` compile le smoke test
-`main(): Int = 42` avec `clang`, et `emit_llvm_scalars` couvre maintenant les
-opérations scalaires `Int`/`Bool` (`IrBinary`, comparaisons, booléens simples,
-`IrCopy` sans allocation). `emit_llvm_control` ajoute les labels/branches,
-`IrLoad`/`IrStore` scalaires et valide un programme combinant `if` et `while`
-compilé puis exécuté via `clang`. `emit_llvm_parameters` couvre maintenant les
-signatures de fonctions avec paramètres `Int`/`Bool`, `IrParameter` et les appels
-argumentés. `--backend=clang` est maintenant activé pour ce sous-ensemble : il
-écrit le `.ir` et le `.ll`, appelle `clang -x ir`, puis produit l'exécutable natif
-validé par `compile_clang_backend_parameters`. FASM reste le backend par défaut,
-protégé par `run_fasm_backend_still_default`. Les diagnostics CLI du backend
-expérimental sont couverts par `reject_clang_backend_cli_diagnostics` : backend
-inconnu, `--emit-llvm` forcé vers FASM, et usage Clang/LLVM sur les modes
-bibliothèque/stdlib non pris en charge. `compile_clang_backend_global_values`
-élargit maintenant le périmètre runtime contrôlé aux imports de modules et aux
-`pub val` globales scalaires `Int`/`Bool` initialisées dans le wrapper principal,
-en comparant l'exécution Clang au backend FASM. `reject_clang_backend_unsupported_types`
-verrouille les diagnostics pour les slots globaux et locaux non scalaires (par
-exemple `String`) afin d'échouer avant toute génération de `.ll` partielle.
-`compile_clang_backend_string_literal` introduit la première représentation
-LLVM des chaînes : un littéral `String` direct est émis en constante globale
-`@str.N`, transporté comme paire `{ ptr, i64 }`, et `lengthBytes` extrait puis
-tronque la longueur vers `Int`; l'exécution reste comparée à FASM.
-`compile_clang_backend_string_is_empty` couvre aussi `isEmpty` sur littéraux
-directs : le backend extrait la longueur de la paire chaîne et compare en `i64`
-contre zéro, y compris dans des conditions de boucle.
-`compile_clang_backend_local_string` étend cette représentation aux slots
-locaux `String` : allocation de la paire `{ ptr, i64 }`, `store`/`load` de la
-paire complète, puis `lengthBytes` et `isEmpty` depuis des variables locales.
-`compile_clang_backend_string_concat` couvre maintenant une concaténation locale
-minimale : extraction des deux paires chaîne, allocation via `malloc`, copie des
-bytes via `memcpy`, puis reconstruction de la paire résultat.
-`compile_clang_backend_string_concat_drop` ajoute le premier nettoyage runtime :
-le backend suit conservativement les chaînes issues de concaténation stockées en
-slots locaux et émet `free(data - 16)` uniquement au `drop` de ces buffers heap,
-sans libérer les littéraux statiques.
-`reject_clang_backend_unsupported_aggregates` verrouille les diagnostics des
-agrégats locaux encore hors périmètre (`struct`, `Vec[T]`) avec des noms source
-lisibles, au lieu de laisser le backend produire un `.ll` partiel.
-`reject_clang_backend_unsupported_global_aggregates` couvre le même garde-fou
-pour les globales agrégées (`pub val pair: Pair`, `pub val values: Vec[Int]`) et
-conserve séparément le diagnostic global `String` déjà existant.
-`compile_clang_backend_string_view` livre la première surface stdlib chaîne :
-`strings.view` et `strings.viewIsValid` sont abaissés directement côté LLVM pour
-des `String` locaux, produisent des `StringView` valides/invalides par paire
-`{ ptr, i64 }`, et restent comparés à FASM.
-`compile_clang_backend_string_search` élargit cette surface à
-`strings.indexOf`/`strings.contains` sur `StringView`, avec boucle LLVM locale,
-appel `memcmp`, gestion de l'aiguille vide, des vues invalides et comparaison
-d'exécution FASM.
-`compile_clang_backend_string_utf8_decode` ajoute les primitives UTF-8
-`strings.decodeAtByte` et `strings.nextByteOffset` pour `String` : décodage 1/2/3/4
-octets, rejet des offsets invalides/continuations, progression par largeur UTF-8
-et comparaison d'exécution FASM.
-`compile_clang_backend_for_string_char_iteration` couvre maintenant l'itération
-UTF-8 via `for` sur `String` et `StringView` : l'état de boucle reste un `Int`
-interprété comme offset d'octet, le backend Clang abaisse `IrStringDecodeAt` et
-`IrStringNextOffset`, et `Char` est représenté comme `i32` côté LLVM.
-`compile_clang_backend_io_println_string` ouvre une première sortie standard :
-les appels directs `io.print`/`io.println` sur `String` sont abaissés via
-`write(1, ptr, len)`, `println` ajoutant un octet newline statique, et le test
-compare la sortie UTF-8 Clang à FASM. `compile_clang_backend_io_println_heap_string`
-étend cette couverture aux chaînes heap issues de concaténation : écriture via la
-même paire `{ ptr, len }`, comparaison stdout FASM et `free` du buffer concaténé.
-`compile_clang_backend_io_println_int` ajoute une sortie entière ciblée :
-`io.printInt`/`io.printlnInt` sont abaissés directement vers `printf` avec formats
-`%d`/`%d\n`, sans activer les conversions générales `String(Int)`.
-`compile_clang_backend_io_println_bool` ajoute la sortie booléenne ciblée :
-`io.printBool`/`io.printlnBool` sélectionnent statiquement les bytes `true` ou
-`false`, écrits via `write(1, ptr, len)`, sans conversion générale `String(Bool)`.
-`compile_clang_backend_io_println_byte` ajoute la sortie `Byte` ciblée : `Byte`
-est abaissé en `i8`, les conversions `Int <-> Byte` sont limitées à `trunc`/`zext`,
-et `io.printByte`/`io.printlnByte` passent par `printf("%u")` après extension
-non signée.
-`compile_clang_backend_io_println_char` ajoute la sortie `Char` ciblée :
-`io.printChar`/`io.printlnChar` encodent le codepoint `i32` en UTF-8 dans un petit
-buffer stack et écrivent 1 à 4 octets via `write`, avec comparaison stdout FASM.
-La stdlib expose désormais aussi `printlnChar`.
-`compile_clang_backend_io_println_double` ajoute la sortie `Double` ciblée :
-`Double` est abaissé en `double`, les constantes et slots locaux doubles sont
-stockables, le moins unaire devient `fneg`, et `io.printDouble`/`io.printlnDouble`
-passent par `printf("%g")` sur un périmètre de formats validés contre FASM.
-`compile_clang_backend_double_operations` élargit ensuite `Double` aux opérations
-arithmétiques `+`, `-`, `*`, `/` via `fadd`/`fsub`/`fmul`/`fdiv`, et aux
-comparaisons ordonnées via `fcmp o*` (`==`, `!=`, `<`, `<=`, `>`, `>=`).
-`compile_clang_backend_local_struct` introduit la première valeur composée simple :
-les `struct` locaux dont tous les champs sont déjà dans le sous-ensemble LLVM sont
-abaissés en agrégats LLVM littéraux (`{ i32, ... }`), construits par `insertvalue`,
-stockés/chargés localement, puis lus par `extractvalue`. `compile_clang_backend_local_struct_field_store`
-ajoute la mutation de champ locale en rechargeant l'agrégat, en le réécrivant par
-`insertvalue`, puis en le restockant. `compile_clang_backend_struct_function_abi`
-étend ce sous-ensemble aux paramètres, retours et appels de fonctions portant des
-structs simples, en conservant le type agrégat LLVM littéral dans la signature.
-`compile_clang_backend_mixed_struct` couvre ensuite les champs mixtes
-`Bool`/`Byte`/`Char`/`Double`/`String`, dont les comparaisons `Byte`/`Char` par
-`icmp`, avec le même modèle `insertvalue`/`extractvalue`.
-`compile_clang_backend_nested_struct` verrouille maintenant les structs locaux
-imbriqués composés de champs déjà supportés : agrégats LLVM récursifs,
-construction `insertvalue`, copies locales et lectures par `extractvalue`
-restent comparés à FASM. `compile_clang_backend_nested_struct_field_store`
-couvre aussi le remplacement de champs top-level dont le type est lui-même une
-struct imbriquée, en rechargeant l'agrégat parent puis en le réécrivant par
-`insertvalue` avant stockage. `compile_clang_backend_nested_struct_subfield_store`
-étend cette garantie à la mutation directe de sous-champs (`entry.point.x = ...`) :
-le parseur conserve le chemin complet, l'analyse sémantique vérifie chaque étape
-structurée, puis l'IR reconstruit récursivement les agrégats parents avec
-`extractvalue`/`insertvalue` avant de restocker la racine. Le test
-`compile_clang_backend_struct_heap_string_drop` couvre désormais la propriété des
-chaînes heap encapsulées dans des structs LLVM : le backend suit les chemins de
-champs contenant une chaîne issue de concaténation, les propage à travers
-`IrStructConstruct`/`IrStore`/`IrLoad`/`IrFieldLoad`, puis émet le drop récursif
-sur le champ de l'agrégat. `compile_clang_backend_struct_heap_string_retain`
-verrouille la copie/`retain` de ces mêmes chemins : le backend extrait le champ
-String imbriqué, incrémente son compteur de références, puis le drop LLVM
-respecte désormais le compteur (`-1` statique, décrément, `free` seulement à zéro)
-pour éviter les doubles libérations entre l'original et la copie.
-`compile_clang_backend_struct_heap_string_field_replace` couvre aussi les
-mutations répétées de champs `String` heap : chaque `IrFieldStore` recharge
-l'agrégat, libère/décrémente l'ancien chemin de champ suivi avant l'`insertvalue`,
-et utilise des noms SSA uniques pour plusieurs stores du même champ.
-Les agrégats globaux et les structs contenant `Box`/`Vec`/tableaux restent rejetés
-explicitement.
+1. généraliser l'ABI runtime/stdlib appelée par LLVM pour réduire les lowerings
+   spécialisés `io.*`/`strings.*` ;
+2. faire construire modules séparés et stdlib précompilée via `clang` ;
+3. lever les diagnostics FASM-only des modes bibliothèque/stdlib quand les objets
+   LLVM sont reliés ;
+4. ajouter une matrice exemples + stdlib en `--backend=clang` ;
+5. inverser le backend par défaut vers Clang lorsque cette matrice est verte, en
+   gardant `--backend=fasm` comme fallback legacy explicite.
 
-Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre contrôlé : propagation de propriété des chaînes heap retournées par
-fonction ou circulant à travers appels/paramètres dans des structs, avant toute
-généralisation. Les copies SSA à travers branches sont désormais matérialisées
-par stockage/rechargement pour les valeurs copiées sur plusieurs chemins et
-verrouillées par `compile_clang_backend_branch_copy` pour les scalaires et
-`compile_clang_backend_struct_branch_copy` pour les agrégats LLVM de structs.
-
-La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
-littéral, car leurs agrégats dépassent 16 octets.
+Discipline : commits petits et séparés, tests RED/GREEN, comparaison FASM tant
+que FASM sert d'oracle, puis mise à jour de `ROADMAP.md` et
+`docs/LLVM_BACKEND_DESIGN.md` à chaque étape de bascule.
