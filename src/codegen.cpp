@@ -858,6 +858,10 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 return call->function == "strings__view" || call->function == "strings__viewIsValid";
             return false;
         });
+    const bool usesStringLengthHelper = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            return std::holds_alternative<IrStringLength>(instruction);
+        });
     const bool usesStringNextByteOffsetHelper = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
@@ -1000,6 +1004,13 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "@zeta.fmt.byte.nl = private unnamed_addr constant [4 x i8] c\"%u\\0A\\00\", align 1\n"
             << "@zeta.fmt.double = private unnamed_addr constant [3 x i8] c\"%g\\00\", align 1\n"
             << "@zeta.fmt.double.nl = private unnamed_addr constant [4 x i8] c\"%g\\0A\\00\", align 1\n";
+    }
+    if (usesStringLengthHelper) {
+        out << "\ndefine internal i32 @zeta_rt_string_length_bytes(ptr %data, i64 %len) {\n"
+            << "entry:\n"
+            << "  %length = trunc i64 %len to i32\n"
+            << "  ret i32 %length\n"
+            << "}\n";
     }
     if (usesStringViewHelper) {
         out << "\ndefine internal { ptr, i64 } @zeta_rt_strings_view(ptr %data, i64 %len, i32 %start, i32 %end) {\n"
@@ -1849,11 +1860,11 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             const ValueType type = program.valueTypes.at(item->string);
             if (type != ValueType::String && type != ValueType::StringView)
                 throw std::runtime_error("backend LLVM: longueur hors chaîne non supportée");
-            const std::string wide = "%v" + std::to_string(item->output) + ".wide";
             const std::string output = "%v" + std::to_string(item->output);
-            out << "  " << wide << " = extractvalue " << llvmType(type) << " "
-                << value(item->string) << ", 1\n"
-                << "  " << output << " = trunc i64 " << wide << " to i32\n";
+            const std::string data = extractStringPart(output + ".string", item->string, 0);
+            const std::string length = extractStringPart(output + ".string", item->string, 1);
+            out << "  " << output << " = call i32 @zeta_rt_string_length_bytes(ptr "
+                << data << ", i64 " << length << ")\n";
             values[item->output] = output;
         } else if (const auto* item = std::get_if<IrStringEmpty>(&instruction)) {
             const ValueType type = program.valueTypes.at(item->string);

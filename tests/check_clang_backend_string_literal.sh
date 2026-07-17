@@ -12,7 +12,16 @@ test -f "${output}.ir"
 test ! -e "${output}.asm"
 
 grep -q '@str\.1 = private unnamed_addr constant { i64, i64, \[4 x i8\] } { i64 -1, i64 4, \[4 x i8\] c"zeta" }' "${output}.ll"
-grep -q 'extractvalue { ptr, i64 }' "${output}.ll"
+helper_defs=$(grep -Fc 'define internal i32 @zeta_rt_string_length_bytes(ptr %data, i64 %len)' "${output}.ll")
+if [[ "${helper_defs}" -ne 1 ]]; then
+    echo "expected one @zeta_rt_string_length_bytes definition, got ${helper_defs}" >&2
+    exit 1
+fi
+app_calls=$(grep -Ec '^  %v[0-9]+ = call i32 @zeta_rt_string_length_bytes\(ptr ' "${output}.ll")
+if [[ "${app_calls}" -ne 1 ]]; then
+    echo "expected one application call to @zeta_rt_string_length_bytes, got ${app_calls}" >&2
+    exit 1
+fi
 
 set +e
 "${output}"
