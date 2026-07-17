@@ -456,6 +456,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             }
             return true;
         }
+        if (type.kind == ValueType::Kind::Array && type.element)
+            return isLlvmValueType(*type.element);
         return false;
     };
     llvmType = [&](const ValueType& type) -> std::string {
@@ -474,6 +476,9 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             }
             aggregate << " }";
             return aggregate.str();
+        }
+        if (type.kind == ValueType::Kind::Array && type.element && isLlvmValueType(type)) {
+            return "[" + std::to_string(type.length) + " x " + llvmType(*type.element) + "]";
         }
         throw std::runtime_error("backend LLVM: type non supporté " + typeName(type));
     };
@@ -1583,7 +1588,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         if (slot.type != ValueType::Int && slot.type != ValueType::Bool &&
             slot.type != ValueType::Byte && slot.type != ValueType::Char &&
             slot.type != ValueType::String && slot.type != ValueType::Double &&
-            !(slot.type.kind == ValueType::Kind::Struct && isLlvmValueType(slot.type))) {
+            !(slot.type.kind == ValueType::Kind::Struct && isLlvmValueType(slot.type)) &&
+            !(slot.type.kind == ValueType::Kind::Array && isLlvmValueType(slot.type))) {
             const bool globalAggregate = slot.type.kind == ValueType::Kind::Array ||
                 slot.type.kind == ValueType::Kind::Slice || slot.type.kind == ValueType::Kind::Box ||
                 slot.type.kind == ValueType::Kind::Vec || slot.type.kind == ValueType::Kind::Struct ||
@@ -1603,7 +1609,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             out << "global " << llvmType(slot.type) << " zeroinitializer\n";
         } else if (slot.type == ValueType::Double) {
             out << "global double 0.000000e+00\n";
-        } else if (slot.type.kind == ValueType::Kind::Struct) {
+        } else if (slot.type.kind == ValueType::Kind::Struct || slot.type.kind == ValueType::Kind::Array) {
             out << "global " << llvmType(slot.type) << " zeroinitializer\n";
         } else {
             out << "global " << llvmType(slot.type) << " 0\n";
@@ -1863,6 +1869,20 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 throw std::runtime_error("backend LLVM: conversion non supportée " +
                                          typeName(item->source) + " vers " + typeName(item->target));
             }
+        } else if (const auto* item = std::get_if<IrArrayConstruct>(&instruction)) {
+            if (moduleObjectMode && !openFunction) continue;
+            if (!isLlvmValueType(item->type) || item->type.kind != ValueType::Kind::Array || !item->type.element)
+                throw std::runtime_error("backend LLVM: construction tableau non supportée " + typeName(item->type));
+            const std::string arrayType = llvmType(item->type);
+            const std::string elementType = llvmType(*item->type.element);
+            std::string current = "undef";
+            for (std::size_t i = 0; i < item->elements.size(); ++i) {
+                const std::string output = "%v" + std::to_string(item->output) + ".elem" + std::to_string(i);
+                out << "  " << output << " = insertvalue " << arrayType << " " << current
+                    << ", " << elementType << " " << value(item->elements[i]) << ", " << i << "\n";
+                current = output;
+            }
+            values[item->output] = current;
         } else if (const auto* item = std::get_if<IrStructConstruct>(&instruction)) {
             if (moduleObjectMode && !openFunction) continue;
             if (!isLlvmValueType(item->type) || item->type.kind != ValueType::Kind::Struct)
@@ -1959,6 +1979,21 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 heapStringValues.insert(item->output);
             if (const auto found = heapStringSlotPaths.find(item->slot); found != heapStringSlotPaths.end())
                 rememberValuePaths(item->output, found->second);
+        } else if (const auto* item = std::get_if<IrIndexLoad>(&instruction)) {
+            if (item->arrayIsReference || item->arrayIsSlice || item->arrayType.kind != ValueType::Kind::Array ||
+                !item->arrayType.element || !isLlvmValueType(item->arrayType) || !isLlvmValueType(*item->arrayType.element))
+                throw std::runtime_error("backend LLVM: indexation tableau non supportée " + typeName(item->arrayType));
+            const ValueType& elementType = *item->arrayType.element;
+            const std::string output = "%v" + std::to_string(item->output);
+            const std::string arrayType = llvmType(item->arrayType);
+            const std::string storage = output + ".array";
+            const std::string element = output + ".ptr";
+            out << "  " << storage << " = alloca " << arrayType << "\n"
+                << "  store " << arrayType << " " << value(item->array) << ", ptr " << storage << "\n"
+                << "  " << element << " = getelementptr inbounds " << arrayType << ", ptr " << storage
+                << ", i32 0, i32 " << value(item->index) << "\n"
+                << "  " << output << " = load " << llvmType(elementType) << ", ptr " << element << "\n";
+            values[item->output] = output;
         } else if (const auto* item = std::get_if<IrStringConcat>(&instruction)) {
             const std::string base = "%v" + std::to_string(item->output);
             const std::string leftPtr = extractStringPart(base + ".left", item->left, 0);

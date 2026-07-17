@@ -1,0 +1,3 @@
+val values: [Int; 3] = [10, 20, 30]
+
+def main(): Int = values[0] + values[2]

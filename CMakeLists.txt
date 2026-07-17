@@ -125,6 +125,11 @@ if(BUILD_TESTING)
         $<TARGET_FILE:zeta>
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/clang_backend_global_struct.zeta
         ${CMAKE_CURRENT_BINARY_DIR}/clang-backend-global-struct)
+    add_test(NAME compile_clang_backend_global_array COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_global_array.sh
+        $<TARGET_FILE:zeta>
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/clang_backend_global_array.zeta
+        ${CMAKE_CURRENT_BINARY_DIR}/clang-backend-global-array)
     add_test(NAME reject_clang_backend_unsupported_aggregates COMMAND bash
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_unsupported_aggregates.sh
         $<TARGET_FILE:zeta>
