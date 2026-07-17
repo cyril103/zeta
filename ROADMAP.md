@@ -712,7 +712,9 @@ interprété comme offset d'octet, le backend Clang abaisse `IrStringDecodeAt` e
 `compile_clang_backend_io_println_string` ouvre une première sortie standard :
 les appels directs `io.print`/`io.println` sur `String` sont abaissés via
 `write(1, ptr, len)`, `println` ajoutant un octet newline statique, et le test
-compare la sortie UTF-8 Clang à FASM.
+compare la sortie UTF-8 Clang à FASM. `compile_clang_backend_io_println_heap_string`
+étend cette couverture aux chaînes heap issues de concaténation : écriture via la
+même paire `{ ptr, len }`, comparaison stdout FASM et `free` du buffer concaténé.
 `compile_clang_backend_io_println_int` ajoute une sortie entière ciblée :
 `io.printInt`/`io.printlnInt` sont abaissés directement vers `printf` avec formats
 `%d`/`%d\n`, sans activer les conversions générales `String(Int)`.
@@ -753,9 +755,8 @@ Les agrégats globaux et les structs contenant `Box`/`Vec`/tableaux restent reje
 explicitement.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre contrôlé : `io.print`/`println` pour chaînes heap concaténées, gestion
-plus complète de propriété/retain des chaînes heap, ou mutation de champs de
-structs imbriqués avant toute généralisation.
+périmètre contrôlé : gestion plus complète de propriété/retain des chaînes heap
+ou mutation de champs de structs imbriqués avant toute généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

@@ -143,6 +143,11 @@ if(BUILD_TESTING)
         $<TARGET_FILE:zeta>
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/clang_backend_io_println_string.zeta
         ${CMAKE_CURRENT_BINARY_DIR}/clang_backend_io_println_string)
+    add_test(NAME compile_clang_backend_io_println_heap_string COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_io_println_heap_string.sh
+        $<TARGET_FILE:zeta>
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/clang_backend_io_println_heap_string.zeta
+        ${CMAKE_CURRENT_BINARY_DIR}/clang_backend_io_println_heap_string)
 
     add_test(NAME compile_clang_backend_io_println_int COMMAND bash
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_io_println_int.sh

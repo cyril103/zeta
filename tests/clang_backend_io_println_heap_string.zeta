@@ -1,0 +1,12 @@
+import io
+
+
+def main(): Int = {
+    val prefix: String = "heap"
+    val suffix: String = " string"
+    val message: String = prefix + suffix
+    io.print(message)
+    io.println(" output")
+    io.println(prefix + suffix)
+    message.lengthBytes + (prefix + "!").lengthBytes + 26
+}
