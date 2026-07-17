@@ -845,6 +845,25 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 constants[item->output] = "{ ptr getelementptr inbounds ({ i64, i64, [" +
                     std::to_string(item->utf8.size()) + " x i8] }, ptr " + global +
                     ", i64 0, i32 2, i64 0), i64 " + std::to_string(item->utf8.size()) + " }";
+            } else if (const auto* item = std::get_if<IrStructConstruct>(&instruction)) {
+                if (item->type.kind != ValueType::Kind::Struct) continue;
+                std::string initializer = "{";
+                bool complete = true;
+                for (std::size_t i = 0; i < item->fields.size(); ++i) {
+                    const auto found = constants.find(item->fields[i]);
+                    if (found == constants.end()) {
+                        complete = false;
+                        break;
+                    }
+                    if (i != 0) initializer += ",";
+                    const ValueType& fieldType = item->type.structure->fields[i].type;
+                    initializer += " " + llvmType(fieldType) + " " + found->second;
+                }
+                if (complete) {
+                    if (!item->fields.empty()) initializer += " ";
+                    initializer += "}";
+                    constants[item->output] = initializer;
+                }
             } else if (const auto* item = std::get_if<IrStore>(&instruction)) {
                 const IrSlot& slot = program.slots.at(item->slot);
                 if (slot.global && !slot.external) {
@@ -1845,6 +1864,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                                          typeName(item->source) + " vers " + typeName(item->target));
             }
         } else if (const auto* item = std::get_if<IrStructConstruct>(&instruction)) {
+            if (moduleObjectMode && !openFunction) continue;
             if (!isLlvmValueType(item->type) || item->type.kind != ValueType::Kind::Struct)
                 throw std::runtime_error("backend LLVM: construction struct non supportée " + typeName(item->type));
             const std::string structType = llvmType(item->type);

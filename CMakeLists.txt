@@ -87,6 +87,10 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_shared_string_global_cache.sh
         $<TARGET_FILE:zeta>
         ${CMAKE_CURRENT_BINARY_DIR}/clang-backend-shared-string-global-cache)
+    add_test(NAME compile_clang_backend_shared_struct_global_cache COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_shared_struct_global_cache.sh
+        $<TARGET_FILE:zeta>
+        ${CMAKE_CURRENT_BINARY_DIR}/clang-backend-shared-struct-global-cache)
     add_test(NAME compile_clang_backend_build_stdlib COMMAND bash
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_build_stdlib.sh
         $<TARGET_FILE:zeta>
