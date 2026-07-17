@@ -745,13 +745,17 @@ structs simples, en conservant le type agrégat LLVM littéral dans la signature
 `compile_clang_backend_mixed_struct` couvre ensuite les champs mixtes
 `Bool`/`Byte`/`Char`/`Double`/`String`, dont les comparaisons `Byte`/`Char` par
 `icmp`, avec le même modèle `insertvalue`/`extractvalue`.
+`compile_clang_backend_nested_struct` verrouille maintenant les structs locaux
+imbriqués composés de champs déjà supportés : agrégats LLVM récursifs,
+construction `insertvalue`, copies locales et lectures par `extractvalue`
+restent comparés à FASM.
 Les agrégats globaux et les structs contenant `Box`/`Vec`/tableaux restent rejetés
 explicitement.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre contrôlé : structs locaux imbriqués, `io.print`/`println` pour chaînes
-heap concaténées, ou gestion plus complète de propriété/retain des chaînes heap,
-avant toute généralisation.
+périmètre contrôlé : `io.print`/`println` pour chaînes heap concaténées, gestion
+plus complète de propriété/retain des chaînes heap, ou mutation de champs de
+structs imbriqués avant toute généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

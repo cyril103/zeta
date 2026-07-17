@@ -1,0 +1,31 @@
+struct Point {
+    x: Int
+    y: Int
+}
+
+struct Label {
+    text: String
+    marker: Char
+}
+
+struct Entry {
+    point: Point
+    label: Label
+    ok: Bool
+}
+
+
+def makePoint(x: Int, y: Int): Point = Point { x: x, y: y }
+
+
+def main(): Int = {
+    var entry: Entry = Entry {
+        point: makePoint(10, 20),
+        label: Label { text: "nested", marker: 'Z' },
+        ok: true
+    }
+    val pointCopy: Point = entry.point
+    val labelCopy: Label = entry.label
+    val sameMarker: Bool = labelCopy.marker == 'Z'
+    pointCopy.x + pointCopy.y + labelCopy.text.lengthBytes + Int(labelCopy.marker) - 84
+}
