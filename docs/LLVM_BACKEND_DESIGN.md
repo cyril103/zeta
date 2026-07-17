@@ -175,9 +175,10 @@ chemin Clang ne crée pas d'artefact `.asm`.
 
 `reject_clang_backend_cli_diagnostics` fixe les diagnostics CLI minimums du
 backend expérimental : backend inconnu, `--emit-llvm` combiné à `--backend=fasm`,
-et tentative d'utiliser Clang/LLVM sur les modes bibliothèque/stdlib. Ces modes
-restent exclus tant que les frontières objets/modules/runtime ne sont pas
-couvertes par des tests dédiés.
+et usages encore interdits comme `--emit-llvm` sur les modes bibliothèque/stdlib
+ou `--backend=clang` sur l'installation directe de modules. Les modes
+`--build-library --backend=clang` et `--build-stdlib --backend=clang` sont désormais
+réouverts par tranches testées.
 
 `compile_clang_backend_global_values` couvre le premier périmètre runtime avec
 imports de modules : les fonctions scalaires importées étaient déjà représentées
@@ -187,12 +188,17 @@ maintenant émises comme `@slotN = global ... 0`, initialisées dans le wrapper
 test compare le code de retour Clang au code de retour FASM pour éviter une
 divergence silencieuse entre backends.
 
-`reject_clang_backend_unsupported_types` verrouille les diagnostics pour les
-types non scalaires encore exclus du backend LLVM. Un `pub val greeting: String`
-échoue avec `backend LLVM: globale non scalaire non supportée greeting: String` ;
-un local `val greeting: String` échoue avec `backend LLVM: slot local non scalaire
-non supporté greeting: String`. Ces erreurs utilisent le nom source quand un slot
-IR a été qualifié par son module.
+`compile_clang_backend_global_string` étend ce périmètre aux `pub val String`
+globales : les slots `String` globaux LLVM sont émis comme
+`@slotN = global { ptr, i64 } zeroinitializer`, initialisés dans le wrapper
+`@main`, puis relus par `load { ptr, i64 }, ptr @slotN`. Le test verrouille la
+forme IR, exécute le binaire Clang, vérifie stdout (`zeta`) et le code retour issu
+de `lengthBytes`.
+
+Les diagnostics d'agrégats globaux restent couverts séparément par les tests
+`reject_clang_backend_unsupported_aggregates` et
+`reject_clang_backend_unsupported_global_aggregates` pour les tableaux, slices,
+Box, Vec, structs et enums encore hors périmètre global LLVM.
 
 `compile_clang_backend_string_literal` ajoute la première représentation LLVM
 positive des chaînes : `def main(): Int = "zeta".lengthBytes`. Les bytes du
@@ -630,6 +636,10 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--build-stdlib --backend=clang` précompile une stdlib simple côté LLVM :
   chaque module produit `.zti`, `.ll` et `.o`, le manifeste est écrit, les sources
   peuvent ensuite être absentes, et un exécutable Clang consomme le cache `precompiled`.
+- fait : `--backend=clang` couvre les `pub val String` globales en les émettant
+  comme `{ ptr, i64 } zeroinitializer`, puis en les initialisant dans `@main`; les
+  lectures globales réutilisent `load { ptr, i64 }`, `String.lengthBytes` passe par
+  `@zeta_rt_string_length_bytes`, avec exécution Clang et stdout vérifié.
 - fait : `--backend=clang` couvre les opérations arithmétiques `Double`
   `+`/`-`/`*`/`/` via `fadd`/`fsub`/`fmul`/`fdiv`, et les comparaisons ordonnées
   via `fcmp o*`, avec exécution Clang et FASM.
