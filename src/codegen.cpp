@@ -638,165 +638,18 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         throw std::runtime_error(std::string("backend LLVM: instruction non supportée ") + instruction);
     };
     std::size_t syntheticBlock = 0;
-    auto nextSyntheticPrefix = [&](const std::string& stem) -> std::string {
-        return stem + std::to_string(syntheticBlock++);
-    };
     auto emitStringDecodeAtByte = [&](const std::string& base, ValueId stringId, ValueId offsetId) -> std::string {
-        const std::string prefix = nextSyntheticPrefix("utf8_decode");
-        const std::string rangeLabel = prefix + ".range";
-        const std::string byteLabel = prefix + ".byte";
-        const std::string check2Label = prefix + ".check2";
-        const std::string twoLabel = prefix + ".two";
-        const std::string check3Label = prefix + ".check3";
-        const std::string threeLabel = prefix + ".three";
-        const std::string check4Label = prefix + ".check4";
-        const std::string fourLabel = prefix + ".four";
-        const std::string invalidLabel = prefix + ".invalid";
-        const std::string doneLabel = prefix + ".done";
-        const std::string ptr = extractStringPart(base + ".string", stringId, 0);
-        const std::string len = extractStringPart(base + ".string", stringId, 1);
-        const std::string off64 = base + ".offset64";
-        const std::string nonNegative = base + ".offset_non_negative";
-        const std::string beforeEnd = base + ".offset_before_end";
-        const std::string inRange = base + ".offset_in_range";
-        const std::string bytePtr = base + ".byte_ptr";
-        const std::string b0raw = base + ".b0.raw";
-        const std::string b0 = base + ".b0";
-        const std::string ascii = base + ".ascii";
-        const std::string ge2 = base + ".two_ge";
-        const std::string le2 = base + ".two_le";
-        const std::string is2 = base + ".two_kind";
-        const std::string ge3 = base + ".three_ge";
-        const std::string le3 = base + ".three_le";
-        const std::string is3 = base + ".three_kind";
-        const std::string ge4 = base + ".four_ge";
-        const std::string le4 = base + ".four_le";
-        const std::string is4 = base + ".four_kind";
-        auto loadByte = [&](const std::string& name, int delta) -> std::string {
-            const std::string deltaName = name + ".offset";
-            const std::string ptrName = name + ".ptr";
-            const std::string rawName = name + ".raw";
-            out << "  " << deltaName << " = add i64 " << off64 << ", " << delta << "\n"
-                << "  " << ptrName << " = getelementptr i8, ptr " << ptr << ", i64 " << deltaName << "\n"
-                << "  " << rawName << " = load i8, ptr " << ptrName << "\n"
-                << "  " << name << " = zext i8 " << rawName << " to i32\n";
-            return name;
-        };
-        auto emitHasByte = [&](const std::string& name, int delta) -> std::string {
-            const std::string needed = name + ".needed";
-            out << "  " << needed << " = add i64 " << off64 << ", " << delta << "\n"
-                << "  " << name << " = icmp slt i64 " << needed << ", " << len << "\n";
-            return name;
-        };
-        auto emitContinuation = [&](const std::string& name, const std::string& byte) -> std::string {
-            const std::string masked = name + ".masked";
-            out << "  " << masked << " = and i32 " << byte << ", 192\n"
-                << "  " << name << " = icmp eq i32 " << masked << ", 128\n";
-            return name;
-        };
-        out << "  " << off64 << " = sext i32 " << value(offsetId) << " to i64\n"
-            << "  " << nonNegative << " = icmp sge i32 " << value(offsetId) << ", 0\n"
-            << "  " << beforeEnd << " = icmp slt i64 " << off64 << ", " << len << "\n"
-            << "  " << inRange << " = and i1 " << nonNegative << ", " << beforeEnd << "\n"
-            << "  br i1 " << inRange << ", label %" << rangeLabel << ", label %" << invalidLabel << "\n"
-            << rangeLabel << ":\n"
-            << "  " << bytePtr << " = getelementptr i8, ptr " << ptr << ", i64 " << off64 << "\n"
-            << "  " << b0raw << " = load i8, ptr " << bytePtr << "\n"
-            << "  " << b0 << " = zext i8 " << b0raw << " to i32\n"
-            << "  " << ascii << " = icmp ult i32 " << b0 << ", 128\n"
-            << "  br i1 " << ascii << ", label %" << byteLabel << ", label %" << check2Label << "\n"
-            << byteLabel << ":\n"
-            << "  br label %" << doneLabel << "\n"
-            << check2Label << ":\n"
-            << "  " << ge2 << " = icmp uge i32 " << b0 << ", 194\n"
-            << "  " << le2 << " = icmp ule i32 " << b0 << ", 223\n"
-            << "  " << is2 << " = and i1 " << ge2 << ", " << le2 << "\n";
-        const std::string has1 = emitHasByte(base + ".has1", 1);
-        const std::string b1 = loadByte(base + ".b1", 1);
-        const std::string c1 = emitContinuation(base + ".b1_cont", b1);
-        const std::string ok2a = base + ".two_ok_a";
-        const std::string ok2 = base + ".two_ok";
-        const std::string cp2hi = base + ".two_hi";
-        const std::string cp2lo = base + ".two_lo";
-        const std::string cp2 = base + ".two_cp";
-        out << "  " << ok2a << " = and i1 " << is2 << ", " << has1 << "\n"
-            << "  " << ok2 << " = and i1 " << ok2a << ", " << c1 << "\n"
-            << "  br i1 " << ok2 << ", label %" << twoLabel << ", label %" << check3Label << "\n"
-            << twoLabel << ":\n"
-            << "  " << cp2hi << " = and i32 " << b0 << ", 31\n"
-            << "  " << cp2hi << ".shifted = shl i32 " << cp2hi << ", 6\n"
-            << "  " << cp2lo << " = and i32 " << b1 << ", 63\n"
-            << "  " << cp2 << " = or i32 " << cp2hi << ".shifted, " << cp2lo << "\n"
-            << "  br label %" << doneLabel << "\n"
-            << check3Label << ":\n"
-            << "  " << ge3 << " = icmp uge i32 " << b0 << ", 224\n"
-            << "  " << le3 << " = icmp ule i32 " << b0 << ", 239\n"
-            << "  " << is3 << " = and i1 " << ge3 << ", " << le3 << "\n";
-        const std::string has2 = emitHasByte(base + ".has2", 2);
-        const std::string b2 = loadByte(base + ".b2", 2);
-        const std::string c2 = emitContinuation(base + ".b2_cont", b2);
-        const std::string ok3a = base + ".three_ok_a";
-        const std::string ok3b = base + ".three_ok_b";
-        const std::string ok3 = base + ".three_ok";
-        const std::string cp3a = base + ".three_a";
-        const std::string cp3b = base + ".three_b";
-        const std::string cp3c = base + ".three_c";
-        const std::string cp3ab = base + ".three_ab";
-        const std::string cp3 = base + ".three_cp";
-        out << "  " << ok3a << " = and i1 " << is3 << ", " << has2 << "\n"
-            << "  " << ok3b << " = and i1 " << c1 << ", " << c2 << "\n"
-            << "  " << ok3 << " = and i1 " << ok3a << ", " << ok3b << "\n"
-            << "  br i1 " << ok3 << ", label %" << threeLabel << ", label %" << check4Label << "\n"
-            << threeLabel << ":\n"
-            << "  " << cp3a << " = and i32 " << b0 << ", 15\n"
-            << "  " << cp3a << ".shifted = shl i32 " << cp3a << ", 12\n"
-            << "  " << cp3b << " = and i32 " << b1 << ", 63\n"
-            << "  " << cp3b << ".shifted = shl i32 " << cp3b << ", 6\n"
-            << "  " << cp3c << " = and i32 " << b2 << ", 63\n"
-            << "  " << cp3ab << " = or i32 " << cp3a << ".shifted, " << cp3b << ".shifted\n"
-            << "  " << cp3 << " = or i32 " << cp3ab << ", " << cp3c << "\n"
-            << "  br label %" << doneLabel << "\n"
-            << check4Label << ":\n"
-            << "  " << ge4 << " = icmp uge i32 " << b0 << ", 240\n"
-            << "  " << le4 << " = icmp ule i32 " << b0 << ", 244\n"
-            << "  " << is4 << " = and i1 " << ge4 << ", " << le4 << "\n";
-        const std::string has3 = emitHasByte(base + ".has3", 3);
-        const std::string b3 = loadByte(base + ".b3", 3);
-        const std::string c3 = emitContinuation(base + ".b3_cont", b3);
-        const std::string ok4a = base + ".four_ok_a";
-        const std::string ok4b = base + ".four_ok_b";
-        const std::string ok4c = base + ".four_ok_c";
-        const std::string ok4 = base + ".four_ok";
-        const std::string cp4a = base + ".four_a";
-        const std::string cp4b = base + ".four_b";
-        const std::string cp4c = base + ".four_c";
-        const std::string cp4d = base + ".four_d";
-        const std::string cp4ab = base + ".four_ab";
-        const std::string cp4abc = base + ".four_abc";
-        const std::string cp4 = base + ".four_cp";
-        out << "  " << ok4a << " = and i1 " << is4 << ", " << has3 << "\n"
-            << "  " << ok4b << " = and i1 " << c1 << ", " << c2 << "\n"
-            << "  " << ok4c << " = and i1 " << ok4b << ", " << c3 << "\n"
-            << "  " << ok4 << " = and i1 " << ok4a << ", " << ok4c << "\n"
-            << "  br i1 " << ok4 << ", label %" << fourLabel << ", label %" << invalidLabel << "\n"
-            << fourLabel << ":\n"
-            << "  " << cp4a << " = and i32 " << b0 << ", 7\n"
-            << "  " << cp4a << ".shifted = shl i32 " << cp4a << ", 18\n"
-            << "  " << cp4b << " = and i32 " << b1 << ", 63\n"
-            << "  " << cp4b << ".shifted = shl i32 " << cp4b << ", 12\n"
-            << "  " << cp4c << " = and i32 " << b2 << ", 63\n"
-            << "  " << cp4c << ".shifted = shl i32 " << cp4c << ", 6\n"
-            << "  " << cp4d << " = and i32 " << b3 << ", 63\n"
-            << "  " << cp4ab << " = or i32 " << cp4a << ".shifted, " << cp4b << ".shifted\n"
-            << "  " << cp4abc << " = or i32 " << cp4ab << ", " << cp4c << ".shifted\n"
-            << "  " << cp4 << " = or i32 " << cp4abc << ", " << cp4d << "\n"
-            << "  br label %" << doneLabel << "\n"
-            << invalidLabel << ":\n"
-            << "  br label %" << doneLabel << "\n"
-            << doneLabel << ":\n"
-            << "  " << base << " = phi i32 [ " << b0 << ", %" << byteLabel << " ], [ "
-            << cp2 << ", %" << twoLabel << " ], [ " << cp3 << ", %" << threeLabel
-            << " ], [ " << cp4 << ", %" << fourLabel << " ], [ -1, %" << invalidLabel << " ]\n";
+        const std::string data = extractStringPart(base + ".string", stringId, 0);
+        const std::string length = extractStringPart(base + ".string", stringId, 1);
+        out << "  " << base << " = call i32 @zeta_rt_strings_decode_at_byte(ptr "
+            << data << ", i64 " << length << ", i32 " << value(offsetId) << ")\n";
+        return base;
+    };
+    auto emitStringNextByteOffset = [&](const std::string& base, ValueId stringId, ValueId offsetId) -> std::string {
+        const std::string data = extractStringPart(base + ".string", stringId, 0);
+        const std::string length = extractStringPart(base + ".string", stringId, 1);
+        out << "  " << base << " = call i32 @zeta_rt_strings_next_byte_offset(ptr "
+            << data << ", i64 " << length << ", i32 " << value(offsetId) << ")\n";
         return base;
     };
     auto emitStringViewCall = [&](const IrCall& item) -> bool {
@@ -920,33 +773,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 item.returnType != ValueType::Int) {
                 throw std::runtime_error("backend LLVM: signature strings.nextByteOffset non supportée");
             }
-            const std::string decoded = emitStringDecodeAtByte("%v" + std::to_string(item.output) + ".decoded",
-                item.arguments[0], item.arguments[1]);
             const std::string output = "%v" + std::to_string(item.output);
-            const std::string invalid = output + ".invalid";
-            const std::string one = output + ".one";
-            const std::string two = output + ".two";
-            const std::string three = output + ".three";
-            const std::string plus1 = output + ".plus1";
-            const std::string plus2 = output + ".plus2";
-            const std::string plus3 = output + ".plus3";
-            const std::string plus4 = output + ".plus4";
-            const std::string tail3 = output + ".tail3";
-            const std::string tail2 = output + ".tail2";
-            const std::string tail1 = output + ".tail1";
-            out << "  " << invalid << " = icmp slt i32 " << decoded << ", 0\n"
-                << "  " << one << " = icmp ule i32 " << decoded << ", 127\n"
-                << "  " << two << " = icmp ule i32 " << decoded << ", 2047\n"
-                << "  " << three << " = icmp ule i32 " << decoded << ", 65535\n"
-                << "  " << plus1 << " = add i32 " << value(item.arguments[1]) << ", 1\n"
-                << "  " << plus2 << " = add i32 " << value(item.arguments[1]) << ", 2\n"
-                << "  " << plus3 << " = add i32 " << value(item.arguments[1]) << ", 3\n"
-                << "  " << plus4 << " = add i32 " << value(item.arguments[1]) << ", 4\n"
-                << "  " << tail3 << " = select i1 " << three << ", i32 " << plus3 << ", i32 " << plus4 << "\n"
-                << "  " << tail2 << " = select i1 " << two << ", i32 " << plus2 << ", i32 " << tail3 << "\n"
-                << "  " << tail1 << " = select i1 " << one << ", i32 " << plus1 << ", i32 " << tail2 << "\n"
-                << "  " << output << " = select i1 " << invalid << ", i32 -1, i32 " << tail1 << "\n";
-            values[item.output] = output;
+            values[item.output] = emitStringNextByteOffset(output, item.arguments[0], item.arguments[1]);
             return true;
         }
         if (item.function == "strings__indexOf") {
@@ -1030,11 +858,17 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 return call->function == "strings__view" || call->function == "strings__viewIsValid";
             return false;
         });
-    const bool usesStringDecodeHelper = std::any_of(program.instructions.begin(), program.instructions.end(),
+    const bool usesStringNextByteOffsetHelper = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
-                return call->function == "strings__decodeAtByte";
-            return false;
+                return call->function == "strings__nextByteOffset";
+            return std::holds_alternative<IrStringNextOffset>(instruction);
+        });
+    const bool usesStringDecodeHelper = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [&](const IrInstruction& instruction) {
+            if (const auto* call = std::get_if<IrCall>(&instruction))
+                return call->function == "strings__decodeAtByte" || call->function == "strings__nextByteOffset";
+            return std::holds_alternative<IrStringDecodeAt>(instruction) || usesStringNextByteOffsetHelper;
         });
     const bool usesIoStringWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
@@ -1246,6 +1080,25 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "done:\n"
             << "  %decoded = phi i32 [ %b0, %byte ], [ %two_cp, %two ], [ %three_cp, %three ], [ %four_cp, %four ], [ -1, %invalid ]\n"
             << "  ret i32 %decoded\n"
+            << "}\n";
+    }
+    if (usesStringNextByteOffsetHelper) {
+        out << "\ndefine internal i32 @zeta_rt_strings_next_byte_offset(ptr %data, i64 %len, i32 %offset) {\n"
+            << "entry:\n"
+            << "  %decoded = call i32 @zeta_rt_strings_decode_at_byte(ptr %data, i64 %len, i32 %offset)\n"
+            << "  %invalid = icmp slt i32 %decoded, 0\n"
+            << "  %one = icmp ule i32 %decoded, 127\n"
+            << "  %two = icmp ule i32 %decoded, 2047\n"
+            << "  %three = icmp ule i32 %decoded, 65535\n"
+            << "  %plus1 = add i32 %offset, 1\n"
+            << "  %plus2 = add i32 %offset, 2\n"
+            << "  %plus3 = add i32 %offset, 3\n"
+            << "  %plus4 = add i32 %offset, 4\n"
+            << "  %tail3 = select i1 %three, i32 %plus3, i32 %plus4\n"
+            << "  %tail2 = select i1 %two, i32 %plus2, i32 %tail3\n"
+            << "  %tail1 = select i1 %one, i32 %plus1, i32 %tail2\n"
+            << "  %next = select i1 %invalid, i32 -1, i32 %tail1\n"
+            << "  ret i32 %next\n"
             << "}\n";
     }
     if (usesStringSearch) {
@@ -1784,33 +1637,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             const ValueType type = program.valueTypes.at(item->string);
             if (type != ValueType::String && type != ValueType::StringView)
                 throw std::runtime_error("backend LLVM: offset UTF-8 hors chaîne non supporté");
-            const std::string decoded = emitStringDecodeAtByte("%v" + std::to_string(item->output) + ".decoded",
-                item->string, item->offset);
             const std::string output = "%v" + std::to_string(item->output);
-            const std::string invalid = output + ".invalid";
-            const std::string one = output + ".one";
-            const std::string two = output + ".two";
-            const std::string three = output + ".three";
-            const std::string plus1 = output + ".plus1";
-            const std::string plus2 = output + ".plus2";
-            const std::string plus3 = output + ".plus3";
-            const std::string plus4 = output + ".plus4";
-            const std::string tail3 = output + ".tail3";
-            const std::string tail2 = output + ".tail2";
-            const std::string tail1 = output + ".tail1";
-            out << "  " << invalid << " = icmp slt i32 " << decoded << ", 0\n"
-                << "  " << one << " = icmp ule i32 " << decoded << ", 127\n"
-                << "  " << two << " = icmp ule i32 " << decoded << ", 2047\n"
-                << "  " << three << " = icmp ule i32 " << decoded << ", 65535\n"
-                << "  " << plus1 << " = add i32 " << value(item->offset) << ", 1\n"
-                << "  " << plus2 << " = add i32 " << value(item->offset) << ", 2\n"
-                << "  " << plus3 << " = add i32 " << value(item->offset) << ", 3\n"
-                << "  " << plus4 << " = add i32 " << value(item->offset) << ", 4\n"
-                << "  " << tail3 << " = select i1 " << three << ", i32 " << plus3 << ", i32 " << plus4 << "\n"
-                << "  " << tail2 << " = select i1 " << two << ", i32 " << plus2 << ", i32 " << tail3 << "\n"
-                << "  " << tail1 << " = select i1 " << one << ", i32 " << plus1 << ", i32 " << tail2 << "\n"
-                << "  " << output << " = select i1 " << invalid << ", i32 -1, i32 " << tail1 << "\n";
-            values[item->output] = output;
+            values[item->output] = emitStringNextByteOffset(output, item->string, item->offset);
         } else if (const auto* item = std::get_if<IrDrop>(&instruction)) {
             if (!isLlvmValueType(item->type) && item->type != ValueType::Unit)
                 throw std::runtime_error("backend LLVM: drop non supporté " + typeName(item->type));

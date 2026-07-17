@@ -12,7 +12,12 @@ test -f "${output}.ir"
 test ! -f "${output}.asm"
 
 grep -Fq "extractvalue { ptr, i64 }" "${output}.ll"
-grep -Fq "utf8_decode" "${output}.ll"
+grep -Fq "define internal i32 @zeta_rt_strings_decode_at_byte(ptr %data, i64 %len, i32 %offset)" "${output}.ll"
+grep -Fq "define internal i32 @zeta_rt_strings_next_byte_offset(ptr %data, i64 %len, i32 %offset)" "${output}.ll"
+test "$(grep -Fc 'define internal i32 @zeta_rt_strings_decode_at_byte' "${output}.ll")" -eq 1
+test "$(grep -Fc 'define internal i32 @zeta_rt_strings_next_byte_offset' "${output}.ll")" -eq 1
+test "$(grep -Fc 'call i32 @zeta_rt_strings_decode_at_byte' "${output}.ll")" -eq 3
+test "$(grep -Fc 'call i32 @zeta_rt_strings_next_byte_offset' "${output}.ll")" -eq 2
 grep -Fq "phi i32" "${output}.ll"
 grep -Fq "and i32" "${output}.ll"
 
