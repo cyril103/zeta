@@ -701,104 +701,217 @@ Chaque étape doit :
 - ne jamais effacer les changements locaux d'un utilisateur pour nettoyer le
   dépôt.
 
-## Première action de la prochaine session
+## Roadmap finale : terminer la migration FASM -> LLVM/Clang
 
-Reprendre la migration LLVM avec l'objectif explicite de remplacer FASM comme
-backend de développement. Le dépôt est vert après
-`compile_clang_backend_string_search` : **527 tests CTest passent** et le backend
-LLVM couvre déjà scalaires, strings, IO ciblée, structs imbriqués, copies à
-travers branches, ownership heap-string intra-struct et propagation de cette
-propriété par paramètres/retours de fonctions portant des structs.
+Objectif : faire de LLVM/Clang le backend de développement principal de Zeta,
+puis le backend par défaut, tout en gardant `--backend=fasm` comme fallback legacy
+explicite tant que nécessaire.
 
-Démarrer par la tranche RED/GREEN suivante de l'ABI runtime/stdlib LLVM :
-**poursuivre l'extraction des primitives `strings.*`** ou une conversion générale
-vers `String`, maintenant que `strings.view`, la recherche `StringView` et les
-`io.*` directs primitifs passent par `zeta_rt_*`, en réduisant les lowerings
-spécialisés dans les corps applicatifs. Les briques livrées sont
-`@zeta_rt_io_write_string(ptr, i64, i1)`
-pour `io.print`/
-`io.println(String)`, `@zeta_rt_io_write_int(i32, i1)` pour `io.printInt`/
-`io.printlnInt`, et `@zeta_rt_io_write_bool(i1, i1)` pour `io.printBool`/
-`io.printlnBool`, `@zeta_rt_io_write_byte(i8, i1)` pour `io.printByte`/
-`io.printlnByte`, et `@zeta_rt_io_write_char(i32, i1)` pour `io.printChar`/
-`io.printlnChar`, `@zeta_rt_io_write_double(double, i1)` pour `io.printDouble`/
-`io.printlnDouble`, `@zeta_rt_string_length_bytes(ptr, i64)` pour
-`String.lengthBytes`, `@zeta_rt_string_is_empty(ptr, i64)` pour
-`String.isEmpty`, `@zeta_rt_strings_view(ptr, i64, i32, i32)` pour
-`strings.view`, et `@zeta_rt_strings_view_is_valid(ptr)` pour
-`strings.viewIsValid`, `@zeta_rt_strings_decode_at_byte(ptr, i64, i32)` pour
-`strings.decodeAtByte`, `@zeta_rt_strings_next_byte_offset(ptr, i64, i32)` pour
-`strings.nextByteOffset`, `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)` pour
-`strings.indexOf`/`strings.contains`, `@zeta_rt_string_from_bool(i1)` pour
-`String(Bool)`, `@zeta_rt_string_from_int(i32)` pour `String(Int)`,
-`@zeta_rt_string_from_byte(i8)` pour `String(Byte)`,
-`@zeta_rt_string_from_char(i32)` pour `String(Char)` et
-`@zeta_rt_string_from_double(double)` pour `String(Double)`, verrouillées respectivement par
-`compile_clang_backend_io_println_string`, `compile_clang_backend_io_println_int`,
-`compile_clang_backend_io_println_bool`, `compile_clang_backend_io_println_byte`,
-`compile_clang_backend_io_println_char`, `compile_clang_backend_io_println_double`,
-`compile_clang_backend_string_literal`, `compile_clang_backend_string_is_empty`,
-`compile_clang_backend_string_view`, `compile_clang_backend_string_utf8_decode`,
-`compile_clang_backend_for_string_char_iteration`, `compile_clang_backend_string_search`,
-`compile_clang_backend_string_bool_conversion`,
-`compile_clang_backend_string_int_conversion`,
-`compile_clang_backend_string_byte_conversion`,
-`compile_clang_backend_string_char_conversion` et
-`compile_clang_backend_string_double_conversion`, ainsi que
-`compile_clang_backend_build_library` pour le premier objet bibliothèque LLVM et
-`compile_clang_backend_shared_library_cache` pour la liaison d'un exécutable Clang
-contre des bibliothèques précompilées LLVM installées,
-`compile_clang_backend_shared_global_cache` pour la lecture de `pub val` scalaires
-précompilés depuis un cache `.o` LLVM,
-`compile_clang_backend_shared_string_global_cache` pour les `pub val String`
-précompilées statiques,
-`compile_clang_backend_shared_struct_global_cache` pour les `pub val` structs
-précompilées statiques composées de types LLVM supportés, et
-`compile_clang_backend_build_stdlib`
-pour la première précompilation stdlib simple via LLVM,
-`compile_clang_backend_global_string` pour les `pub val String`
-globales LLVM, `compile_clang_backend_global_double` pour les `pub val Double`
-globales LLVM, `compile_clang_backend_global_byte` pour les `pub val Byte`
-globales LLVM, `compile_clang_backend_global_char` pour les `pub val Char`
-globales LLVM, `compile_clang_backend_global_struct` pour les `pub val` structs
-LLVM composées de types LLVM déjà supportés, et `compile_clang_backend_global_array`
-pour les premières globales `[Int; N]` LLVM.
-Les tests doivent continuer à comparer Clang et FASM tant que FASM sert d'oracle,
-mais la nouvelle frontière doit être conçue pour le backend LLVM principal.
+### État acquis
 
-Après cette tranche :
+Le backend LLVM/Clang couvre déjà un sous-ensemble large et exécutable :
 
-1. poursuivre la généralisation des helpers runtime/stdlib encore
-   spécialisés `io.*`/`strings.*` ;
-2. fait partiel : `--build-library --backend=clang` produit maintenant `.zti`,
-   `.ll` et `.o` via `clang -c` pour les modules bibliothèque simples,
-   `--backend=clang` relie les exécutables aux objets précompilés LLVM installés
-   (`.zti`/`.o`) en copiant les dépendances dans `<app>.modules`, les `pub val`
-   scalaires précompilés sont émis avec un symbole stable `module__name`, déclarés
-   `external global` côté consommateur et relus depuis l'objet `.o` du cache, les
-   `pub val String` précompilées initialisées par littéral sont émises statiquement
-   comme une paire `{ ptr, i64 }` pointant vers leur constante privée, les `pub val`
-   structs précompilées dont les champs ont des constantes LLVM sont émises comme
-   `global { ... } { ... }` statiques et relues par le consommateur depuis l'objet
-   du cache, et
-   `--build-stdlib --backend=clang` précompile désormais les modules stdlib simples
-   en `.zti`/`.ll`/`.o`, les `pub val String` globales sont émises en
-   `{ ptr, i64 } zeroinitializer` puis initialisées dans le wrapper `@main`,
-   les `pub val Double` globales sont émises en `global double 0.000000e+00`,
-   les `pub val Byte` globales sont émises en `global i8 0`,
-   les `pub val Char` globales sont émises en `global i32 0`,
-   les `pub val` structs composées de types LLVM supportés sont émises en
-   `global { ... } zeroinitializer` puis initialisées dans `@main`, et les
-   premières globales `[Int; N]` sont émises en `[N x i32] zeroinitializer`,
-   initialisées par `store [N x i32]` puis indexées via `load` + `getelementptr` ;
-   poursuivre avec la vraie stdlib complète, ses modules
-   génériques/agrégats et les modules locaux non précompilés ;
-3. lever les diagnostics FASM-only restants des modes stdlib quand les objets
-   LLVM sont reliés ;
-4. ajouter une matrice exemples + stdlib en `--backend=clang` ;
-5. inverser le backend par défaut vers Clang lorsque cette matrice est verte, en
-   gardant `--backend=fasm` comme fallback legacy explicite.
+- scalaires `Int`/`Bool`/`Byte`/`Char`/`Double` ;
+- contrôle de flot, paramètres, retours, appels de fonctions et comparaisons ;
+- `String` littérales, strings locales, concaténation, drop/retain ciblés,
+  primitives `String.lengthBytes` et `String.isEmpty` ;
+- helpers runtime internes `@zeta_rt_*` pour IO, strings UTF-8, recherche et
+  conversions `String(...)` ;
+- structs locaux simples, structs imbriqués, structs mixtes contenant `String`,
+  mutations de champs et propagation d'ownership heap-string dans les structs ;
+- globales LLVM `String`, `Double`, `Byte`, `Char`, structs simples et premiers
+  tableaux `[Int; N]` ;
+- `--build-library --backend=clang` produisant `.zti`, `.ll` et `.o` sans `main` ;
+- linkage d'exécutables Clang contre des bibliothèques précompilées `.o` ;
+- globals précompilées scalaires, `String` littérales et structs statiques via
+  symboles stables `module__name` ;
+- première précompilation `--build-stdlib --backend=clang` pour modules stdlib
+  simples ;
+- suite CTest verte après chaque tranche ; dernier jalon connu : premières
+  globales `[Int; N]` LLVM.
 
-Discipline : commits petits et séparés, tests RED/GREEN, comparaison FASM tant
-que FASM sert d'oracle, puis mise à jour de `ROADMAP.md` et
-`docs/LLVM_BACKEND_DESIGN.md` à chaque étape de bascule.
+### Règles d'exécution jusqu'à la fin
+
+Chaque tranche doit rester petite, testable et réversible :
+
+1. choisir le prochain item prioritaire dans cette roadmap ;
+2. écrire un test RED ciblé (`tests/check_clang_backend_*.sh`, fixture `.zeta` si
+   utile, entrée CTest dans `CMakeLists.txt`) ;
+3. confirmer que le RED exprime la capacité manquante, pas un script ou une
+   syntaxe Zeta invalide ;
+4. implémenter le minimum pour passer le test ;
+5. lancer test ciblé, `git diff --check`, build et suite CTest complète ;
+6. commit/push code + tests ;
+7. mettre à jour `ROADMAP.md` et `docs/LLVM_BACKEND_DESIGN.md` ;
+8. relancer la validation complète ;
+9. commit/push docs.
+
+La comparaison FASM/Clang reste obligatoire quand FASM sert d'oracle fiable. Les
+nouveaux tests purement LLVM sont acceptables pour les zones où FASM n'a plus le
+modèle attendu ou quand on valide le chemin objet/cache LLVM.
+
+### Phase 1 — Compléter les agrégats LLVM nécessaires au quotidien
+
+But : supprimer les diagnostics LLVM sur les agrégats nécessaires aux exemples et
+à la stdlib, sans viser tous les types avancés en une seule fois.
+
+1. **Tableaux globaux et locaux au-delà de `[Int; N]`**
+   - étendre `[Bool; N]`, `[Byte; N]`, `[Char; N]`, `[Double; N]` ;
+   - tester lecture globale, lecture locale, index statique et index dynamique ;
+   - ajouter ensuite tableaux de structs simples si le layout LLVM est stable.
+2. **Tableaux précompilés**
+   - `pub val values: [Int; N]` dans une bibliothèque `--build-library --backend=clang` ;
+   - émission statique `@module__values = global [N x ...] ...` quand les éléments
+     sont constants ;
+   - consumer en `external global [N x ...]` avec exécution reliée au `.o` du cache.
+3. **Slices LLVM minimales**
+   - représentation `{ ptr, i64 }` ou ABI existante équivalente ;
+   - création de slice depuis tableau local/global ;
+   - indexation et bounds compatibles avec FASM ;
+   - maintien des diagnostics pour slices globales si la sémantique reste interdite.
+4. **Box minimal côté LLVM**
+   - allocation, lecture de contenu, mutation autorisée, drop ;
+   - tests sur `Box[Int]`, puis `Box[Struct]` ;
+   - conserver diagnostics pour cas d'ownership non couverts.
+5. **Enums simples côté LLVM**
+   - représentation tag + payload pour variants sans ownership ;
+   - construction, match, égalité quand déjà supportée côté langage ;
+   - ensuite payloads structs/strings seulement si les règles de drop sont sûres.
+6. **Vec : décision explicite**
+   - soit implémenter le sous-ensemble requis par la stdlib/exemples ;
+   - soit documenter le maintien temporaire du diagnostic et exclure Vec des
+     critères de bascule par défaut.
+
+Critère de phase : les diagnostics `reject_clang_backend_unsupported_aggregates`
+et `reject_clang_backend_unsupported_global_aggregates` ne doivent plus couvrir
+de cas requis par les exemples ou la stdlib de base.
+
+### Phase 2 — Durcir modules séparés, cache et stdlib précompilée
+
+But : garantir que le chemin LLVM fonctionne sans sources disponibles, avec `.zti`
+et `.o` comme artefacts d'interface et de linkage.
+
+1. **Bibliothèques multi-symboles**
+   - fonctions + globals dans le même module précompilé ;
+   - plusieurs imports dans un consumer ;
+   - ordre de lien stable et absence de redéfinitions.
+2. **Globals précompilées étendues**
+   - `Double`, `Byte`, `Char` explicites si non verrouillés par test dédié ;
+   - tableaux et structs imbriqués statiques ;
+   - diagnostic propre quand l'initialiseur ne peut pas être statique en objet LLVM.
+3. **Graphes de modules**
+   - A importe B, consumer importe A ;
+   - cache `<app>.modules` complet ;
+   - fallback source quand l'objet précompilé est absent ou périmé.
+4. **Stdlib réelle en `--build-stdlib --backend=clang`**
+   - remplacer le test stdlib jouet par une matrice de modules stdlib réels ;
+   - précompiler, supprimer/masquer les sources, compiler un consumer Clang ;
+   - vérifier manifeste, `.zti`, `.ll`, `.o` et invalidation de cache.
+5. **Runtime LLVM/Clang explicite**
+   - centraliser les helpers `@zeta_rt_*` encore inline ;
+   - vérifier émission conditionnelle seulement si utilisé ;
+   - documenter l'ABI runtime interne stable.
+
+Critère de phase : un programme consommant la stdlib précompilée doit compiler et
+s'exécuter en `--backend=clang` sans assembler FASM ni sources stdlib.
+
+### Phase 3 — Matrice exemples + stdlib en LLVM
+
+But : transformer les capacités isolées en garantie produit.
+
+1. **Inventaire des exemples**
+   - lister exemples triviaux, exemples IO/string, exemples agrégats, exemples
+     modules/stdlib ;
+   - créer un CTest par famille `compile_clang_backend_example_*`.
+2. **Matrice stdlib publique**
+   - pour chaque module stdlib public : build source Clang, build précompilé Clang,
+     consumer source, consumer cache ;
+   - inclure fonctions génériques si elles font partie de l'API quotidienne.
+3. **Matrice négative**
+   - garder des tests de rejet explicites uniquement pour limitations assumées ;
+   - chaque diagnostic doit expliquer la limitation LLVM restante et la solution
+     recommandée.
+4. **Comparaison d'exécution**
+   - continuer stdout/code retour FASM vs Clang pour les programmes que FASM sait
+     représenter ;
+   - pour les cas LLVM-only, vérifier IR clé + exécution binaire.
+
+Critère de phase : tous les exemples non triviaux et la stdlib de base passent en
+`--backend=clang` dans CTest.
+
+### Phase 4 — Nettoyage des diagnostics FASM-only et UX CLI
+
+But : retirer les restrictions de transition qui bloquent l'usage quotidien.
+
+1. Remplacer les messages “backend LLVM non supporté” par des chemins LLVM réels
+   quand une capacité est désormais couverte.
+2. Vérifier les options CLI :
+   - `--build-library --backend=clang` ;
+   - `--install-library --backend=clang` ;
+   - `--build-stdlib --backend=clang` ;
+   - `--emit-llvm` avec messages cohérents quand combiné aux modes bibliothèque.
+3. Nettoyer les artefacts obsolètes :
+   - anciens `.o`/`.zti` ignorés par manifeste ;
+   - cache local ;
+   - messages de rebuild.
+4. Stabiliser les noms de symboles et diagnostics pour que les tests ne dépendent
+   pas de détails accidentels quand ce n'est pas nécessaire.
+
+Critère de phase : les diagnostics LLVM restants décrivent seulement des choix de
+langage ou limitations explicitement reportées, pas des morceaux nécessaires à la
+migration principale.
+
+### Phase 5 — Basculer le backend par défaut
+
+But : faire de LLVM/Clang le chemin standard.
+
+1. Ajouter un test RED `run_clang_backend_default` ou équivalent :
+   - `zeta source.zeta -o programme` doit produire un binaire via Clang ;
+   - `--backend=fasm` doit continuer à produire l'ancien chemin.
+2. Modifier la sélection de backend par défaut.
+3. Ajuster les diagnostics et l'aide CLI.
+4. Mettre à jour README, docs d'installation et exemples de commandes.
+5. Lancer la matrice complète :
+   - build ;
+   - CTest complet ;
+   - exemples ;
+   - stdlib source ;
+   - stdlib précompilée ;
+   - fallback FASM explicite.
+
+Critère de phase : l'utilisation sans option backend passe par LLVM/Clang et la
+suite complète reste verte.
+
+### Phase 6 — Après bascule : durcissement et dette non bloquante
+
+Ces items ne bloquent pas la migration complète, mais doivent rester visibles :
+
+- optimisation des copies d'agrégats et temporaires de pile ;
+- passes IR avant/après codegen LLVM ;
+- debug info DWARF/source maps ;
+- autres plateformes/architectures via LLVM ;
+- gestionnaire de paquets ;
+- collections avancées (`Map`, `Set`) et IO fichiers/réseau ;
+- analyse interprocédurale plus fine des durées de vie.
+
+### Définition de “migration LLVM complète”
+
+La migration est considérée complète lorsque :
+
+- `zeta source.zeta -o programme` utilise LLVM/Clang par défaut ;
+- `--backend=fasm` reste disponible comme fallback legacy explicite ;
+- la stdlib de base se compile et s'installe en `--build-stdlib --backend=clang` ;
+- un consumer peut utiliser la stdlib précompilée sans sources et sans FASM ;
+- les exemples non triviaux passent en `--backend=clang` ;
+- les modules séparés `.zti` + `.o` fonctionnent avec fonctions, globals et graphes
+  de dépendances courants ;
+- les limitations restantes sont documentées, testées négativement et non bloquantes
+  pour le développement quotidien de Zeta.
+
+### Prochaine tranche recommandée
+
+Commencer par **tableaux précompilés LLVM** : `pub val values: [Int; N]` dans une
+bibliothèque construite avec `--build-library --backend=clang`, installation dans
+`--library-cache`, puis consumer Clang qui lit `settings.values[i]`. C'est le
+prolongement direct des globales `[Int; N]` et des globals précompilées scalaires
+/ strings / structs déjà validées.
