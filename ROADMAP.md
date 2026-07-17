@@ -613,12 +613,14 @@ travail par défaut pour le développement courant :
    `strings.view` passe maintenant par le helper LLVM interne
    `@zeta_rt_strings_view(ptr, i64, i32, i32)`, `strings.viewIsValid` par
    `@zeta_rt_strings_view_is_valid(ptr)`, `strings.decodeAtByte` par
-   `@zeta_rt_strings_decode_at_byte(ptr, i64, i32)`, et `strings.indexOf` /
+   `@zeta_rt_strings_decode_at_byte(ptr, i64, i32)`, `strings.nextByteOffset`
+   par `@zeta_rt_strings_next_byte_offset(ptr, i64, i32)`, et `strings.indexOf` /
    `strings.contains` passent par `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)`,
    au lieu de dupliquer les bornes, le calcul de pointeur, le sentinelle
-   `{ null, 0 }`, le test de validité, le décodage UTF-8 direct et la boucle
-   `memcmp` dans chaque corps applicatif. `compile_clang_backend_string_view`,
-   `compile_clang_backend_string_utf8_decode` et `compile_clang_backend_string_search`
+   `{ null, 0 }`, le test de validité, le décodage UTF-8 direct, le calcul d'offset
+   UTF-8 suivant et la boucle `memcmp` dans chaque corps applicatif.
+   `compile_clang_backend_string_view`, `compile_clang_backend_string_utf8_decode`,
+   `compile_clang_backend_for_string_char_iteration` et `compile_clang_backend_string_search`
    verrouillent chacun une définition unique des helpers, les appels applicatifs et
    la comparaison Clang/FASM.
 4. **Suite runtime/stdlib par Clang** : étendre cette ABI stable aux autres
@@ -717,12 +719,14 @@ pour `io.print`/
 `io.printlnDouble`, `@zeta_rt_strings_view(ptr, i64, i32, i32)` pour
 `strings.view`, et `@zeta_rt_strings_view_is_valid(ptr)` pour
 `strings.viewIsValid`, `@zeta_rt_strings_decode_at_byte(ptr, i64, i32)` pour
-`strings.decodeAtByte`, `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)` pour
+`strings.decodeAtByte`, `@zeta_rt_strings_next_byte_offset(ptr, i64, i32)` pour
+`strings.nextByteOffset`, `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)` pour
 `strings.indexOf`/`strings.contains`, verrouillées respectivement par
 `compile_clang_backend_io_println_string`, `compile_clang_backend_io_println_int`,
 `compile_clang_backend_io_println_bool`, `compile_clang_backend_io_println_byte`,
 `compile_clang_backend_io_println_char`, `compile_clang_backend_io_println_double`,
-`compile_clang_backend_string_view` et `compile_clang_backend_string_search`.
+`compile_clang_backend_string_view`, `compile_clang_backend_string_utf8_decode`,
+`compile_clang_backend_for_string_char_iteration` et `compile_clang_backend_string_search`.
 Les tests doivent continuer à comparer Clang et FASM tant que FASM sert d'oracle,
 mais la nouvelle frontière doit être conçue pour le backend LLVM principal.
 

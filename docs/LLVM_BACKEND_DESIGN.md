@@ -256,16 +256,19 @@ sont remplacés directement par cette primitive spécialisée. Cette tranche ne
 définit pas encore d'ABI native générale pour les fonctions `StringView`.
 
 `compile_clang_backend_string_utf8_decode` ajoute les primitives UTF-8 de bas
-niveau sur `String`. `strings.decodeAtByte(text, offset)` extrait la paire chaîne,
-vérifie `offset >= 0 && offset < length`, lit le premier octet, puis produit un
-codepoint `Int` pour les séquences 1, 2, 3 ou 4 octets avec validation des octets
-de continuation ; les offsets invalides ou placés sur une continuation retournent
-`-1`. `strings.nextByteOffset(text, offset)` réutilise ce décodage spécialisé et
+niveau sur `String`. `strings.decodeAtByte(text, offset)` extrait la paire chaîne
+et appelle la frontière runtime interne
+`@zeta_rt_strings_decode_at_byte(ptr, i64, i32)`, qui vérifie
+`offset >= 0 && offset < length`, lit le premier octet, puis produit un codepoint
+`Int` pour les séquences 1, 2, 3 ou 4 octets avec validation des octets de
+continuation ; les offsets invalides ou placés sur une continuation retournent
+`-1`. `strings.nextByteOffset(text, offset)` passe par
+`@zeta_rt_strings_next_byte_offset(ptr, i64, i32)`, qui réutilise ce décodage et
 avance de 1/2/3/4 octets, ou retourne `-1` si le décodage échoue.
 
-`compile_clang_backend_for_string_char_iteration` réutilise ce décodage dans les
-instructions IR de boucle `IrStringDecodeAt` et `IrStringNextOffset`. Le backend
-Clang accepte désormais `Char` comme `i32`, les constantes/copies/conversions
+`compile_clang_backend_for_string_char_iteration` réutilise ces deux frontières
+runtime dans les instructions IR de boucle `IrStringDecodeAt` et
+`IrStringNextOffset`. Le backend Clang accepte désormais `Char` comme `i32`, les constantes/copies/conversions
 `Char` <-> `Int`, et l'itération `for` sur `String` comme sur `StringView` ; l'état
 reste un `Int` mais représente un offset d'octet UTF-8, pas un index logique de
 caractère. La tranche ne définit toujours pas `charAtByte`/`Option[Char]` ni une
@@ -513,6 +516,9 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--backend=clang` couvre `strings.decodeAtByte` via la frontière runtime
   interne `@zeta_rt_strings_decode_at_byte(ptr, i64, i32)`, qui centralise le
   décodage UTF-8 direct et les rejets d'offset invalides, avec exécution Clang et FASM.
+- fait : `--backend=clang` couvre `strings.nextByteOffset` et `IrStringNextOffset`
+  via la frontière runtime interne `@zeta_rt_strings_next_byte_offset(ptr, i64, i32)`,
+  qui réutilise le décodage UTF-8 et centralise l'avance 1/2/3/4 octets.
 - fait : `--backend=clang` couvre `strings.indexOf` et `strings.contains` via la
   frontière runtime interne `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)`, qui
   centralise les vues invalides, l'aiguille vide, la borne de recherche et la
