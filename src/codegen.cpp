@@ -840,6 +840,11 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 constants[item->output] = std::to_string(item->value);
             } else if (const auto* item = std::get_if<IrDoubleConst>(&instruction)) {
                 constants[item->output] = formatDouble(item->value);
+            } else if (const auto* item = std::get_if<IrStringConst>(&instruction)) {
+                const std::string global = "@str." + std::to_string(item->output);
+                constants[item->output] = "{ ptr getelementptr inbounds ({ i64, i64, [" +
+                    std::to_string(item->utf8.size()) + " x i8] }, ptr " + global +
+                    ", i64 0, i32 2, i64 0), i64 " + std::to_string(item->utf8.size()) + " }";
             } else if (const auto* item = std::get_if<IrStore>(&instruction)) {
                 const IrSlot& slot = program.slots.at(item->slot);
                 if (slot.global && !slot.external) {
