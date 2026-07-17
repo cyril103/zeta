@@ -288,11 +288,12 @@ ABI native générale ni un support complet de `String(value)`.
 
 `compile_clang_backend_io_println_bool` ajoute une sortie booléenne ciblée : les
 appels stdlib directs `io.printBool(value: Bool)` et
-`io.printlnBool(value: Bool)` sélectionnent entre deux constantes privées `true`
-et `false`, puis appellent `write(1, ptr, len)` ; `printlnBool` écrit ensuite le
-newline privé partagé. Les helpers `io__printBool`/`io__printlnBool` sont sautés
-pendant l'émission LLVM pour éviter de dépendre de la conversion générale
-`String(Bool)`, encore hors périmètre.
+`io.printlnBool(value: Bool)` passent par la frontière runtime interne
+`@zeta_rt_io_write_bool(i1, i1)`. Le helper sélectionne entre deux constantes
+privées `true` et `false`, appelle `write(1, ptr, len)` et écrit le newline privé
+partagé uniquement pour `printlnBool`. Les helpers `io__printBool`/
+`io__printlnBool` sont sautés pendant l'émission LLVM pour éviter de dépendre de la
+conversion générale `String(Bool)`, encore hors périmètre.
 
 `compile_clang_backend_io_println_byte` ajoute une sortie `Byte` ciblée : `Byte`
 est représenté comme `i8` côté LLVM, les conversions minimales `Int -> Byte` et
@@ -353,10 +354,11 @@ les drops/retains conditionnels ne libèrent jamais les constantes.
 
 Le chemin LLVM/Clang couvre désormais un sous-ensemble exécutable large : scalaires
 `Int`/`Bool`/`Byte`/`Char`/`Double`, contrôle de flot, appels, modules source avec
-globales scalaires, strings et `StringView`, IO spécialisée avec deux premières
+globales scalaires, strings et `StringView`, IO spécialisée avec trois premières
 frontières runtime internes (`@zeta_rt_io_write_string` pour `io.print`/
-`io.println(String)` et `@zeta_rt_io_write_int` pour `io.printInt`/
-`io.printlnInt`), structs simples, mixtes et imbriqués, ABI de fonctions sur
+`io.println(String)`, `@zeta_rt_io_write_int` pour `io.printInt`/
+`io.printlnInt` et `@zeta_rt_io_write_bool` pour `io.printBool`/
+`io.printlnBool`), structs simples, mixtes et imbriqués, ABI de fonctions sur
 structs simples, copies à travers branches et ownership de chaînes heap encapsulées
 dans des structs, y compris à travers paramètres, appels et retours de fonctions
 portant ces structs.
@@ -375,10 +377,11 @@ Tests structurants déjà verrouillés côté structs/ownership :
 
 Prochaines tranches nécessaires pour remplacer FASM :
 
-1. étendre l'ABI runtime/stdlib LLVM `zeta_rt_*` au-delà des deux premières briques
-   `@zeta_rt_io_write_string(ptr, i64, i1)` et `@zeta_rt_io_write_int(i32, i1)`
-   déjà utilisées par `io.print`/`io.println(String)` et `io.printInt`/
-   `io.printlnInt` ; cibler ensuite les helpers `io.*` primitifs restants, les
+1. étendre l'ABI runtime/stdlib LLVM `zeta_rt_*` au-delà des trois premières briques
+   `@zeta_rt_io_write_string(ptr, i64, i1)`, `@zeta_rt_io_write_int(i32, i1)` et
+   `@zeta_rt_io_write_bool(i1, i1)` déjà utilisées par `io.print`/
+   `io.println(String)`, `io.printInt`/`io.printlnInt` et `io.printBool`/
+   `io.printlnBool` ; cibler ensuite les helpers `io.*` primitifs restants, les
    primitives `strings.*` ou les conversions générales vers `String` encore
    abaissées de façon spécialisée ;
 2. produire et relier modules séparés, stdlib précompilée et runtime via `clang` ;
@@ -465,7 +468,9 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   frontière runtime interne `@zeta_rt_io_write_int(i32, i1)`, qui centralise le
   choix du format `printf` avec ou sans newline, avec comparaison stdout FASM.
 - fait : `--backend=clang` couvre `io.printBool`/`io.printlnBool` directs via
-  sélection `true`/`false` et `write`, avec comparaison stdout FASM.
+  la frontière runtime interne `@zeta_rt_io_write_bool(i1, i1)`, qui centralise la
+  sélection `true`/`false`, l'appel `write` et l'écriture conditionnelle du newline,
+  avec comparaison stdout FASM.
 - fait : `--backend=clang` couvre `io.printByte`/`io.printlnByte` directs via
   `Byte` en `i8`, extension non signée et `printf`, avec comparaison stdout FASM.
 - fait : `--backend=clang` couvre `io.printChar`/`io.printlnChar` directs via
