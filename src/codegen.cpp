@@ -952,17 +952,9 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 item.argumentTypes[0] != ValueType::Bool || item.returnType != ValueType::Unit) {
                 throw std::runtime_error("backend LLVM: signature io.printBool/printlnBool non supportée");
             }
-            const std::string base = "%v" + std::to_string(item.output);
-            const std::string data = base + ".bool_data";
-            const std::string length = base + ".bool_len";
-            out << "  " << data << " = select i1 " << value(item.arguments[0])
-                << ", ptr @zeta.bool.true, ptr @zeta.bool.false\n"
-                << "  " << length << " = select i1 " << value(item.arguments[0])
-                << ", i64 4, i64 5\n"
-                << "  call i64 @write(i32 1, ptr " << data << ", i64 " << length << ")\n";
-            if (item.function == "io__printlnBool") {
-                out << "  call i64 @write(i32 1, ptr @zeta.newline, i64 1)\n";
-            }
+            const char* newline = item.function == "io__printlnBool" ? "true" : "false";
+            out << "  call void @zeta_rt_io_write_bool(i1 " << value(item.arguments[0])
+                << ", i1 " << newline << ")\n";
             return true;
         }
         if (item.function == "strings__view") {
@@ -1292,6 +1284,20 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "entry:\n"
             << "  %format = select i1 %newline, ptr @zeta.fmt.int.nl, ptr @zeta.fmt.int\n"
             << "  call i32 (ptr, ...) @printf(ptr %format, i32 %value)\n"
+            << "  ret void\n"
+            << "}\n";
+    }
+    if (usesIoBoolWrite) {
+        out << "\ndefine internal void @zeta_rt_io_write_bool(i1 %value, i1 %newline) {\n"
+            << "entry:\n"
+            << "  %data = select i1 %value, ptr @zeta.bool.true, ptr @zeta.bool.false\n"
+            << "  %len = select i1 %value, i64 4, i64 5\n"
+            << "  call i64 @write(i32 1, ptr %data, i64 %len)\n"
+            << "  br i1 %newline, label %write_newline, label %done\n"
+            << "write_newline:\n"
+            << "  call i64 @write(i32 1, ptr @zeta.newline, i64 1)\n"
+            << "  br label %done\n"
+            << "done:\n"
             << "  ret void\n"
             << "}\n";
     }
