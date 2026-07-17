@@ -876,6 +876,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 return item->source == ValueType::Bool && item->target == ValueType::String;
             return false;
         });
+    const bool usesStringFromIntHelper = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            if (const auto* item = std::get_if<IrConvert>(&instruction))
+                return item->source == ValueType::Int && item->target == ValueType::String;
+            return false;
+        });
     const bool usesIoStringWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
@@ -930,11 +936,13 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         });
 
     out << "target triple = \"x86_64-pc-linux-gnu\"\n\n";
-    if (usesStringConcat) {
-        out << "declare ptr @malloc(i64)\n"
-            << "declare ptr @memcpy(ptr, ptr, i64)\n\n";
+    if (usesStringConcat || usesStringFromIntHelper) {
+        out << "declare ptr @malloc(i64)\n";
     }
-    if (usesStringConcat || usesStringOwnership) {
+    if (usesStringConcat || usesStringFromIntHelper) {
+        out << "declare ptr @memcpy(ptr, ptr, i64)\n\n";
+    }
+    if (usesStringConcat || usesStringOwnership || usesStringFromIntHelper) {
         out << "declare void @free(ptr)\n\n";
     }
     if (usesStringSearch) {
@@ -1116,6 +1124,51 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "  %len = select i1 %value, i64 4, i64 5\n"
             << "  %pair_ptr = insertvalue { ptr, i64 } undef, ptr %data, 0\n"
             << "  %pair = insertvalue { ptr, i64 } %pair_ptr, i64 %len, 1\n"
+            << "  ret { ptr, i64 } %pair\n"
+            << "}\n";
+    }
+    if (usesStringFromIntHelper) {
+        out << "\ndefine internal { ptr, i64 } @zeta_rt_string_from_int(i32 %value) {\n"
+            << "entry:\n"
+            << "  %negative = icmp slt i32 %value, 0\n"
+            << "  %value64 = sext i32 %value to i64\n"
+            << "  %negated = sub i64 0, %value64\n"
+            << "  %magnitude0 = select i1 %negative, i64 %negated, i64 %value64\n"
+            << "  %buffer = alloca [12 x i8], align 1\n"
+            << "  %end = getelementptr [12 x i8], ptr %buffer, i64 0, i64 12\n"
+            << "  br label %digits\n"
+            << "digits:\n"
+            << "  %magnitude = phi i64 [ %magnitude0, %entry ], [ %next_magnitude, %digits ]\n"
+            << "  %cursor = phi ptr [ %end, %entry ], [ %next_cursor, %digits ]\n"
+            << "  %count = phi i64 [ 0, %entry ], [ %next_count, %digits ]\n"
+            << "  %digit = urem i64 %magnitude, 10\n"
+            << "  %digit8 = trunc i64 %digit to i8\n"
+            << "  %ascii = add i8 %digit8, 48\n"
+            << "  %next_cursor = getelementptr i8, ptr %cursor, i64 -1\n"
+            << "  store i8 %ascii, ptr %next_cursor\n"
+            << "  %next_count = add i64 %count, 1\n"
+            << "  %next_magnitude = udiv i64 %magnitude, 10\n"
+            << "  %more = icmp ne i64 %next_magnitude, 0\n"
+            << "  br i1 %more, label %digits, label %sign\n"
+            << "sign:\n"
+            << "  br i1 %negative, label %with_sign, label %allocate\n"
+            << "with_sign:\n"
+            << "  %signed_cursor = getelementptr i8, ptr %next_cursor, i64 -1\n"
+            << "  store i8 45, ptr %signed_cursor\n"
+            << "  %signed_count = add i64 %next_count, 1\n"
+            << "  br label %allocate\n"
+            << "allocate:\n"
+            << "  %start = phi ptr [ %signed_cursor, %with_sign ], [ %next_cursor, %sign ]\n"
+            << "  %length = phi i64 [ %signed_count, %with_sign ], [ %next_count, %sign ]\n"
+            << "  %allocation_size = add i64 %length, 16\n"
+            << "  %raw = call ptr @malloc(i64 %allocation_size)\n"
+            << "  store i64 1, ptr %raw\n"
+            << "  %len_ptr = getelementptr i8, ptr %raw, i64 8\n"
+            << "  store i64 %length, ptr %len_ptr\n"
+            << "  %data = getelementptr i8, ptr %raw, i64 16\n"
+            << "  call ptr @memcpy(ptr %data, ptr %start, i64 %length)\n"
+            << "  %pair_ptr = insertvalue { ptr, i64 } undef, ptr %data, 0\n"
+            << "  %pair = insertvalue { ptr, i64 } %pair_ptr, i64 %length, 1\n"
             << "  ret { ptr, i64 } %pair\n"
             << "}\n";
     }
@@ -1507,6 +1560,13 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 out << "  " << output << " = call { ptr, i64 } @zeta_rt_string_from_bool(i1 "
                     << value(item->input) << ")\n";
                 values[item->output] = output;
+            } else if (item->source == ValueType::Int && item->target == ValueType::String) {
+                const std::string output = "%v" + std::to_string(item->output);
+                out << "  " << output << " = call { ptr, i64 } @zeta_rt_string_from_int(i32 "
+                    << value(item->input) << ")\n";
+                values[item->output] = output;
+                heapStringValues.insert(item->output);
+                rememberValuePaths(item->output, HeapStringPaths{HeapStringPath{}});
             } else {
                 throw std::runtime_error("backend LLVM: conversion non supportée " +
                                          typeName(item->source) + " vers " + typeName(item->target));
