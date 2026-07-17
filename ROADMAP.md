@@ -744,7 +744,8 @@ pour `io.print`/
 `compile_clang_backend_string_int_conversion`,
 `compile_clang_backend_string_byte_conversion`,
 `compile_clang_backend_string_char_conversion` et
-`compile_clang_backend_string_double_conversion`.
+`compile_clang_backend_string_double_conversion`, ainsi que
+`compile_clang_backend_build_library` pour le premier objet bibliothèque LLVM.
 Les tests doivent continuer à comparer Clang et FASM tant que FASM sert d'oracle,
 mais la nouvelle frontière doit être conçue pour le backend LLVM principal.
 
@@ -752,8 +753,11 @@ Après cette tranche :
 
 1. poursuivre la généralisation des helpers runtime/stdlib encore
    spécialisés `io.*`/`strings.*` ;
-2. faire construire modules séparés et stdlib précompilée via `clang` ;
-3. lever les diagnostics FASM-only des modes bibliothèque/stdlib quand les objets
+2. fait partiel : `--build-library --backend=clang` produit maintenant `.zti`,
+   `.ll` et `.o` via `clang -c` pour les modules bibliothèque simples, verrouillé
+   par `compile_clang_backend_build_library` ; poursuivre avec le lien d'exécutables
+   contre ces objets et la stdlib précompilée via `clang` ;
+3. lever les diagnostics FASM-only restants des modes stdlib quand les objets
    LLVM sont reliés ;
 4. ajouter une matrice exemples + stdlib en `--backend=clang` ;
 5. inverser le backend par défaut vers Clang lorsque cette matrice est verte, en

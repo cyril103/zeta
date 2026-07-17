@@ -429,7 +429,9 @@ runtime internes (`@zeta_rt_io_write_string` pour `io.print`/
 structs simples, mixtes et imbriqués, ABI de fonctions sur
 structs simples, copies à travers branches et ownership de chaînes heap encapsulées
 dans des structs, y compris à travers paramètres, appels et retours de fonctions
-portant ces structs.
+portant ces structs. Le mode `--build-library --backend=clang` produit désormais
+un objet bibliothèque LLVM (`.ll` + `.o` via `clang -c`) pour les modules simples,
+sans définir `main` dans l'IR de bibliothèque.
 
 Tests structurants déjà verrouillés côté structs/ownership :
 
@@ -470,7 +472,11 @@ Prochaines tranches nécessaires pour remplacer FASM :
    `String(Byte)`, `String(Char)` et `String(Double)` ; cibler ensuite
    les autres primitives `strings.*` ou les conversions générales vers `String` encore
    abaissées de façon spécialisée ;
-2. produire et relier modules séparés, stdlib précompilée et runtime via `clang` ;
+2. fait partiel : `--build-library --backend=clang` produit désormais des objets
+   bibliothèque LLVM pour les modules simples (`LlvmIrCodeGenerator::generateObject`,
+   `clang -c`, `.zti` + `.ll` + `.o`, test `compile_clang_backend_build_library`) ;
+   poursuivre avec le lien d'exécutables contre objets LLVM précompilés, puis la
+   stdlib précompilée via `clang` ;
 3. choisir le support ou le rejet final pour globals agrégats, tableaux dans
    structs, `Box`, `Vec`, enums et gros agrégats ;
 4. ajouter une matrice exemples + stdlib en `--backend=clang`, puis inverser le
@@ -605,6 +611,9 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   frontière runtime interne `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)`, qui
   centralise les vues invalides, l'aiguille vide, la borne de recherche et la
   boucle `memcmp`; `contains` reste un test `index >= 0`, avec exécution Clang et FASM.
+- fait : `--build-library --backend=clang` produit un objet bibliothèque LLVM pour
+  un module simple : l'IR objet ne définit pas `main`, `clang -c` produit le `.o`,
+  et les artefacts publiés incluent `.zti`, `.ll` et `.o`.
 - fait : `--backend=clang` couvre les opérations arithmétiques `Double`
   `+`/`-`/`*`/`/` via `fadd`/`fsub`/`fmul`/`fdiv`, et les comparaisons ordonnées
   via `fcmp o*`, avec exécution Clang et FASM.
