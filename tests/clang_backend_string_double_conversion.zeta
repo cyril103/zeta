@@ -1,0 +1,11 @@
+import io
+
+
+def main(): Int = {
+    val positive: String = String(18.5)
+    val negative: String = String(-0.25)
+    val zero: String = String(0.0)
+    val message: String = positive + " / " + negative + " / " + zero
+    io.println(message)
+    0
+}

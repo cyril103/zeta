@@ -894,6 +894,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 return item->source == ValueType::Char && item->target == ValueType::String;
             return false;
         });
+    const bool usesStringFromDoubleHelper = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            if (const auto* item = std::get_if<IrConvert>(&instruction))
+                return item->source == ValueType::Double && item->target == ValueType::String;
+            return false;
+        });
     const bool usesIoStringWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
@@ -948,16 +954,20 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         });
 
     const bool usesStringFromIntRuntime = usesStringFromIntHelper || usesStringFromByteHelper;
-    const bool usesStringAllocatedRuntime = usesStringFromIntRuntime || usesStringFromCharHelper;
+    const bool usesStringAllocatedRuntime = usesStringFromIntRuntime || usesStringFromCharHelper || usesStringFromDoubleHelper;
+    const bool usesDoubleFormat = usesIoDoubleWrite || usesStringFromDoubleHelper;
     out << "target triple = \"x86_64-pc-linux-gnu\"\n\n";
     if (usesStringConcat || usesStringAllocatedRuntime) {
         out << "declare ptr @malloc(i64)\n";
     }
-    if (usesStringConcat || usesStringFromIntRuntime) {
+    if (usesStringConcat || usesStringFromIntRuntime || usesStringFromDoubleHelper) {
         out << "declare ptr @memcpy(ptr, ptr, i64)\n\n";
     }
     if (usesStringConcat || usesStringOwnership || usesStringAllocatedRuntime) {
         out << "declare void @free(ptr)\n\n";
+    }
+    if (usesStringFromDoubleHelper) {
+        out << "declare i32 @snprintf(ptr, i64, ptr, ...)\n\n";
     }
     if (usesStringSearch) {
         out << "declare i32 @memcmp(ptr, ptr, i64)\n\n";
@@ -983,7 +993,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         out << "@zeta.bool.true = private unnamed_addr constant [4 x i8] c\"true\", align 1\n"
             << "@zeta.bool.false = private unnamed_addr constant [5 x i8] c\"false\", align 1\n";
     }
-    if (usesIoPrintf) {
+    if (usesIoPrintf || usesDoubleFormat) {
         out << "@zeta.fmt.int = private unnamed_addr constant [3 x i8] c\"%d\\00\", align 1\n"
             << "@zeta.fmt.int.nl = private unnamed_addr constant [4 x i8] c\"%d\\0A\\00\", align 1\n"
             << "@zeta.fmt.byte = private unnamed_addr constant [3 x i8] c\"%u\\00\", align 1\n"
@@ -1272,6 +1282,27 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "done:\n"
             << "  %pair_ptr = insertvalue { ptr, i64 } undef, ptr %data, 0\n"
             << "  %pair = insertvalue { ptr, i64 } %pair_ptr, i64 %len, 1\n"
+            << "  ret { ptr, i64 } %pair\n"
+            << "}\n";
+    }
+    if (usesStringFromDoubleHelper) {
+        out << "\ndefine internal { ptr, i64 } @zeta_rt_string_from_double(double %value) {\n"
+            << "entry:\n"
+            << "  %buffer = alloca [64 x i8], align 1\n"
+            << "  %start = getelementptr [64 x i8], ptr %buffer, i64 0, i64 0\n"
+            << "  %count32 = call i32 (ptr, i64, ptr, ...) @snprintf(ptr %start, i64 64, ptr @zeta.fmt.double, double %value)\n"
+            << "  %negative_count = icmp slt i32 %count32, 0\n"
+            << "  %safe_count32 = select i1 %negative_count, i32 0, i32 %count32\n"
+            << "  %length = zext i32 %safe_count32 to i64\n"
+            << "  %allocation_size = add i64 %length, 16\n"
+            << "  %raw = call ptr @malloc(i64 %allocation_size)\n"
+            << "  store i64 1, ptr %raw\n"
+            << "  %len_ptr = getelementptr i8, ptr %raw, i64 8\n"
+            << "  store i64 %length, ptr %len_ptr\n"
+            << "  %data = getelementptr i8, ptr %raw, i64 16\n"
+            << "  call ptr @memcpy(ptr %data, ptr %start, i64 %length)\n"
+            << "  %pair_ptr = insertvalue { ptr, i64 } undef, ptr %data, 0\n"
+            << "  %pair = insertvalue { ptr, i64 } %pair_ptr, i64 %length, 1\n"
             << "  ret { ptr, i64 } %pair\n"
             << "}\n";
     }
@@ -1680,6 +1711,13 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             } else if (item->source == ValueType::Char && item->target == ValueType::String) {
                 const std::string output = "%v" + std::to_string(item->output);
                 out << "  " << output << " = call { ptr, i64 } @zeta_rt_string_from_char(i32 "
+                    << value(item->input) << ")\n";
+                values[item->output] = output;
+                heapStringValues.insert(item->output);
+                rememberValuePaths(item->output, HeapStringPaths{HeapStringPath{}});
+            } else if (item->source == ValueType::Double && item->target == ValueType::String) {
+                const std::string output = "%v" + std::to_string(item->output);
+                out << "  " << output << " = call { ptr, i64 } @zeta_rt_string_from_double(double "
                     << value(item->input) << ")\n";
                 values[item->output] = output;
                 heapStringValues.insert(item->output);
