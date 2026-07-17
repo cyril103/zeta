@@ -431,7 +431,9 @@ structs simples, copies à travers branches et ownership de chaînes heap encaps
 dans des structs, y compris à travers paramètres, appels et retours de fonctions
 portant ces structs. Le mode `--build-library --backend=clang` produit désormais
 un objet bibliothèque LLVM (`.ll` + `.o` via `clang -c`) pour les modules simples,
-sans définir `main` dans l'IR de bibliothèque.
+sans définir `main` dans l'IR de bibliothèque ; les exécutables `--backend=clang`
+relient aussi les objets précompilés LLVM installés depuis le cache de bibliothèques
+en les copiant dans `<app>.modules` avant l'appel final à `clang`.
 
 Tests structurants déjà verrouillés côté structs/ownership :
 
@@ -474,9 +476,11 @@ Prochaines tranches nécessaires pour remplacer FASM :
    abaissées de façon spécialisée ;
 2. fait partiel : `--build-library --backend=clang` produit désormais des objets
    bibliothèque LLVM pour les modules simples (`LlvmIrCodeGenerator::generateObject`,
-   `clang -c`, `.zti` + `.ll` + `.o`, test `compile_clang_backend_build_library`) ;
-   poursuivre avec le lien d'exécutables contre objets LLVM précompilés, puis la
-   stdlib précompilée via `clang` ;
+   `clang -c`, `.zti` + `.ll` + `.o`, test `compile_clang_backend_build_library`),
+   et `--backend=clang` relie les exécutables aux objets précompilés LLVM installés
+   depuis le cache de bibliothèques (`compile_clang_backend_shared_library_cache`) ;
+   poursuivre avec la stdlib précompilée via `clang` et les modules locaux non
+   précompilés ;
 3. choisir le support ou le rejet final pour globals agrégats, tableaux dans
    structs, `Box`, `Vec`, enums et gros agrégats ;
 4. ajouter une matrice exemples + stdlib en `--backend=clang`, puis inverser le
@@ -614,6 +618,10 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--build-library --backend=clang` produit un objet bibliothèque LLVM pour
   un module simple : l'IR objet ne définit pas `main`, `clang -c` produit le `.o`,
   et les artefacts publiés incluent `.zti`, `.ll` et `.o`.
+- fait : `--backend=clang` relie un exécutable consommateur contre des bibliothèques
+  précompilées LLVM installées : les appels externes sont déclarés dans l'IR,
+  les `.o` de dépendances sont copiés dans `<app>.modules`, puis passés au lien
+  final `clang`, avec exécution du binaire résultant.
 - fait : `--backend=clang` couvre les opérations arithmétiques `Double`
   `+`/`-`/`*`/`/` via `fadd`/`fsub`/`fmul`/`fdiv`, et les comparaisons ordonnées
   via `fcmp o*`, avec exécution Clang et FASM.
