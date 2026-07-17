@@ -195,6 +195,12 @@ globales : les slots `String` globaux LLVM sont émis comme
 forme IR, exécute le binaire Clang, vérifie stdout (`zeta`) et le code retour issu
 de `lengthBytes`.
 
+`compile_clang_backend_global_double` couvre ensuite les `pub val Double`
+globales : le slot est émis comme `@slotN = global double 0.000000e+00`, initialisé
+par `store double` dans `@main`, relu via `load double, ptr @slotN`, puis utilisé
+par `io.printlnDouble` et une comparaison `fcmp`, avec stdout et code retour
+vérifiés côté Clang.
+
 Les diagnostics d'agrégats globaux restent couverts séparément par les tests
 `reject_clang_backend_unsupported_aggregates` et
 `reject_clang_backend_unsupported_global_aggregates` pour les tableaux, slices,
@@ -640,6 +646,10 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   comme `{ ptr, i64 } zeroinitializer`, puis en les initialisant dans `@main`; les
   lectures globales réutilisent `load { ptr, i64 }`, `String.lengthBytes` passe par
   `@zeta_rt_string_length_bytes`, avec exécution Clang et stdout vérifié.
+- fait : `--backend=clang` couvre les `pub val Double` globales en les émettant
+  comme `global double 0.000000e+00`, puis en les initialisant dans `@main`; les
+  lectures globales réutilisent `load double`, avec `io.printlnDouble`, comparaison
+  `fcmp`, stdout et code retour vérifiés.
 - fait : `--backend=clang` couvre les opérations arithmétiques `Double`
   `+`/`-`/`*`/`/` via `fadd`/`fsub`/`fmul`/`fdiv`, et les comparaisons ordonnées
   via `fcmp o*`, avec exécution Clang et FASM.

@@ -749,7 +749,8 @@ pour `io.print`/
 `compile_clang_backend_shared_library_cache` pour la liaison d'un exécutable Clang
 contre des bibliothèques précompilées LLVM installées, et
 `compile_clang_backend_build_stdlib` pour la première précompilation stdlib simple
-via LLVM, et `compile_clang_backend_global_string` pour les `pub val String`
+via LLVM, `compile_clang_backend_global_string` pour les `pub val String`
+globales LLVM, et `compile_clang_backend_global_double` pour les `pub val Double`
 globales LLVM.
 Les tests doivent continuer à comparer Clang et FASM tant que FASM sert d'oracle,
 mais la nouvelle frontière doit être conçue pour le backend LLVM principal.
@@ -763,8 +764,9 @@ Après cette tranche :
    `--backend=clang` relie les exécutables aux objets précompilés LLVM installés
    (`.zti`/`.o`) en copiant les dépendances dans `<app>.modules`, et
    `--build-stdlib --backend=clang` précompile désormais les modules stdlib simples
-   en `.zti`/`.ll`/`.o`, et les `pub val String` globales sont émises en
-   `{ ptr, i64 } zeroinitializer` puis initialisées dans le wrapper `@main` ;
+   en `.zti`/`.ll`/`.o`, les `pub val String` globales sont émises en
+   `{ ptr, i64 } zeroinitializer` puis initialisées dans le wrapper `@main`, et
+   les `pub val Double` globales sont émises en `global double 0.000000e+00` ;
    poursuivre avec la vraie stdlib complète, ses modules
    génériques/agrégats et les modules locaux non précompilés ;
 3. lever les diagnostics FASM-only restants des modes stdlib quand les objets
