@@ -301,6 +301,12 @@ maintenant couverte séparément par `@zeta_rt_string_from_bool(i1)`, tandis que
 helpers `io__printBool`/`io__printlnBool` restent sautés pendant l'émission LLVM
 pour conserver les chemins directs `io.*` derrière leurs frontières runtime dédiées.
 
+`compile_clang_backend_string_literal` verrouille aussi `String.lengthBytes` côté
+Clang : le champ longueur extrait de la paire `{ ptr, i64 }` passe désormais par la
+frontière runtime interne `@zeta_rt_string_length_bytes(ptr, i64)`, qui retourne la
+longueur en `i32`. Le test conserve l'oracle FASM sur le code de sortie tout en
+vérifiant une définition unique du helper et un appel applicatif.
+
 `compile_clang_backend_string_bool_conversion` couvre la première conversion
 générale vers `String` côté Clang : `String(true)` / `String(false)` appellent la
 frontière runtime interne `@zeta_rt_string_from_bool(i1)`. Le helper réutilise les
@@ -404,7 +410,8 @@ runtime internes (`@zeta_rt_io_write_string` pour `io.print`/
 `io.printlnBool`, et `@zeta_rt_io_write_byte` pour `io.printByte`/
 `io.printlnByte`, et `@zeta_rt_io_write_char` pour `io.printChar`/
 `io.printlnChar`, et `@zeta_rt_io_write_double` pour `io.printDouble`/
-`io.printlnDouble`), conversions `String(Bool)` / `String(Int)` / `String(Byte)` /
+`io.printlnDouble`), `String.lengthBytes` via
+`@zeta_rt_string_length_bytes(ptr, i64)`, conversions `String(Bool)` / `String(Int)` / `String(Byte)` /
 `String(Char)` / `String(Double)` via `@zeta_rt_string_from_bool(i1)`,
 `@zeta_rt_string_from_int(i32)`, `@zeta_rt_string_from_byte(i8)`,
 `@zeta_rt_string_from_char(i32)` et `@zeta_rt_string_from_double(double)`, strings (`String`/`StringView`, concaténation,
@@ -437,6 +444,7 @@ Prochaines tranches nécessaires pour remplacer FASM :
    `@zeta_rt_io_write_int(i32, i1)`, `@zeta_rt_io_write_bool(i1, i1)`,
    `@zeta_rt_io_write_byte(i8, i1)`, `@zeta_rt_io_write_char(i32, i1)` et
    `@zeta_rt_io_write_double(double, i1)`,
+   `@zeta_rt_string_length_bytes(ptr, i64)`,
    `@zeta_rt_strings_view(ptr, i64, i32, i32)`,
    `@zeta_rt_strings_view_is_valid(ptr)`,
    `@zeta_rt_strings_decode_at_byte(ptr, i64, i32)`,
@@ -447,7 +455,8 @@ Prochaines tranches nécessaires pour remplacer FASM :
    `@zeta_rt_string_from_double(double)`) utilisées par `io.print`/
    `io.println(String)`, `io.printInt`/`io.printlnInt`, `io.printBool`/
    `io.printlnBool`, `io.printByte`/`io.printlnByte`, `io.printChar`/
-   `io.printlnChar`, `io.printDouble`/`io.printlnDouble`, `strings.view`,
+   `io.printlnChar`, `io.printDouble`/`io.printlnDouble`, `String.lengthBytes`,
+   `strings.view`,
    `strings.viewIsValid`, `strings.decodeAtByte`, `strings.nextByteOffset`,
    `strings.indexOf`/`strings.contains`, `String(Bool)`, `String(Int)`,
    `String(Byte)`, `String(Char)` et `String(Double)` ; cibler ensuite
@@ -568,6 +577,9 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   la frontière runtime interne `@zeta_rt_io_write_double(double, i1)`, qui
   centralise `printf("%g")`, le format avec/sans newline, `Double` en `double`,
   constantes/slots locaux et `fneg` unaire sur formats stables comparés à FASM.
+- fait : `--backend=clang` couvre `String.lengthBytes` via la frontière runtime
+  interne `@zeta_rt_string_length_bytes(ptr, i64)`, qui centralise le passage
+  longueur `{ ptr, i64 } -> i32`, avec exécution Clang et FASM.
 - fait : `--backend=clang` couvre `strings.view` via la frontière runtime interne
   `@zeta_rt_strings_view(ptr, i64, i32, i32)`, qui centralise les bornes, le calcul
   du pointeur et le sentinelle `{ null, 0 }`; `strings.viewIsValid` passe par la

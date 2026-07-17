@@ -722,7 +722,8 @@ pour `io.print`/
 `io.printlnBool`, `@zeta_rt_io_write_byte(i8, i1)` pour `io.printByte`/
 `io.printlnByte`, et `@zeta_rt_io_write_char(i32, i1)` pour `io.printChar`/
 `io.printlnChar`, `@zeta_rt_io_write_double(double, i1)` pour `io.printDouble`/
-`io.printlnDouble`, `@zeta_rt_strings_view(ptr, i64, i32, i32)` pour
+`io.printlnDouble`, `@zeta_rt_string_length_bytes(ptr, i64)` pour
+`String.lengthBytes`, `@zeta_rt_strings_view(ptr, i64, i32, i32)` pour
 `strings.view`, et `@zeta_rt_strings_view_is_valid(ptr)` pour
 `strings.viewIsValid`, `@zeta_rt_strings_decode_at_byte(ptr, i64, i32)` pour
 `strings.decodeAtByte`, `@zeta_rt_strings_next_byte_offset(ptr, i64, i32)` pour
@@ -735,6 +736,7 @@ pour `io.print`/
 `compile_clang_backend_io_println_string`, `compile_clang_backend_io_println_int`,
 `compile_clang_backend_io_println_bool`, `compile_clang_backend_io_println_byte`,
 `compile_clang_backend_io_println_char`, `compile_clang_backend_io_println_double`,
+`compile_clang_backend_string_literal`,
 `compile_clang_backend_string_view`, `compile_clang_backend_string_utf8_decode`,
 `compile_clang_backend_for_string_char_iteration`, `compile_clang_backend_string_search`,
 `compile_clang_backend_string_bool_conversion`,
