@@ -1,0 +1,8 @@
+import io
+
+pub val marker: Char = 'A'
+
+def main(): Int = {
+    io.printlnChar(marker)
+    Int(marker)
+}

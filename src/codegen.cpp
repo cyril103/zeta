@@ -1533,8 +1533,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         const IrSlot& slot = program.slots[id];
         if (!slot.global && !slot.external) continue;
         if (slot.type != ValueType::Int && slot.type != ValueType::Bool &&
-            slot.type != ValueType::Byte && slot.type != ValueType::String &&
-            slot.type != ValueType::Double) {
+            slot.type != ValueType::Byte && slot.type != ValueType::Char &&
+            slot.type != ValueType::String && slot.type != ValueType::Double) {
             const bool globalAggregate = slot.type.kind == ValueType::Kind::Array ||
                 slot.type.kind == ValueType::Kind::Slice || slot.type.kind == ValueType::Kind::Box ||
                 slot.type.kind == ValueType::Kind::Vec || slot.type.kind == ValueType::Kind::Struct ||
