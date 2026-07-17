@@ -71,6 +71,10 @@ if(BUILD_TESTING)
         $<TARGET_FILE:zeta>
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/emit_llvm_parameters.zeta
         ${CMAKE_CURRENT_BINARY_DIR}/clang-backend-cli-diagnostics)
+    add_test(NAME compile_clang_backend_build_library COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_build_library.sh
+        $<TARGET_FILE:zeta>
+        ${CMAKE_CURRENT_BINARY_DIR}/clang-backend-build-library)
     add_test(NAME compile_clang_backend_global_values COMMAND bash
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_global_values.sh
         $<TARGET_FILE:zeta>

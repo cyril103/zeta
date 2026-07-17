@@ -21,4 +21,4 @@ expect_failure "backend inconnu 'wat'" \
 expect_failure "--emit-llvm requiert le backend clang" \
     "${compiler}" "${source}" --emit-llvm --backend=fasm -o "${output}"
 expect_failure "--backend=clang et --emit-llvm sont réservés aux exécutables" \
-    "${compiler}" --build-library "${source}" --backend=clang -o "${output}"
+    "${compiler}" --build-library "${source}" --emit-llvm -o "${output}"

@@ -22,4 +22,6 @@ class LlvmIrCodeGenerator {
 public:
     static std::string generate(const IrProgram& program);
     static std::string generate(const VerifiedIrProgram& program);
+    static std::string generateObject(const IrProgram& program);
+    static std::string generateObject(const VerifiedIrProgram& program);
 };

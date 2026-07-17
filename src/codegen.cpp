@@ -364,9 +364,21 @@ std::string LlvmIrCodeGenerator::generate(const IrProgram& program) {
     return generate(IrVerifier::verify(program, IrVerificationMode::Executable));
 }
 
+std::string LlvmIrCodeGenerator::generateObject(const IrProgram& program) {
+    return generateObject(IrVerifier::verify(program, IrVerificationMode::ModuleObject));
+}
+
+std::string LlvmIrCodeGenerator::generateObject(const VerifiedIrProgram& verified) {
+    if (verified.mode() != IrVerificationMode::ModuleObject)
+        throw IrVerificationError("IRV004", "mode exécutable fourni au codegen LLVM objet");
+    return generate(verified);
+}
+
 std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
-    if (verified.mode() != IrVerificationMode::Executable)
-        throw IrVerificationError("IRV004", "mode objet fourni au codegen LLVM exécutable");
+    if (verified.mode() != IrVerificationMode::Executable &&
+        verified.mode() != IrVerificationMode::ModuleObject)
+        throw IrVerificationError("IRV004", "mode de vérification incompatible avec le codegen LLVM");
+    const bool moduleObjectMode = verified.mode() == IrVerificationMode::ModuleObject;
 
     const IrProgram& program = verified.program();
     std::ostringstream out;
@@ -1496,9 +1508,11 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             out << "global " << llvmType(slot.type) << " 0\n";
         }
     }
-    out << "\ndefine i32 @main() {\nentry:\n";
-    emitScalarAllocas();
-    bool openFunction = true;
+    if (!moduleObjectMode) {
+        out << "\ndefine i32 @main() {\nentry:\n";
+        emitScalarAllocas();
+    }
+    bool openFunction = !moduleObjectMode;
     bool terminated = false;
     bool skippingFunction = false;
     for (const IrInstruction& instruction : program.instructions) {

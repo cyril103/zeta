@@ -90,6 +90,25 @@ void runClang(const fs::path& llvmIr, const fs::path& executable) {
         throw std::runtime_error("clang n'a pas pu produire l'exécutable");
 }
 
+void runClangObject(const fs::path& llvmIr, const fs::path& object) {
+    const pid_t child = fork();
+    if (child < 0) throw std::runtime_error("impossible de lancer clang");
+    if (child == 0) {
+        const std::string input = llvmIr.string();
+        const std::string output = object.string();
+        execlp("clang", "clang", "-x", "ir", "-c", input.c_str(), "-o", output.c_str(),
+               static_cast<char*>(nullptr));
+        _exit(127);
+    }
+    int status{};
+    if (waitpid(child, &status, 0) < 0 || !WIFEXITED(status))
+        throw std::runtime_error("clang n'a pas pu produire l'objet");
+    if (WEXITSTATUS(status) == 127)
+        throw std::runtime_error("clang introuvable pour --backend=clang");
+    if (WEXITSTATUS(status) != 0)
+        throw std::runtime_error("clang n'a pas pu produire l'objet");
+}
+
 void runRelocatableLink(const std::vector<fs::path>& objects, const fs::path& output) {
     const pid_t child = fork();
     if (child < 0) throw std::runtime_error("impossible de lancer ld -r");
@@ -164,7 +183,7 @@ bool hasNativeExports(const ModuleInterface& interface) {
     return false;
 }
 
-void buildLibrary(const ModuleGraph& modules, const fs::path& outputDirectory) {
+void buildLibrary(const ModuleGraph& modules, const fs::path& outputDirectory, Backend backend) {
     if (fs::exists(outputDirectory) && !fs::is_directory(outputDirectory))
         throw std::runtime_error("la sortie de --build-library doit être un dossier");
     fs::create_directories(outputDirectory);
@@ -179,6 +198,8 @@ void buildLibrary(const ModuleGraph& modules, const fs::path& outputDirectory) {
         outputDirectory / ("." + moduleName + ".zti" + temporarySuffix);
     const fs::path temporaryAssembly =
         outputDirectory / ("." + moduleName + ".asm" + temporarySuffix);
+    const fs::path temporaryLlvm =
+        outputDirectory / ("." + moduleName + ".ll" + temporarySuffix);
     const fs::path temporaryObject =
         outputDirectory / ("." + moduleName + ".o" + temporarySuffix);
     const fs::path temporaryRuntime =
@@ -186,8 +207,8 @@ void buildLibrary(const ModuleGraph& modules, const fs::path& outputDirectory) {
     const fs::path temporaryLinked =
         outputDirectory / ("." + moduleName + ".linked.o" + temporarySuffix);
     TemporaryFiles temporaryFiles;
-    for (const fs::path& path : {temporaryInterface, temporaryAssembly, temporaryObject,
-                                 temporaryRuntime, temporaryLinked}) {
+    for (const fs::path& path : {temporaryInterface, temporaryAssembly, temporaryLlvm,
+                                 temporaryObject, temporaryRuntime, temporaryLinked}) {
         std::error_code ignored;
         fs::remove(path, ignored);
         temporaryFiles.add(path);
@@ -195,14 +216,20 @@ void buildLibrary(const ModuleGraph& modules, const fs::path& outputDirectory) {
 
     IrGenerator generator;
     const IrProgram ir = generator.generateModule(modules, moduleName);
+    const VerifiedIrProgram verifiedIr = IrVerifier::verify(ir, IrVerificationMode::ModuleObject);
     writeFile(temporaryInterface, InterfaceCodec::serialize(
         modules.interfaces.at(moduleName),
         modules.interfaceFingerprints.at(moduleName),
         modules.dependencies.at(moduleName), module.genericTokens));
-    writeFile(temporaryAssembly,
-              FasmCodeGenerator::generateObject(ir, false, moduleName));
-    runFasm(temporaryAssembly, temporaryObject);
-    weakenGenericSymbols(temporaryObject, ir);
+    if (backend == Backend::Clang) {
+        writeFile(temporaryLlvm, LlvmIrCodeGenerator::generateObject(verifiedIr));
+        runClangObject(temporaryLlvm, temporaryObject);
+    } else {
+        writeFile(temporaryAssembly,
+                  FasmCodeGenerator::generateObject(verifiedIr, false, moduleName));
+        runFasm(temporaryAssembly, temporaryObject);
+        weakenGenericSymbols(temporaryObject, ir);
+    }
 
     fs::path publishedObject = temporaryObject;
     if (hasNativeExports(modules.interfaces.at(moduleName))) {
@@ -220,8 +247,11 @@ void buildLibrary(const ModuleGraph& modules, const fs::path& outputDirectory) {
 
     const fs::path interfacePath = outputDirectory / (moduleName + ".zti");
     const fs::path objectPath = outputDirectory / (moduleName + ".o");
+    const fs::path llvmPath = outputDirectory / (moduleName + ".ll");
     fs::rename(temporaryInterface, interfacePath);
     fs::rename(publishedObject, objectPath);
+    if (backend == Backend::Clang)
+        fs::rename(temporaryLlvm, llvmPath);
 }
 
 fs::path defaultLibraryCache() {
@@ -433,9 +463,9 @@ int main(int argc, char** argv) {
         usage();
         return 2;
     }
-    if ((buildStandardLibrary || buildLibraryModule || installLibraryModule) &&
-        (emitLlvm || backend == Backend::Clang)) {
-        std::cerr << "Erreur: --backend=clang et --emit-llvm sont réservés aux exécutables\n";
+    if (((buildStandardLibrary || installLibraryModule) && (emitLlvm || backend == Backend::Clang)) ||
+        (buildLibraryModule && emitLlvm)) {
+        std::cerr << "Erreur: --backend=clang et --emit-llvm sont réservés aux exécutables, sauf --build-library --backend=clang\n";
         return 2;
     }
     if (emitLlvm && backend == Backend::Fasm) {
@@ -502,7 +532,7 @@ int main(int argc, char** argv) {
                                      moduleName == modules.root && !buildLibraryModule);
         }
         if (buildLibraryModule) {
-            buildLibrary(modules, outputPath);
+            buildLibrary(modules, outputPath, backend);
             std::cout << "Bibliothèque créée : " << outputPath / (modules.root + ".zti")
                       << " et " << outputPath / (modules.root + ".o") << '\n';
             return 0;
