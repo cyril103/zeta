@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <unordered_set>
 
 namespace {
@@ -545,17 +546,51 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         }
         return paths;
     };
+    std::size_t ownershipSequence = 0;
     auto emitStringFree = [&](const std::string& prefix, const std::string& stringValue,
                               const ValueType& stringType) -> void {
         const std::string data = prefix + ".ptr";
         const std::string raw = prefix + ".raw";
+        const std::string count = prefix + ".refcount";
+        const std::string isStatic = prefix + ".is_static";
+        const std::string decremented = prefix + ".decremented";
+        const std::string shouldFree = prefix + ".should_free";
+        const std::string labelStem = "string.drop." + std::to_string(ownershipSequence++);
+        const std::string decrementLabel = labelStem + ".decrement";
+        const std::string freeLabel = labelStem + ".free";
+        const std::string doneLabel = labelStem + ".done";
         out << "  " << data << " = extractvalue " << llvmType(stringType) << " "
             << stringValue << ", 0\n"
             << "  " << raw << " = getelementptr i8, ptr " << data << ", i64 -16\n"
-            << "  call void @free(ptr " << raw << ")\n";
+            << "  " << count << " = load i64, ptr " << raw << "\n"
+            << "  " << isStatic << " = icmp eq i64 " << count << ", -1\n"
+            << "  br i1 " << isStatic << ", label %" << doneLabel << ", label %" << decrementLabel << "\n"
+            << decrementLabel << ":\n"
+            << "  " << decremented << " = add i64 " << count << ", -1\n"
+            << "  store i64 " << decremented << ", ptr " << raw << "\n"
+            << "  " << shouldFree << " = icmp eq i64 " << decremented << ", 0\n"
+            << "  br i1 " << shouldFree << ", label %" << freeLabel << ", label %" << doneLabel << "\n"
+            << freeLabel << ":\n"
+            << "  call void @free(ptr " << raw << ")\n"
+            << "  br label %" << doneLabel << "\n"
+            << doneLabel << ":\n";
     };
-    auto emitHeapStringPathDrop = [&](const std::string& prefix, const std::string& rootValue,
-                                      const ValueType& rootType, const HeapStringPath& path) -> void {
+    auto emitStringRetain = [&](const std::string& prefix, const std::string& stringValue,
+                                const ValueType& stringType) -> void {
+        const std::string data = prefix + ".ptr";
+        const std::string raw = prefix + ".raw";
+        const std::string count = prefix + ".refcount";
+        const std::string retained = prefix + ".retained";
+        out << "  " << data << " = extractvalue " << llvmType(stringType) << " "
+            << stringValue << ", 0\n"
+            << "  " << raw << " = getelementptr i8, ptr " << data << ", i64 -16\n"
+            << "  " << count << " = load i64, ptr " << raw << "\n"
+            << "  " << retained << " = add i64 " << count << ", 1\n"
+            << "  store i64 " << retained << ", ptr " << raw << "\n";
+    };
+    auto valueAtHeapStringPath = [&](const std::string& prefix, const std::string& rootValue,
+                                     const ValueType& rootType,
+                                     const HeapStringPath& path) -> std::pair<std::string, ValueType> {
         std::string currentValue = rootValue;
         ValueType currentType = rootType;
         for (std::size_t depth = 0; depth < path.size(); ++depth) {
@@ -566,7 +601,17 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             currentValue = fieldValue;
             currentType = currentType.structure->fields[fieldIndex].type;
         }
+        return {currentValue, currentType};
+    };
+    auto emitHeapStringPathDrop = [&](const std::string& prefix, const std::string& rootValue,
+                                      const ValueType& rootType, const HeapStringPath& path) -> void {
+        const auto [currentValue, currentType] = valueAtHeapStringPath(prefix, rootValue, rootType, path);
         emitStringFree(prefix, currentValue, currentType);
+    };
+    auto emitHeapStringPathRetain = [&](const std::string& prefix, const std::string& rootValue,
+                                        const ValueType& rootType, const HeapStringPath& path) -> void {
+        const auto [currentValue, currentType] = valueAtHeapStringPath(prefix, rootValue, rootType, path);
+        emitStringRetain(prefix, currentValue, currentType);
     };
     auto unsupported = [](const char* instruction) -> void {
         throw std::runtime_error(std::string("backend LLVM: instruction non supportée ") + instruction);
@@ -1607,6 +1652,16 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         } else if (const auto* item = std::get_if<IrRetain>(&instruction)) {
             if (!isLlvmValueType(item->type) && item->type != ValueType::Unit)
                 throw std::runtime_error("backend LLVM: retain non supporté " + typeName(item->type));
+            if (item->type == ValueType::String && heapStringValues.contains(item->value)) {
+                emitStringRetain("%retain" + std::to_string(item->value), value(item->value), item->type);
+            } else if (item->type.kind == ValueType::Kind::Struct) {
+                const HeapStringPaths paths = pathsForValue(item->value);
+                std::size_t pathIndex = 0;
+                for (const HeapStringPath& path : paths)
+                    emitHeapStringPathRetain("%retain" + std::to_string(item->value) + ".path" +
+                                                 std::to_string(pathIndex++),
+                                             value(item->value), item->type, path);
+            }
         } else {
             unsupported("complexe");
         }

@@ -1,0 +1,15 @@
+import io
+
+struct Packet {
+    text: String
+    code: Int
+}
+
+
+def main(): Int = {
+    val suffix: String = "retain"
+    val original: Packet = Packet { text: "heap " + suffix, code: 9 }
+    val copied: Packet = original
+    io.println(copied.text)
+    if (original.text.lengthBytes == 11 && copied.text.lengthBytes == 11 && original.code == copied.code) 0 else 1
+}
