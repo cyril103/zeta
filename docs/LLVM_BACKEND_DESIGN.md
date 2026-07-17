@@ -317,9 +317,11 @@ l'émission LLVM pour éviter la conversion générale `String(Char)`.
 `compile_clang_backend_io_println_double` ajoute une sortie `Double` ciblée :
 `Double` est représenté comme `double`, les constantes littérales et les slots
 locaux doubles sont stockables, le moins unaire est abaissé en `fneg double`, et
-les appels directs `io.printDouble` / `io.printlnDouble` passent par `printf`
-avec formats `%g` / `%g\n`. La tranche reste volontairement limitée aux formats
-stables comparés à FASM.
+les appels directs `io.printDouble` / `io.printlnDouble` passent par la frontière
+runtime interne `@zeta_rt_io_write_double(double, i1)`. Le helper sélectionne les
+formats privés `%g` / `%g\n` puis appelle `printf`, ce qui retire la logique de
+formatage des corps applicatifs. La tranche reste volontairement limitée aux
+formats stables comparés à FASM.
 
 `compile_clang_backend_double_operations` couvre ensuite le noyau calculatoire
 `Double` : les opérations `+`, `-`, `*`, `/` sont abaissées respectivement en
@@ -357,13 +359,14 @@ les drops/retains conditionnels ne libèrent jamais les constantes.
 
 Le chemin LLVM/Clang couvre désormais un sous-ensemble exécutable large : scalaires
 `Int`/`Bool`/`Byte`/`Char`/`Double`, contrôle de flot, appels, modules source avec
-globales scalaires, strings et `StringView`, IO spécialisée avec cinq premières
-frontières runtime internes (`@zeta_rt_io_write_string` pour `io.print`/
+globales scalaires, strings et `StringView`, IO spécialisée avec six frontières
+runtime internes (`@zeta_rt_io_write_string` pour `io.print`/
 `io.println(String)`, `@zeta_rt_io_write_int` pour `io.printInt`/
 `io.printlnInt` et `@zeta_rt_io_write_bool` pour `io.printBool`/
 `io.printlnBool`, et `@zeta_rt_io_write_byte` pour `io.printByte`/
 `io.printlnByte`, et `@zeta_rt_io_write_char` pour `io.printChar`/
-`io.printlnChar`), structs simples, mixtes et imbriqués, ABI de fonctions sur
+`io.printlnChar`, et `@zeta_rt_io_write_double` pour `io.printDouble`/
+`io.printlnDouble`), structs simples, mixtes et imbriqués, ABI de fonctions sur
 structs simples, copies à travers branches et ownership de chaînes heap encapsulées
 dans des structs, y compris à travers paramètres, appels et retours de fonctions
 portant ces structs.
@@ -382,13 +385,14 @@ Tests structurants déjà verrouillés côté structs/ownership :
 
 Prochaines tranches nécessaires pour remplacer FASM :
 
-1. étendre l'ABI runtime/stdlib LLVM `zeta_rt_*` au-delà des cinq premières briques
-   `@zeta_rt_io_write_string(ptr, i64, i1)`, `@zeta_rt_io_write_int(i32, i1)`,
-   `@zeta_rt_io_write_bool(i1, i1)`, `@zeta_rt_io_write_byte(i8, i1)` et
-   `@zeta_rt_io_write_char(i32, i1)` déjà
-   utilisées par `io.print`/`io.println(String)`, `io.printInt`/`io.printlnInt`,
-   `io.printBool`/`io.printlnBool`, `io.printByte`/`io.printlnByte` et
-   `io.printChar`/`io.printlnChar` ; cibler ensuite les helpers `io.*` primitifs restants, les
+1. étendre l'ABI runtime/stdlib LLVM `zeta_rt_*` après les six briques
+   `io.*` déjà livrées (`@zeta_rt_io_write_string(ptr, i64, i1)`,
+   `@zeta_rt_io_write_int(i32, i1)`, `@zeta_rt_io_write_bool(i1, i1)`,
+   `@zeta_rt_io_write_byte(i8, i1)`, `@zeta_rt_io_write_char(i32, i1)` et
+   `@zeta_rt_io_write_double(double, i1)`) utilisées par `io.print`/
+   `io.println(String)`, `io.printInt`/`io.printlnInt`, `io.printBool`/
+   `io.printlnBool`, `io.printByte`/`io.printlnByte`, `io.printChar`/
+   `io.printlnChar` et `io.printDouble`/`io.printlnDouble` ; cibler ensuite les
    primitives `strings.*` ou les conversions générales vers `String` encore
    abaissées de façon spécialisée ;
 2. produire et relier modules séparés, stdlib précompilée et runtime via `clang` ;
@@ -487,8 +491,9 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   l'encodage UTF-8 1-4 octets, l'appel `write` et le newline conditionnel, avec
   comparaison stdout FASM.
 - fait : `--backend=clang` couvre `io.printDouble`/`io.printlnDouble` directs via
-  `Double` en `double`, constantes/slots locaux, `fneg` unaire et `printf("%g")`
-  sur formats stables comparés à FASM.
+  la frontière runtime interne `@zeta_rt_io_write_double(double, i1)`, qui
+  centralise `printf("%g")`, le format avec/sans newline, `Double` en `double`,
+  constantes/slots locaux et `fneg` unaire sur formats stables comparés à FASM.
 - fait : `--backend=clang` couvre les opérations arithmétiques `Double`
   `+`/`-`/`*`/`/` via `fadd`/`fsub`/`fmul`/`fdiv`, et les comparaisons ordonnées
   via `fcmp o*`, avec exécution Clang et FASM.
