@@ -747,9 +747,11 @@ pour `io.print`/
 `compile_clang_backend_string_double_conversion`, ainsi que
 `compile_clang_backend_build_library` pour le premier objet bibliothèque LLVM et
 `compile_clang_backend_shared_library_cache` pour la liaison d'un exécutable Clang
-contre des bibliothèques précompilées LLVM installées, et
-`compile_clang_backend_build_stdlib` pour la première précompilation stdlib simple
-via LLVM, `compile_clang_backend_global_string` pour les `pub val String`
+contre des bibliothèques précompilées LLVM installées,
+`compile_clang_backend_shared_global_cache` pour la lecture de `pub val` scalaires
+précompilés depuis un cache `.o` LLVM, et `compile_clang_backend_build_stdlib`
+pour la première précompilation stdlib simple via LLVM,
+`compile_clang_backend_global_string` pour les `pub val String`
 globales LLVM, `compile_clang_backend_global_double` pour les `pub val Double`
 globales LLVM, `compile_clang_backend_global_byte` pour les `pub val Byte`
 globales LLVM, `compile_clang_backend_global_char` pour les `pub val Char`
@@ -765,7 +767,9 @@ Après cette tranche :
 2. fait partiel : `--build-library --backend=clang` produit maintenant `.zti`,
    `.ll` et `.o` via `clang -c` pour les modules bibliothèque simples,
    `--backend=clang` relie les exécutables aux objets précompilés LLVM installés
-   (`.zti`/`.o`) en copiant les dépendances dans `<app>.modules`, et
+   (`.zti`/`.o`) en copiant les dépendances dans `<app>.modules`, les `pub val`
+   scalaires précompilés sont émis avec un symbole stable `module__name`, déclarés
+   `external global` côté consommateur et relus depuis l'objet `.o` du cache, et
    `--build-stdlib --backend=clang` précompile désormais les modules stdlib simples
    en `.zti`/`.ll`/`.o`, les `pub val String` globales sont émises en
    `{ ptr, i64 } zeroinitializer` puis initialisées dans le wrapper `@main`,

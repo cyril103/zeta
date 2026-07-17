@@ -217,6 +217,15 @@ champs sont déjà des types LLVM supportés : le slot est émis comme
 `@main`, relu par `load { ... }, ptr @slotN`, puis les champs restent extraits
 via les chemins d'agrégats locaux existants.
 
+`compile_clang_backend_shared_global_cache` verrouille ensuite le cas module
+précompilé : un module construit avec `--build-library --backend=clang` émet ses
+`pub val` scalaires avec le symbole stable `@module__name` et, quand l'initialiseur
+est une constante scalaire, avec un initialiseur LLVM statique (`global i32 42` par
+exemple). Le consommateur marque les modules `precompiled` comme slots externes,
+déclare `@module__name = external global ...`, relit cette globale depuis l'objet
+`.o` du cache, et le lien Clang réutilise l'objet copié dans `<app>.modules` sans
+redéfinition locale.
+
 Les diagnostics d'agrégats globaux restent couverts séparément par les tests
 `reject_clang_backend_unsupported_aggregates` et
 `reject_clang_backend_unsupported_global_aggregates` pour les tableaux, slices,
@@ -655,6 +664,10 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   précompilées LLVM installées : les appels externes sont déclarés dans l'IR,
   les `.o` de dépendances sont copiés dans `<app>.modules`, puis passés au lien
   final `clang`, avec exécution du binaire résultant.
+- fait : `--backend=clang` consomme aussi les `pub val` scalaires de modules
+  précompilés LLVM : le producteur utilise les symboles globaux stables
+  `module__name` avec initialiseur statique quand possible, le consommateur les
+  déclare `external global`, puis relie l'objet `.o` du cache sans redéfinition.
 - fait : `--build-stdlib --backend=clang` précompile une stdlib simple côté LLVM :
   chaque module produit `.zti`, `.ll` et `.o`, le manifeste est écrit, les sources
   peuvent ensuite être absentes, et un exécutable Clang consomme le cache `precompiled`.
