@@ -206,6 +206,11 @@ le slot est émis comme `@slotN = global i8 0`, initialisé par `store i8`, relu
 `load i8, ptr @slotN`, puis utilisé par `io.printlnByte` et `Int(Byte)`, avec stdout
 et code retour vérifiés côté Clang.
 
+`compile_clang_backend_global_char` couvre les `pub val Char` globales : le slot
+est émis comme `@slotN = global i32 0`, initialisé par `store i32`, relu via
+`load i32, ptr @slotN`, puis utilisé par `io.printlnChar` et `Int(Char)`, avec stdout
+et code retour vérifiés côté Clang.
+
 Les diagnostics d'agrégats globaux restent couverts séparément par les tests
 `reject_clang_backend_unsupported_aggregates` et
 `reject_clang_backend_unsupported_global_aggregates` pour les tableaux, slices,
@@ -658,6 +663,10 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--backend=clang` couvre les `pub val Byte` globales en les émettant
   comme `global i8 0`, puis en les initialisant dans `@main`; les lectures globales
   réutilisent `load i8`, avec `io.printlnByte`, conversion `Int(Byte)`, stdout et
+  code retour vérifiés.
+- fait : `--backend=clang` couvre les `pub val Char` globales en les émettant
+  comme `global i32 0`, puis en les initialisant dans `@main`; les lectures globales
+  réutilisent `load i32`, avec `io.printlnChar`, conversion `Int(Char)`, stdout et
   code retour vérifiés.
 - fait : `--backend=clang` couvre les opérations arithmétiques `Double`
   `+`/`-`/`*`/`/` via `fadd`/`fsub`/`fmul`/`fdiv`, et les comparaisons ordonnées
