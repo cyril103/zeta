@@ -758,10 +758,11 @@ Les agrégats globaux et les structs contenant `Box`/`Vec`/tableaux restent reje
 explicitement.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre contrôlé : gestion plus complète de propriété/retain des chaînes heap,
-correction des copies SSA à travers branches pour les expressions conditionnelles,
+périmètre contrôlé : gestion plus complète de propriété/retain des chaînes heap
 ou mutation directe de sous-champs (`entry.point.x = ...`) avant toute
-généralisation.
+généralisation. Les copies SSA à travers branches sont désormais matérialisées
+par stockage/rechargement pour les valeurs copiées sur plusieurs chemins et
+verrouillées par `compile_clang_backend_branch_copy`.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.

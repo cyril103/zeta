@@ -412,6 +412,20 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         }
     }
 
+    std::unordered_map<ValueId, std::size_t> copyDefinitionCounts;
+    for (const IrInstruction& instruction : program.instructions) {
+        if (const auto* copy = std::get_if<IrCopy>(&instruction)) {
+            ++copyDefinitionCounts[copy->output];
+        }
+    }
+    std::unordered_map<ValueId, ValueType> repeatedCopyTypes;
+    for (const auto& [id, count] : copyDefinitionCounts) {
+        if (count > 1) {
+            const ValueType type = program.valueTypes.at(id);
+            if (type != ValueType::Unit) repeatedCopyTypes.insert_or_assign(id, type);
+        }
+    }
+
     std::function<bool(const ValueType&)> isLlvmValueType;
     std::function<std::string(const ValueType&)> llvmType;
     isLlvmValueType = [&](const ValueType& type) -> bool {
@@ -463,6 +477,14 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             }
         }
         return escaped.str();
+    };
+    std::size_t repeatedCopyLoad = 0;
+    auto reloadRepeatedCopies = [&]() -> void {
+        for (const auto& [id, type] : repeatedCopyTypes) {
+            const std::string loaded = "%v" + std::to_string(id) + ".reload" + std::to_string(repeatedCopyLoad++);
+            out << "  " << loaded << " = load " << llvmType(type) << ", ptr %copy" << id << "\n";
+            values[id] = loaded;
+        }
     };
     auto value = [&](ValueId id) -> std::string {
         if (const auto found = values.find(id); found != values.end()) return found->second;
@@ -1020,6 +1042,11 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             }
             out << "  " << slotName(id) << " = alloca " << llvmType(slot.type) << "\n";
         }
+        for (const auto& [id, type] : repeatedCopyTypes) {
+            if (!isLlvmValueType(type))
+                throw std::runtime_error("backend LLVM: copie SSA répétée non supportée " + typeName(type));
+            out << "  %copy" << id << " = alloca " << llvmType(type) << "\n";
+        }
     };
 
     const bool usesStringConcat = std::any_of(program.instructions.begin(), program.instructions.end(),
@@ -1213,6 +1240,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         } else if (const auto* item = std::get_if<IrLabel>(&instruction)) {
             if (!terminated) out << "  br label %" << labelName(item->label) << "\n";
             out << labelName(item->label) << ":\n";
+            reloadRepeatedCopies();
             terminated = false;
         } else if (const auto* item = std::get_if<IrJump>(&instruction)) {
             out << "  br label %" << labelName(item->label) << "\n";
@@ -1294,7 +1322,14 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                        item->type == ValueType::Bool || item->type == ValueType::Char ||
                        item->type == ValueType::Double ||
                        item->type.kind == ValueType::Kind::Struct) {
-                values[item->output] = value(item->input);
+                if (repeatedCopyTypes.contains(item->output)) {
+                    const std::string input = value(item->input);
+                    out << "  store " << llvmType(item->type) << " " << input
+                        << ", ptr %copy" << item->output << "\n";
+                    values[item->output] = input;
+                } else {
+                    values[item->output] = value(item->input);
+                }
             } else {
                 throw std::runtime_error("backend LLVM: type de copie non supporté " +
                                          typeName(item->type));

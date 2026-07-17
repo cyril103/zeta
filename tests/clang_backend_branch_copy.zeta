@@ -1,0 +1,10 @@
+def pick(flag: Bool, left: Int, right: Int): Int = {
+    if (flag) left else right
+}
+
+def main(): Int = {
+    val a: Int = pick(true, 41, 1)
+    val b: Int = pick(false, 1, 1)
+    val c: Int = if (a == 41) 1 else 0
+    a + b + c - 1
+}
