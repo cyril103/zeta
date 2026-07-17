@@ -1,0 +1,8 @@
+import io
+
+pub val greeting: String = "zeta"
+
+def main(): Int = {
+    io.println(greeting)
+    greeting.lengthBytes
+}
