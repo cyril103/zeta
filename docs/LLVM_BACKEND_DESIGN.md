@@ -299,9 +299,11 @@ conversion générale `String(Bool)`, encore hors périmètre.
 est représenté comme `i8` côté LLVM, les conversions minimales `Int -> Byte` et
 `Byte -> Int` sont abaissées en `trunc i32 ... to i8` et `zext i8 ... to i32`, et
 les appels stdlib directs `io.printByte(value: Byte)` /
-`io.printlnByte(value: Byte)` passent par `printf` avec formats `%u` / `%u\n`
-après extension non signée. Les helpers `io__printByte`/`io__printlnByte` sont
-sautés pendant l'émission LLVM pour éviter la conversion générale `String(Byte)`.
+`io.printlnByte(value: Byte)` passent par la frontière runtime interne
+`@zeta_rt_io_write_byte(i8, i1)`. Le helper garde l'extension non signée vers
+`i32`, sélectionne les formats privés `%u` / `%u\n` et appelle `printf`. Les
+helpers `io__printByte`/`io__printlnByte` sont sautés pendant l'émission LLVM pour
+éviter la conversion générale `String(Byte)`.
 
 `compile_clang_backend_io_println_char` ajoute une sortie `Char` ciblée : la
 stdlib expose désormais `printlnChar`, et les appels directs `io.printChar` /
@@ -354,11 +356,12 @@ les drops/retains conditionnels ne libèrent jamais les constantes.
 
 Le chemin LLVM/Clang couvre désormais un sous-ensemble exécutable large : scalaires
 `Int`/`Bool`/`Byte`/`Char`/`Double`, contrôle de flot, appels, modules source avec
-globales scalaires, strings et `StringView`, IO spécialisée avec trois premières
+globales scalaires, strings et `StringView`, IO spécialisée avec quatre premières
 frontières runtime internes (`@zeta_rt_io_write_string` pour `io.print`/
 `io.println(String)`, `@zeta_rt_io_write_int` pour `io.printInt`/
 `io.printlnInt` et `@zeta_rt_io_write_bool` pour `io.printBool`/
-`io.printlnBool`), structs simples, mixtes et imbriqués, ABI de fonctions sur
+`io.printlnBool`, et `@zeta_rt_io_write_byte` pour `io.printByte`/
+`io.printlnByte`), structs simples, mixtes et imbriqués, ABI de fonctions sur
 structs simples, copies à travers branches et ownership de chaînes heap encapsulées
 dans des structs, y compris à travers paramètres, appels et retours de fonctions
 portant ces structs.
@@ -377,11 +380,12 @@ Tests structurants déjà verrouillés côté structs/ownership :
 
 Prochaines tranches nécessaires pour remplacer FASM :
 
-1. étendre l'ABI runtime/stdlib LLVM `zeta_rt_*` au-delà des trois premières briques
-   `@zeta_rt_io_write_string(ptr, i64, i1)`, `@zeta_rt_io_write_int(i32, i1)` et
-   `@zeta_rt_io_write_bool(i1, i1)` déjà utilisées par `io.print`/
-   `io.println(String)`, `io.printInt`/`io.printlnInt` et `io.printBool`/
-   `io.printlnBool` ; cibler ensuite les helpers `io.*` primitifs restants, les
+1. étendre l'ABI runtime/stdlib LLVM `zeta_rt_*` au-delà des quatre premières briques
+   `@zeta_rt_io_write_string(ptr, i64, i1)`, `@zeta_rt_io_write_int(i32, i1)`,
+   `@zeta_rt_io_write_bool(i1, i1)` et `@zeta_rt_io_write_byte(i8, i1)` déjà
+   utilisées par `io.print`/`io.println(String)`, `io.printInt`/`io.printlnInt`,
+   `io.printBool`/`io.printlnBool` et `io.printByte`/`io.printlnByte` ; cibler
+   ensuite les helpers `io.*` primitifs restants, les
    primitives `strings.*` ou les conversions générales vers `String` encore
    abaissées de façon spécialisée ;
 2. produire et relier modules séparés, stdlib précompilée et runtime via `clang` ;
@@ -472,7 +476,9 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   sélection `true`/`false`, l'appel `write` et l'écriture conditionnelle du newline,
   avec comparaison stdout FASM.
 - fait : `--backend=clang` couvre `io.printByte`/`io.printlnByte` directs via
-  `Byte` en `i8`, extension non signée et `printf`, avec comparaison stdout FASM.
+  la frontière runtime interne `@zeta_rt_io_write_byte(i8, i1)`, qui centralise
+  l'extension non signée, le choix du format `printf` avec ou sans newline et
+  l'appel varargs, avec comparaison stdout FASM.
 - fait : `--backend=clang` couvre `io.printChar`/`io.printlnChar` directs via
   encodage UTF-8 1-4 octets et `write`, avec comparaison stdout FASM.
 - fait : `--backend=clang` couvre `io.printDouble`/`io.printlnDouble` directs via

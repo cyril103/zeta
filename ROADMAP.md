@@ -570,10 +570,10 @@ notamment :
 5. imports de modules source et globales scalaires `Int`/`Bool` ;
 6. `String`/`StringView` : littéraux, slots locaux, concat heap, `lengthBytes`,
    `isEmpty`, vues, recherche, UTF-8, itération `for` ;
-7. `io.print`/`io.println(String)`, `io.printInt`/`io.printlnInt` et
-   `io.printBool`/`io.printlnBool` via helpers runtime internes `zeta_rt_*`,
-   autres `io.print*`/`io.println*` primitifs encore spécialisés pour `Byte`,
-   `Char` et `Double` ;
+7. `io.print`/`io.println(String)`, `io.printInt`/`io.printlnInt`,
+   `io.printBool`/`io.printlnBool` et `io.printByte`/`io.printlnByte` via helpers
+   runtime internes `zeta_rt_*`, autres `io.print*`/`io.println*` primitifs encore
+   spécialisés pour `Char` et `Double` ;
 8. structs locaux simples, mixtes et imbriqués, ABI de fonctions portant des
    structs simples, mutations de champs et sous-champs ;
 9. ownership des chaînes heap dans des structs LLVM : propagation par chemins de
@@ -594,16 +594,19 @@ travail par défaut pour le développement courant :
    drops sans double libération.
 2. **En cours le 17 juillet 2026 — ABI runtime/stdlib par Clang** : premières
    frontières stabilisées pour `io.print`/`io.println(String)`, `io.printInt`/
-   `io.printlnInt` et `io.printBool`/`io.printlnBool`. Les appels `String`
-   passent par le helper LLVM interne `@zeta_rt_io_write_string(ptr, i64, i1)`,
-   les appels `Int` par `@zeta_rt_io_write_int(i32, i1)` et les appels `Bool` par
-   `@zeta_rt_io_write_bool(i1, i1)`, au lieu de dupliquer les appels `write` ou
+   `io.printlnInt`, `io.printBool`/`io.printlnBool` et `io.printByte`/
+   `io.printlnByte`. Les appels `String` passent par le helper LLVM interne
+   `@zeta_rt_io_write_string(ptr, i64, i1)`, les appels `Int` par
+   `@zeta_rt_io_write_int(i32, i1)`, les appels `Bool` par
+   `@zeta_rt_io_write_bool(i1, i1)` et les appels `Byte` par
+   `@zeta_rt_io_write_byte(i8, i1)`, au lieu de dupliquer les appels `write` ou
    `printf` dans les corps applicatifs. `compile_clang_backend_io_println_string`,
-   `compile_clang_backend_io_println_int` et `compile_clang_backend_io_println_bool`
-   verrouillent chacun la définition unique du helper, les chemins `print`/
-   `println` et la comparaison stdout Clang/FASM.
+   `compile_clang_backend_io_println_int`, `compile_clang_backend_io_println_bool`
+   et `compile_clang_backend_io_println_byte` verrouillent chacun la définition
+   unique du helper, les chemins `print`/`println` et la comparaison stdout
+   Clang/FASM.
 3. **Suite runtime/stdlib par Clang** : étendre cette ABI stable aux helpers
-   `io.*` primitifs restants (`Byte`, `Char`, `Double`), aux primitives
+   `io.*` primitifs restants (`Char`, `Double`), aux primitives
    `strings.*` et aux conversions générales vers `String`, sans réintroduire
    d'assembleur FASM dans le chemin Clang.
 4. **Modules séparés et stdlib précompilée** : produire/relier objets runtime,
@@ -677,21 +680,22 @@ Chaque étape doit :
 
 Reprendre la migration LLVM avec l'objectif explicite de remplacer FASM comme
 backend de développement. Le dépôt est vert après
-`compile_clang_backend_io_println_bool` : **527 tests CTest passent** et le backend
+`compile_clang_backend_io_println_byte` : **527 tests CTest passent** et le backend
 LLVM couvre déjà scalaires, strings, IO ciblée, structs imbriqués, copies à
 travers branches, ownership heap-string intra-struct et propagation de cette
 propriété par paramètres/retours de fonctions portant des structs.
 
 Démarrer par la tranche RED/GREEN suivante de l'ABI runtime/stdlib LLVM :
-**étendre la frontière `zeta_rt_*` aux `io.*` primitifs restants** (`Byte`, `Char`,
+**étendre la frontière `zeta_rt_*` aux `io.*` primitifs restants** (`Char`,
 `Double`) ou extraire une primitive `strings.*` suffisamment centrale, en
-réduisant les lowerings spécialisés dans les corps applicatifs. Les trois premières
+réduisant les lowerings spécialisés dans les corps applicatifs. Les quatre premières
 briques livrées sont `@zeta_rt_io_write_string(ptr, i64, i1)` pour `io.print`/
 `io.println(String)`, `@zeta_rt_io_write_int(i32, i1)` pour `io.printInt`/
 `io.printlnInt`, et `@zeta_rt_io_write_bool(i1, i1)` pour `io.printBool`/
-`io.printlnBool`, verrouillées respectivement par
-`compile_clang_backend_io_println_string`, `compile_clang_backend_io_println_int`
-et `compile_clang_backend_io_println_bool`.
+`io.printlnBool`, et `@zeta_rt_io_write_byte(i8, i1)` pour `io.printByte`/
+`io.printlnByte`, verrouillées respectivement par
+`compile_clang_backend_io_println_string`, `compile_clang_backend_io_println_int`,
+`compile_clang_backend_io_println_bool` et `compile_clang_backend_io_println_byte`.
 Les tests doivent continuer à comparer Clang et FASM tant que FASM sert d'oracle,
 mais la nouvelle frontière doit être conçue pour le backend LLVM principal.
 
