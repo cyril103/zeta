@@ -752,8 +752,9 @@ contre des bibliothèques précompilées LLVM installées, et
 via LLVM, `compile_clang_backend_global_string` pour les `pub val String`
 globales LLVM, `compile_clang_backend_global_double` pour les `pub val Double`
 globales LLVM, `compile_clang_backend_global_byte` pour les `pub val Byte`
-globales LLVM, et `compile_clang_backend_global_char` pour les `pub val Char`
-globales LLVM.
+globales LLVM, `compile_clang_backend_global_char` pour les `pub val Char`
+globales LLVM, et `compile_clang_backend_global_struct` pour les `pub val` structs
+LLVM composées de types LLVM déjà supportés.
 Les tests doivent continuer à comparer Clang et FASM tant que FASM sert d'oracle,
 mais la nouvelle frontière doit être conçue pour le backend LLVM principal.
 
@@ -769,8 +770,10 @@ Après cette tranche :
    en `.zti`/`.ll`/`.o`, les `pub val String` globales sont émises en
    `{ ptr, i64 } zeroinitializer` puis initialisées dans le wrapper `@main`,
    les `pub val Double` globales sont émises en `global double 0.000000e+00`,
-   les `pub val Byte` globales sont émises en `global i8 0`, et
-   les `pub val Char` globales sont émises en `global i32 0` ;
+   les `pub val Byte` globales sont émises en `global i8 0`,
+   les `pub val Char` globales sont émises en `global i32 0`, et
+   les `pub val` structs composées de types LLVM supportés sont émises en
+   `global { ... } zeroinitializer` puis initialisées dans `@main` ;
    poursuivre avec la vraie stdlib complète, ses modules
    génériques/agrégats et les modules locaux non précompilés ;
 3. lever les diagnostics FASM-only restants des modes stdlib quand les objets

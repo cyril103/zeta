@@ -211,10 +211,16 @@ est émis comme `@slotN = global i32 0`, initialisé par `store i32`, relu via
 `load i32, ptr @slotN`, puis utilisé par `io.printlnChar` et `Int(Char)`, avec stdout
 et code retour vérifiés côté Clang.
 
+`compile_clang_backend_global_struct` couvre les `pub val` structs dont tous les
+champs sont déjà des types LLVM supportés : le slot est émis comme
+`@slotN = global { ... } zeroinitializer`, initialisé par `store { ... }` dans
+`@main`, relu par `load { ... }, ptr @slotN`, puis les champs restent extraits
+via les chemins d'agrégats locaux existants.
+
 Les diagnostics d'agrégats globaux restent couverts séparément par les tests
 `reject_clang_backend_unsupported_aggregates` et
 `reject_clang_backend_unsupported_global_aggregates` pour les tableaux, slices,
-Box, Vec, structs et enums encore hors périmètre global LLVM.
+Box, Vec et enums encore hors périmètre global LLVM.
 
 `compile_clang_backend_string_literal` ajoute la première représentation LLVM
 positive des chaînes : `def main(): Int = "zeta".lengthBytes`. Les bytes du
@@ -668,6 +674,10 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   comme `global i32 0`, puis en les initialisant dans `@main`; les lectures globales
   réutilisent `load i32`, avec `io.printlnChar`, conversion `Int(Char)`, stdout et
   code retour vérifiés.
+- fait : `--backend=clang` couvre les `pub val` structs composées de types LLVM
+  déjà supportés en les émettant comme `global { ... } zeroinitializer`, puis en
+  les initialisant dans `@main`; les lectures globales réutilisent `load { ... }`
+  et les champs restent extraits par `extractvalue`.
 - fait : `--backend=clang` couvre les opérations arithmétiques `Double`
   `+`/`-`/`*`/`/` via `fadd`/`fsub`/`fmul`/`fdiv`, et les comparaisons ordonnées
   via `fcmp o*`, avec exécution Clang et FASM.
