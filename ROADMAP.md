@@ -753,13 +753,17 @@ construction `insertvalue`, copies locales et lectures par `extractvalue`
 restent comparés à FASM. `compile_clang_backend_nested_struct_field_store`
 couvre aussi le remplacement de champs top-level dont le type est lui-même une
 struct imbriquée, en rechargeant l'agrégat parent puis en le réécrivant par
-`insertvalue` avant stockage.
+`insertvalue` avant stockage. `compile_clang_backend_nested_struct_subfield_store`
+étend cette garantie à la mutation directe de sous-champs (`entry.point.x = ...`) :
+le parseur conserve le chemin complet, l'analyse sémantique vérifie chaque étape
+structurée, puis l'IR reconstruit récursivement les agrégats parents avec
+`extractvalue`/`insertvalue` avant de restocker la racine.
 Les agrégats globaux et les structs contenant `Box`/`Vec`/tableaux restent rejetés
 explicitement.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
 périmètre contrôlé : gestion plus complète de propriété/retain des chaînes heap
-ou mutation directe de sous-champs (`entry.point.x = ...`) avant toute
+lors de mutations de structs ou d'affectations répétées, avant toute
 généralisation. Les copies SSA à travers branches sont désormais matérialisées
 par stockage/rechargement pour les valeurs copiées sur plusieurs chemins et
 verrouillées par `compile_clang_backend_branch_copy` pour les scalaires et
