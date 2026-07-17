@@ -611,12 +611,15 @@ travail par défaut pour le développement courant :
    `println` et la comparaison stdout Clang/FASM.
 3. **En cours le 17 juillet 2026 — helpers `strings.*` par Clang** :
    `strings.view` passe maintenant par le helper LLVM interne
-   `@zeta_rt_strings_view(ptr, i64, i32, i32)`, au lieu de dupliquer les bornes,
-   le calcul de pointeur et le sentinelle `{ null, 0 }` dans chaque corps
-   applicatif. `compile_clang_backend_string_view` verrouille la définition
-   unique du helper, les trois appels de test et la comparaison Clang/FASM.
+   `@zeta_rt_strings_view(ptr, i64, i32, i32)`, et `strings.indexOf` /
+   `strings.contains` passent par `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)`,
+   au lieu de dupliquer les bornes, le calcul de pointeur, le sentinelle
+   `{ null, 0 }` et la boucle `memcmp` dans chaque corps applicatif.
+   `compile_clang_backend_string_view` et `compile_clang_backend_string_search`
+   verrouillent chacun une définition unique du helper, les appels applicatifs et
+   la comparaison Clang/FASM.
 4. **Suite runtime/stdlib par Clang** : étendre cette ABI stable aux autres
-   primitives `strings.*` (`viewIsValid`, recherche, UTF-8) et aux conversions
+   primitives `strings.*` (`viewIsValid`, UTF-8) et aux conversions
    générales vers `String`, après consolidation des `io.print*`/`io.println*`
    primitifs directs derrière `zeta_rt_*`, sans réintroduire d'assembleur FASM
    dans le chemin Clang.
@@ -691,28 +694,30 @@ Chaque étape doit :
 
 Reprendre la migration LLVM avec l'objectif explicite de remplacer FASM comme
 backend de développement. Le dépôt est vert après
-`compile_clang_backend_string_view` : **527 tests CTest passent** et le backend
+`compile_clang_backend_string_search` : **527 tests CTest passent** et le backend
 LLVM couvre déjà scalaires, strings, IO ciblée, structs imbriqués, copies à
 travers branches, ownership heap-string intra-struct et propagation de cette
 propriété par paramètres/retours de fonctions portant des structs.
 
 Démarrer par la tranche RED/GREEN suivante de l'ABI runtime/stdlib LLVM :
 **poursuivre l'extraction des primitives `strings.*`** ou une conversion générale
-vers `String`, maintenant que `strings.view` et les `io.*` directs primitifs
-passent par `zeta_rt_*`, en réduisant les lowerings spécialisés dans les corps
-applicatifs. Les briques livrées sont `@zeta_rt_io_write_string(ptr, i64, i1)`
+vers `String`, maintenant que `strings.view`, la recherche `StringView` et les
+`io.*` directs primitifs passent par `zeta_rt_*`, en réduisant les lowerings
+spécialisés dans les corps applicatifs. Les briques livrées sont
+`@zeta_rt_io_write_string(ptr, i64, i1)`
 pour `io.print`/
 `io.println(String)`, `@zeta_rt_io_write_int(i32, i1)` pour `io.printInt`/
 `io.printlnInt`, et `@zeta_rt_io_write_bool(i1, i1)` pour `io.printBool`/
 `io.printlnBool`, `@zeta_rt_io_write_byte(i8, i1)` pour `io.printByte`/
 `io.printlnByte`, et `@zeta_rt_io_write_char(i32, i1)` pour `io.printChar`/
 `io.printlnChar`, `@zeta_rt_io_write_double(double, i1)` pour `io.printDouble`/
-`io.printlnDouble`, et `@zeta_rt_strings_view(ptr, i64, i32, i32)` pour
-`strings.view`, verrouillées respectivement par
+`io.printlnDouble`, `@zeta_rt_strings_view(ptr, i64, i32, i32)` pour
+`strings.view`, et `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)` pour
+`strings.indexOf`/`strings.contains`, verrouillées respectivement par
 `compile_clang_backend_io_println_string`, `compile_clang_backend_io_println_int`,
 `compile_clang_backend_io_println_bool`, `compile_clang_backend_io_println_byte`,
-`compile_clang_backend_io_println_char`, `compile_clang_backend_io_println_double`
-et `compile_clang_backend_string_view`.
+`compile_clang_backend_io_println_char`, `compile_clang_backend_io_println_double`,
+`compile_clang_backend_string_view` et `compile_clang_backend_string_search`.
 Les tests doivent continuer à comparer Clang et FASM tant que FASM sert d'oracle,
 mais la nouvelle frontière doit être conçue pour le backend LLVM principal.
 
