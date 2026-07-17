@@ -888,6 +888,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 return item->source == ValueType::Byte && item->target == ValueType::String;
             return false;
         });
+    const bool usesStringFromCharHelper = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            if (const auto* item = std::get_if<IrConvert>(&instruction))
+                return item->source == ValueType::Char && item->target == ValueType::String;
+            return false;
+        });
     const bool usesIoStringWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
@@ -942,14 +948,15 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         });
 
     const bool usesStringFromIntRuntime = usesStringFromIntHelper || usesStringFromByteHelper;
+    const bool usesStringAllocatedRuntime = usesStringFromIntRuntime || usesStringFromCharHelper;
     out << "target triple = \"x86_64-pc-linux-gnu\"\n\n";
-    if (usesStringConcat || usesStringFromIntRuntime) {
+    if (usesStringConcat || usesStringAllocatedRuntime) {
         out << "declare ptr @malloc(i64)\n";
     }
     if (usesStringConcat || usesStringFromIntRuntime) {
         out << "declare ptr @memcpy(ptr, ptr, i64)\n\n";
     }
-    if (usesStringConcat || usesStringOwnership || usesStringFromIntRuntime) {
+    if (usesStringConcat || usesStringOwnership || usesStringAllocatedRuntime) {
         out << "declare void @free(ptr)\n\n";
     }
     if (usesStringSearch) {
@@ -1185,6 +1192,87 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "  %extended = zext i8 %value to i32\n"
             << "  %result = call { ptr, i64 } @zeta_rt_string_from_int(i32 %extended)\n"
             << "  ret { ptr, i64 } %result\n"
+            << "}\n";
+    }
+    if (usesStringFromCharHelper) {
+        out << "\ndefine internal { ptr, i64 } @zeta_rt_string_from_char(i32 %code) {\n"
+            << "entry:\n"
+            << "  %one = icmp ule i32 %code, 127\n"
+            << "  %two = icmp ule i32 %code, 2047\n"
+            << "  %three = icmp ule i32 %code, 65535\n"
+            << "  %len.tail.wide = select i1 %three, i64 3, i64 4\n"
+            << "  %len.tail = select i1 %two, i64 2, i64 %len.tail.wide\n"
+            << "  %len = select i1 %one, i64 1, i64 %len.tail\n"
+            << "  %allocation_size = add i64 %len, 16\n"
+            << "  %raw = call ptr @malloc(i64 %allocation_size)\n"
+            << "  store i64 1, ptr %raw\n"
+            << "  %len_ptr = getelementptr i8, ptr %raw, i64 8\n"
+            << "  store i64 %len, ptr %len_ptr\n"
+            << "  %data = getelementptr i8, ptr %raw, i64 16\n"
+            << "  br i1 %one, label %encode_one, label %check_two\n"
+            << "encode_one:\n"
+            << "  %byte0.one = trunc i32 %code to i8\n"
+            << "  store i8 %byte0.one, ptr %data\n"
+            << "  br label %done\n"
+            << "check_two:\n"
+            << "  br i1 %two, label %encode_two, label %check_three\n"
+            << "encode_two:\n"
+            << "  %top.two = lshr i32 %code, 6\n"
+            << "  %byte0.two.raw = or i32 %top.two, 192\n"
+            << "  %byte0.two = trunc i32 %byte0.two.raw to i8\n"
+            << "  %tail.two.raw = and i32 %code, 63\n"
+            << "  %byte1.two.raw = or i32 %tail.two.raw, 128\n"
+            << "  %byte1.two = trunc i32 %byte1.two.raw to i8\n"
+            << "  store i8 %byte0.two, ptr %data\n"
+            << "  %data.1.two = getelementptr i8, ptr %data, i64 1\n"
+            << "  store i8 %byte1.two, ptr %data.1.two\n"
+            << "  br label %done\n"
+            << "check_three:\n"
+            << "  br i1 %three, label %encode_three, label %encode_four\n"
+            << "encode_three:\n"
+            << "  %top.three = lshr i32 %code, 12\n"
+            << "  %byte0.three.raw = or i32 %top.three, 224\n"
+            << "  %byte0.three = trunc i32 %byte0.three.raw to i8\n"
+            << "  %middle.three.shift = lshr i32 %code, 6\n"
+            << "  %middle.three.raw = and i32 %middle.three.shift, 63\n"
+            << "  %byte1.three.raw = or i32 %middle.three.raw, 128\n"
+            << "  %byte1.three = trunc i32 %byte1.three.raw to i8\n"
+            << "  %tail.three.raw = and i32 %code, 63\n"
+            << "  %byte2.three.raw = or i32 %tail.three.raw, 128\n"
+            << "  %byte2.three = trunc i32 %byte2.three.raw to i8\n"
+            << "  store i8 %byte0.three, ptr %data\n"
+            << "  %data.1.three = getelementptr i8, ptr %data, i64 1\n"
+            << "  store i8 %byte1.three, ptr %data.1.three\n"
+            << "  %data.2.three = getelementptr i8, ptr %data, i64 2\n"
+            << "  store i8 %byte2.three, ptr %data.2.three\n"
+            << "  br label %done\n"
+            << "encode_four:\n"
+            << "  %top.four = lshr i32 %code, 18\n"
+            << "  %byte0.four.raw = or i32 %top.four, 240\n"
+            << "  %byte0.four = trunc i32 %byte0.four.raw to i8\n"
+            << "  %mid1.four.shift = lshr i32 %code, 12\n"
+            << "  %mid1.four.raw = and i32 %mid1.four.shift, 63\n"
+            << "  %byte1.four.raw = or i32 %mid1.four.raw, 128\n"
+            << "  %byte1.four = trunc i32 %byte1.four.raw to i8\n"
+            << "  %mid2.four.shift = lshr i32 %code, 6\n"
+            << "  %mid2.four.raw = and i32 %mid2.four.shift, 63\n"
+            << "  %byte2.four.raw = or i32 %mid2.four.raw, 128\n"
+            << "  %byte2.four = trunc i32 %byte2.four.raw to i8\n"
+            << "  %tail.four.raw = and i32 %code, 63\n"
+            << "  %byte3.four.raw = or i32 %tail.four.raw, 128\n"
+            << "  %byte3.four = trunc i32 %byte3.four.raw to i8\n"
+            << "  store i8 %byte0.four, ptr %data\n"
+            << "  %data.1.four = getelementptr i8, ptr %data, i64 1\n"
+            << "  store i8 %byte1.four, ptr %data.1.four\n"
+            << "  %data.2.four = getelementptr i8, ptr %data, i64 2\n"
+            << "  store i8 %byte2.four, ptr %data.2.four\n"
+            << "  %data.3.four = getelementptr i8, ptr %data, i64 3\n"
+            << "  store i8 %byte3.four, ptr %data.3.four\n"
+            << "  br label %done\n"
+            << "done:\n"
+            << "  %pair_ptr = insertvalue { ptr, i64 } undef, ptr %data, 0\n"
+            << "  %pair = insertvalue { ptr, i64 } %pair_ptr, i64 %len, 1\n"
+            << "  ret { ptr, i64 } %pair\n"
             << "}\n";
     }
     if (usesStringSearch) {
@@ -1585,6 +1673,13 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             } else if (item->source == ValueType::Byte && item->target == ValueType::String) {
                 const std::string output = "%v" + std::to_string(item->output);
                 out << "  " << output << " = call { ptr, i64 } @zeta_rt_string_from_byte(i8 "
+                    << value(item->input) << ")\n";
+                values[item->output] = output;
+                heapStringValues.insert(item->output);
+                rememberValuePaths(item->output, HeapStringPaths{HeapStringPath{}});
+            } else if (item->source == ValueType::Char && item->target == ValueType::String) {
+                const std::string output = "%v" + std::to_string(item->output);
+                out << "  " << output << " = call { ptr, i64 } @zeta_rt_string_from_char(i32 "
                     << value(item->input) << ")\n";
                 values[item->output] = output;
                 heapStringValues.insert(item->output);

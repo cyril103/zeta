@@ -1,0 +1,9 @@
+import io
+
+
+def main(): Int = {
+    val accent: Char = 'é'
+    val message: String = String('A') + " / " + String(accent) + " / " + String('🚀')
+    io.println(message)
+    0
+}
