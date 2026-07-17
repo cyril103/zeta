@@ -369,7 +369,8 @@ runtime internes (`@zeta_rt_io_write_string` pour `io.print`/
 `io.printlnByte`, et `@zeta_rt_io_write_char` pour `io.printChar`/
 `io.printlnChar`, et `@zeta_rt_io_write_double` pour `io.printDouble`/
 `io.printlnDouble`) et frontières `strings.*` (`@zeta_rt_strings_view` pour
-`strings.view`, `@zeta_rt_strings_index_of` pour `strings.indexOf`/`contains`),
+`strings.view`, `@zeta_rt_strings_view_is_valid` pour `strings.viewIsValid`,
+`@zeta_rt_strings_index_of` pour `strings.indexOf`/`contains`),
 structs simples, mixtes et imbriqués, ABI de fonctions sur
 structs simples, copies à travers branches et ownership de chaînes heap encapsulées
 dans des structs, y compris à travers paramètres, appels et retours de fonctions
@@ -396,12 +397,13 @@ Prochaines tranches nécessaires pour remplacer FASM :
    `@zeta_rt_io_write_byte(i8, i1)`, `@zeta_rt_io_write_char(i32, i1)` et
    `@zeta_rt_io_write_double(double, i1)`,
    `@zeta_rt_strings_view(ptr, i64, i32, i32)`,
+   `@zeta_rt_strings_view_is_valid(ptr)`,
    `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)`) utilisées par `io.print`/
    `io.println(String)`, `io.printInt`/`io.printlnInt`, `io.printBool`/
    `io.printlnBool`, `io.printByte`/`io.printlnByte`, `io.printChar`/
-   `io.printlnChar`, `io.printDouble`/`io.printlnDouble`, `strings.view` et
-   `strings.indexOf`/`strings.contains` ; cibler ensuite les
-   autres primitives `strings.*` ou les conversions générales vers `String` encore
+   `io.printlnChar`, `io.printDouble`/`io.printlnDouble`, `strings.view`,
+   `strings.viewIsValid` et `strings.indexOf`/`strings.contains` ; cibler ensuite
+   les autres primitives `strings.*` ou les conversions générales vers `String` encore
    abaissées de façon spécialisée ;
 2. produire et relier modules séparés, stdlib précompilée et runtime via `clang` ;
 3. choisir le support ou le rejet final pour globals agrégats, tableaux dans
@@ -504,8 +506,8 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   constantes/slots locaux et `fneg` unaire sur formats stables comparés à FASM.
 - fait : `--backend=clang` couvre `strings.view` via la frontière runtime interne
   `@zeta_rt_strings_view(ptr, i64, i32, i32)`, qui centralise les bornes, le calcul
-  du pointeur et le sentinelle `{ null, 0 }`; `strings.viewIsValid` reste un test
-  `ptr != null`, avec exécution Clang et FASM.
+  du pointeur et le sentinelle `{ null, 0 }`; `strings.viewIsValid` passe par la
+  frontière interne `@zeta_rt_strings_view_is_valid(ptr)`, avec exécution Clang et FASM.
 - fait : `--backend=clang` couvre `strings.indexOf` et `strings.contains` via la
   frontière runtime interne `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)`, qui
   centralise les vues invalides, l'aiguille vide, la borne de recherche et la
