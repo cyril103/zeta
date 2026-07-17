@@ -353,10 +353,12 @@ les drops/retains conditionnels ne libèrent jamais les constantes.
 
 Le chemin LLVM/Clang couvre désormais un sous-ensemble exécutable large : scalaires
 `Int`/`Bool`/`Byte`/`Char`/`Double`, contrôle de flot, appels, modules source avec
-globales scalaires, strings et `StringView`, IO spécialisée, structs simples,
-mixtes et imbriqués, ABI de fonctions sur structs simples, copies à travers
-branches et ownership de chaînes heap encapsulées dans des structs, y compris à
-travers paramètres, appels et retours de fonctions portant ces structs.
+globales scalaires, strings et `StringView`, IO spécialisée avec une première
+frontière runtime interne `@zeta_rt_io_write_string` pour `io.print`/
+`io.println(String)`, structs simples, mixtes et imbriqués, ABI de fonctions sur
+structs simples, copies à travers branches et ownership de chaînes heap encapsulées
+dans des structs, y compris à travers paramètres, appels et retours de fonctions
+portant ces structs.
 
 Tests structurants déjà verrouillés côté structs/ownership :
 
@@ -372,8 +374,11 @@ Tests structurants déjà verrouillés côté structs/ownership :
 
 Prochaines tranches nécessaires pour remplacer FASM :
 
-1. définir une ABI runtime/stdlib LLVM stable pour les helpers aujourd'hui abaissés
-   de façon spécialisée (`io.*`, `strings.*`, conversions générales vers `String`) ;
+1. étendre l'ABI runtime/stdlib LLVM `zeta_rt_*` au-delà de la première brique
+   `@zeta_rt_io_write_string(ptr, i64, i1)` déjà utilisée par `io.print`/
+   `io.println(String)` ; cibler ensuite les helpers `io.*` primitifs, les
+   primitives `strings.*` ou les conversions générales vers `String` encore
+   abaissées de façon spécialisée ;
 2. produire et relier modules séparés, stdlib précompilée et runtime via `clang` ;
 3. choisir le support ou le rejet final pour globals agrégats, tableaux dans
    structs, `Box`, `Vec`, enums et gros agrégats ;
@@ -451,7 +456,9 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--backend=clang` couvre l'itération `for` UTF-8 sur `String` et
   `StringView`, avec `Char` abaissé en `i32`.
 - fait : `--backend=clang` couvre `io.print`/`io.println` directs sur `String`
-  via `write(1, ptr, len)` et comparaison stdout avec FASM.
+  via la frontière runtime interne `@zeta_rt_io_write_string(ptr, i64, i1)`, qui
+  centralise `write(1, ptr, len)` et l'écriture conditionnelle du newline, avec
+  comparaison stdout FASM.
 - fait : `--backend=clang` couvre `io.printInt`/`io.printlnInt` directs via
   `printf` spécialisé et comparaison stdout avec FASM.
 - fait : `--backend=clang` couvre `io.printBool`/`io.printlnBool` directs via

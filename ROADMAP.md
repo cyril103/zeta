@@ -590,20 +590,26 @@ travail par défaut pour le développement courant :
    de propriété par paramètres, appels et retours, conserve les strings statiques
    avec un refcount sentinelle, incrémente les copies heap et décrémente/free aux
    drops sans double libération.
-2. **Runtime/stdlib par Clang** : remplacer les lowerings trop spécialisés par une
-   ABI stable pour les helpers runtime/stdlib utilisés par LLVM, sans réintroduire
-   d'assembleur FASM dans le chemin Clang.
-3. **Modules séparés et stdlib précompilée** : produire/relier objets runtime,
+2. **En cours le 17 juillet 2026 — ABI runtime/stdlib par Clang** : première
+   frontière stabilisée pour `io.print`/`io.println(String)`. Ces appels passent
+   maintenant par le helper LLVM interne `@zeta_rt_io_write_string(ptr, i64, i1)`
+   au lieu de dupliquer les appels `write` dans les corps applicatifs ;
+   `compile_clang_backend_io_println_string` verrouille la définition unique du
+   helper, les chemins `print`/`println` et la comparaison stdout Clang/FASM.
+3. **Suite runtime/stdlib par Clang** : étendre cette ABI stable aux helpers
+   `io.*` primitifs, aux primitives `strings.*` et aux conversions générales vers
+   `String`, sans réintroduire d'assembleur FASM dans le chemin Clang.
+4. **Modules séparés et stdlib précompilée** : produire/relier objets runtime,
    modules et stdlib via `clang`, puis lever les diagnostics FASM-only de
    `--build-library`, `--install-library` et `--build-stdlib` pour le backend LLVM.
-4. **Agrégats restants** : décider et implémenter le support LLVM ou les rejets
+5. **Agrégats restants** : décider et implémenter le support LLVM ou les rejets
    définitifs pour globals agrégats, tableaux dans structs, `Box`, `Vec`, enums et
    grands agrégats dépassant l'ABI actuelle.
-5. **Mode par défaut contrôlé** : ajouter un job/test de matrice qui compile les
+6. **Mode par défaut contrôlé** : ajouter un job/test de matrice qui compile les
    exemples et la stdlib avec `--backend=clang`; quand il est vert, inverser le
    défaut local de développement vers Clang tout en gardant `--backend=fasm` comme
    fallback explicite.
-6. **Retrait progressif de FASM** : une fois la matrice LLVM verte sur exemples,
+7. **Retrait progressif de FASM** : une fois la matrice LLVM verte sur exemples,
    stdlib et modules, figer FASM en backend legacy puis supprimer les dépendances
    de développement qui bloquent la portabilité.
 
@@ -670,11 +676,14 @@ imbriqués, copies à travers branches, ownership heap-string intra-struct et
 propagation de cette propriété par paramètres/retours de fonctions portant des
 structs.
 
-Démarrer par une tranche RED/GREEN ciblée : **généraliser l'ABI runtime/stdlib
-appelée par LLVM** afin de réduire les lowerings spécialisés `io.*`/`strings.*`
-et préparer la construction de modules séparés/stdlib précompilée via Clang. Les
-tests doivent continuer à comparer Clang et FASM tant que FASM sert d'oracle, mais
-la nouvelle frontière doit être conçue pour le backend LLVM principal.
+Démarrer par la tranche RED/GREEN suivante de l'ABI runtime/stdlib LLVM :
+**étendre la frontière `zeta_rt_*` aux `io.*` primitifs** (`Int`, `Bool`, `Byte`,
+`Char`, `Double`) ou extraire une primitive `strings.*` suffisamment centrale, en
+réduisant les lowerings spécialisés dans les corps applicatifs. La première brique
+livrée est `@zeta_rt_io_write_string(ptr, i64, i1)` pour `io.print`/
+`io.println(String)`, verrouillée par `compile_clang_backend_io_println_string`.
+Les tests doivent continuer à comparer Clang et FASM tant que FASM sert d'oracle,
+mais la nouvelle frontière doit être conçue pour le backend LLVM principal.
 
 Après cette tranche :
 
