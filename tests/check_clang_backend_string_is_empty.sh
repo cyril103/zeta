@@ -13,7 +13,16 @@ test ! -e "${output}.asm"
 
 grep -q '@str\.[0-9][0-9]* = private unnamed_addr constant { i64, i64, \[0 x i8\] } { i64 -1, i64 0, \[0 x i8\] c"" }' "${output}.ll"
 grep -q '@str\.[0-9][0-9]* = private unnamed_addr constant { i64, i64, \[4 x i8\] } { i64 -1, i64 4, \[4 x i8\] c"zeta" }' "${output}.ll"
-grep -q 'icmp eq i64' "${output}.ll"
+helper_defs=$(grep -Fc 'define internal i1 @zeta_rt_string_is_empty(ptr %data, i64 %len)' "${output}.ll")
+if [[ "${helper_defs}" -ne 1 ]]; then
+    echo "expected one @zeta_rt_string_is_empty definition, got ${helper_defs}" >&2
+    exit 1
+fi
+helper_calls=$(grep -Ec '^  %v[0-9]+ = call i1 @zeta_rt_string_is_empty\(ptr ' "${output}.ll")
+if [[ "${helper_calls}" -ne 2 ]]; then
+    echo "expected two application calls to @zeta_rt_string_is_empty, got ${helper_calls}" >&2
+    exit 1
+fi
 
 set +e
 "${output}"

@@ -862,6 +862,10 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         [](const IrInstruction& instruction) {
             return std::holds_alternative<IrStringLength>(instruction);
         });
+    const bool usesStringIsEmptyHelper = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            return std::holds_alternative<IrStringEmpty>(instruction);
+        });
     const bool usesStringNextByteOffsetHelper = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
@@ -1010,6 +1014,13 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "entry:\n"
             << "  %length = trunc i64 %len to i32\n"
             << "  ret i32 %length\n"
+            << "}\n";
+    }
+    if (usesStringIsEmptyHelper) {
+        out << "\ndefine internal i1 @zeta_rt_string_is_empty(ptr %data, i64 %len) {\n"
+            << "entry:\n"
+            << "  %empty = icmp eq i64 %len, 0\n"
+            << "  ret i1 %empty\n"
             << "}\n";
     }
     if (usesStringViewHelper) {
@@ -1870,11 +1881,11 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             const ValueType type = program.valueTypes.at(item->string);
             if (type != ValueType::String && type != ValueType::StringView)
                 throw std::runtime_error("backend LLVM: isEmpty hors chaîne non supporté");
-            const std::string length = "%v" + std::to_string(item->output) + ".length";
             const std::string output = "%v" + std::to_string(item->output);
-            out << "  " << length << " = extractvalue " << llvmType(type) << " "
-                << value(item->string) << ", 1\n"
-                << "  " << output << " = icmp eq i64 " << length << ", 0\n";
+            const std::string data = extractStringPart(output + ".string", item->string, 0);
+            const std::string length = extractStringPart(output + ".string", item->string, 1);
+            out << "  " << output << " = call i1 @zeta_rt_string_is_empty(ptr "
+                << data << ", i64 " << length << ")\n";
             values[item->output] = output;
         } else if (const auto* item = std::get_if<IrStringDecodeAt>(&instruction)) {
             const ValueType type = program.valueTypes.at(item->string);
