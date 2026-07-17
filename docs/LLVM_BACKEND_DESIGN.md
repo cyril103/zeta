@@ -314,6 +314,13 @@ positives, négatives et zéro en décimal, alloue un buffer heap avec en-tête
 ownership compatible `drop`, retourne `{ ptr, i64 }`, puis le test compare la
 sortie Clang/FASM après concaténation.
 
+`compile_clang_backend_string_byte_conversion` couvre `String(Byte)` côté Clang :
+le helper runtime interne `@zeta_rt_string_from_byte(i8)` effectue une extension
+non signée `zext` vers `i32`, délègue au helper stabilisé
+`@zeta_rt_string_from_int(i32)`, puis retourne la même paire `{ ptr, i64 }`. Le
+test verrouille la frontière `Byte` dédiée, la dépendance au helper `Int` et la
+sortie Clang/FASM `7 / 250` après concaténation.
+
 `compile_clang_backend_io_println_byte` ajoute une sortie `Byte` ciblée : `Byte`
 est représenté comme `i8` côté LLVM, les conversions minimales `Int -> Byte` et
 `Byte -> Int` sont abaissées en `trunc i32 ... to i8` et `zext i8 ... to i32`, et
@@ -385,9 +392,9 @@ runtime internes (`@zeta_rt_io_write_string` pour `io.print`/
 `io.printlnBool`, et `@zeta_rt_io_write_byte` pour `io.printByte`/
 `io.printlnByte`, et `@zeta_rt_io_write_char` pour `io.printChar`/
 `io.printlnChar`, et `@zeta_rt_io_write_double` pour `io.printDouble`/
-`io.printlnDouble`), conversions `String(Bool)` / `String(Int)` via
-`@zeta_rt_string_from_bool` / `@zeta_rt_string_from_int`,
-et frontières `strings.*` (`@zeta_rt_strings_view` pour
+`io.printlnDouble`), conversions `String(Bool)` / `String(Int)` / `String(Byte)`
+via `@zeta_rt_string_from_bool(i1)`, `@zeta_rt_string_from_int(i32)` et
+`@zeta_rt_string_from_byte(i8)`, strings (`String`/`StringView`, concaténation,
 `strings.view`, `@zeta_rt_strings_view_is_valid` pour `strings.viewIsValid`,
 `@zeta_rt_strings_decode_at_byte` pour `strings.decodeAtByte`,
 `@zeta_rt_strings_next_byte_offset` pour `strings.nextByteOffset`,
@@ -422,12 +429,14 @@ Prochaines tranches nécessaires pour remplacer FASM :
    `@zeta_rt_strings_decode_at_byte(ptr, i64, i32)`,
    `@zeta_rt_strings_next_byte_offset(ptr, i64, i32)`,
    `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)`,
-   `@zeta_rt_string_from_bool(i1)`, `@zeta_rt_string_from_int(i32)`) utilisées par `io.print`/
+   `@zeta_rt_string_from_bool(i1)`, `@zeta_rt_string_from_int(i32)`,
+   `@zeta_rt_string_from_byte(i8)`) utilisées par `io.print`/
    `io.println(String)`, `io.printInt`/`io.printlnInt`, `io.printBool`/
    `io.printlnBool`, `io.printByte`/`io.printlnByte`, `io.printChar`/
    `io.printlnChar`, `io.printDouble`/`io.printlnDouble`, `strings.view`,
    `strings.viewIsValid`, `strings.decodeAtByte`, `strings.nextByteOffset`,
-   `strings.indexOf`/`strings.contains`, `String(Bool)` et `String(Int)` ; cibler ensuite
+   `strings.indexOf`/`strings.contains`, `String(Bool)`, `String(Int)` et
+   `String(Byte)` ; cibler ensuite
    les autres primitives `strings.*` ou les conversions générales vers `String` encore
    abaissées de façon spécialisée ;
 2. produire et relier modules séparés, stdlib précompilée et runtime via `clang` ;
@@ -523,6 +532,9 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
 - fait : `--backend=clang` couvre `String(Int)` via la frontière runtime interne
   `@zeta_rt_string_from_int(i32)`, qui convertit en décimal signé dans un buffer
   heap propriétaire compatible `drop`, avec exécution Clang et FASM.
+- fait : `--backend=clang` couvre `String(Byte)` via la frontière runtime interne
+  `@zeta_rt_string_from_byte(i8)`, qui effectue une extension non signée puis
+  délègue à `@zeta_rt_string_from_int(i32)`, avec exécution Clang et FASM.
 - fait : `--backend=clang` couvre `io.printByte`/`io.printlnByte` directs via
   la frontière runtime interne `@zeta_rt_io_write_byte(i8, i1)`, qui centralise
   l'extension non signée, le choix du format `printf` avec ou sans newline et

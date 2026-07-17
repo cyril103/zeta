@@ -728,14 +728,16 @@ pour `io.print`/
 `strings.decodeAtByte`, `@zeta_rt_strings_next_byte_offset(ptr, i64, i32)` pour
 `strings.nextByteOffset`, `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)` pour
 `strings.indexOf`/`strings.contains`, `@zeta_rt_string_from_bool(i1)` pour
-`String(Bool)` et `@zeta_rt_string_from_int(i32)` pour `String(Int)`, verrouillées respectivement par
+`String(Bool)`, `@zeta_rt_string_from_int(i32)` pour `String(Int)` et
+`@zeta_rt_string_from_byte(i8)` pour `String(Byte)`, verrouillées respectivement par
 `compile_clang_backend_io_println_string`, `compile_clang_backend_io_println_int`,
 `compile_clang_backend_io_println_bool`, `compile_clang_backend_io_println_byte`,
 `compile_clang_backend_io_println_char`, `compile_clang_backend_io_println_double`,
 `compile_clang_backend_string_view`, `compile_clang_backend_string_utf8_decode`,
 `compile_clang_backend_for_string_char_iteration`, `compile_clang_backend_string_search`,
 `compile_clang_backend_string_bool_conversion` et
-`compile_clang_backend_string_int_conversion`.
+`compile_clang_backend_string_int_conversion`, puis
+`compile_clang_backend_string_byte_conversion`.
 Les tests doivent continuer à comparer Clang et FASM tant que FASM sert d'oracle,
 mais la nouvelle frontière doit être conçue pour le backend LLVM principal.
 
