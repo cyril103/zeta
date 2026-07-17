@@ -2,7 +2,8 @@ import io
 
 
 def main(): Int = {
-    val greeting: String = "zeta 🚀"
-    io.println(greeting)
+    val greeting: String = "zeta "
+    io.print(greeting)
+    io.println("🚀")
     0
 }

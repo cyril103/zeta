@@ -808,10 +808,9 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             const std::string base = "%v" + std::to_string(item.output);
             const std::string data = extractStringPart(base + ".string", item.arguments[0], 0);
             const std::string length = extractStringPart(base + ".string", item.arguments[0], 1);
-            out << "  call i64 @write(i32 1, ptr " << data << ", i64 " << length << ")\n";
-            if (item.function == "io__println") {
-                out << "  call i64 @write(i32 1, ptr @zeta.newline, i64 1)\n";
-            }
+            const char* newline = item.function == "io__println" ? "true" : "false";
+            out << "  call void @zeta_rt_io_write_string(ptr " << data << ", i64 "
+                << length << ", i1 " << newline << ")\n";
             return true;
         }
         if (item.function == "io__printInt" || item.function == "io__printlnInt") {
@@ -1201,6 +1200,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 return call->function == "strings__indexOf" || call->function == "strings__contains";
             return false;
         });
+    const bool usesIoStringWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            if (const auto* call = std::get_if<IrCall>(&instruction))
+                return call->function == "io__print" || call->function == "io__println";
+            return false;
+        });
     const bool usesIoWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
@@ -1263,6 +1268,18 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "@zeta.fmt.byte.nl = private unnamed_addr constant [4 x i8] c\"%u\\0A\\00\", align 1\n"
             << "@zeta.fmt.double = private unnamed_addr constant [3 x i8] c\"%g\\00\", align 1\n"
             << "@zeta.fmt.double.nl = private unnamed_addr constant [4 x i8] c\"%g\\0A\\00\", align 1\n";
+    }
+    if (usesIoStringWrite) {
+        out << "\ndefine internal void @zeta_rt_io_write_string(ptr %data, i64 %len, i1 %newline) {\n"
+            << "entry:\n"
+            << "  call i64 @write(i32 1, ptr %data, i64 %len)\n"
+            << "  br i1 %newline, label %write_newline, label %done\n"
+            << "write_newline:\n"
+            << "  call i64 @write(i32 1, ptr @zeta.newline, i64 1)\n"
+            << "  br label %done\n"
+            << "done:\n"
+            << "  ret void\n"
+            << "}\n";
     }
     for (SlotId id = 0; id < program.slots.size(); ++id) {
         const IrSlot& slot = program.slots[id];
