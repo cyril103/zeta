@@ -353,9 +353,10 @@ les drops/retains conditionnels ne libèrent jamais les constantes.
 
 Le chemin LLVM/Clang couvre désormais un sous-ensemble exécutable large : scalaires
 `Int`/`Bool`/`Byte`/`Char`/`Double`, contrôle de flot, appels, modules source avec
-globales scalaires, strings et `StringView`, IO spécialisée avec une première
-frontière runtime interne `@zeta_rt_io_write_string` pour `io.print`/
-`io.println(String)`, structs simples, mixtes et imbriqués, ABI de fonctions sur
+globales scalaires, strings et `StringView`, IO spécialisée avec deux premières
+frontières runtime internes (`@zeta_rt_io_write_string` pour `io.print`/
+`io.println(String)` et `@zeta_rt_io_write_int` pour `io.printInt`/
+`io.printlnInt`), structs simples, mixtes et imbriqués, ABI de fonctions sur
 structs simples, copies à travers branches et ownership de chaînes heap encapsulées
 dans des structs, y compris à travers paramètres, appels et retours de fonctions
 portant ces structs.
@@ -374,9 +375,10 @@ Tests structurants déjà verrouillés côté structs/ownership :
 
 Prochaines tranches nécessaires pour remplacer FASM :
 
-1. étendre l'ABI runtime/stdlib LLVM `zeta_rt_*` au-delà de la première brique
-   `@zeta_rt_io_write_string(ptr, i64, i1)` déjà utilisée par `io.print`/
-   `io.println(String)` ; cibler ensuite les helpers `io.*` primitifs, les
+1. étendre l'ABI runtime/stdlib LLVM `zeta_rt_*` au-delà des deux premières briques
+   `@zeta_rt_io_write_string(ptr, i64, i1)` et `@zeta_rt_io_write_int(i32, i1)`
+   déjà utilisées par `io.print`/`io.println(String)` et `io.printInt`/
+   `io.printlnInt` ; cibler ensuite les helpers `io.*` primitifs restants, les
    primitives `strings.*` ou les conversions générales vers `String` encore
    abaissées de façon spécialisée ;
 2. produire et relier modules séparés, stdlib précompilée et runtime via `clang` ;
@@ -459,8 +461,9 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   via la frontière runtime interne `@zeta_rt_io_write_string(ptr, i64, i1)`, qui
   centralise `write(1, ptr, len)` et l'écriture conditionnelle du newline, avec
   comparaison stdout FASM.
-- fait : `--backend=clang` couvre `io.printInt`/`io.printlnInt` directs via
-  `printf` spécialisé et comparaison stdout avec FASM.
+- fait : `--backend=clang` couvre `io.printInt`/`io.printlnInt` directs via la
+  frontière runtime interne `@zeta_rt_io_write_int(i32, i1)`, qui centralise le
+  choix du format `printf` avec ou sans newline, avec comparaison stdout FASM.
 - fait : `--backend=clang` couvre `io.printBool`/`io.printlnBool` directs via
   sélection `true`/`false` et `write`, avec comparaison stdout FASM.
 - fait : `--backend=clang` couvre `io.printByte`/`io.printlnByte` directs via
