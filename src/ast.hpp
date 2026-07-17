@@ -379,7 +379,7 @@ struct IndexAssignment {
     std::vector<ExprPtr> indexes;
     ExprPtr value;
 };
-struct FieldAssignment { SourceLocation location; std::string name; std::string field; ExprPtr value; };
+struct FieldAssignment { SourceLocation location; std::string name; std::vector<std::string> fields; ExprPtr value; };
 struct DereferenceAssignment {
     SourceLocation location;
     ExprPtr reference;

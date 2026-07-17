@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <functional>
 #include <iomanip>
 #include <limits>
 #include <sstream>
@@ -598,13 +599,50 @@ void IrGenerator::emitFieldStore(
     const std::unordered_map<std::string, ValueId>& parameters) {
     const auto symbol = symbols_.find(assignment.name);
     const ValueType type = resolveType(symbol->second.declaration->type);
-    const auto& fields = type.structure->fields;
-    const auto field = std::find_if(fields.begin(), fields.end(), [&](const StructField& candidate) {
-        return candidate.name == assignment.field;
-    });
-    ir_.instructions.push_back(IrFieldStore{symbol->second.slot,
-        expression(*assignment.value, parameters), type,
-        static_cast<std::size_t>(field - fields.begin())});
+    const auto findFieldIndex = [](const ValueType& ownerType, const std::string& name) -> std::size_t {
+        const auto& fields = ownerType.structure->fields;
+        const auto field = std::find_if(fields.begin(), fields.end(), [&](const StructField& candidate) {
+            return candidate.name == name;
+        });
+        return static_cast<std::size_t>(field - fields.begin());
+    };
+    if (assignment.fields.size() == 1) {
+        ir_.instructions.push_back(IrFieldStore{symbol->second.slot,
+            expression(*assignment.value, parameters), type,
+            findFieldIndex(type, assignment.fields.front())});
+        return;
+    }
+
+    const ValueId replacement = expression(*assignment.value, parameters);
+    const ValueId root = nextValue(type);
+    ir_.instructions.push_back(IrLoad{root, symbol->second.slot, type});
+    std::function<ValueId(ValueId, const ValueType&, std::size_t)> updatePath =
+        [&](ValueId object, const ValueType& objectType, std::size_t depth) -> ValueId {
+            const std::size_t targetField = findFieldIndex(objectType, assignment.fields[depth]);
+            std::vector<ValueId> values;
+            values.reserve(objectType.structure->fields.size());
+            for (std::size_t index = 0; index < objectType.structure->fields.size(); ++index) {
+                const ValueType fieldType = resolveType(objectType.structure->fields[index].type);
+                if (index == targetField) {
+                    if (depth + 1 == assignment.fields.size()) {
+                        values.push_back(replacement);
+                    } else {
+                        const ValueId nested = nextValue(fieldType);
+                        ir_.instructions.push_back(IrFieldLoad{nested, object, objectType, index});
+                        values.push_back(updatePath(nested, fieldType, depth + 1));
+                    }
+                } else {
+                    const ValueId current = nextValue(fieldType);
+                    ir_.instructions.push_back(IrFieldLoad{current, object, objectType, index});
+                    values.push_back(current);
+                }
+            }
+            const ValueId updated = nextValue(objectType);
+            ir_.instructions.push_back(IrStructConstruct{updated, std::move(values), objectType});
+            return updated;
+        };
+    const ValueId updatedRoot = updatePath(root, type, 0);
+    ir_.instructions.push_back(IrStore{symbol->second.slot, updatedRoot, type});
 }
 
 void IrGenerator::emitBoxDrops(const std::vector<std::string>& names) {

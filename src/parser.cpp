@@ -154,9 +154,15 @@ bool Parser::matchSeparator() {
 bool Parser::startsAssignment() const {
     if (!check(TokenKind::Identifier) || current_ + 1 >= tokens_.size()) return false;
     if (tokens_[current_ + 1].kind == TokenKind::Equal) return true;
-    if (current_ + 3 < tokens_.size() && tokens_[current_ + 1].kind == TokenKind::Dot &&
-        tokens_[current_ + 2].kind == TokenKind::Identifier &&
-        tokens_[current_ + 3].kind == TokenKind::Equal) return true;
+    std::size_t fieldCursor = current_ + 1;
+    bool sawField = false;
+    while (fieldCursor + 1 < tokens_.size() && tokens_[fieldCursor].kind == TokenKind::Dot &&
+           tokens_[fieldCursor + 1].kind == TokenKind::Identifier) {
+        sawField = true;
+        fieldCursor += 2;
+    }
+    if (sawField && fieldCursor < tokens_.size() && tokens_[fieldCursor].kind == TokenKind::Equal)
+        return true;
     std::size_t cursor = current_ + 1;
     while (cursor < tokens_.size() && tokens_[cursor].kind == TokenKind::LeftBracket) {
         std::size_t depth = 0;
@@ -933,9 +939,13 @@ std::string Parser::qualifiedName() {
 Statement Parser::assignment() {
     const Token& name = consume(TokenKind::Identifier, "identifiant attendu");
     if (match(TokenKind::Dot)) {
-        const Token& field = consume(TokenKind::Identifier, "nom de champ attendu");
+        std::vector<std::string> fields;
+        do {
+            const Token& field = consume(TokenKind::Identifier, "nom de champ attendu");
+            fields.push_back(field.text);
+        } while (match(TokenKind::Dot));
         consume(TokenKind::Equal, "'=' attendu après le champ");
-        return FieldAssignment{name.location, name.text, field.text, expression()};
+        return FieldAssignment{name.location, name.text, std::move(fields), expression()};
     }
     if (match(TokenKind::LeftBracket)) {
         std::vector<ExprPtr> indexes;

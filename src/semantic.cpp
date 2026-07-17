@@ -840,14 +840,26 @@ void SemanticAnalyzer::checkFieldAssignment(FieldAssignment& assignment) {
         throw CompileError(assignment.location, "identifiant inconnu '" + assignment.name + "'");
     if (target->parameter || target->kind != BindingKind::Var)
         throw CompileError(assignment.location, "la structure '" + assignment.name + "' est immuable");
-    if (target->type.kind != ValueType::Kind::Struct)
+    ValueType currentType = target->type;
+    if (currentType.kind != ValueType::Kind::Struct)
         throw CompileError(assignment.location, "l'affectation de champ exige une structure");
-    for (const StructField& field : target->type.structure->fields)
-        if (field.name == assignment.field) {
-            checkExpression(*assignment.value, field.type);
+    for (std::size_t index = 0; index < assignment.fields.size(); ++index) {
+        const std::string& requested = assignment.fields[index];
+        const auto field = std::find_if(currentType.structure->fields.begin(),
+            currentType.structure->fields.end(), [&](const StructField& candidate) {
+                return candidate.name == requested;
+            });
+        if (field == currentType.structure->fields.end())
+            throw CompileError(assignment.location, "champ inconnu '" + requested + "'");
+        if (index + 1 == assignment.fields.size()) {
+            checkExpression(*assignment.value, field->type);
             return;
         }
-    throw CompileError(assignment.location, "champ inconnu '" + assignment.field + "'");
+        currentType = field->type;
+        if (currentType.kind != ValueType::Kind::Struct)
+            throw CompileError(assignment.location,
+                               "l'affectation de sous-champ exige une structure");
+    }
 }
 
 void SemanticAnalyzer::checkDereferenceAssignment(DereferenceAssignment& assignment) {
