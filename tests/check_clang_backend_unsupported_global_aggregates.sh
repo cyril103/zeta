@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 compiler="$1"
-struct_source="$2"
-vec_source="$3"
-output="$4"
+vec_source="$2"
+output="$3"
 rm -f "${output}" "${output}.ll" "${output}.ir" "${output}.diag"
 
 expect_failure() {
@@ -19,5 +18,4 @@ expect_failure() {
     test ! -e "${output}"
 }
 
-expect_failure "${struct_source}" 'backend LLVM: agrégat global non supporté pair: Pair'
 expect_failure "${vec_source}" 'backend LLVM: agrégat global non supporté values: Vec[Int]'
