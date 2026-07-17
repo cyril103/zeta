@@ -818,9 +818,9 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 item.argumentTypes[0] != ValueType::Int || item.returnType != ValueType::Unit) {
                 throw std::runtime_error("backend LLVM: signature io.printInt/printlnInt non supportée");
             }
-            const char* format = item.function == "io__printlnInt" ? "@zeta.fmt.int.nl" : "@zeta.fmt.int";
-            out << "  call i32 (ptr, ...) @printf(ptr " << format << ", i32 "
-                << value(item.arguments[0]) << ")\n";
+            const char* newline = item.function == "io__printlnInt" ? "true" : "false";
+            out << "  call void @zeta_rt_io_write_int(i32 " << value(item.arguments[0])
+                << ", i1 " << newline << ")\n";
             return true;
         }
         if (item.function == "io__printByte" || item.function == "io__printlnByte") {
@@ -1206,6 +1206,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 return call->function == "io__print" || call->function == "io__println";
             return false;
         });
+    const bool usesIoIntWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            if (const auto* call = std::get_if<IrCall>(&instruction))
+                return call->function == "io__printInt" || call->function == "io__printlnInt";
+            return false;
+        });
     const bool usesIoWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
@@ -1278,6 +1284,14 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "  call i64 @write(i32 1, ptr @zeta.newline, i64 1)\n"
             << "  br label %done\n"
             << "done:\n"
+            << "  ret void\n"
+            << "}\n";
+    }
+    if (usesIoIntWrite) {
+        out << "\ndefine internal void @zeta_rt_io_write_int(i32 %value, i1 %newline) {\n"
+            << "entry:\n"
+            << "  %format = select i1 %newline, ptr @zeta.fmt.int.nl, ptr @zeta.fmt.int\n"
+            << "  call i32 (ptr, ...) @printf(ptr %format, i32 %value)\n"
             << "  ret void\n"
             << "}\n";
     }

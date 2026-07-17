@@ -14,7 +14,18 @@ test ! -f "${output}.asm"
 grep -Fq "declare i32 @printf(ptr, ...)" "${output}.ll"
 grep -Fq "@zeta.fmt.int" "${output}.ll"
 grep -Fq "@zeta.fmt.int.nl" "${output}.ll"
+grep -Fq "define internal void @zeta_rt_io_write_int(i32 %value, i1 %newline)" "${output}.ll"
+grep -Fq "call void @zeta_rt_io_write_int(i32 40, i1 false)" "${output}.ll"
+grep -Fq "call void @zeta_rt_io_write_int(i32 2, i1 true)" "${output}.ll"
 grep -Fq "call i32 (ptr, ...) @printf" "${output}.ll"
+if [[ $(grep -Fc "define internal void @zeta_rt_io_write_int" "${output}.ll") -ne 1 ]]; then
+    echo "expected one zeta_rt_io_write_int definition" >&2
+    exit 1
+fi
+if [[ $(grep -Fc "call void @zeta_rt_io_write_int" "${output}.ll") -ne 2 ]]; then
+    echo "expected two zeta_rt_io_write_int calls" >&2
+    exit 1
+fi
 
 "${output}" > "${output}.out"
 "${compiler}" "${source}" -o "${output}.fasm" >/dev/null
