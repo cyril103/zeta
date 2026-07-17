@@ -998,6 +998,47 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     if (usesIoPrintf) {
         out << "declare i32 @printf(ptr, ...)\n\n";
     }
+    {
+        std::unordered_set<std::string> declaredExternalFunctions;
+        std::string currentFunction;
+        auto emitExternalDeclaration = [&](const std::string& function,
+                                           const ValueType& returnType,
+                                           const std::vector<ValueType>& argumentTypes) {
+            if (function == "io__print" || function == "io__println" ||
+                function == "io__printInt" || function == "io__printlnInt" ||
+                function == "io__printBool" || function == "io__printlnBool" ||
+                function == "io__printByte" || function == "io__printlnByte" ||
+                function == "io__printChar" || function == "io__printlnChar" ||
+                function == "io__printDouble" || function == "io__printlnDouble" ||
+                function == "strings__view" || function == "strings__viewIsValid" ||
+                function == "strings__decodeAtByte" || function == "strings__nextByteOffset" ||
+                function == "strings__indexOf" || function == "strings__contains") return;
+            if (definedFunctions.contains(function)) return;
+            if (!declaredExternalFunctions.insert(function).second) return;
+            if (!isLlvmValueType(returnType))
+                throw std::runtime_error("backend LLVM: type de retour externe non supporté pour " + function);
+            out << "declare " << llvmType(returnType) << " @" << function << "(";
+            for (std::size_t index = 0; index < argumentTypes.size(); ++index) {
+                if (!isLlvmValueType(argumentTypes[index]))
+                    throw std::runtime_error("backend LLVM: paramètre externe non supporté pour " + function);
+                if (index > 0) out << ", ";
+                out << llvmType(argumentTypes[index]);
+            }
+            out << ")\n";
+        };
+        for (const IrInstruction& instruction : program.instructions) {
+            if (const auto* function = std::get_if<IrFunctionStart>(&instruction)) {
+                currentFunction = function->name;
+            } else if (const auto* call = std::get_if<IrCall>(&instruction)) {
+                emitExternalDeclaration(call->function, call->returnType, call->argumentTypes);
+            } else if (const auto* tail = std::get_if<IrTailCall>(&instruction)) {
+                const auto returnType = functionReturnTypes.find(currentFunction);
+                if (returnType != functionReturnTypes.end())
+                    emitExternalDeclaration(tail->function, returnType->second, tail->argumentTypes);
+            }
+        }
+        if (!declaredExternalFunctions.empty()) out << "\n";
+    }
     for (const IrInstruction& instruction : program.instructions) {
         if (const auto* item = std::get_if<IrStringConst>(&instruction)) {
             out << "@str." << item->output << " = private unnamed_addr constant { i64, i64, ["

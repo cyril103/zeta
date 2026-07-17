@@ -71,14 +71,19 @@ void runLinker(const std::vector<fs::path>& objects, const fs::path& executable)
         throw std::runtime_error("ld n'a pas pu lier l'exécutable");
 }
 
-void runClang(const fs::path& llvmIr, const fs::path& executable) {
+void runClang(const fs::path& llvmIr, const fs::path& executable,
+              const std::vector<fs::path>& extraObjects = {}) {
     const pid_t child = fork();
     if (child < 0) throw std::runtime_error("impossible de lancer clang");
     if (child == 0) {
-        const std::string input = llvmIr.string();
-        const std::string output = executable.string();
-        execlp("clang", "clang", "-x", "ir", input.c_str(), "-o", output.c_str(),
-               static_cast<char*>(nullptr));
+        std::vector<std::string> arguments{"clang", llvmIr.string()};
+        for (const fs::path& object : extraObjects) arguments.push_back(object.string());
+        arguments.push_back("-o");
+        arguments.push_back(executable.string());
+        std::vector<char*> rawArguments;
+        for (std::string& argument : arguments) rawArguments.push_back(argument.data());
+        rawArguments.push_back(nullptr);
+        execvp("clang", rawArguments.data());
         _exit(127);
     }
     int status{};
@@ -574,9 +579,25 @@ int main(int argc, char** argv) {
         if (backend == Backend::Clang) {
             writeFile(irPath, IrGenerator::print(verifiedIr));
             writeFile(llvmIrPath, LlvmIrCodeGenerator::generate(verifiedIr));
-            runClang(llvmIrPath, outputPath);
+            fs::path moduleDirectory = outputPath;
+            moduleDirectory += ".modules";
+            fs::create_directories(moduleDirectory);
+            std::vector<fs::path> linkedObjects;
+            for (const std::string& moduleName : modules.compilationOrder) {
+                const Module& module = modules.modules.at(moduleName);
+                if (!module.precompiled) continue;
+                const fs::path moduleObject = moduleDirectory / (moduleName + ".o");
+                const fs::path moduleInterface = moduleDirectory / (moduleName + ".zti");
+                fs::copy_file(module.objectPath, moduleObject,
+                              fs::copy_options::overwrite_existing);
+                fs::copy_file(module.path, moduleInterface,
+                              fs::copy_options::overwrite_existing);
+                linkedObjects.push_back(moduleObject);
+            }
+            runClang(llvmIrPath, outputPath, linkedObjects);
             std::cout << "IR créé          : " << irPath << '\n'
                       << "LLVM IR créé     : " << llvmIrPath << '\n'
+                      << "Objets LLVM liés : " << moduleDirectory << '\n'
                       << "Executable créé : " << outputPath << '\n';
             return 0;
         }
