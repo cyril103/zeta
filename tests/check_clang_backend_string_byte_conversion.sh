@@ -9,20 +9,20 @@ test -x "${output}"
 test -f "${output}.ll"
 test -f "${output}.ir"
 test ! -e "${output}.asm"
-grep -Fq "declare ptr @malloc(i64)" "${output}.ll"
+grep -Fq "define internal { ptr, i64 } @zeta_rt_string_from_byte(i8 %value)" "${output}.ll"
 grep -Fq "define internal { ptr, i64 } @zeta_rt_string_from_int(i32 %value)" "${output}.ll"
-grep -Fq "call { ptr, i64 } @zeta_rt_string_from_int(i32 18)" "${output}.ll"
-grep -Fq "call { ptr, i64 } @zeta_rt_string_from_int(i32 0)" "${output}.ll"
-if [[ $(grep -Fc "define internal { ptr, i64 } @zeta_rt_string_from_int" "${output}.ll") -ne 1 ]]; then
-    echo "expected one zeta_rt_string_from_int definition" >&2
+grep -Fq "zext i8 %value to i32" "${output}.ll"
+grep -Fq "call { ptr, i64 } @zeta_rt_string_from_int(i32" "${output}.ll"
+if [[ $(grep -Fc "define internal { ptr, i64 } @zeta_rt_string_from_byte" "${output}.ll") -ne 1 ]]; then
+    echo "expected one zeta_rt_string_from_byte definition" >&2
     exit 1
 fi
-if [[ $(grep -Ec '^  %v[0-9]+ = call \{ ptr, i64 \} @zeta_rt_string_from_int' "${output}.ll") -ne 3 ]]; then
-    echo "expected three zeta_rt_string_from_int application calls" >&2
+if [[ $(grep -Fc "call { ptr, i64 } @zeta_rt_string_from_byte" "${output}.ll") -ne 2 ]]; then
+    echo "expected two zeta_rt_string_from_byte application calls" >&2
     exit 1
 fi
 "${output}" > "${output}.stdout"
-printf '18 / -7 / 0\n' > "${output}.expected"
+printf '7 / 250\n' > "${output}.expected"
 cmp "${output}.expected" "${output}.stdout"
 "${compiler}" "${source}" -o "${output}.fasm"
 "${output}.fasm" > "${output}.fasm.stdout"

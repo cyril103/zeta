@@ -1,0 +1,9 @@
+import io
+
+def main(): Int = {
+    val small: Byte = 7
+    val large: Byte = Byte(250)
+    val message: String = String(small) + " / " + String(large)
+    io.println(message)
+    0
+}

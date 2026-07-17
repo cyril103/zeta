@@ -882,6 +882,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 return item->source == ValueType::Int && item->target == ValueType::String;
             return false;
         });
+    const bool usesStringFromByteHelper = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            if (const auto* item = std::get_if<IrConvert>(&instruction))
+                return item->source == ValueType::Byte && item->target == ValueType::String;
+            return false;
+        });
     const bool usesIoStringWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
@@ -935,14 +941,15 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             return false;
         });
 
+    const bool usesStringFromIntRuntime = usesStringFromIntHelper || usesStringFromByteHelper;
     out << "target triple = \"x86_64-pc-linux-gnu\"\n\n";
-    if (usesStringConcat || usesStringFromIntHelper) {
+    if (usesStringConcat || usesStringFromIntRuntime) {
         out << "declare ptr @malloc(i64)\n";
     }
-    if (usesStringConcat || usesStringFromIntHelper) {
+    if (usesStringConcat || usesStringFromIntRuntime) {
         out << "declare ptr @memcpy(ptr, ptr, i64)\n\n";
     }
-    if (usesStringConcat || usesStringOwnership || usesStringFromIntHelper) {
+    if (usesStringConcat || usesStringOwnership || usesStringFromIntRuntime) {
         out << "declare void @free(ptr)\n\n";
     }
     if (usesStringSearch) {
@@ -1127,7 +1134,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "  ret { ptr, i64 } %pair\n"
             << "}\n";
     }
-    if (usesStringFromIntHelper) {
+    if (usesStringFromIntRuntime) {
         out << "\ndefine internal { ptr, i64 } @zeta_rt_string_from_int(i32 %value) {\n"
             << "entry:\n"
             << "  %negative = icmp slt i32 %value, 0\n"
@@ -1170,6 +1177,14 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "  %pair_ptr = insertvalue { ptr, i64 } undef, ptr %data, 0\n"
             << "  %pair = insertvalue { ptr, i64 } %pair_ptr, i64 %length, 1\n"
             << "  ret { ptr, i64 } %pair\n"
+            << "}\n";
+    }
+    if (usesStringFromByteHelper) {
+        out << "\ndefine internal { ptr, i64 } @zeta_rt_string_from_byte(i8 %value) {\n"
+            << "entry:\n"
+            << "  %extended = zext i8 %value to i32\n"
+            << "  %result = call { ptr, i64 } @zeta_rt_string_from_int(i32 %extended)\n"
+            << "  ret { ptr, i64 } %result\n"
             << "}\n";
     }
     if (usesStringSearch) {
@@ -1563,6 +1578,13 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             } else if (item->source == ValueType::Int && item->target == ValueType::String) {
                 const std::string output = "%v" + std::to_string(item->output);
                 out << "  " << output << " = call { ptr, i64 } @zeta_rt_string_from_int(i32 "
+                    << value(item->input) << ")\n";
+                values[item->output] = output;
+                heapStringValues.insert(item->output);
+                rememberValuePaths(item->output, HeapStringPaths{HeapStringPath{}});
+            } else if (item->source == ValueType::Byte && item->target == ValueType::String) {
+                const std::string output = "%v" + std::to_string(item->output);
+                out << "  " << output << " = call { ptr, i64 } @zeta_rt_string_from_byte(i8 "
                     << value(item->input) << ")\n";
                 values[item->output] = output;
                 heapStringValues.insert(item->output);
