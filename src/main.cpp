@@ -468,9 +468,10 @@ int main(int argc, char** argv) {
         usage();
         return 2;
     }
-    if (((buildStandardLibrary || installLibraryModule) && (emitLlvm || backend == Backend::Clang)) ||
+    if ((buildStandardLibrary && emitLlvm) ||
+        (installLibraryModule && (emitLlvm || backend == Backend::Clang)) ||
         (buildLibraryModule && emitLlvm)) {
-        std::cerr << "Erreur: --backend=clang et --emit-llvm sont réservés aux exécutables, sauf --build-library --backend=clang\n";
+        std::cerr << "Erreur: --backend=clang et --emit-llvm sont réservés aux exécutables, sauf --build-library/--build-stdlib --backend=clang\n";
         return 2;
     }
     if (emitLlvm && backend == Backend::Fasm) {
@@ -574,6 +575,71 @@ int main(int argc, char** argv) {
         llvmIrPath += ".ll";
         if (emitLlvm) {
             writeFile(llvmIrPath, LlvmIrCodeGenerator::generate(verifiedIr));
+            return 0;
+        }
+        if (buildStandardLibrary && backend == Backend::Clang) {
+            const fs::path precompiled = standardLibraryPath / "precompiled";
+            fs::path moduleDirectory = outputPath;
+            moduleDirectory += ".modules";
+            fs::create_directories(moduleDirectory);
+            for (const std::string& moduleName : standardModules) {
+                const IrProgram& moduleIr = moduleIrs.at(moduleName);
+                const VerifiedIrProgram verifiedModuleIr =
+                    IrVerifier::verify(moduleIr, IrVerificationMode::ModuleObject);
+                const fs::path moduleIrPath = moduleDirectory / (moduleName + ".ir");
+                const fs::path moduleInterfacePath = moduleDirectory / (moduleName + ".zti");
+                const fs::path moduleLlvmPath = moduleDirectory / (moduleName + ".ll");
+                const fs::path moduleObject = moduleDirectory / (moduleName + ".o");
+                writeFile(moduleIrPath, IrGenerator::print(verifiedModuleIr));
+                writeFile(moduleInterfacePath, InterfaceCodec::serialize(
+                    modules.interfaces.at(moduleName),
+                    modules.interfaceFingerprints.at(moduleName),
+                    modules.dependencies.at(moduleName),
+                    modules.modules.at(moduleName).genericTokens));
+                writeFile(moduleLlvmPath, LlvmIrCodeGenerator::generateObject(verifiedModuleIr));
+                runClangObject(moduleLlvmPath, moduleObject);
+                fs::copy_file(moduleInterfacePath, precompiled / (moduleName + ".zti"),
+                              fs::copy_options::overwrite_existing);
+                fs::copy_file(moduleLlvmPath, precompiled / (moduleName + ".ll"),
+                              fs::copy_options::overwrite_existing);
+                const fs::path runtimeLinkedObject = moduleDirectory / (moduleName + ".linked.o");
+                if (hasNativeExports(modules.interfaces.at(moduleName))) {
+#ifdef ZETA_RUNTIME_DIR
+                    const fs::path runtimeAssembly = fs::path(ZETA_RUNTIME_DIR) / (moduleName + ".asm");
+#else
+                    const fs::path runtimeAssembly;
+#endif
+                    if (readOptionalFile(runtimeAssembly).empty())
+                        throw std::runtime_error("runtime natif introuvable pour le module " + moduleName);
+                    const fs::path runtimeObject = moduleDirectory / (moduleName + ".runtime.o");
+                    runFasm(runtimeAssembly, runtimeObject);
+                    runRelocatableLink({moduleObject, runtimeObject}, runtimeLinkedObject);
+                    fs::copy_file(runtimeLinkedObject, precompiled / (moduleName + ".o"),
+                                  fs::copy_options::overwrite_existing);
+                } else {
+                    fs::copy_file(moduleObject, precompiled / (moduleName + ".o"),
+                                  fs::copy_options::overwrite_existing);
+                }
+            }
+            std::string manifest = "ZETA_STDLIB " + std::string(ZetaVersion::StdlibManifest) +
+                "\ncompiler " + std::string(ZetaVersion::Compiler) +
+                "\nabi " + std::string(ZetaVersion::Abi) +
+                "\ninterface " + std::to_string(ZetaVersion::InterfaceFormat) + "\n";
+            for (const std::string& module : standardModules) manifest += "module " + module + "\n";
+            for (const std::string& module : standardModules) {
+                std::uint64_t hash = 1469598103934665603ULL;
+                for (const unsigned char byte : readOptionalFile(standardLibraryPath / (module + ".zeta"))) {
+                    hash ^= byte;
+                    hash *= 1099511628211ULL;
+                }
+                std::ostringstream encoded;
+                encoded << std::hex << std::setfill('0') << std::setw(16) << hash;
+                manifest += "source " + module + " " + encoded.str() + "\n";
+            }
+            writeFile(precompiled / "manifest", manifest);
+            fs::remove(sourcePath);
+            fs::remove_all(moduleDirectory);
+            std::cout << "Bibliothèque standard LLVM précompilée : " << precompiled << '\n';
             return 0;
         }
         if (backend == Backend::Clang) {
