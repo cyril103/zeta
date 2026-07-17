@@ -564,7 +564,7 @@ notamment :
 1. `--backend=fasm|clang`, `--emit-llvm`, diagnostics CLI et FASM encore par défaut ;
 2. génération textuelle LLVM après IR Zeta vérifiée (`LlvmIrCodeGenerator`) ;
 3. `Int`/`Bool`/`Byte`/`Char`/`Double`, arithmétique, comparaisons, conversions
-   couvertes et `Double` en `double` ;
+   couvertes, `Bool` -> `String` via helper runtime interne et `Double` en `double` ;
 4. fonctions, paramètres, appels, retours, labels, branches, boucles, slots locaux
    et copies SSA matérialisées si plusieurs chemins les définissent ;
 5. imports de modules source et globales scalaires `Int`/`Bool` ;
@@ -609,7 +609,13 @@ travail par défaut pour le développement courant :
    et `compile_clang_backend_io_println_double`
    verrouillent chacun la définition unique du helper, les chemins `print`/
    `println` et la comparaison stdout Clang/FASM.
-3. **En cours le 17 juillet 2026 — helpers `strings.*` par Clang** :
+3. **En cours le 17 juillet 2026 — conversions `String(value)` par Clang** :
+   `String(Bool)` passe maintenant par le helper LLVM interne
+   `@zeta_rt_string_from_bool(i1)`, qui réutilise les constantes privées
+   `true`/`false` et retourne la paire `{ ptr, i64 }` sans allocation. Le test
+   `compile_clang_backend_string_bool_conversion` verrouille la définition unique,
+   les appels applicatifs, la sortie Clang et la comparaison FASM.
+4. **En cours le 17 juillet 2026 — helpers `strings.*` par Clang** :
    `strings.view` passe maintenant par le helper LLVM interne
    `@zeta_rt_strings_view(ptr, i64, i32, i32)`, `strings.viewIsValid` par
    `@zeta_rt_strings_view_is_valid(ptr)`, `strings.decodeAtByte` par
@@ -623,22 +629,22 @@ travail par défaut pour le développement courant :
    `compile_clang_backend_for_string_char_iteration` et `compile_clang_backend_string_search`
    verrouillent chacun une définition unique des helpers, les appels applicatifs et
    la comparaison Clang/FASM.
-4. **Suite runtime/stdlib par Clang** : étendre cette ABI stable aux autres
+5. **Suite runtime/stdlib par Clang** : étendre cette ABI stable aux autres
    primitives `strings.*` (UTF-8) et aux conversions
-   générales vers `String`, après consolidation des `io.print*`/`io.println*`
+   générales vers `String` restantes, après consolidation des `io.print*`/`io.println*`
    primitifs directs derrière `zeta_rt_*`, sans réintroduire d'assembleur FASM
    dans le chemin Clang.
-5. **Modules séparés et stdlib précompilée** : produire/relier objets runtime,
+6. **Modules séparés et stdlib précompilée** : produire/relier objets runtime,
    modules et stdlib via `clang`, puis lever les diagnostics FASM-only de
    `--build-library`, `--install-library` et `--build-stdlib` pour le backend LLVM.
-6. **Agrégats restants** : décider et implémenter le support LLVM ou les rejets
+7. **Agrégats restants** : décider et implémenter le support LLVM ou les rejets
    définitifs pour globals agrégats, tableaux dans structs, `Box`, `Vec`, enums et
    grands agrégats dépassant l'ABI actuelle.
-7. **Mode par défaut contrôlé** : ajouter un job/test de matrice qui compile les
+8. **Mode par défaut contrôlé** : ajouter un job/test de matrice qui compile les
    exemples et la stdlib avec `--backend=clang`; quand il est vert, inverser le
    défaut local de développement vers Clang tout en gardant `--backend=fasm` comme
    fallback explicite.
-8. **Retrait progressif de FASM** : une fois la matrice LLVM verte sur exemples,
+9. **Retrait progressif de FASM** : une fois la matrice LLVM verte sur exemples,
    stdlib et modules, figer FASM en backend legacy puis supprimer les dépendances
    de développement qui bloquent la portabilité.
 
@@ -721,12 +727,14 @@ pour `io.print`/
 `strings.viewIsValid`, `@zeta_rt_strings_decode_at_byte(ptr, i64, i32)` pour
 `strings.decodeAtByte`, `@zeta_rt_strings_next_byte_offset(ptr, i64, i32)` pour
 `strings.nextByteOffset`, `@zeta_rt_strings_index_of(ptr, i64, ptr, i64)` pour
-`strings.indexOf`/`strings.contains`, verrouillées respectivement par
+`strings.indexOf`/`strings.contains`, `@zeta_rt_string_from_bool(i1)` pour
+`String(Bool)`, verrouillées respectivement par
 `compile_clang_backend_io_println_string`, `compile_clang_backend_io_println_int`,
 `compile_clang_backend_io_println_bool`, `compile_clang_backend_io_println_byte`,
 `compile_clang_backend_io_println_char`, `compile_clang_backend_io_println_double`,
 `compile_clang_backend_string_view`, `compile_clang_backend_string_utf8_decode`,
-`compile_clang_backend_for_string_char_iteration` et `compile_clang_backend_string_search`.
+`compile_clang_backend_for_string_char_iteration`, `compile_clang_backend_string_search`
+et `compile_clang_backend_string_bool_conversion`.
 Les tests doivent continuer à comparer Clang et FASM tant que FASM sert d'oracle,
 mais la nouvelle frontière doit être conçue pour le backend LLVM principal.
 
