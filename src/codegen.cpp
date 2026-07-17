@@ -890,67 +890,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             return true;
         }
         auto emitStringIndexOf = [&](const std::string& base, ValueId haystackId, ValueId needleId) -> std::string {
-            const std::string prefix = nextSyntheticPrefix("string_search");
-            const std::string invalidLabel = prefix + ".invalid";
-            const std::string rangeLabel = prefix + ".range";
-            const std::string emptyLabel = prefix + ".empty";
-            const std::string loopLabel = prefix + ".loop";
-            const std::string compareLabel = prefix + ".compare";
-            const std::string memcmpLabel = prefix + ".memcmp";
-            const std::string foundLabel = prefix + ".found";
-            const std::string nextLabel = prefix + ".next";
-            const std::string doneLabel = prefix + ".done";
             const std::string hayPtr = extractStringPart(base + ".haystack", haystackId, 0);
             const std::string hayLen = extractStringPart(base + ".haystack", haystackId, 1);
             const std::string needlePtr = extractStringPart(base + ".needle", needleId, 0);
             const std::string needleLen = extractStringPart(base + ".needle", needleId, 1);
-            const std::string hayValid = base + ".haystack_valid";
-            const std::string needleValid = base + ".needle_valid";
-            const std::string valid = base + ".valid";
-            const std::string isEmpty = base + ".empty";
-            const std::string fits = base + ".fits";
-            const std::string limit = base + ".limit";
-            const std::string index = base + ".index";
-            const std::string inRange = base + ".in_range";
-            const std::string candidate = base + ".candidate";
-            const std::string cmp = base + ".cmp";
-            const std::string match = base + ".match";
-            const std::string found32 = base + ".found32";
-            const std::string next = base + ".next";
-            out << "  " << hayValid << " = icmp ne ptr " << hayPtr << ", null\n"
-                << "  " << needleValid << " = icmp ne ptr " << needlePtr << ", null\n"
-                << "  " << valid << " = and i1 " << hayValid << ", " << needleValid << "\n"
-                << "  br i1 " << valid << ", label %" << rangeLabel << ", label %" << invalidLabel << "\n"
-                << invalidLabel << ":\n"
-                << "  br label %" << doneLabel << "\n"
-                << rangeLabel << ":\n"
-                << "  " << isEmpty << " = icmp eq i64 " << needleLen << ", 0\n"
-                << "  br i1 " << isEmpty << ", label %" << emptyLabel << ", label %" << loopLabel << "\n"
-                << emptyLabel << ":\n"
-                << "  br label %" << doneLabel << "\n"
-                << loopLabel << ":\n"
-                << "  " << fits << " = icmp ule i64 " << needleLen << ", " << hayLen << "\n"
-                << "  " << limit << " = sub i64 " << hayLen << ", " << needleLen << "\n"
-                << "  br i1 " << fits << ", label %" << compareLabel << ", label %" << invalidLabel << "\n"
-                << compareLabel << ":\n"
-                << "  " << index << " = phi i64 [ 0, %" << loopLabel << " ], [ " << next << ", %" << nextLabel << " ]\n"
-                << "  " << inRange << " = icmp ule i64 " << index << ", " << limit << "\n"
-                << "  br i1 " << inRange << ", label %" << memcmpLabel << ", label %" << invalidLabel << "\n"
-                << memcmpLabel << ":\n"
-                << "  " << candidate << " = getelementptr i8, ptr " << hayPtr << ", i64 " << index << "\n"
-                << "  " << cmp << " = call i32 @memcmp(ptr " << candidate << ", ptr " << needlePtr
-                << ", i64 " << needleLen << ")\n"
-                << "  " << match << " = icmp eq i32 " << cmp << ", 0\n"
-                << "  br i1 " << match << ", label %" << foundLabel << ", label %" << nextLabel << "\n"
-                << foundLabel << ":\n"
-                << "  " << found32 << " = trunc i64 " << index << " to i32\n"
-                << "  br label %" << doneLabel << "\n"
-                << nextLabel << ":\n"
-                << "  " << next << " = add i64 " << index << ", 1\n"
-                << "  br label %" << compareLabel << "\n"
-                << doneLabel << ":\n"
-                << "  " << base << " = phi i32 [ -1, %" << invalidLabel << " ], [ 0, %"
-                << emptyLabel << " ], [ " << found32 << ", %" << foundLabel << " ]\n";
+            out << "  " << base << " = call i32 @zeta_rt_strings_index_of(ptr " << hayPtr
+                << ", i64 " << hayLen << ", ptr " << needlePtr << ", i64 " << needleLen << ")\n";
             return base;
         };
         if (item.function == "strings__decodeAtByte") {
@@ -1191,6 +1136,44 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "  %pair_ptr = insertvalue { ptr, i64 } undef, ptr %view_ptr, 0\n"
             << "  %pair = insertvalue { ptr, i64 } %pair_ptr, i64 %view_len, 1\n"
             << "  ret { ptr, i64 } %pair\n"
+            << "}\n";
+    }
+    if (usesStringSearch) {
+        out << "\ndefine internal i32 @zeta_rt_strings_index_of(ptr %hay_data, i64 %hay_len, ptr %needle_data, i64 %needle_len) {\n"
+            << "entry:\n"
+            << "  %hay_valid = icmp ne ptr %hay_data, null\n"
+            << "  %needle_valid = icmp ne ptr %needle_data, null\n"
+            << "  %valid = and i1 %hay_valid, %needle_valid\n"
+            << "  br i1 %valid, label %range, label %invalid\n"
+            << "invalid:\n"
+            << "  br label %done\n"
+            << "range:\n"
+            << "  %empty = icmp eq i64 %needle_len, 0\n"
+            << "  br i1 %empty, label %empty_needle, label %loop\n"
+            << "empty_needle:\n"
+            << "  br label %done\n"
+            << "loop:\n"
+            << "  %fits = icmp ule i64 %needle_len, %hay_len\n"
+            << "  %limit = sub i64 %hay_len, %needle_len\n"
+            << "  br i1 %fits, label %compare, label %invalid\n"
+            << "compare:\n"
+            << "  %index = phi i64 [ 0, %loop ], [ %next, %next_candidate ]\n"
+            << "  %in_range = icmp ule i64 %index, %limit\n"
+            << "  br i1 %in_range, label %memcmp, label %invalid\n"
+            << "memcmp:\n"
+            << "  %candidate = getelementptr i8, ptr %hay_data, i64 %index\n"
+            << "  %cmp = call i32 @memcmp(ptr %candidate, ptr %needle_data, i64 %needle_len)\n"
+            << "  %match = icmp eq i32 %cmp, 0\n"
+            << "  br i1 %match, label %found, label %next_candidate\n"
+            << "found:\n"
+            << "  %found32 = trunc i64 %index to i32\n"
+            << "  br label %done\n"
+            << "next_candidate:\n"
+            << "  %next = add i64 %index, 1\n"
+            << "  br label %compare\n"
+            << "done:\n"
+            << "  %result = phi i32 [ -1, %invalid ], [ 0, %empty_needle ], [ %found32, %found ]\n"
+            << "  ret i32 %result\n"
             << "}\n";
     }
     if (usesIoStringWrite) {

@@ -12,6 +12,9 @@ test -f "${output}.ir"
 test ! -f "${output}.asm"
 
 grep -Fq "declare i32 @memcmp(ptr, ptr, i64)" "${output}.ll"
+grep -Fq "define internal i32 @zeta_rt_strings_index_of(ptr %hay_data, i64 %hay_len, ptr %needle_data, i64 %needle_len)" "${output}.ll"
+test "$(grep -Fc 'define internal i32 @zeta_rt_strings_index_of' "${output}.ll")" -eq 1
+test "$(grep -Fc 'call i32 @zeta_rt_strings_index_of' "${output}.ll")" -eq 4
 grep -Fq "call i32 @memcmp" "${output}.ll"
 grep -Fq "icmp eq i32" "${output}.ll"
 grep -Fq "phi i32" "${output}.ll"
