@@ -233,8 +233,9 @@ des constantes ou des vues empruntées ; `retain`/aliasing heap complet reste ho
 périmètre.
 
 `compile_clang_backend_string_view` ajoute une première surface `stdlib/strings` :
-`strings.view(text, start, end)` est abaissé en LLVM sans appel runtime externe.
-Le backend extrait `{ ptr, i64 }`, vérifie `start >= 0`, `start <= end` et
+`strings.view(text, start, end)` passe par la frontière runtime interne
+`@zeta_rt_strings_view(ptr, i64, i32, i32)`, après extraction du couple `String`
+au point d'appel. Le helper vérifie `start >= 0`, `start <= end` et
 `end <= length`, calcule le pointeur par `getelementptr i8`, puis sélectionne soit
 la vue valide, soit `{ null, 0 }`. `strings.viewIsValid(view)` devient un test
 `icmp ne ptr ... null`. Pour éviter que l'import de `strings` force la génération
@@ -366,7 +367,8 @@ runtime internes (`@zeta_rt_io_write_string` pour `io.print`/
 `io.printlnBool`, et `@zeta_rt_io_write_byte` pour `io.printByte`/
 `io.printlnByte`, et `@zeta_rt_io_write_char` pour `io.printChar`/
 `io.printlnChar`, et `@zeta_rt_io_write_double` pour `io.printDouble`/
-`io.printlnDouble`), structs simples, mixtes et imbriqués, ABI de fonctions sur
+`io.printlnDouble`) et première frontière `strings.*` (`@zeta_rt_strings_view`
+pour `strings.view`), structs simples, mixtes et imbriqués, ABI de fonctions sur
 structs simples, copies à travers branches et ownership de chaînes heap encapsulées
 dans des structs, y compris à travers paramètres, appels et retours de fonctions
 portant ces structs.
@@ -386,14 +388,16 @@ Tests structurants déjà verrouillés côté structs/ownership :
 Prochaines tranches nécessaires pour remplacer FASM :
 
 1. étendre l'ABI runtime/stdlib LLVM `zeta_rt_*` après les six briques
-   `io.*` déjà livrées (`@zeta_rt_io_write_string(ptr, i64, i1)`,
+   `io.*` déjà livrées et la première brique `strings.*`
+   (`@zeta_rt_io_write_string(ptr, i64, i1)`,
    `@zeta_rt_io_write_int(i32, i1)`, `@zeta_rt_io_write_bool(i1, i1)`,
    `@zeta_rt_io_write_byte(i8, i1)`, `@zeta_rt_io_write_char(i32, i1)` et
-   `@zeta_rt_io_write_double(double, i1)`) utilisées par `io.print`/
+   `@zeta_rt_io_write_double(double, i1)`,
+   `@zeta_rt_strings_view(ptr, i64, i32, i32)`) utilisées par `io.print`/
    `io.println(String)`, `io.printInt`/`io.printlnInt`, `io.printBool`/
    `io.printlnBool`, `io.printByte`/`io.printlnByte`, `io.printChar`/
-   `io.printlnChar` et `io.printDouble`/`io.printlnDouble` ; cibler ensuite les
-   primitives `strings.*` ou les conversions générales vers `String` encore
+   `io.printlnChar`, `io.printDouble`/`io.printlnDouble` et `strings.view` ; cibler ensuite les
+   autres primitives `strings.*` ou les conversions générales vers `String` encore
    abaissées de façon spécialisée ;
 2. produire et relier modules séparés, stdlib précompilée et runtime via `clang` ;
 3. choisir le support ou le rejet final pour globals agrégats, tableaux dans
@@ -494,6 +498,10 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   la frontière runtime interne `@zeta_rt_io_write_double(double, i1)`, qui
   centralise `printf("%g")`, le format avec/sans newline, `Double` en `double`,
   constantes/slots locaux et `fneg` unaire sur formats stables comparés à FASM.
+- fait : `--backend=clang` couvre `strings.view` via la frontière runtime interne
+  `@zeta_rt_strings_view(ptr, i64, i32, i32)`, qui centralise les bornes, le calcul
+  du pointeur et le sentinelle `{ null, 0 }`; `strings.viewIsValid` reste un test
+  `ptr != null`, avec exécution Clang et FASM.
 - fait : `--backend=clang` couvre les opérations arithmétiques `Double`
   `+`/`-`/`*`/`/` via `fadd`/`fsub`/`fmul`/`fdiv`, et les comparaisons ordonnées
   via `fcmp o*`, avec exécution Clang et FASM.
