@@ -872,32 +872,9 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             const std::string base = "%v" + std::to_string(item.output);
             const std::string sourcePtr = extractStringPart(base + ".source", item.arguments[0], 0);
             const std::string sourceLen = extractStringPart(base + ".source", item.arguments[0], 1);
-            const std::string start64 = base + ".start64";
-            const std::string end64 = base + ".end64";
-            const std::string startOk = base + ".start_ok";
-            const std::string orderOk = base + ".order_ok";
-            const std::string endOk = base + ".end_ok";
-            const std::string validPrefix = base + ".valid_prefix";
-            const std::string valid = base + ".valid";
-            const std::string rawPtr = base + ".raw_ptr";
-            const std::string rawLen = base + ".raw_len";
-            const std::string viewPtr = base + ".ptr";
-            const std::string viewLen = base + ".len";
-            const std::string pairPtr = base + ".pair_ptr";
-            out << "  " << start64 << " = sext i32 " << value(item.arguments[1]) << " to i64\n"
-                << "  " << end64 << " = sext i32 " << value(item.arguments[2]) << " to i64\n"
-                << "  " << startOk << " = icmp sge i32 " << value(item.arguments[1]) << ", 0\n"
-                << "  " << orderOk << " = icmp sle i32 " << value(item.arguments[1]) << ", "
-                << value(item.arguments[2]) << "\n"
-                << "  " << endOk << " = icmp sle i64 " << end64 << ", " << sourceLen << "\n"
-                << "  " << validPrefix << " = and i1 " << startOk << ", " << orderOk << "\n"
-                << "  " << valid << " = and i1 " << validPrefix << ", " << endOk << "\n"
-                << "  " << rawPtr << " = getelementptr i8, ptr " << sourcePtr << ", i64 " << start64 << "\n"
-                << "  " << rawLen << " = sub i64 " << end64 << ", " << start64 << "\n"
-                << "  " << viewPtr << " = select i1 " << valid << ", ptr " << rawPtr << ", ptr null\n"
-                << "  " << viewLen << " = select i1 " << valid << ", i64 " << rawLen << ", i64 0\n"
-                << "  " << pairPtr << " = insertvalue { ptr, i64 } undef, ptr " << viewPtr << ", 0\n"
-                << "  " << base << " = insertvalue { ptr, i64 } " << pairPtr << ", i64 " << viewLen << ", 1\n";
+            out << "  " << base << " = call { ptr, i64 } @zeta_rt_strings_view(ptr "
+                << sourcePtr << ", i64 " << sourceLen << ", i32 " << value(item.arguments[1])
+                << ", i32 " << value(item.arguments[2]) << ")\n";
             values[item.output] = base;
             return true;
         }
@@ -1098,6 +1075,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 return call->function == "strings__indexOf" || call->function == "strings__contains";
             return false;
         });
+    const bool usesStringViewHelper = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            if (const auto* call = std::get_if<IrCall>(&instruction))
+                return call->function == "strings__view";
+            return false;
+        });
     const bool usesIoStringWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
@@ -1190,6 +1173,25 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "@zeta.fmt.byte.nl = private unnamed_addr constant [4 x i8] c\"%u\\0A\\00\", align 1\n"
             << "@zeta.fmt.double = private unnamed_addr constant [3 x i8] c\"%g\\00\", align 1\n"
             << "@zeta.fmt.double.nl = private unnamed_addr constant [4 x i8] c\"%g\\0A\\00\", align 1\n";
+    }
+    if (usesStringViewHelper) {
+        out << "\ndefine internal { ptr, i64 } @zeta_rt_strings_view(ptr %data, i64 %len, i32 %start, i32 %end) {\n"
+            << "entry:\n"
+            << "  %start64 = sext i32 %start to i64\n"
+            << "  %end64 = sext i32 %end to i64\n"
+            << "  %start_ok = icmp sge i32 %start, 0\n"
+            << "  %order_ok = icmp sle i32 %start, %end\n"
+            << "  %end_ok = icmp sle i64 %end64, %len\n"
+            << "  %valid_prefix = and i1 %start_ok, %order_ok\n"
+            << "  %valid = and i1 %valid_prefix, %end_ok\n"
+            << "  %raw_ptr = getelementptr i8, ptr %data, i64 %start64\n"
+            << "  %raw_len = sub i64 %end64, %start64\n"
+            << "  %view_ptr = select i1 %valid, ptr %raw_ptr, ptr null\n"
+            << "  %view_len = select i1 %valid, i64 %raw_len, i64 0\n"
+            << "  %pair_ptr = insertvalue { ptr, i64 } undef, ptr %view_ptr, 0\n"
+            << "  %pair = insertvalue { ptr, i64 } %pair_ptr, i64 %view_len, 1\n"
+            << "  ret { ptr, i64 } %pair\n"
+            << "}\n";
     }
     if (usesIoStringWrite) {
         out << "\ndefine internal void @zeta_rt_io_write_string(ptr %data, i64 %len, i1 %newline) {\n"
