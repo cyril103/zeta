@@ -838,9 +838,9 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 item.argumentTypes[0] != ValueType::Double || item.returnType != ValueType::Unit) {
                 throw std::runtime_error("backend LLVM: signature io.printDouble/printlnDouble non supportée");
             }
-            const char* format = item.function == "io__printlnDouble" ? "@zeta.fmt.double.nl" : "@zeta.fmt.double";
-            out << "  call i32 (ptr, ...) @printf(ptr " << format << ", double "
-                << value(item.arguments[0]) << ")\n";
+            const char* newline = item.function == "io__printlnDouble" ? "true" : "false";
+            out << "  call void @zeta_rt_io_write_double(double " << value(item.arguments[0])
+                << ", i1 " << newline << ")\n";
             return true;
         }
         if (item.function == "io__printChar" || item.function == "io__printlnChar") {
@@ -1144,6 +1144,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 return call->function == "io__printChar" || call->function == "io__printlnChar";
             return false;
         });
+    const bool usesIoDoubleWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            if (const auto* call = std::get_if<IrCall>(&instruction))
+                return call->function == "io__printDouble" || call->function == "io__printlnDouble";
+            return false;
+        });
 
     out << "target triple = \"x86_64-pc-linux-gnu\"\n\n";
     if (usesStringConcat) {
@@ -1225,6 +1231,14 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "  %format = select i1 %newline, ptr @zeta.fmt.byte.nl, ptr @zeta.fmt.byte\n"
             << "  %wide = zext i8 %value to i32\n"
             << "  call i32 (ptr, ...) @printf(ptr %format, i32 %wide)\n"
+            << "  ret void\n"
+            << "}\n";
+    }
+    if (usesIoDoubleWrite) {
+        out << "\ndefine internal void @zeta_rt_io_write_double(double %value, i1 %newline) {\n"
+            << "entry:\n"
+            << "  %format = select i1 %newline, ptr @zeta.fmt.double.nl, ptr @zeta.fmt.double\n"
+            << "  call i32 (ptr, ...) @printf(ptr %format, double %value)\n"
             << "  ret void\n"
             << "}\n";
     }
