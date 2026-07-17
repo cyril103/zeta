@@ -884,8 +884,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 throw std::runtime_error("backend LLVM: signature strings.viewIsValid non supportée");
             }
             const std::string output = "%v" + std::to_string(item.output);
-            const std::string ptr = extractStringPart(output, item.arguments[0], 0);
-            out << "  " << output << " = icmp ne ptr " << ptr << ", null\n";
+            const std::string ptr = extractStringPart(output + ".view", item.arguments[0], 0);
+            out << "  " << output << " = call i1 @zeta_rt_strings_view_is_valid(ptr " << ptr << ")\n";
             values[item.output] = output;
             return true;
         }
@@ -1023,7 +1023,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     const bool usesStringViewHelper = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
-                return call->function == "strings__view";
+                return call->function == "strings__view" || call->function == "strings__viewIsValid";
             return false;
         });
     const bool usesIoStringWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
@@ -1136,6 +1136,11 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "  %pair_ptr = insertvalue { ptr, i64 } undef, ptr %view_ptr, 0\n"
             << "  %pair = insertvalue { ptr, i64 } %pair_ptr, i64 %view_len, 1\n"
             << "  ret { ptr, i64 } %pair\n"
+            << "}\n"
+            << "\ndefine internal i1 @zeta_rt_strings_view_is_valid(ptr %data) {\n"
+            << "entry:\n"
+            << "  %valid = icmp ne ptr %data, null\n"
+            << "  ret i1 %valid\n"
             << "}\n";
     }
     if (usesStringSearch) {
