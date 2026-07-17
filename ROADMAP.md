@@ -751,7 +751,10 @@ contre des bibliothèques précompilées LLVM installées,
 `compile_clang_backend_shared_global_cache` pour la lecture de `pub val` scalaires
 précompilés depuis un cache `.o` LLVM,
 `compile_clang_backend_shared_string_global_cache` pour les `pub val String`
-précompilées statiques, et `compile_clang_backend_build_stdlib`
+précompilées statiques,
+`compile_clang_backend_shared_struct_global_cache` pour les `pub val` structs
+précompilées statiques composées de types LLVM supportés, et
+`compile_clang_backend_build_stdlib`
 pour la première précompilation stdlib simple via LLVM,
 `compile_clang_backend_global_string` pour les `pub val String`
 globales LLVM, `compile_clang_backend_global_double` pour les `pub val Double`
@@ -773,7 +776,10 @@ Après cette tranche :
    scalaires précompilés sont émis avec un symbole stable `module__name`, déclarés
    `external global` côté consommateur et relus depuis l'objet `.o` du cache, les
    `pub val String` précompilées initialisées par littéral sont émises statiquement
-   comme une paire `{ ptr, i64 }` pointant vers leur constante privée, et
+   comme une paire `{ ptr, i64 }` pointant vers leur constante privée, les `pub val`
+   structs précompilées dont les champs ont des constantes LLVM sont émises comme
+   `global { ... } { ... }` statiques et relues par le consommateur depuis l'objet
+   du cache, et
    `--build-stdlib --backend=clang` précompile désormais les modules stdlib simples
    en `.zti`/`.ll`/`.o`, les `pub val String` globales sont émises en
    `{ ptr, i64 } zeroinitializer` puis initialisées dans le wrapper `@main`,

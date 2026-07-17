@@ -234,6 +234,14 @@ privée `@str.N = private unnamed_addr constant { i64, i64, [N x i8] } ...`, pui
 { ptr, i64 }`, charge la paire depuis l'objet `.o` du cache, puis réutilise les
 helpers String existants comme `@zeta_rt_string_length_bytes`.
 
+`compile_clang_backend_shared_struct_global_cache` couvre le même flux pour les
+`pub val` structs précompilées dont les champs sont des constantes LLVM supportées :
+le producteur replie la construction `Pair { ... }` en initialiseur global statique,
+par exemple `@module__pair = global { i32, i32 } { i32 3, i32 4 }`, sans `insertvalue`
+ou `store` top-level dans l'IR objet. Le consommateur déclare `external global`,
+charge la struct depuis l'objet `.o` du cache, puis les accès champs restent des
+`extractvalue` locaux.
+
 Les diagnostics d'agrégats globaux restent couverts séparément par les tests
 `reject_clang_backend_unsupported_aggregates` et
 `reject_clang_backend_unsupported_global_aggregates` pour les tableaux, slices,
@@ -680,6 +688,10 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   précompilés LLVM : le producteur émet la paire `{ ptr, i64 }` comme initialiseur
   global statique pointant vers `@str.N`, et le consommateur charge la paire depuis
   `external global { ptr, i64 }` avant d'appeler les helpers String existants.
+- fait : `--backend=clang` consomme les `pub val` structs statiques de modules
+  précompilés LLVM quand leurs champs sont des constantes LLVM supportées : le
+  producteur émet `global { ... } { ... }` sans instructions top-level, et le
+  consommateur charge la struct depuis `external global { ... }` avant `extractvalue`.
 - fait : `--build-stdlib --backend=clang` précompile une stdlib simple côté LLVM :
   chaque module produit `.zti`, `.ll` et `.o`, le manifeste est écrit, les sources
   peuvent ensuite être absentes, et un exécutable Clang consomme le cache `precompiled`.
