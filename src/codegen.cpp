@@ -372,6 +372,10 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
     std::unordered_map<ValueId, std::string> values;
     std::unordered_set<ValueId> heapStringValues;
     std::unordered_set<SlotId> heapStringSlots;
+    using HeapStringPath = std::vector<std::size_t>;
+    using HeapStringPaths = std::set<HeapStringPath>;
+    std::unordered_map<ValueId, HeapStringPaths> heapStringValuePaths;
+    std::unordered_map<SlotId, HeapStringPaths> heapStringSlotPaths;
     std::unordered_map<std::string, ValueType> functionReturnTypes;
     std::unordered_map<std::string, std::vector<ValueType>> functionParameterTypes;
     std::unordered_map<std::string, std::vector<std::string>> functionCalls;
@@ -498,6 +502,71 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
         out << "  " << part << " = extractvalue " << llvmType(type) << " "
             << value(id) << ", " << index << "\n";
         return part;
+    };
+    auto pathsForValue = [&](ValueId id) -> HeapStringPaths {
+        if (const auto found = heapStringValuePaths.find(id); found != heapStringValuePaths.end())
+            return found->second;
+        if (heapStringValues.contains(id)) return HeapStringPaths{HeapStringPath{}};
+        return {};
+    };
+    auto rememberValuePaths = [&](ValueId id, const HeapStringPaths& paths) -> void {
+        if (paths.empty()) {
+            heapStringValuePaths.erase(id);
+            if (program.valueTypes.at(id) == ValueType::String) heapStringValues.erase(id);
+            return;
+        }
+        heapStringValuePaths[id] = paths;
+        if (program.valueTypes.at(id) == ValueType::String && paths.contains(HeapStringPath{}))
+            heapStringValues.insert(id);
+    };
+    auto prefixPaths = [](const HeapStringPaths& paths, std::size_t field) -> HeapStringPaths {
+        HeapStringPaths prefixed;
+        for (HeapStringPath path : paths) {
+            path.insert(path.begin(), field);
+            prefixed.insert(std::move(path));
+        }
+        return prefixed;
+    };
+    auto pathsForField = [](const HeapStringPaths& paths, std::size_t field) -> HeapStringPaths {
+        HeapStringPaths selected;
+        for (const HeapStringPath& path : paths) {
+            if (!path.empty() && path.front() == field)
+                selected.insert(HeapStringPath(path.begin() + 1, path.end()));
+        }
+        return selected;
+    };
+    auto removeFieldPaths = [](HeapStringPaths paths, std::size_t field) -> HeapStringPaths {
+        for (auto it = paths.begin(); it != paths.end();) {
+            if (!it->empty() && it->front() == field) {
+                it = paths.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        return paths;
+    };
+    auto emitStringFree = [&](const std::string& prefix, const std::string& stringValue,
+                              const ValueType& stringType) -> void {
+        const std::string data = prefix + ".ptr";
+        const std::string raw = prefix + ".raw";
+        out << "  " << data << " = extractvalue " << llvmType(stringType) << " "
+            << stringValue << ", 0\n"
+            << "  " << raw << " = getelementptr i8, ptr " << data << ", i64 -16\n"
+            << "  call void @free(ptr " << raw << ")\n";
+    };
+    auto emitHeapStringPathDrop = [&](const std::string& prefix, const std::string& rootValue,
+                                      const ValueType& rootType, const HeapStringPath& path) -> void {
+        std::string currentValue = rootValue;
+        ValueType currentType = rootType;
+        for (std::size_t depth = 0; depth < path.size(); ++depth) {
+            const std::size_t fieldIndex = path[depth];
+            const std::string fieldValue = prefix + ".field" + std::to_string(depth);
+            out << "  " << fieldValue << " = extractvalue " << llvmType(currentType) << " "
+                << currentValue << ", " << fieldIndex << "\n";
+            currentValue = fieldValue;
+            currentType = currentType.structure->fields[fieldIndex].type;
+        }
+        emitStringFree(prefix, currentValue, currentType);
     };
     auto unsupported = [](const char* instruction) -> void {
         throw std::runtime_error(std::string("backend LLVM: instruction non supportée ") + instruction);
@@ -1330,6 +1399,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 } else {
                     values[item->output] = value(item->input);
                 }
+                rememberValuePaths(item->output, pathsForValue(item->input));
             } else {
                 throw std::runtime_error("backend LLVM: type de copie non supporté " +
                                          typeName(item->type));
@@ -1363,6 +1433,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 current = output;
             }
             values[item->output] = current;
+            HeapStringPaths structPaths;
+            for (std::size_t i = 0; i < item->fields.size(); ++i) {
+                const HeapStringPaths fieldPaths = prefixPaths(pathsForValue(item->fields[i]), i);
+                structPaths.insert(fieldPaths.begin(), fieldPaths.end());
+            }
+            rememberValuePaths(item->output, structPaths);
         } else if (const auto* item = std::get_if<IrFieldLoad>(&instruction)) {
             if (!isLlvmValueType(item->objectType) || item->objectType.kind != ValueType::Kind::Struct)
                 throw std::runtime_error("backend LLVM: chargement champ struct non supporté " +
@@ -1371,6 +1447,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             out << "  " << output << " = extractvalue " << llvmType(item->objectType) << " "
                 << value(item->object) << ", " << item->field << "\n";
             values[item->output] = output;
+            rememberValuePaths(item->output, pathsForField(pathsForValue(item->object), item->field));
         } else if (const auto* item = std::get_if<IrFieldStore>(&instruction)) {
             if (!isLlvmValueType(item->objectType) || item->objectType.kind != ValueType::Kind::Struct)
                 throw std::runtime_error("backend LLVM: mutation champ struct non supportée " +
@@ -1387,6 +1464,14 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             out << "  " << updated << " = insertvalue " << structType << " " << current
                 << ", " << llvmType(field.type) << " " << value(item->value) << ", " << item->field << "\n";
             out << "  store " << structType << " " << updated << ", ptr " << slotName(item->slot) << "\n";
+            HeapStringPaths slotPaths = removeFieldPaths(heapStringSlotPaths[item->slot], item->field);
+            const HeapStringPaths valuePaths = prefixPaths(pathsForValue(item->value), item->field);
+            slotPaths.insert(valuePaths.begin(), valuePaths.end());
+            if (slotPaths.empty()) {
+                heapStringSlotPaths.erase(item->slot);
+            } else {
+                heapStringSlotPaths[item->slot] = slotPaths;
+            }
         } else if (const auto* item = std::get_if<IrStore>(&instruction)) {
             if (!isLlvmValueType(item->type))
                 throw std::runtime_error("backend LLVM: type de store non supporté " +
@@ -1400,6 +1485,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                     heapStringSlots.erase(item->slot);
                 }
             }
+            const HeapStringPaths storedPaths = pathsForValue(item->value);
+            if (storedPaths.empty()) {
+                heapStringSlotPaths.erase(item->slot);
+            } else {
+                heapStringSlotPaths[item->slot] = storedPaths;
+            }
         } else if (const auto* item = std::get_if<IrLoad>(&instruction)) {
             if (!isLlvmValueType(item->type))
                 throw std::runtime_error("backend LLVM: type de load non supporté " +
@@ -1410,6 +1501,8 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             values[item->output] = output;
             if (item->type == ValueType::String && heapStringSlots.contains(item->slot))
                 heapStringValues.insert(item->output);
+            if (const auto found = heapStringSlotPaths.find(item->slot); found != heapStringSlotPaths.end())
+                rememberValuePaths(item->output, found->second);
         } else if (const auto* item = std::get_if<IrStringConcat>(&instruction)) {
             const std::string base = "%v" + std::to_string(item->output);
             const std::string leftPtr = extractStringPart(base + ".left", item->left, 0);
@@ -1437,6 +1530,7 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 << "  " << base << " = insertvalue { ptr, i64 } " << pairPtr << ", i64 " << length << ", 1\n";
             values[item->output] = base;
             heapStringValues.insert(item->output);
+            rememberValuePaths(item->output, HeapStringPaths{HeapStringPath{}});
         } else if (const auto* item = std::get_if<IrStringLength>(&instruction)) {
             const ValueType type = program.valueTypes.at(item->string);
             if (type != ValueType::String && type != ValueType::StringView)
@@ -1498,12 +1592,17 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             if (!isLlvmValueType(item->type) && item->type != ValueType::Unit)
                 throw std::runtime_error("backend LLVM: drop non supporté " + typeName(item->type));
             if (item->type == ValueType::String && heapStringValues.contains(item->value)) {
-                const std::string prefix = "%drop" + std::to_string(item->value);
-                const std::string data = extractStringPart(prefix, item->value, 0);
-                const std::string raw = prefix + ".raw";
-                out << "  " << raw << " = getelementptr i8, ptr " << data << ", i64 -16\n"
-                    << "  call void @free(ptr " << raw << ")\n";
+                emitStringFree("%drop" + std::to_string(item->value), value(item->value), item->type);
                 heapStringValues.erase(item->value);
+                heapStringValuePaths.erase(item->value);
+            } else if (item->type.kind == ValueType::Kind::Struct) {
+                const HeapStringPaths paths = pathsForValue(item->value);
+                std::size_t pathIndex = 0;
+                for (const HeapStringPath& path : paths)
+                    emitHeapStringPathDrop("%drop" + std::to_string(item->value) + ".path" +
+                                               std::to_string(pathIndex++),
+                                           value(item->value), item->type, path);
+                heapStringValuePaths.erase(item->value);
             }
         } else if (const auto* item = std::get_if<IrRetain>(&instruction)) {
             if (!isLlvmValueType(item->type) && item->type != ValueType::Unit)

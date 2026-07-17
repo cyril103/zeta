@@ -215,6 +215,11 @@ if(BUILD_TESTING)
         $<TARGET_FILE:zeta>
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/clang_backend_nested_struct_subfield_store.zeta
         ${CMAKE_CURRENT_BINARY_DIR}/clang_backend_nested_struct_subfield_store)
+    add_test(NAME compile_clang_backend_struct_heap_string_drop COMMAND bash
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_struct_heap_string_drop.sh
+        $<TARGET_FILE:zeta>
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/clang_backend_struct_heap_string_drop.zeta
+        ${CMAKE_CURRENT_BINARY_DIR}/clang_backend_struct_heap_string_drop)
     add_test(NAME compile_clang_backend_branch_copy COMMAND bash
         ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_clang_backend_branch_copy.sh
         $<TARGET_FILE:zeta>
