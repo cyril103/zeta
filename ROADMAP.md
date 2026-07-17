@@ -761,15 +761,18 @@ structurée, puis l'IR reconstruit récursivement les agrégats parents avec
 `compile_clang_backend_struct_heap_string_drop` couvre désormais la propriété des
 chaînes heap encapsulées dans des structs LLVM : le backend suit les chemins de
 champs contenant une chaîne issue de concaténation, les propage à travers
-`IrStructConstruct`/`IrStore`/`IrLoad`/`IrFieldLoad`, puis émet le `free` récursif
-sur le champ au `drop` de l'agrégat.
+`IrStructConstruct`/`IrStore`/`IrLoad`/`IrFieldLoad`, puis émet le drop récursif
+sur le champ de l'agrégat. `compile_clang_backend_struct_heap_string_retain`
+verrouille la copie/`retain` de ces mêmes chemins : le backend extrait le champ
+String imbriqué, incrémente son compteur de références, puis le drop LLVM
+respecte désormais le compteur (`-1` statique, décrément, `free` seulement à zéro)
+pour éviter les doubles libérations entre l'original et la copie.
 Les agrégats globaux et les structs contenant `Box`/`Vec`/tableaux restent rejetés
 explicitement.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre contrôlé : `retain`/copie des chaînes heap imbriquées dans des structs
-et remplacement de champs String heap lors de mutations répétées, avant toute
-généralisation. Les copies SSA à travers branches sont désormais matérialisées
+périmètre contrôlé : remplacement de champs `String` heap lors de mutations
+répétées, avant toute généralisation. Les copies SSA à travers branches sont désormais matérialisées
 par stockage/rechargement pour les valeurs copiées sur plusieurs chemins et
 verrouillées par `compile_clang_backend_branch_copy` pour les scalaires et
 `compile_clang_backend_struct_branch_copy` pour les agrégats LLVM de structs.
