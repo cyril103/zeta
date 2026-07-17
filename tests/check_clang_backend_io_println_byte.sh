@@ -11,7 +11,17 @@ test -f "${output}.ir"
 test ! -f "${output}.asm"
 grep -Fq 'declare i32 @printf(ptr, ...)' "${output}.ll"
 grep -Fq '@zeta.fmt.byte' "${output}.ll"
+grep -Fq 'define internal void @zeta_rt_io_write_byte(i8 %value, i1 %newline)' "${output}.ll"
 grep -Fq 'zext i8' "${output}.ll"
+grep -Fq 'call void @zeta_rt_io_write_byte(i8' "${output}.ll"
+if [[ $(grep -Fc 'define internal void @zeta_rt_io_write_byte' "${output}.ll") -ne 1 ]]; then
+    echo "expected one zeta_rt_io_write_byte definition" >&2
+    exit 1
+fi
+if [[ $(grep -Fc 'call void @zeta_rt_io_write_byte' "${output}.ll") -ne 2 ]]; then
+    echo "expected two zeta_rt_io_write_byte calls" >&2
+    exit 1
+fi
 "${output}" > "${output}.stdout"
 printf '7250\n' > "${output}.expected"
 cmp -s "${output}.expected" "${output}.stdout"

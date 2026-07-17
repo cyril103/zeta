@@ -828,10 +828,9 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 item.argumentTypes[0] != ValueType::Byte || item.returnType != ValueType::Unit) {
                 throw std::runtime_error("backend LLVM: signature io.printByte/printlnByte non supportée");
             }
-            const std::string widened = "%v" + std::to_string(item.output) + ".byte_i32";
-            const char* format = item.function == "io__printlnByte" ? "@zeta.fmt.byte.nl" : "@zeta.fmt.byte";
-            out << "  " << widened << " = zext i8 " << value(item.arguments[0]) << " to i32\n"
-                << "  call i32 (ptr, ...) @printf(ptr " << format << ", i32 " << widened << ")\n";
+            const char* newline = item.function == "io__printlnByte" ? "true" : "false";
+            out << "  call void @zeta_rt_io_write_byte(i8 " << value(item.arguments[0])
+                << ", i1 " << newline << ")\n";
             return true;
         }
         if (item.function == "io__printDouble" || item.function == "io__printlnDouble") {
@@ -1226,6 +1225,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 return call->function == "io__printBool" || call->function == "io__printlnBool";
             return false;
         });
+    const bool usesIoByteWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            if (const auto* call = std::get_if<IrCall>(&instruction))
+                return call->function == "io__printByte" || call->function == "io__printlnByte";
+            return false;
+        });
 
     out << "target triple = \"x86_64-pc-linux-gnu\"\n\n";
     if (usesStringConcat) {
@@ -1298,6 +1303,15 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "  call i64 @write(i32 1, ptr @zeta.newline, i64 1)\n"
             << "  br label %done\n"
             << "done:\n"
+            << "  ret void\n"
+            << "}\n";
+    }
+    if (usesIoByteWrite) {
+        out << "\ndefine internal void @zeta_rt_io_write_byte(i8 %value, i1 %newline) {\n"
+            << "entry:\n"
+            << "  %format = select i1 %newline, ptr @zeta.fmt.byte.nl, ptr @zeta.fmt.byte\n"
+            << "  %wide = zext i8 %value to i32\n"
+            << "  call i32 (ptr, ...) @printf(ptr %format, i32 %wide)\n"
             << "  ret void\n"
             << "}\n";
     }
