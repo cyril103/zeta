@@ -906,7 +906,11 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 throw std::runtime_error("backend LLVM: signature strings.decodeAtByte non supportée");
             }
             const std::string output = "%v" + std::to_string(item.output);
-            values[item.output] = emitStringDecodeAtByte(output, item.arguments[0], item.arguments[1]);
+            const std::string data = extractStringPart(output + ".string", item.arguments[0], 0);
+            const std::string length = extractStringPart(output + ".string", item.arguments[0], 1);
+            out << "  " << output << " = call i32 @zeta_rt_strings_decode_at_byte(ptr "
+                << data << ", i64 " << length << ", i32 " << value(item.arguments[1]) << ")\n";
+            values[item.output] = output;
             return true;
         }
         if (item.function == "strings__nextByteOffset") {
@@ -1026,6 +1030,12 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
                 return call->function == "strings__view" || call->function == "strings__viewIsValid";
             return false;
         });
+    const bool usesStringDecodeHelper = std::any_of(program.instructions.begin(), program.instructions.end(),
+        [](const IrInstruction& instruction) {
+            if (const auto* call = std::get_if<IrCall>(&instruction))
+                return call->function == "strings__decodeAtByte";
+            return false;
+        });
     const bool usesIoStringWrite = std::any_of(program.instructions.begin(), program.instructions.end(),
         [](const IrInstruction& instruction) {
             if (const auto* call = std::get_if<IrCall>(&instruction))
@@ -1141,6 +1151,101 @@ std::string LlvmIrCodeGenerator::generate(const VerifiedIrProgram& verified) {
             << "entry:\n"
             << "  %valid = icmp ne ptr %data, null\n"
             << "  ret i1 %valid\n"
+            << "}\n";
+    }
+    if (usesStringDecodeHelper) {
+        out << "\ndefine internal i32 @zeta_rt_strings_decode_at_byte(ptr %data, i64 %len, i32 %offset) {\n"
+            << "entry:\n"
+            << "  %offset64 = sext i32 %offset to i64\n"
+            << "  %offset_non_negative = icmp sge i32 %offset, 0\n"
+            << "  %offset_before_end = icmp slt i64 %offset64, %len\n"
+            << "  %offset_in_range = and i1 %offset_non_negative, %offset_before_end\n"
+            << "  br i1 %offset_in_range, label %range, label %invalid\n"
+            << "range:\n"
+            << "  %byte_ptr = getelementptr i8, ptr %data, i64 %offset64\n"
+            << "  %b0_raw = load i8, ptr %byte_ptr\n"
+            << "  %b0 = zext i8 %b0_raw to i32\n"
+            << "  %ascii = icmp ult i32 %b0, 128\n"
+            << "  br i1 %ascii, label %byte, label %check2\n"
+            << "byte:\n"
+            << "  br label %done\n"
+            << "check2:\n"
+            << "  %two_ge = icmp uge i32 %b0, 194\n"
+            << "  %two_le = icmp ule i32 %b0, 223\n"
+            << "  %two_kind = and i1 %two_ge, %two_le\n"
+            << "  %has1_needed = add i64 %offset64, 1\n"
+            << "  %has1 = icmp slt i64 %has1_needed, %len\n"
+            << "  %b1_ptr = getelementptr i8, ptr %data, i64 %has1_needed\n"
+            << "  %b1_raw = load i8, ptr %b1_ptr\n"
+            << "  %b1 = zext i8 %b1_raw to i32\n"
+            << "  %b1_masked = and i32 %b1, 192\n"
+            << "  %b1_cont = icmp eq i32 %b1_masked, 128\n"
+            << "  %two_ok_a = and i1 %two_kind, %has1\n"
+            << "  %two_ok = and i1 %two_ok_a, %b1_cont\n"
+            << "  br i1 %two_ok, label %two, label %check3\n"
+            << "two:\n"
+            << "  %two_hi = and i32 %b0, 31\n"
+            << "  %two_hi_shifted = shl i32 %two_hi, 6\n"
+            << "  %two_lo = and i32 %b1, 63\n"
+            << "  %two_cp = or i32 %two_hi_shifted, %two_lo\n"
+            << "  br label %done\n"
+            << "check3:\n"
+            << "  %three_ge = icmp uge i32 %b0, 224\n"
+            << "  %three_le = icmp ule i32 %b0, 239\n"
+            << "  %three_kind = and i1 %three_ge, %three_le\n"
+            << "  %has2_needed = add i64 %offset64, 2\n"
+            << "  %has2 = icmp slt i64 %has2_needed, %len\n"
+            << "  %b2_ptr = getelementptr i8, ptr %data, i64 %has2_needed\n"
+            << "  %b2_raw = load i8, ptr %b2_ptr\n"
+            << "  %b2 = zext i8 %b2_raw to i32\n"
+            << "  %b2_masked = and i32 %b2, 192\n"
+            << "  %b2_cont = icmp eq i32 %b2_masked, 128\n"
+            << "  %three_ok_a = and i1 %three_kind, %has2\n"
+            << "  %three_ok_b = and i1 %b1_cont, %b2_cont\n"
+            << "  %three_ok = and i1 %three_ok_a, %three_ok_b\n"
+            << "  br i1 %three_ok, label %three, label %check4\n"
+            << "three:\n"
+            << "  %three_a = and i32 %b0, 15\n"
+            << "  %three_a_shifted = shl i32 %three_a, 12\n"
+            << "  %three_b = and i32 %b1, 63\n"
+            << "  %three_b_shifted = shl i32 %three_b, 6\n"
+            << "  %three_c = and i32 %b2, 63\n"
+            << "  %three_ab = or i32 %three_a_shifted, %three_b_shifted\n"
+            << "  %three_cp = or i32 %three_ab, %three_c\n"
+            << "  br label %done\n"
+            << "check4:\n"
+            << "  %four_ge = icmp uge i32 %b0, 240\n"
+            << "  %four_le = icmp ule i32 %b0, 244\n"
+            << "  %four_kind = and i1 %four_ge, %four_le\n"
+            << "  %has3_needed = add i64 %offset64, 3\n"
+            << "  %has3 = icmp slt i64 %has3_needed, %len\n"
+            << "  %b3_ptr = getelementptr i8, ptr %data, i64 %has3_needed\n"
+            << "  %b3_raw = load i8, ptr %b3_ptr\n"
+            << "  %b3 = zext i8 %b3_raw to i32\n"
+            << "  %b3_masked = and i32 %b3, 192\n"
+            << "  %b3_cont = icmp eq i32 %b3_masked, 128\n"
+            << "  %four_ok_a = and i1 %four_kind, %has3\n"
+            << "  %four_ok_b = and i1 %b1_cont, %b2_cont\n"
+            << "  %four_ok_c = and i1 %four_ok_b, %b3_cont\n"
+            << "  %four_ok = and i1 %four_ok_a, %four_ok_c\n"
+            << "  br i1 %four_ok, label %four, label %invalid\n"
+            << "four:\n"
+            << "  %four_a = and i32 %b0, 7\n"
+            << "  %four_a_shifted = shl i32 %four_a, 18\n"
+            << "  %four_b = and i32 %b1, 63\n"
+            << "  %four_b_shifted = shl i32 %four_b, 12\n"
+            << "  %four_c = and i32 %b2, 63\n"
+            << "  %four_c_shifted = shl i32 %four_c, 6\n"
+            << "  %four_d = and i32 %b3, 63\n"
+            << "  %four_ab = or i32 %four_a_shifted, %four_b_shifted\n"
+            << "  %four_abc = or i32 %four_ab, %four_c_shifted\n"
+            << "  %four_cp = or i32 %four_abc, %four_d\n"
+            << "  br label %done\n"
+            << "invalid:\n"
+            << "  br label %done\n"
+            << "done:\n"
+            << "  %decoded = phi i32 [ %b0, %byte ], [ %two_cp, %two ], [ %three_cp, %three ], [ %four_cp, %four ], [ -1, %invalid ]\n"
+            << "  ret i32 %decoded\n"
             << "}\n";
     }
     if (usesStringSearch) {

@@ -11,6 +11,9 @@ test -f "${output}.ll"
 test -f "${output}.ir"
 test ! -f "${output}.asm"
 
+grep -Fq "define internal i32 @zeta_rt_strings_decode_at_byte(ptr %data, i64 %len, i32 %offset)" "${output}.ll"
+test "$(grep -Fc 'define internal i32 @zeta_rt_strings_decode_at_byte' "${output}.ll")" -eq 1
+test "$(grep -Fc 'call i32 @zeta_rt_strings_decode_at_byte' "${output}.ll")" -eq 4
 grep -Fq "and i32" "${output}.ll"
 grep -Fq "shl i32" "${output}.ll"
 grep -Fq "or i32" "${output}.ll"
