@@ -750,13 +750,18 @@ structs simples, en conservant le type agrégat LLVM littéral dans la signature
 `compile_clang_backend_nested_struct` verrouille maintenant les structs locaux
 imbriqués composés de champs déjà supportés : agrégats LLVM récursifs,
 construction `insertvalue`, copies locales et lectures par `extractvalue`
-restent comparés à FASM.
+restent comparés à FASM. `compile_clang_backend_nested_struct_field_store`
+couvre aussi le remplacement de champs top-level dont le type est lui-même une
+struct imbriquée, en rechargeant l'agrégat parent puis en le réécrivant par
+`insertvalue` avant stockage.
 Les agrégats globaux et les structs contenant `Box`/`Vec`/tableaux restent rejetés
 explicitement.
 
 Prochaine étape : élargir le backend Clang par tests RED/GREEN au prochain
-périmètre contrôlé : gestion plus complète de propriété/retain des chaînes heap
-ou mutation de champs de structs imbriqués avant toute généralisation.
+périmètre contrôlé : gestion plus complète de propriété/retain des chaînes heap,
+correction des copies SSA à travers branches pour les expressions conditionnelles,
+ou mutation directe de sous-champs (`entry.point.x = ...`) avant toute
+généralisation.
 
 La limite ABI reste visible : `Stack[T]` et `Queue[T]` se construisent encore par
 littéral, car leurs agrégats dépassent 16 octets.
