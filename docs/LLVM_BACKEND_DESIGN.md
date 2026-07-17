@@ -307,11 +307,12 @@ helpers `io__printByte`/`io__printlnByte` sont sautés pendant l'émission LLVM 
 
 `compile_clang_backend_io_println_char` ajoute une sortie `Char` ciblée : la
 stdlib expose désormais `printlnChar`, et les appels directs `io.printChar` /
-`io.printlnChar` encodent le codepoint `i32` en UTF-8 dans un buffer stack de
-quatre octets. Le backend sélectionne une longueur 1/2/3/4, écrit les bytes via
-`write(1, ptr, len)`, puis `printlnChar` écrit le newline partagé. Les helpers
-`io__printChar`/`io__printlnChar` sont sautés pendant l'émission LLVM pour éviter
-la conversion générale `String(Char)`.
+`io.printlnChar` passent par la frontière runtime interne
+`@zeta_rt_io_write_char(i32, i1)`. Le helper encode le codepoint `i32` en UTF-8
+dans un buffer stack de quatre octets, sélectionne une longueur 1/2/3/4, écrit les
+bytes via `write(1, ptr, len)` et ajoute le newline partagé selon le booléen
+`println`. Les helpers `io__printChar`/`io__printlnChar` sont sautés pendant
+l'émission LLVM pour éviter la conversion générale `String(Char)`.
 
 `compile_clang_backend_io_println_double` ajoute une sortie `Double` ciblée :
 `Double` est représenté comme `double`, les constantes littérales et les slots
@@ -356,12 +357,13 @@ les drops/retains conditionnels ne libèrent jamais les constantes.
 
 Le chemin LLVM/Clang couvre désormais un sous-ensemble exécutable large : scalaires
 `Int`/`Bool`/`Byte`/`Char`/`Double`, contrôle de flot, appels, modules source avec
-globales scalaires, strings et `StringView`, IO spécialisée avec quatre premières
+globales scalaires, strings et `StringView`, IO spécialisée avec cinq premières
 frontières runtime internes (`@zeta_rt_io_write_string` pour `io.print`/
 `io.println(String)`, `@zeta_rt_io_write_int` pour `io.printInt`/
 `io.printlnInt` et `@zeta_rt_io_write_bool` pour `io.printBool`/
 `io.printlnBool`, et `@zeta_rt_io_write_byte` pour `io.printByte`/
-`io.printlnByte`), structs simples, mixtes et imbriqués, ABI de fonctions sur
+`io.printlnByte`, et `@zeta_rt_io_write_char` pour `io.printChar`/
+`io.printlnChar`), structs simples, mixtes et imbriqués, ABI de fonctions sur
 structs simples, copies à travers branches et ownership de chaînes heap encapsulées
 dans des structs, y compris à travers paramètres, appels et retours de fonctions
 portant ces structs.
@@ -380,12 +382,13 @@ Tests structurants déjà verrouillés côté structs/ownership :
 
 Prochaines tranches nécessaires pour remplacer FASM :
 
-1. étendre l'ABI runtime/stdlib LLVM `zeta_rt_*` au-delà des quatre premières briques
+1. étendre l'ABI runtime/stdlib LLVM `zeta_rt_*` au-delà des cinq premières briques
    `@zeta_rt_io_write_string(ptr, i64, i1)`, `@zeta_rt_io_write_int(i32, i1)`,
-   `@zeta_rt_io_write_bool(i1, i1)` et `@zeta_rt_io_write_byte(i8, i1)` déjà
+   `@zeta_rt_io_write_bool(i1, i1)`, `@zeta_rt_io_write_byte(i8, i1)` et
+   `@zeta_rt_io_write_char(i32, i1)` déjà
    utilisées par `io.print`/`io.println(String)`, `io.printInt`/`io.printlnInt`,
-   `io.printBool`/`io.printlnBool` et `io.printByte`/`io.printlnByte` ; cibler
-   ensuite les helpers `io.*` primitifs restants, les
+   `io.printBool`/`io.printlnBool`, `io.printByte`/`io.printlnByte` et
+   `io.printChar`/`io.printlnChar` ; cibler ensuite les helpers `io.*` primitifs restants, les
    primitives `strings.*` ou les conversions générales vers `String` encore
    abaissées de façon spécialisée ;
 2. produire et relier modules séparés, stdlib précompilée et runtime via `clang` ;
@@ -480,7 +483,9 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   l'extension non signée, le choix du format `printf` avec ou sans newline et
   l'appel varargs, avec comparaison stdout FASM.
 - fait : `--backend=clang` couvre `io.printChar`/`io.printlnChar` directs via
-  encodage UTF-8 1-4 octets et `write`, avec comparaison stdout FASM.
+  la frontière runtime interne `@zeta_rt_io_write_char(i32, i1)`, qui centralise
+  l'encodage UTF-8 1-4 octets, l'appel `write` et le newline conditionnel, avec
+  comparaison stdout FASM.
 - fait : `--backend=clang` couvre `io.printDouble`/`io.printlnDouble` directs via
   `Double` en `double`, constantes/slots locaux, `fneg` unaire et `printf("%g")`
   sur formats stables comparés à FASM.
