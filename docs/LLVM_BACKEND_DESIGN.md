@@ -242,9 +242,17 @@ ou `store` top-level dans l'IR objet. Le consommateur déclare `external global`
 charge la struct depuis l'objet `.o` du cache, puis les accès champs restent des
 `extractvalue` locaux.
 
+`compile_clang_backend_global_array` lève le premier diagnostic d'agrégat global
+hors struct pour les tableaux `[Int; N]` : le slot est émis comme
+`@slotN = global [N x i32] zeroinitializer`, l'initialisation du wrapper `@main`
+stocke l'agrégat complet construit par `insertvalue`, puis la lecture globale
+charge `[N x i32]` avant un `getelementptr inbounds [N x i32]` et un `load i32`.
+Cette tranche reste volontairement limitée aux tableaux de types LLVM supportés ;
+les slices, Box, Vec et enums restent hors périmètre global LLVM.
+
 Les diagnostics d'agrégats globaux restent couverts séparément par les tests
 `reject_clang_backend_unsupported_aggregates` et
-`reject_clang_backend_unsupported_global_aggregates` pour les tableaux, slices,
+`reject_clang_backend_unsupported_global_aggregates` pour les slices,
 Box, Vec et enums encore hors périmètre global LLVM.
 
 `compile_clang_backend_string_literal` ajoute la première représentation LLVM
@@ -715,6 +723,10 @@ Ces diagnostics sont préférables à une génération partielle de `.ll` invali
   déjà supportés en les émettant comme `global { ... } zeroinitializer`, puis en
   les initialisant dans `@main`; les lectures globales réutilisent `load { ... }`
   et les champs restent extraits par `extractvalue`.
+- fait : `--backend=clang` couvre les premières globales `[Int; N]` en les émettant
+  comme `global [N x i32] zeroinitializer`, puis en les initialisant dans `@main` ;
+  les lectures globales chargent l'agrégat `[N x i32]` et les indexations passent
+  par un `getelementptr inbounds [N x i32]` suivi d'un `load i32`.
 - fait : `--backend=clang` couvre les opérations arithmétiques `Double`
   `+`/`-`/`*`/`/` via `fadd`/`fsub`/`fmul`/`fdiv`, et les comparaisons ordonnées
   via `fcmp o*`, avec exécution Clang et FASM.
